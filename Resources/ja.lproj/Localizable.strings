@@ -85,3 +85,31 @@
 "error.cleanPartial" = "%d 項目を削除できませんでした（Xcode が使用中の可能性）：%@";
 "error.feedInvalid" = "アップデートフィード URL が無効です";
 "error.feedBad" = "アップデートフィードの応答が異常です";
+
+/* 設定タブ */
+"settings.tab.general" = "一般";
+"settings.tab.rightClick" = "右クリックツール";
+
+/* 右クリックツール */
+"rc.title" = "右クリックツール";
+"rc.subtitle" = "Finder のコンテキストメニューに表示する項目を選択します。";
+"rc.section.permission" = "権限";
+"rc.permission.title" = "Finder 機能拡張";
+"rc.permission.enabled" = "有効";
+"rc.permission.disabled" = "未有効";
+"rc.permission.desc" = "システム設定で MenuTools 右クリックツールを有効にしてください。場所：ログイン項目と機能拡張 > Finder 機能拡張。";
+"rc.permission.openSettings" = "設定を開く";
+"rc.group.directory" = "ディレクトリ操作";
+"rc.group.copy" = "コピー項目";
+"rc.item.newFolder" = "新規フォルダ";
+"rc.item.newFile" = "新規ファイル";
+"rc.item.newFile.desc" = ".txt / .md / .json に対応";
+"rc.item.openInTerminal" = "ターミナルで開く";
+"rc.item.copyFilename" = "ファイル名をコピー";
+"rc.item.copyAbsolutePath" = "絶対パスをコピー";
+"rc.item.copyRelativePath" = "相対パスをコピー";
+"rc.item.copyEscapedPath" = "エスケープパスをコピー";
+"rc.item.copyEscapedPath.desc" = "ターミナルコマンド向け";
+"rc.item.copyFileURL" = "file:// リンクをコピー";
+"rc.default.newFolder" = "名称未設定フォルダ";
+"rc.default.newFile" = "名称未設定.txt";

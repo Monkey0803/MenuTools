@@ -31,14 +31,35 @@ for lproj in Resources/*.lproj; do
     [[ -d "$lproj" ]] && cp -R "$lproj" "$APP_BUNDLE/Contents/Resources/"
 done
 
+# ===== 编译并嵌入 Finder 右键扩展（.appex）=====
+EXT_NAME="RightClickTools"
+APPEX="$APP_BUNDLE/Contents/PlugIns/$EXT_NAME.appex"
+SDK=$(xcrun --show-sdk-path)
+echo "==> 编译 Finder 扩展"
+mkdir -p "$APPEX/Contents/MacOS" "$APPEX/Contents/Resources"
+# 扩展源 + 与主 App 共享的配置模型一起编译；入口 NSExtensionMain
+swiftc Extension/*.swift Sources/MenuTools/RightClickConfig.swift \
+    -sdk "$SDK" -target arm64-apple-macos26.0 \
+    -framework FinderSync -framework AppKit \
+    -Xlinker -e -Xlinker _NSExtensionMain \
+    -o "$APPEX/Contents/MacOS/$EXT_NAME"
+cp "Extension/Info.plist" "$APPEX/Contents/Info.plist"
+# 扩展也带上多语言资源（右键菜单标题随系统语言）
+for lproj in Resources/*.lproj; do
+    [[ -d "$lproj" ]] && cp -R "$lproj" "$APPEX/Contents/Resources/"
+done
+
 echo "==> 签名"
 # 优先用稳定的自签名证书（使 TCC 权限授予可跨重编译保留）；未安装时回退 ad-hoc
 SIGN_IDENTITY="MenuTools Self-Signed"
 if security find-identity -p codesigning 2>/dev/null | grep -q "$SIGN_IDENTITY"; then
-    codesign --force --deep --sign "$SIGN_IDENTITY" "$APP_BUNDLE"
+    SIGN_ARG=(--sign "$SIGN_IDENTITY")
 else
     echo "   （未找到 '$SIGN_IDENTITY' 证书，回退 ad-hoc 签名）"
-    codesign --force --deep --sign - "$APP_BUNDLE"
+    SIGN_ARG=(--sign -)
 fi
+# 必须先签内嵌扩展，再签外层 App（否则封装校验失败）
+codesign --force "${SIGN_ARG[@]}" "$APPEX"
+codesign --force "${SIGN_ARG[@]}" "$APP_BUNDLE"
 
 echo "==> 完成：$APP_BUNDLE"

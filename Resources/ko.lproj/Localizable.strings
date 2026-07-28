@@ -85,3 +85,31 @@
 "error.cleanPartial" = "%d개 항목을 삭제하지 못했습니다(Xcode 사용 중일 수 있음): %@";
 "error.feedInvalid" = "업데이트 피드 URL이 잘못되었습니다";
 "error.feedBad" = "업데이트 피드 응답 오류";
+
+/* 설정 탭 */
+"settings.tab.general" = "일반";
+"settings.tab.rightClick" = "우클릭 도구";
+
+/* 우클릭 도구 */
+"rc.title" = "우클릭 도구";
+"rc.subtitle" = "Finder 컨텍스트 메뉴에 표시할 항목을 선택합니다.";
+"rc.section.permission" = "권한";
+"rc.permission.title" = "Finder 확장 프로그램";
+"rc.permission.enabled" = "활성화됨";
+"rc.permission.disabled" = "비활성화됨";
+"rc.permission.desc" = "시스템 설정에서 MenuTools 우클릭 도구를 활성화하세요. 위치: 로그인 항목 및 확장 프로그램 > Finder 확장 프로그램.";
+"rc.permission.openSettings" = "설정 열기";
+"rc.group.directory" = "디렉터리 작업";
+"rc.group.copy" = "복사 항목";
+"rc.item.newFolder" = "새 폴더";
+"rc.item.newFile" = "새 파일";
+"rc.item.newFile.desc" = ".txt / .md / .json 지원";
+"rc.item.openInTerminal" = "터미널에서 열기";
+"rc.item.copyFilename" = "파일 이름 복사";
+"rc.item.copyAbsolutePath" = "절대 경로 복사";
+"rc.item.copyRelativePath" = "상대 경로 복사";
+"rc.item.copyEscapedPath" = "이스케이프 경로 복사";
+"rc.item.copyEscapedPath.desc" = "터미널 명령에 적합";
+"rc.item.copyFileURL" = "file:// 링크 복사";
+"rc.default.newFolder" = "무제 폴더";
+"rc.default.newFile" = "무제.txt";

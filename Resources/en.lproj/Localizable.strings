@@ -85,3 +85,31 @@
 "error.cleanPartial" = "%d item(s) could not be deleted (possibly in use by Xcode): %@";
 "error.feedInvalid" = "Invalid update feed URL";
 "error.feedBad" = "Update feed returned an error";
+
+/* Settings tabs */
+"settings.tab.general" = "General";
+"settings.tab.rightClick" = "Right-Click Tools";
+
+/* Right-Click Tools */
+"rc.title" = "Right-Click Tools";
+"rc.subtitle" = "Choose which items appear in the Finder context menu.";
+"rc.section.permission" = "Permission";
+"rc.permission.title" = "Finder Extension";
+"rc.permission.enabled" = "Enabled";
+"rc.permission.disabled" = "Not Enabled";
+"rc.permission.desc" = "Enable MenuTools Right-Click Tools in System Settings > Login Items & Extensions > Finder Extensions.";
+"rc.permission.openSettings" = "Open Settings";
+"rc.group.directory" = "Directory Actions";
+"rc.group.copy" = "Copy Items";
+"rc.item.newFolder" = "New Folder";
+"rc.item.newFile" = "New File";
+"rc.item.newFile.desc" = "Supports .txt / .md / .json";
+"rc.item.openInTerminal" = "Open in Terminal";
+"rc.item.copyFilename" = "Copy Filename";
+"rc.item.copyAbsolutePath" = "Copy Absolute Path";
+"rc.item.copyRelativePath" = "Copy Relative Path";
+"rc.item.copyEscapedPath" = "Copy Escaped Path";
+"rc.item.copyEscapedPath.desc" = "For terminal commands";
+"rc.item.copyFileURL" = "Copy file:// Link";
+"rc.default.newFolder" = "untitled folder";
+"rc.default.newFile" = "untitled.txt";

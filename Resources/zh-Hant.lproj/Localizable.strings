@@ -85,3 +85,31 @@
 "error.cleanPartial" = "有 %d 項無法刪除（可能正被 Xcode 使用）：%@";
 "error.feedInvalid" = "更新來源網址無效";
 "error.feedBad" = "更新來源回應異常";
+
+/* 設定標籤 */
+"settings.tab.general" = "一般";
+"settings.tab.rightClick" = "右鍵工具";
+
+/* 右鍵工具 */
+"rc.title" = "右鍵工具";
+"rc.subtitle" = "選擇 Finder 右鍵選單顯示哪些項。";
+"rc.section.permission" = "權限";
+"rc.permission.title" = "Finder 擴充功能";
+"rc.permission.enabled" = "已啟用";
+"rc.permission.disabled" = "未啟用";
+"rc.permission.desc" = "在系統設定中打開 MenuTools 右鍵工具。入口：登入項目與擴充功能 > Finder 擴充功能。";
+"rc.permission.openSettings" = "打開設定";
+"rc.group.directory" = "目錄操作";
+"rc.group.copy" = "複製選單項";
+"rc.item.newFolder" = "新增檔案夾";
+"rc.item.newFile" = "新增檔案";
+"rc.item.newFile.desc" = "支援 .txt / .md / .json";
+"rc.item.openInTerminal" = "在終端機打開";
+"rc.item.copyFilename" = "複製檔案名稱";
+"rc.item.copyAbsolutePath" = "複製絕對路徑";
+"rc.item.copyRelativePath" = "複製相對路徑";
+"rc.item.copyEscapedPath" = "複製轉義路徑";
+"rc.item.copyEscapedPath.desc" = "適合終端機指令";
+"rc.item.copyFileURL" = "複製 file:// 連結";
+"rc.default.newFolder" = "未命名檔案夾";
+"rc.default.newFile" = "未命名.txt";

@@ -1,7 +1,19 @@
 import SwiftUI
 
-/// 独立设置窗口（⌘, / 面板齿轮按钮打开）
+/// 设置窗口（⌘, / 面板齿轮按钮打开）：分标签容纳通用与右键工具
 struct SettingsView: View {
+    var body: some View {
+        TabView {
+            GeneralSettingsView()
+                .tabItem { Label(L("settings.tab.general"), systemImage: "gearshape") }
+            RightClickToolsView()
+                .tabItem { Label(L("settings.tab.rightClick"), systemImage: "contextualmenu.and.cursorarrow") }
+        }
+    }
+}
+
+/// 通用设置页
+struct GeneralSettingsView: View {
     @AppStorage(SettingsKey.menuBarIcon) private var menuBarIcon = MenuBarIcon.default.rawValue
     @AppStorage(SettingsKey.preferredTerminal) private var preferredTerminal = TerminalApp.systemDefault.rawValue
     @AppStorage(SettingsKey.autoCheckUpdate) private var autoCheckUpdate = true
@@ -96,6 +108,7 @@ struct SettingsView: View {
             .contentShape(.rect(cornerRadius: 8))
         }
         .buttonStyle(.plain)
+        .focusable(false)
         .foregroundStyle(isSelected ? AnyShapeStyle(.tint) : AnyShapeStyle(.secondary))
         .background(
             RoundedRectangle(cornerRadius: 8)
