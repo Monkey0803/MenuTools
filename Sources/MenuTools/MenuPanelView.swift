@@ -32,6 +32,8 @@ private extension View {
 struct MenuPanelView: View {
     @AppStorage(SettingsKey.menuBarIcon) private var menuBarIcon = MenuBarIcon.default.rawValue
     @AppStorage(SettingsKey.preferredTerminal) private var preferredTerminal = TerminalApp.systemDefault.rawValue
+    @AppStorage(SettingsKey.autoCheckUpdate) private var autoCheckUpdate = true
+    @Environment(\.openSettings) private var openSettings
 
     @ObservedObject private var caffeinate = CaffeinateService.shared
     @ObservedObject private var bleMonitor = BLEBatteryMonitor.shared
@@ -43,7 +45,6 @@ struct MenuPanelView: View {
     @State private var clipboardCount = 0
     @State private var isCheckingUpdate = false
     @State private var availableUpdate: UpdateInfo?
-    @State private var showSettings = false
     @State private var statusMessage: String?
     @State private var statusIsError = false
     @State private var appeared = false
@@ -69,10 +70,6 @@ struct MenuPanelView: View {
                         .entrance(3, appeared: appeared)
                     cleanupTiles
                         .entrance(4, appeared: appeared)
-
-                    if showSettings {
-                        settingsSection
-                    }
                 }
             }
 
@@ -137,19 +134,18 @@ struct MenuPanelView: View {
             }
             Spacer()
             Button {
-                withAnimation(.spring(response: 0.4, dampingFraction: 0.75)) {
-                    showSettings.toggle()
-                }
+                NSApp.activate(ignoringOtherApps: true)
+                openSettings()
             } label: {
                 Image(systemName: "gearshape.fill")
                     .font(.callout)
-                    .rotationEffect(.degrees(showSettings ? 90 : 0))
                     .frame(width: 28, height: 28)
                     .contentShape(.circle)
             }
             .buttonStyle(.plain)
-            .foregroundStyle(showSettings ? AnyShapeStyle(.tint) : AnyShapeStyle(.secondary))
+            .foregroundStyle(.secondary)
             .glassEffect(.regular.interactive(), in: .circle)
+            .help("打开设置")
         }
     }
 
@@ -488,66 +484,6 @@ struct MenuPanelView: View {
         clipboardCount == 0 ? "已是空的" : "\(clipboardCount) 项内容"
     }
 
-    // MARK: - 设置区：更换菜单栏图标 / 选择终端
-
-    private var settingsSection: some View {
-        VStack(alignment: .leading, spacing: 12) {
-            Text("菜单栏图标")
-                .font(.caption.weight(.semibold))
-                .foregroundStyle(.secondary)
-
-            LazyVGrid(columns: Array(repeating: GridItem(.flexible(), spacing: 8), count: 4), spacing: 8) {
-                ForEach(MenuBarIcon.allCases) { icon in
-                    iconOption(icon)
-                }
-            }
-
-            Divider()
-
-            Text("终端 App")
-                .font(.caption.weight(.semibold))
-                .foregroundStyle(.secondary)
-
-            Picker("终端 App", selection: $preferredTerminal) {
-                ForEach(TerminalApp.installed) { app in
-                    Text(app.displayName).tag(app.rawValue)
-                }
-            }
-            .labelsHidden()
-            .pickerStyle(.menu)
-        }
-        .padding(14)
-        .glassEffect(.regular, in: .rect(cornerRadius: 16))
-        .glassEffectID("settings", in: glassNamespace)
-        .transition(.opacity.combined(with: .move(edge: .top)))
-    }
-
-    private func iconOption(_ icon: MenuBarIcon) -> some View {
-        let isSelected = menuBarIcon == icon.rawValue
-        return Button {
-            withAnimation(.spring(response: 0.3, dampingFraction: 0.7)) {
-                menuBarIcon = icon.rawValue
-            }
-        } label: {
-            Image(systemName: icon.rawValue)
-                .font(.body)
-                .symbolEffect(.bounce, value: isSelected)
-                .frame(width: 40, height: 32)
-                .contentShape(.rect(cornerRadius: 8))
-        }
-        .buttonStyle(.plain)
-        .foregroundStyle(isSelected ? AnyShapeStyle(.tint) : AnyShapeStyle(.secondary))
-        .background(
-            RoundedRectangle(cornerRadius: 8)
-                .fill(isSelected ? AnyShapeStyle(.tint.opacity(0.15)) : AnyShapeStyle(.clear))
-        )
-        .overlay(
-            RoundedRectangle(cornerRadius: 8)
-                .strokeBorder(isSelected ? AnyShapeStyle(.tint) : AnyShapeStyle(.clear), lineWidth: 1)
-        )
-        .help(icon.displayName)
-    }
-
     // MARK: - 状态提示 / 底部
 
     private func statusBanner(_ message: String) -> some View {
@@ -707,9 +643,9 @@ struct MenuPanelView: View {
         }
     }
 
-    /// 打开面板时的静默自动检查：24 小时节流，只在发现新版本时提示
+    /// 打开面板时的静默自动检查：可在设置中关闭；24 小时节流，只在发现新版本时提示
     private func autoCheckUpdateIfNeeded() {
-        guard availableUpdate == nil, UpdateCheckerService.shouldAutoCheck() else { return }
+        guard autoCheckUpdate, availableUpdate == nil, UpdateCheckerService.shouldAutoCheck() else { return }
         Task {
             guard let update = try? await UpdateCheckerService.check() else { return }
             withAnimation(.smooth(duration: 0.3)) {

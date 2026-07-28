@@ -4,6 +4,7 @@ import SwiftUI
 enum SettingsKey {
     static let menuBarIcon = "menuBarIcon"
     static let preferredTerminal = "preferredTerminal"
+    static let autoCheckUpdate = "autoCheckUpdateEnabled"
 }
 
 /// 可选的菜单栏图标（SF Symbols）
@@ -46,5 +47,9 @@ struct MenuToolsApp: App {
             Image(systemName: menuBarIcon)
         }
         .menuBarExtraStyle(.window)
+
+        Settings {
+            SettingsView()
+        }
     }
 }
