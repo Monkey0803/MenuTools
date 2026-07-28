@@ -33,6 +33,7 @@ struct MenuPanelView: View {
     @AppStorage(SettingsKey.menuBarIcon) private var menuBarIcon = MenuBarIcon.default.rawValue
     @AppStorage(SettingsKey.preferredTerminal) private var preferredTerminal = TerminalApp.systemDefault.rawValue
     @AppStorage(SettingsKey.autoCheckUpdate) private var autoCheckUpdate = true
+    @AppStorage(SettingsKey.appLanguage) private var appLanguage = AppLanguage.system.rawValue
     @Environment(\.openSettings) private var openSettings
 
     @ObservedObject private var caffeinate = CaffeinateService.shared
@@ -82,6 +83,7 @@ struct MenuPanelView: View {
         }
         .padding(16)
         .frame(width: 320)
+        .id(appLanguage)   // 切换语言时重建面板，文案即时生效
         .onAppear {
             appeared = true
         }

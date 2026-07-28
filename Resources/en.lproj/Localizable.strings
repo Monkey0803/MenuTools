@@ -56,6 +56,9 @@
 "settings.latest" = "Up to date";
 "settings.found" = "New version v%@ found";
 "settings.checkFailed" = "Check failed: %@";
+"settings.section.language" = "Language";
+"settings.language.label" = "App Language";
+"settings.language.system" = "Follow System";
 
 /* Menu bar icon names */
 "icon.wrench" = "Wrench";

@@ -56,6 +56,9 @@
 "settings.latest" = "最新バージョンです";
 "settings.found" = "新バージョン v%@ が見つかりました";
 "settings.checkFailed" = "確認に失敗：%@";
+"settings.section.language" = "言語";
+"settings.language.label" = "アプリの言語";
+"settings.language.system" = "システムに従う";
 
 /* メニューバーアイコン名 */
 "icon.wrench" = "ツール";

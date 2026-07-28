@@ -56,6 +56,9 @@
 "settings.latest" = "已是最新版本";
 "settings.found" = "發現新版本 v%@";
 "settings.checkFailed" = "檢查失敗：%@";
+"settings.section.language" = "語言";
+"settings.language.label" = "介面語言";
+"settings.language.system" = "跟隨系統";
 
 /* 選單列圖示名 */
 "icon.wrench" = "工具";

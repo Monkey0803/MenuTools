@@ -5,6 +5,7 @@ enum SettingsKey {
     static let menuBarIcon = "menuBarIcon"
     static let preferredTerminal = "preferredTerminal"
     static let autoCheckUpdate = "autoCheckUpdateEnabled"
+    static let appLanguage = "appLanguage"
 }
 
 /// 可选的菜单栏图标（SF Symbols）

@@ -5,6 +5,7 @@ struct SettingsView: View {
     @AppStorage(SettingsKey.menuBarIcon) private var menuBarIcon = MenuBarIcon.default.rawValue
     @AppStorage(SettingsKey.preferredTerminal) private var preferredTerminal = TerminalApp.systemDefault.rawValue
     @AppStorage(SettingsKey.autoCheckUpdate) private var autoCheckUpdate = true
+    @AppStorage(SettingsKey.appLanguage) private var appLanguage = AppLanguage.system.rawValue
 
     @State private var isCheckingUpdate = false
     @State private var checkResult: String?
@@ -19,6 +20,14 @@ struct SettingsView: View {
                     }
                 }
                 .padding(.vertical, 4)
+            }
+
+            Section(L("settings.section.language")) {
+                Picker(L("settings.language.label"), selection: $appLanguage) {
+                    ForEach(AppLanguage.allCases) { language in
+                        Text(language.displayName).tag(language.rawValue)
+                    }
+                }
             }
 
             Section(L("settings.section.terminal")) {

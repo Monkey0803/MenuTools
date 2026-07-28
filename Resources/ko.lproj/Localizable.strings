@@ -56,6 +56,9 @@
 "settings.latest" = "최신 버전입니다";
 "settings.found" = "새 버전 v%@ 발견";
 "settings.checkFailed" = "확인 실패: %@";
+"settings.section.language" = "언어";
+"settings.language.label" = "앱 언어";
+"settings.language.system" = "시스템 따르기";
 
 /* 메뉴 막대 아이콘 이름 */
 "icon.wrench" = "도구";
