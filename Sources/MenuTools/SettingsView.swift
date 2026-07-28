@@ -33,9 +33,24 @@ struct GeneralSettingsView: View {
     @State private var isCheckingUpdate = false
     @State private var checkResult: String?
     @State private var availableUpdate: UpdateInfo?
+    @State private var launchAtLogin = LoginItemService.isEnabled
 
     var body: some View {
         Form {
+            Section(L("settings.section.general")) {
+                Toggle(isOn: $launchAtLogin) {
+                    Text(L("settings.launchAtLogin"))
+                    Text(L("settings.launchAtLogin.desc"))
+                }
+                .onChange(of: launchAtLogin) { _, newValue in
+                    do {
+                        try LoginItemService.setEnabled(newValue)
+                    } catch {
+                        launchAtLogin = LoginItemService.isEnabled
+                    }
+                }
+            }
+
             Section(L("settings.section.icon")) {
                 LazyVGrid(columns: Array(repeating: GridItem(.flexible(), spacing: 8), count: 4), spacing: 8) {
                     ForEach(MenuBarIcon.allCases) { icon in

@@ -150,3 +150,8 @@
 "scroll.axis.horizontal" = "수평";
 "scroll.smooth" = "부드럽게";
 "scroll.invert" = "반전";
+
+/* 로그인 시 실행 */
+"settings.section.general" = "일반";
+"settings.launchAtLogin" = "로그인 시 실행";
+"settings.launchAtLogin.desc" = "로그인 후 MenuTools를 자동으로 실행합니다.";

@@ -150,3 +150,8 @@
 "scroll.axis.horizontal" = "水平";
 "scroll.smooth" = "スムーズ";
 "scroll.invert" = "反転";
+
+/* ログイン時に起動 */
+"settings.section.general" = "一般";
+"settings.launchAtLogin" = "ログイン時に起動";
+"settings.launchAtLogin.desc" = "ログイン後に MenuTools を自動的に実行します。";

@@ -150,3 +150,8 @@
 "scroll.axis.horizontal" = "Horizontal";
 "scroll.smooth" = "Smooth";
 "scroll.invert" = "Invert";
+
+/* Launch at login */
+"settings.section.general" = "General";
+"settings.launchAtLogin" = "Launch at Login";
+"settings.launchAtLogin.desc" = "Automatically run MenuTools after you log in.";

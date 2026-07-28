@@ -150,3 +150,8 @@
 "scroll.axis.horizontal" = "水平";
 "scroll.smooth" = "平滑";
 "scroll.invert" = "反向";
+
+/* 開機啟動 */
+"settings.section.general" = "一般";
+"settings.launchAtLogin" = "開機時啟動";
+"settings.launchAtLogin.desc" = "登入後自動執行 MenuTools。";
