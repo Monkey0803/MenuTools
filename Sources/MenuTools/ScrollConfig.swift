@@ -11,6 +11,9 @@ struct ScrollConfig {
     var duration: Double   // 持续时间（秒）0.1 ~ 0.8
     var minStep: Double    // 最短步长（像素）
     var touchpadEmulation: Bool
+    var accelModifier: UInt   // 加速键（NSEvent.ModifierFlags rawValue，0=未设）
+    var shiftModifier: UInt   // 转换键（垂直→水平）
+    var disableModifier: UInt // 禁用键
 
     static func load() -> ScrollConfig {
         let d = UserDefaults.standard
@@ -19,6 +22,9 @@ struct ScrollConfig {
         }
         func bool(_ key: String, _ fallback: Bool) -> Bool {
             d.object(forKey: key) == nil ? fallback : d.bool(forKey: key)
+        }
+        func uint(_ key: String) -> UInt {
+            UInt(bitPattern: d.integer(forKey: key))
         }
         return ScrollConfig(
             enabled: bool(SettingsKey.scrollEnabled, false),
@@ -29,7 +35,10 @@ struct ScrollConfig {
             gain: dbl(SettingsKey.scrollGain, 1.0),
             duration: dbl(SettingsKey.scrollDuration, 0.35),
             minStep: dbl(SettingsKey.scrollMinStep, 8),
-            touchpadEmulation: bool(SettingsKey.scrollTouchpad, true)
+            touchpadEmulation: bool(SettingsKey.scrollTouchpad, true),
+            accelModifier: uint(SettingsKey.scrollAccelKey),
+            shiftModifier: uint(SettingsKey.scrollShiftKey),
+            disableModifier: uint(SettingsKey.scrollDisableKey)
         )
     }
 }

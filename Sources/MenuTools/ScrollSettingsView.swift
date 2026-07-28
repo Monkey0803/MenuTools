@@ -13,6 +13,9 @@ struct ScrollSettingsView: View {
     @AppStorage(SettingsKey.scrollDuration) private var duration = 0.35
     @AppStorage(SettingsKey.scrollMinStep) private var minStep = 8.0
     @AppStorage(SettingsKey.scrollTouchpad) private var touchpad = true
+    @AppStorage(SettingsKey.scrollAccelKey) private var accelKey = 0
+    @AppStorage(SettingsKey.scrollShiftKey) private var shiftKey = 0
+    @AppStorage(SettingsKey.scrollDisableKey) private var disableKey = 0
 
     @State private var accessibilityOK = SmoothScrollEngine.shared.accessibilityGranted
     private let refreshTimer = Timer.publish(every: 2, on: .main, in: .common).autoconnect()
@@ -26,7 +29,9 @@ struct ScrollSettingsView: View {
                     permissionHint
                 }
                 smoothSection
+                modifierSection
                 axisSection
+                resetButton
             }
             .padding(20)
         }
@@ -142,11 +147,67 @@ struct ScrollSettingsView: View {
                 .frame(width: 88, alignment: .leading)
             Slider(value: value, in: range)
                 .onChange(of: value.wrappedValue) { _, _ in engine.reload() }
-            Text(String(format: unit == "×" || unit == "s" ? "%.2f%@" : "%.0f%@", value.wrappedValue, unit))
-                .font(.caption.monospacedDigit())
+            // 数值步进框（可直接微调）
+            TextField("", value: value, format: .number.precision(.fractionLength(2)))
+                .textFieldStyle(.roundedBorder)
+                .frame(width: 56)
+                .multilineTextAlignment(.trailing)
+                .onChange(of: value.wrappedValue) { _, _ in engine.reload() }
+            Stepper("", value: value, in: range, step: range.upperBound > 10 ? 1 : 0.05)
+                .labelsHidden()
+                .onChange(of: value.wrappedValue) { _, _ in engine.reload() }
+            Text(unit)
+                .font(.caption)
                 .foregroundStyle(.secondary)
-                .frame(width: 56, alignment: .trailing)
+                .frame(width: 18, alignment: .leading)
         }
+    }
+
+    // MARK: - 修饰键（加速/转换/禁用）
+
+    private var modifierSection: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            sectionLabel(icon: "keyboard", title: L("scroll.section.modifier"))
+            VStack(spacing: 0) {
+                modifierRow(title: L("scroll.accel"), desc: L("scroll.accel.desc"), value: $accelKey)
+                Divider()
+                modifierRow(title: L("scroll.shiftAxis"), desc: L("scroll.shiftAxis.desc"), value: $shiftKey)
+                Divider()
+                modifierRow(title: L("scroll.disableKey"), desc: L("scroll.disableKey.desc"), value: $disableKey)
+            }
+            .frame(maxWidth: .infinity)
+            .padding(14)
+            .glassEffect(.regular, in: .rect(cornerRadius: 14))
+        }
+        .disabled(!enabled)
+        .opacity(enabled ? 1 : 0.5)
+    }
+
+    private func modifierRow(title: String, desc: String, value: Binding<Int>) -> some View {
+        HStack(spacing: 12) {
+            VStack(alignment: .leading, spacing: 2) {
+                Text(title).font(.body)
+                Text(desc).font(.caption2).foregroundStyle(.secondary)
+            }
+            Spacer(minLength: 0)
+            ModifierRecorder(rawValue: value) { engine.reload() }
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .padding(.vertical, 8)
+    }
+
+    // MARK: - 恢复预设
+
+    private var resetButton: some View {
+        Button(L("scroll.reset")) {
+            gain = 1.0; duration = 0.35; minStep = 8
+            touchpad = true; invertV = false; invertH = false
+            smoothV = true; smoothH = true
+            accelKey = 0; shiftKey = 0; disableKey = 0
+            engine.reload()
+        }
+        .frame(maxWidth: .infinity)
+        .disabled(!enabled)
     }
 
     // MARK: - 轴向独立
@@ -192,5 +253,89 @@ struct ScrollSettingsView: View {
                 .font(.subheadline.weight(.medium))
         }
         .foregroundStyle(.secondary)
+    }
+}
+
+/// 修饰键录制器：点击后按住任意修饰键组合即记录（存 Cocoa ModifierFlags rawValue）
+private struct ModifierRecorder: View {
+    @Binding var rawValue: Int
+    var onChange: () -> Void
+    @State private var recording = false
+
+    var body: some View {
+        HStack(spacing: 6) {
+            Button {
+                recording.toggle()
+            } label: {
+                Text(recording ? L("sc.recording") : (display.isEmpty ? L("sc.unset") : display))
+                    .font(.callout)
+                    .frame(minWidth: 96)
+                    .padding(.horizontal, 10)
+                    .padding(.vertical, 5)
+                    .contentShape(.rect(cornerRadius: 8))
+            }
+            .buttonStyle(.plain)
+            .foregroundStyle(recording ? AnyShapeStyle(.tint) : AnyShapeStyle(.primary))
+            .glassEffect(recording ? .regular.tint(.accentColor.opacity(0.3)) : .regular, in: .rect(cornerRadius: 8))
+            .background(ModifierMonitor(recording: recording) { flags in
+                rawValue = Int(bitPattern: UInt(flags))
+                recording = false
+                onChange()
+            })
+            if rawValue != 0 && !recording {
+                Button {
+                    rawValue = 0
+                    onChange()
+                } label: {
+                    Image(systemName: "xmark.circle.fill").foregroundStyle(.tertiary)
+                }
+                .buttonStyle(.plain)
+            }
+        }
+    }
+
+    private var display: String {
+        let flags = NSEvent.ModifierFlags(rawValue: UInt(rawValue))
+        var s = ""
+        if flags.contains(.control) { s += "⌃" }
+        if flags.contains(.option) { s += "⌥" }
+        if flags.contains(.shift) { s += "⇧" }
+        if flags.contains(.command) { s += "⌘" }
+        return s
+    }
+}
+
+/// 监听 flagsChanged 捕获修饰键
+private struct ModifierMonitor: NSViewRepresentable {
+    let recording: Bool
+    let onCapture: (UInt) -> Void
+
+    func makeNSView(context: Context) -> NSView { NSView() }
+    func updateNSView(_ nsView: NSView, context: Context) {
+        context.coordinator.onCapture = onCapture
+        recording ? context.coordinator.start() : context.coordinator.stop()
+    }
+    func makeCoordinator() -> Coordinator { Coordinator() }
+
+    final class Coordinator {
+        var onCapture: ((UInt) -> Void)?
+        private var monitor: Any?
+        private let relevant: NSEvent.ModifierFlags = [.command, .option, .control, .shift]
+
+        func start() {
+            guard monitor == nil else { return }
+            monitor = NSEvent.addLocalMonitorForEvents(matching: .flagsChanged) { [weak self] event in
+                guard let self else { return event }
+                let masked = event.modifierFlags.intersection(self.relevant)
+                if !masked.isEmpty {
+                    self.onCapture?(masked.rawValue)
+                }
+                return event
+            }
+        }
+        func stop() {
+            if let monitor { NSEvent.removeMonitor(monitor); self.monitor = nil }
+        }
+        deinit { stop() }
     }
 }

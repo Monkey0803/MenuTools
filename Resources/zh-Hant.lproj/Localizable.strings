@@ -155,3 +155,12 @@
 "settings.section.general" = "一般";
 "settings.launchAtLogin" = "開機時啟動";
 "settings.launchAtLogin.desc" = "登入後自動執行 MenuTools。";
+
+"scroll.section.modifier" = "修飾鍵";
+"scroll.accel" = "加速鍵";
+"scroll.accel.desc" = "按住時加快捲動速度。";
+"scroll.shiftAxis" = "轉換鍵";
+"scroll.shiftAxis.desc" = "按住時將垂直捲動變為水平方向。";
+"scroll.disableKey" = "停用鍵";
+"scroll.disableKey.desc" = "按住時暫時停用平滑捲動。";
+"scroll.reset" = "恢復為預設值";

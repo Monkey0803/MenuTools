@@ -107,11 +107,28 @@ final class SmoothScrollEngine: ObservableObject, @unchecked Sendable {
             return Unmanaged.passUnretained(event)
         }
 
+        // 修饰键：禁用键按下 → 放行原始事件（临时关闭平滑）
+        let flags = event.flags.rawValue
+        if config.disableModifier != 0 && (flags & UInt64(config.disableModifier)) == UInt64(config.disableModifier) {
+            return Unmanaged.passUnretained(event)
+        }
+        // 加速键按下 → 增益放大
+        var accel = 1.0
+        if config.accelModifier != 0 && (flags & UInt64(config.accelModifier)) == UInt64(config.accelModifier) {
+            accel = 3.0
+        }
+        // 转换键按下 → 垂直滚动转为水平
+        let shiftAxis = config.shiftModifier != 0 && (flags & UInt64(config.shiftModifier)) == UInt64(config.shiftModifier)
+
         let templateCopy = event.copy()
         let pid = pid_t(event.getIntegerValueField(.eventTargetUnixProcessID))
-        let lineToPixel = 48.0 * config.gain
-        let dy = handleV ? rawY * lineToPixel * (config.invertVertical ? -1 : 1) : 0
-        let dx = handleH ? rawX * lineToPixel * (config.invertHorizontal ? -1 : 1) : 0
+        let lineToPixel = 48.0 * config.gain * accel
+        var dy = handleV ? rawY * lineToPixel * (config.invertVertical ? -1 : 1) : 0
+        var dx = handleH ? rawX * lineToPixel * (config.invertHorizontal ? -1 : 1) : 0
+        if shiftAxis && dy != 0 && dx == 0 {
+            dx = dy   // 垂直量搬到水平轴
+            dy = 0
+        }
 
         os_unfair_lock_lock(&lock)
         template = templateCopy

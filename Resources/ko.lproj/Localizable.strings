@@ -155,3 +155,12 @@
 "settings.section.general" = "일반";
 "settings.launchAtLogin" = "로그인 시 실행";
 "settings.launchAtLogin.desc" = "로그인 후 MenuTools를 자동으로 실행합니다.";
+
+"scroll.section.modifier" = "수정자 키";
+"scroll.accel" = "가속 키";
+"scroll.accel.desc" = "누르고 있는 동안 스크롤을 빠르게 합니다.";
+"scroll.shiftAxis" = "전환 키";
+"scroll.shiftAxis.desc" = "누르고 있는 동안 수직 스크롤을 수평으로 전환합니다.";
+"scroll.disableKey" = "비활성화 키";
+"scroll.disableKey.desc" = "누르고 있는 동안 부드러운 스크롤을 일시 비활성화합니다.";
+"scroll.reset" = "기본값으로 복원";

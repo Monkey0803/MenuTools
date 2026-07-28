@@ -155,3 +155,12 @@
 "settings.section.general" = "General";
 "settings.launchAtLogin" = "Launch at Login";
 "settings.launchAtLogin.desc" = "Automatically run MenuTools after you log in.";
+
+"scroll.section.modifier" = "Modifiers";
+"scroll.accel" = "Accelerate";
+"scroll.accel.desc" = "Hold to scroll faster.";
+"scroll.shiftAxis" = "Axis Swap";
+"scroll.shiftAxis.desc" = "Hold to convert vertical scroll to horizontal.";
+"scroll.disableKey" = "Disable";
+"scroll.disableKey.desc" = "Hold to temporarily disable smooth scrolling.";
+"scroll.reset" = "Restore Defaults";

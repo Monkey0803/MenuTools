@@ -155,3 +155,12 @@
 "settings.section.general" = "通用";
 "settings.launchAtLogin" = "开机时启动";
 "settings.launchAtLogin.desc" = "登录后自动运行 MenuTools。";
+
+"scroll.section.modifier" = "修饰键";
+"scroll.accel" = "加速键";
+"scroll.accel.desc" = "按住时加快滚动速度。";
+"scroll.shiftAxis" = "转换键";
+"scroll.shiftAxis.desc" = "按住时将垂直滚动变为水平方向。";
+"scroll.disableKey" = "禁用键";
+"scroll.disableKey.desc" = "按住时临时禁用平滑滚动。";
+"scroll.reset" = "恢复为预设值";

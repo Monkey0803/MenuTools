@@ -16,6 +16,9 @@ enum SettingsKey {
     static let scrollDuration = "scrollDuration"
     static let scrollMinStep = "scrollMinStep"
     static let scrollTouchpad = "scrollTouchpadEmulation"
+    static let scrollAccelKey = "scrollAccelModifier"   // 加速键修饰符（Cocoa rawValue）
+    static let scrollShiftKey = "scrollShiftModifier"   // 转换键
+    static let scrollDisableKey = "scrollDisableModifier" // 禁用键
 }
 
 /// 可选的菜单栏图标（SF Symbols）

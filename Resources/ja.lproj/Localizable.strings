@@ -155,3 +155,12 @@
 "settings.section.general" = "一般";
 "settings.launchAtLogin" = "ログイン時に起動";
 "settings.launchAtLogin.desc" = "ログイン後に MenuTools を自動的に実行します。";
+
+"scroll.section.modifier" = "修飾キー";
+"scroll.accel" = "加速キー";
+"scroll.accel.desc" = "押している間スクロールを速くします。";
+"scroll.shiftAxis" = "変換キー";
+"scroll.shiftAxis.desc" = "押している間、垂直スクロールを水平方向に変換します。";
+"scroll.disableKey" = "無効化キー";
+"scroll.disableKey.desc" = "押している間スムーズスクロールを一時的に無効化します。";
+"scroll.reset" = "デフォルトに戻す";
