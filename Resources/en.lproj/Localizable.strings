@@ -113,3 +113,20 @@
 "rc.item.copyFileURL" = "Copy file:// Link";
 "rc.default.newFolder" = "untitled folder";
 "rc.default.newFile" = "untitled.txt";
+
+/* Shortcut binding */
+"settings.tab.shortcut" = "Shortcuts";
+"sc.title" = "Keyboard Shortcuts";
+"sc.subtitle" = "Bind global shortcuts to system actions. Key-simulation actions require Accessibility permission.";
+"sc.unset" = "Not Set";
+"sc.recording" = "Press keys…";
+"sc.clear" = "Clear";
+"sc.action.missionControl" = "Mission Control";
+"sc.action.launchpad" = "Launchpad";
+"sc.action.spotlight" = "Spotlight (System)";
+"sc.action.dictation" = "Dictation";
+"sc.action.doNotDisturb" = "Do Not Disturb";
+"sc.action.showDesktop" = "Show Desktop";
+"sc.action.quitApp" = "Quit Current App";
+"sc.action.moveLeftSpace" = "Move Left a Space";
+"sc.action.moveRightSpace" = "Move Right a Space";

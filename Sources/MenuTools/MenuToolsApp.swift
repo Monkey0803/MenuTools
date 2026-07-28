@@ -41,6 +41,11 @@ enum MenuBarIcon: String, CaseIterable, Identifiable {
 struct MenuToolsApp: App {
     @AppStorage(SettingsKey.menuBarIcon) private var menuBarIcon = MenuBarIcon.default.rawValue
 
+    init() {
+        // 注册已保存的全局快捷键
+        ShortcutManager.shared.activate()
+    }
+
     var body: some Scene {
         MenuBarExtra {
             MenuPanelView()

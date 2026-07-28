@@ -113,3 +113,20 @@
 "rc.item.copyFileURL" = "file:// リンクをコピー";
 "rc.default.newFolder" = "名称未設定フォルダ";
 "rc.default.newFile" = "名称未設定.txt";
+
+/* ショートカット割り当て */
+"settings.tab.shortcut" = "ショートカット";
+"sc.title" = "キーボードショートカット";
+"sc.subtitle" = "システム操作にグローバルショートカットを割り当てます。キー入力系の操作は「アクセシビリティ」の許可が必要です。";
+"sc.unset" = "未設定";
+"sc.recording" = "キーを押してください…";
+"sc.clear" = "消去";
+"sc.action.missionControl" = "Mission Control";
+"sc.action.launchpad" = "Launchpad";
+"sc.action.spotlight" = "Spotlight（システム）";
+"sc.action.dictation" = "音声入力";
+"sc.action.doNotDisturb" = "おやすみモード";
+"sc.action.showDesktop" = "デスクトップを表示";
+"sc.action.quitApp" = "現在の App を終了";
+"sc.action.moveLeftSpace" = "左の操作スペースへ";
+"sc.action.moveRightSpace" = "右の操作スペースへ";

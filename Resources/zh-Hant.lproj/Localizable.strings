@@ -113,3 +113,20 @@
 "rc.item.copyFileURL" = "複製 file:// 連結";
 "rc.default.newFolder" = "未命名檔案夾";
 "rc.default.newFile" = "未命名.txt";
+
+/* 快捷鍵綁定 */
+"settings.tab.shortcut" = "快捷鍵綁定";
+"sc.title" = "快捷鍵綁定";
+"sc.subtitle" = "為系統動作綁定全域快捷鍵。按鍵模擬類動作需在「輔助使用」中授權。";
+"sc.unset" = "未設定";
+"sc.recording" = "請按快捷鍵…";
+"sc.clear" = "清除";
+"sc.action.missionControl" = "調度中心";
+"sc.action.launchpad" = "啟動台";
+"sc.action.spotlight" = "聚焦搜尋 (系統)";
+"sc.action.dictation" = "聽寫";
+"sc.action.doNotDisturb" = "勿擾模式";
+"sc.action.showDesktop" = "顯示桌面";
+"sc.action.quitApp" = "結束目前應用程式";
+"sc.action.moveLeftSpace" = "向左移動空間";
+"sc.action.moveRightSpace" = "向右移動空間";

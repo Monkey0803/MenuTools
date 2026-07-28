@@ -1,5 +1,11 @@
 import SwiftUI
 
+/// 设置窗口统一尺寸（各 Tab 一致，避免切换时窗口重置闪烁）
+enum SettingsLayout {
+    static let width: CGFloat = 480
+    static let height: CGFloat = 580
+}
+
 /// 设置窗口（⌘, / 面板齿轮按钮打开）：分标签容纳通用与右键工具
 struct SettingsView: View {
     var body: some View {
@@ -8,7 +14,10 @@ struct SettingsView: View {
                 .tabItem { Label(L("settings.tab.general"), systemImage: "gearshape") }
             RightClickToolsView()
                 .tabItem { Label(L("settings.tab.rightClick"), systemImage: "contextualmenu.and.cursorarrow") }
+            ShortcutSettingsView()
+                .tabItem { Label(L("settings.tab.shortcut"), systemImage: "command") }
         }
+        .frame(width: SettingsLayout.width, height: SettingsLayout.height)
     }
 }
 
@@ -84,8 +93,7 @@ struct GeneralSettingsView: View {
             }
         }
         .formStyle(.grouped)
-        .frame(width: 440)
-        .fixedSize(horizontal: false, vertical: true)
+        .frame(width: SettingsLayout.width, height: SettingsLayout.height)
         .navigationTitle(L("settings.title"))
     }
 
