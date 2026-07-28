@@ -60,7 +60,7 @@ struct ScrollSettingsView: View {
     }
 
     private var masterSwitch: some View {
-        Toggle(isOn: $enabled) {
+        HStack(spacing: 12) {
             VStack(alignment: .leading, spacing: 2) {
                 Text(L("scroll.enable"))
                     .font(.body.weight(.medium))
@@ -68,11 +68,15 @@ struct ScrollSettingsView: View {
                     .font(.caption2)
                     .foregroundStyle(.secondary)
             }
+            Spacer(minLength: 0)
+            Toggle("", isOn: $enabled)
+                .labelsHidden()
+                .toggleStyle(.switch)
+                .onChange(of: enabled) { _, _ in engine.reload() }
         }
-        .toggleStyle(.switch)
+        .frame(maxWidth: .infinity, alignment: .leading)
         .padding(14)
         .glassEffect(.regular, in: .rect(cornerRadius: 14))
-        .onChange(of: enabled) { _, _ in engine.reload() }
     }
 
     private var permissionHint: some View {
@@ -99,14 +103,14 @@ struct ScrollSettingsView: View {
     private var smoothSection: some View {
         VStack(alignment: .leading, spacing: 8) {
             sectionLabel(icon: "slider.horizontal.3", title: L("scroll.section.smooth"))
-            VStack(spacing: 14) {
+            VStack(alignment: .leading, spacing: 14) {
                 sliderRow(title: L("scroll.gain"), value: $gain, range: 0.5...3.0, unit: "×")
                 Divider()
                 sliderRow(title: L("scroll.duration"), value: $duration, range: 0.1...0.8, unit: "s")
                 Divider()
                 sliderRow(title: L("scroll.minStep"), value: $minStep, range: 1...30, unit: "px")
                 Divider()
-                Toggle(isOn: $touchpad) {
+                HStack(spacing: 12) {
                     VStack(alignment: .leading, spacing: 2) {
                         Text(L("scroll.touchpad"))
                             .font(.body)
@@ -114,10 +118,14 @@ struct ScrollSettingsView: View {
                             .font(.caption2)
                             .foregroundStyle(.secondary)
                     }
+                    Spacer(minLength: 0)
+                    Toggle("", isOn: $touchpad)
+                        .labelsHidden()
+                        .toggleStyle(.switch)
+                        .controlSize(.small)
+                        .onChange(of: touchpad) { _, _ in engine.reload() }
                 }
-                .toggleStyle(.switch)
-                .controlSize(.small)
-                .onChange(of: touchpad) { _, _ in engine.reload() }
+                .frame(maxWidth: .infinity, alignment: .leading)
             }
             .frame(maxWidth: .infinity)
             .padding(14)
