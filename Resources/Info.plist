@@ -1,0 +1,36 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+	<key>CFBundleDevelopmentRegion</key>
+	<string>zh_CN</string>
+	<key>CFBundleExecutable</key>
+	<string>MenuTools</string>
+	<key>CFBundleIconFile</key>
+	<string>AppIcon</string>
+	<key>CFBundleIdentifier</key>
+	<string>com.qoder.menutools</string>
+	<key>CFBundleInfoDictionaryVersion</key>
+	<string>6.0</string>
+	<key>CFBundleName</key>
+	<string>MenuTools</string>
+	<key>CFBundleDisplayName</key>
+	<string>MenuTools</string>
+	<key>CFBundlePackageType</key>
+	<string>APPL</string>
+	<key>CFBundleShortVersionString</key>
+	<string>1.0.0</string>
+	<key>CFBundleVersion</key>
+	<string>1</string>
+	<key>LSMinimumSystemVersion</key>
+	<string>26.0</string>
+	<key>LSUIElement</key>
+	<true/>
+	<key>NSAppleEventsUsageDescription</key>
+	<string>MenuTools 需要访问 Finder 以获取当前窗口路径，并通过“系统事件”切换深色/浅色外观。</string>
+	<key>NSBluetoothAlwaysUsageDescription</key>
+	<string>MenuTools 需要访问蓝牙以读取已连接设备（键盘、鼠标、耳机）的电量。</string>
+	<key>NSHumanReadableCopyright</key>
+	<string>Copyright © 2026 MenuTools.</string>
+</dict>
+</plist>
