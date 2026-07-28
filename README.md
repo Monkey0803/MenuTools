@@ -98,14 +98,17 @@ MenuTools/
 
 ## 🔄 发布更新
 
-1. 修改 `Resources/Info.plist` 中的 `CFBundleShortVersionString`
-2. 更新 `appcast.json` 的 `version` / `notes` / `url` 并部署到 HTTPS 可达位置
-3. 用户端点击「检查更新」即可收到提示
+更新检查已对接 **GitHub Releases API**，发版流程：
 
-更新源默认地址可在 `UpdateCheckerService.defaultFeedURL` 修改，也可通过命令行覆盖（便于测试）：
+1. 修改 `Resources/Info.plist` 中的 `CFBundleShortVersionString`，构建并打包 `MenuTools.app`（可压缩为 zip）
+2. 在 GitHub 上发布 Release：tag 使用 `v1.1.0` 或 `1.1.0`，描述即更新说明，附件上传安装包（.zip / .dmg / .pkg）
+3. 用户端自动生效：打开面板时静默自动检查（24 小时节流），或手动点击「检查更新」；发现新版本后底栏出现下载按钮，优先直链 Release 附件，无附件则跳转 Release 页面
+
+也兼容简单 appcast JSON（`{"version","notes","url"}`，见 `appcast.json` 模板），便于私有部署。更新源可通过命令行覆盖（便于测试）：
 
 ```bash
 defaults write com.qoder.menutools updateFeedURL "https://your-server/appcast.json"
+defaults delete com.qoder.menutools updateFeedURL   # 恢复默认 GitHub 源
 ```
 
 ## ⚠️ 已知限制

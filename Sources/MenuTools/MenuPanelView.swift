@@ -100,6 +100,7 @@ struct MenuPanelView: View {
             refreshToggles()
             refreshDerivedDataSize()
             clipboardCount = ClipboardService.itemCount
+            autoCheckUpdateIfNeeded()
             // 面板展示期间每 30 秒刷新一次蓝牙设备电量
             while !Task.isCancelled {
                 bleMonitor.refresh()
@@ -703,6 +704,18 @@ struct MenuPanelView: View {
                 isCheckingUpdate = false
                 flashStatus("检查更新失败：\(error.localizedDescription)", isError: true)
             }
+        }
+    }
+
+    /// 打开面板时的静默自动检查：24 小时节流，只在发现新版本时提示
+    private func autoCheckUpdateIfNeeded() {
+        guard availableUpdate == nil, UpdateCheckerService.shouldAutoCheck() else { return }
+        Task {
+            guard let update = try? await UpdateCheckerService.check() else { return }
+            withAnimation(.smooth(duration: 0.3)) {
+                availableUpdate = update
+            }
+            flashStatus("发现新版本 v\(update.version)，点击底栏下载", isError: false)
         }
     }
 
