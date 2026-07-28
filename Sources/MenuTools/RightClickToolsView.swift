@@ -104,6 +104,7 @@ struct RightClickToolsView: View {
                     toggleRow(item)
                 }
             }
+            .frame(maxWidth: .infinity)
             .padding(.horizontal, 14)
             .padding(.vertical, 4)
             .glassEffect(.regular, in: .rect(cornerRadius: 14))
@@ -111,7 +112,7 @@ struct RightClickToolsView: View {
     }
 
     private func toggleRow(_ item: RightClickItem) -> some View {
-        Toggle(isOn: binding(for: item)) {
+        HStack(spacing: 12) {
             VStack(alignment: .leading, spacing: 2) {
                 Text(L(item.titleKey))
                     .font(.body)
@@ -121,9 +122,13 @@ struct RightClickToolsView: View {
                         .foregroundStyle(.secondary)
                 }
             }
+            Spacer(minLength: 0)
+            Toggle("", isOn: binding(for: item))
+                .labelsHidden()
+                .toggleStyle(.switch)
+                .controlSize(.small)
         }
-        .toggleStyle(.switch)
-        .controlSize(.small)
+        .frame(maxWidth: .infinity, alignment: .leading)
         .padding(.vertical, 10)
     }
 
