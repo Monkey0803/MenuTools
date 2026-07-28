@@ -31,7 +31,14 @@ for lproj in Resources/*.lproj; do
     [[ -d "$lproj" ]] && cp -R "$lproj" "$APP_BUNDLE/Contents/Resources/"
 done
 
-echo "==> Ad-hoc 签名"
-codesign --force --deep --sign - "$APP_BUNDLE"
+echo "==> 签名"
+# 优先用稳定的自签名证书（使 TCC 权限授予可跨重编译保留）；未安装时回退 ad-hoc
+SIGN_IDENTITY="MenuTools Self-Signed"
+if security find-identity -p codesigning 2>/dev/null | grep -q "$SIGN_IDENTITY"; then
+    codesign --force --deep --sign "$SIGN_IDENTITY" "$APP_BUNDLE"
+else
+    echo "   （未找到 '$SIGN_IDENTITY' 证书，回退 ad-hoc 签名）"
+    codesign --force --deep --sign - "$APP_BUNDLE"
+fi
 
 echo "==> 完成：$APP_BUNDLE"

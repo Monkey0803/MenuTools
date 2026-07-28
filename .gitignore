@@ -5,5 +5,8 @@
 # 打包产物
 dist/
 
+# 本地代码签名证书（私钥，绝不提交）
+.cert/
+
 # macOS
 .DS_Store
