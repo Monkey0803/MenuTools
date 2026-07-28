@@ -70,7 +70,7 @@ enum BluetoothBatteryService {
 
             let name = (props["Product"] as? String)
                 ?? (props["DeviceName"] as? String)
-                ?? "蓝牙设备"
+                ?? L("bt.device")
             let address = (props["DeviceAddress"] as? String) ?? name
 
             results.append(BluetoothDeviceBattery(
@@ -100,8 +100,8 @@ enum BluetoothBatteryService {
             guard left != nil || right != nil || box != nil || single != nil else { continue }
 
             var entry = BluetoothDeviceBattery(
-                id: device.addressString ?? device.name ?? "蓝牙设备",
-                name: device.name ?? "蓝牙设备",
+                id: device.addressString ?? device.name ?? L("bt.device"),
+                name: device.name ?? L("bt.device"),
                 leftPercent: left,
                 rightPercent: right,
                 casePercent: box,

@@ -12,7 +12,7 @@ struct SettingsView: View {
 
     var body: some View {
         Form {
-            Section("菜单栏图标") {
+            Section(L("settings.section.icon")) {
                 LazyVGrid(columns: Array(repeating: GridItem(.flexible(), spacing: 8), count: 4), spacing: 8) {
                     ForEach(MenuBarIcon.allCases) { icon in
                         iconOption(icon)
@@ -21,21 +21,21 @@ struct SettingsView: View {
                 .padding(.vertical, 4)
             }
 
-            Section("终端 App") {
-                Picker("在终端打开 Finder 路径时使用", selection: $preferredTerminal) {
+            Section(L("settings.section.terminal")) {
+                Picker(L("settings.terminal.desc"), selection: $preferredTerminal) {
                     ForEach(TerminalApp.installed) { app in
                         Text(app.displayName).tag(app.rawValue)
                     }
                 }
             }
 
-            Section("软件更新") {
+            Section(L("settings.section.update")) {
                 Toggle(isOn: $autoCheckUpdate) {
-                    Text("自动检查更新")
-                    Text("打开面板时静默检查，每 24 小时最多一次")
+                    Text(L("settings.autoCheck"))
+                    Text(L("settings.autoCheck.desc"))
                 }
 
-                LabeledContent("当前版本", value: "v\(UpdateCheckerService.currentVersion)")
+                LabeledContent(L("settings.currentVersion"), value: "v\(UpdateCheckerService.currentVersion)")
 
                 LabeledContent {
                     HStack(spacing: 10) {
@@ -48,24 +48,24 @@ struct SettingsView: View {
                             ProgressView()
                                 .controlSize(.small)
                         } else if let update = availableUpdate {
-                            Button("下载 v\(update.version)") {
+                            Button(L("settings.download", update.version)) {
                                 UpdateCheckerService.openDownloadPage(update)
                             }
                         } else {
-                            Button("立即检查") {
+                            Button(L("settings.checkNow")) {
                                 checkForUpdate()
                             }
                         }
                     }
                 } label: {
-                    Text("手动检查")
+                    Text(L("settings.manualCheck"))
                 }
             }
         }
         .formStyle(.grouped)
         .frame(width: 440)
         .fixedSize(horizontal: false, vertical: true)
-        .navigationTitle("MenuTools 设置")
+        .navigationTitle(L("settings.title"))
     }
 
     private func iconOption(_ icon: MenuBarIcon) -> some View {
@@ -108,13 +108,13 @@ struct SettingsView: View {
                 isCheckingUpdate = false
                 if let update {
                     availableUpdate = update
-                    checkResult = "发现新版本 v\(update.version)"
+                    checkResult = L("settings.found", update.version)
                 } else {
-                    checkResult = "已是最新版本"
+                    checkResult = L("settings.latest")
                 }
             } catch {
                 isCheckingUpdate = false
-                checkResult = "检查失败：\(error.localizedDescription)"
+                checkResult = L("settings.checkFailed", error.localizedDescription)
             }
         }
     }

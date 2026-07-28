@@ -1,0 +1,84 @@
+/* Panel */
+"panel.subtitle" = "Lightweight system toolkit";
+"panel.tile.terminal" = "Open in Terminal";
+"panel.tile.tap" = "Tap to switch";
+"panel.tile.dark" = "Dark Mode";
+"panel.tile.light" = "Light Mode";
+"help.settings" = "Open Settings";
+
+/* Quick toggles */
+"toggle.caffeinate" = "Keep Awake";
+"toggle.hiddenFiles" = "Show Hidden Files";
+"toggle.mute" = "Mute";
+"toggle.dock" = "Auto-hide Dock";
+"toggle.menubar" = "Auto-hide Menu Bar";
+"toggle.nightShift" = "Night Shift";
+
+/* Bluetooth */
+"bt.empty" = "No Bluetooth battery info";
+"bt.device" = "Bluetooth Device";
+
+/* Cleanup */
+"cleanup.derivedData" = "DerivedData";
+"cleanup.clipboard" = "Clear Clipboard";
+"cleanup.cleaning" = "Cleaning…";
+"cleanup.calculating" = "Calculating…";
+"cleanup.cleared" = "Empty";
+"cleanup.clipboardEmpty" = "Already empty";
+"cleanup.items" = "%d item(s)";
+
+/* Footer */
+"footer.checkUpdate" = "Check for Updates";
+"footer.newVersion" = "New version v%@";
+"footer.quit" = "Quit";
+
+/* Status */
+"status.openedIn" = "Opened in %@: %@";
+"status.clipboardCleared" = "Clipboard cleared";
+"status.freed" = "Freed %@";
+"status.newVersion" = "New version v%@ available%@";
+"status.upToDate" = "You're up to date (v%@)";
+"status.updateFailed" = "Update check failed: %@";
+"status.newVersionHint" = "New version v%@ available, tap the footer to download";
+
+/* Settings */
+"settings.title" = "MenuTools Settings";
+"settings.section.icon" = "Menu Bar Icon";
+"settings.section.terminal" = "Terminal App";
+"settings.terminal.desc" = "Used when opening the Finder path in terminal";
+"settings.section.update" = "Software Update";
+"settings.autoCheck" = "Check for updates automatically";
+"settings.autoCheck.desc" = "Checks silently when the panel opens, at most once every 24 hours";
+"settings.currentVersion" = "Current Version";
+"settings.manualCheck" = "Manual Check";
+"settings.checkNow" = "Check Now";
+"settings.download" = "Download v%@";
+"settings.latest" = "Up to date";
+"settings.found" = "New version v%@ found";
+"settings.checkFailed" = "Check failed: %@";
+
+/* Menu bar icon names */
+"icon.wrench" = "Wrench";
+"icon.terminal" = "Terminal";
+"icon.sparkles" = "Sparkles";
+"icon.bolt" = "Bolt";
+"icon.cube" = "Cube";
+"icon.moon" = "Moon";
+"icon.gear" = "Gear";
+"icon.paw" = "Paw";
+
+/* Terminal */
+"terminal.builtin" = "Terminal";
+
+/* Errors */
+"error.finderPath" = "Failed to get Finder path: %@";
+"error.scriptInit" = "Failed to initialize script";
+"error.emptyResult" = "Empty result";
+"error.unknown" = "Unknown error";
+"error.terminalNotFound" = "%@ not found. Install it or choose another terminal in Settings";
+"error.appearance" = "Failed to switch appearance: %@ (allow MenuTools to control \"System Events\" in System Settings > Privacy & Security > Automation)";
+"error.toggle" = "Operation failed: %@ (if \"System Events\" is involved, allow MenuTools in System Settings > Privacy & Security > Automation)";
+"error.nightShift" = "Night Shift is not supported on this device";
+"error.cleanPartial" = "%d item(s) could not be deleted (possibly in use by Xcode): %@";
+"error.feedInvalid" = "Invalid update feed URL";
+"error.feedBad" = "Update feed returned an error";

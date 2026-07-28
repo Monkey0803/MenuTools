@@ -1,0 +1,84 @@
+/* 面板 */
+"panel.subtitle" = "輕量系統工具集";
+"panel.tile.terminal" = "終端機開啟";
+"panel.tile.tap" = "點按切換";
+"panel.tile.dark" = "深色模式";
+"panel.tile.light" = "淺色模式";
+"help.settings" = "打開設定";
+
+/* 快捷開關 */
+"toggle.caffeinate" = "防止鎖定螢幕";
+"toggle.hiddenFiles" = "顯示隱藏檔案";
+"toggle.mute" = "靜音";
+"toggle.dock" = "隱藏 Dock";
+"toggle.menubar" = "隱藏選單列";
+"toggle.nightShift" = "夜覽 (Night Shift)";
+
+/* 藍牙 */
+"bt.empty" = "未偵測到藍牙裝置電量";
+"bt.device" = "藍牙裝置";
+
+/* 清理 */
+"cleanup.derivedData" = "DerivedData";
+"cleanup.clipboard" = "清理剪貼板";
+"cleanup.cleaning" = "清理中…";
+"cleanup.calculating" = "計算中…";
+"cleanup.cleared" = "已清空";
+"cleanup.clipboardEmpty" = "已是空的";
+"cleanup.items" = "%d 項內容";
+
+/* 底欄 */
+"footer.checkUpdate" = "檢查更新";
+"footer.newVersion" = "新版本 v%@";
+"footer.quit" = "結束";
+
+/* 狀態提示 */
+"status.openedIn" = "已在 %@ 開啟：%@";
+"status.clipboardCleared" = "剪貼板已清空";
+"status.freed" = "已釋放 %@";
+"status.newVersion" = "發現新版本 v%@%@";
+"status.upToDate" = "目前已是最新版本 (v%@)";
+"status.updateFailed" = "檢查更新失敗：%@";
+"status.newVersionHint" = "發現新版本 v%@，點擊底欄下載";
+
+/* 設定視窗 */
+"settings.title" = "MenuTools 設定";
+"settings.section.icon" = "選單列圖示";
+"settings.section.terminal" = "終端機 App";
+"settings.terminal.desc" = "在終端機開啟 Finder 路徑時使用";
+"settings.section.update" = "軟體更新";
+"settings.autoCheck" = "自動檢查更新";
+"settings.autoCheck.desc" = "打開面板時靜默檢查，每 24 小時最多一次";
+"settings.currentVersion" = "目前版本";
+"settings.manualCheck" = "手動檢查";
+"settings.checkNow" = "立即檢查";
+"settings.download" = "下載 v%@";
+"settings.latest" = "已是最新版本";
+"settings.found" = "發現新版本 v%@";
+"settings.checkFailed" = "檢查失敗：%@";
+
+/* 選單列圖示名 */
+"icon.wrench" = "工具";
+"icon.terminal" = "終端機";
+"icon.sparkles" = "星光";
+"icon.bolt" = "閃電";
+"icon.cube" = "方塊";
+"icon.moon" = "月亮";
+"icon.gear" = "齒輪";
+"icon.paw" = "爪印";
+
+/* 終端機 */
+"terminal.builtin" = "終端機 (Terminal)";
+
+/* 錯誤 */
+"error.finderPath" = "無法取得 Finder 路徑：%@";
+"error.scriptInit" = "腳本初始化失敗";
+"error.emptyResult" = "回傳結果為空";
+"error.unknown" = "未知錯誤";
+"error.terminalNotFound" = "找不到 %@，請先安裝或在設定中更換終端機";
+"error.appearance" = "切換外觀失敗：%@（請在「系統設定 > 隱私權與安全性 > 自動化」允許 MenuTools 控制「系統事件」）";
+"error.toggle" = "操作失敗：%@（如涉及「系統事件」，請在「系統設定 > 隱私權與安全性 > 自動化」允許 MenuTools）";
+"error.nightShift" = "此裝置不支援夜覽 (Night Shift)";
+"error.cleanPartial" = "有 %d 項無法刪除（可能正被 Xcode 使用）：%@";
+"error.feedInvalid" = "更新來源網址無效";
+"error.feedBad" = "更新來源回應異常";

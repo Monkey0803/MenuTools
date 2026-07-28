@@ -10,7 +10,7 @@ enum AppearanceService {
         var errorDescription: String? {
             switch self {
             case .scriptFailure(let message):
-                return "切换外观失败：\(message)（请在“系统设置 > 隐私与安全性 > 自动化”中允许 MenuTools 控制“系统事件”）"
+                return L("error.appearance", message)
             }
         }
     }
@@ -34,11 +34,11 @@ enum AppearanceService {
         """
         var errorInfo: NSDictionary?
         guard let script = NSAppleScript(source: source) else {
-            throw AppearanceError.scriptFailure("脚本初始化失败")
+            throw AppearanceError.scriptFailure(L("error.scriptInit"))
         }
         script.executeAndReturnError(&errorInfo)
         if let errorInfo {
-            let message = errorInfo[NSAppleScript.errorMessage] as? String ?? "未知错误"
+            let message = errorInfo[NSAppleScript.errorMessage] as? String ?? L("error.unknown")
             throw AppearanceError.scriptFailure(message)
         }
     }

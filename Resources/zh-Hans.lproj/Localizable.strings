@@ -1,0 +1,84 @@
+/* 面板 */
+"panel.subtitle" = "轻量系统工具集";
+"panel.tile.terminal" = "终端打开";
+"panel.tile.tap" = "点按切换";
+"panel.tile.dark" = "深色模式";
+"panel.tile.light" = "浅色模式";
+"help.settings" = "打开设置";
+
+/* 快捷开关 */
+"toggle.caffeinate" = "防止锁屏";
+"toggle.hiddenFiles" = "显示隐藏文件";
+"toggle.mute" = "静音";
+"toggle.dock" = "隐藏程序坞";
+"toggle.menubar" = "隐藏菜单栏";
+"toggle.nightShift" = "夜览 (Night Shift)";
+
+/* 蓝牙 */
+"bt.empty" = "未检测到蓝牙设备电量";
+"bt.device" = "蓝牙设备";
+
+/* 清理 */
+"cleanup.derivedData" = "DerivedData";
+"cleanup.clipboard" = "清理剪贴板";
+"cleanup.cleaning" = "清理中…";
+"cleanup.calculating" = "计算中…";
+"cleanup.cleared" = "已清空";
+"cleanup.clipboardEmpty" = "已是空的";
+"cleanup.items" = "%d 项内容";
+
+/* 底栏 */
+"footer.checkUpdate" = "检查更新";
+"footer.newVersion" = "新版本 v%@";
+"footer.quit" = "退出";
+
+/* 状态提示 */
+"status.openedIn" = "已在 %@ 打开：%@";
+"status.clipboardCleared" = "剪贴板已清空";
+"status.freed" = "已释放 %@";
+"status.newVersion" = "发现新版本 v%@%@";
+"status.upToDate" = "当前已是最新版本 (v%@)";
+"status.updateFailed" = "检查更新失败：%@";
+"status.newVersionHint" = "发现新版本 v%@，点击底栏下载";
+
+/* 设置窗口 */
+"settings.title" = "MenuTools 设置";
+"settings.section.icon" = "菜单栏图标";
+"settings.section.terminal" = "终端 App";
+"settings.terminal.desc" = "在终端打开 Finder 路径时使用";
+"settings.section.update" = "软件更新";
+"settings.autoCheck" = "自动检查更新";
+"settings.autoCheck.desc" = "打开面板时静默检查，每 24 小时最多一次";
+"settings.currentVersion" = "当前版本";
+"settings.manualCheck" = "手动检查";
+"settings.checkNow" = "立即检查";
+"settings.download" = "下载 v%@";
+"settings.latest" = "已是最新版本";
+"settings.found" = "发现新版本 v%@";
+"settings.checkFailed" = "检查失败：%@";
+
+/* 菜单栏图标名 */
+"icon.wrench" = "工具";
+"icon.terminal" = "终端";
+"icon.sparkles" = "星光";
+"icon.bolt" = "闪电";
+"icon.cube" = "方块";
+"icon.moon" = "月亮";
+"icon.gear" = "齿轮";
+"icon.paw" = "爪印";
+
+/* 终端 */
+"terminal.builtin" = "终端 (Terminal)";
+
+/* 错误 */
+"error.finderPath" = "无法获取 Finder 路径：%@";
+"error.scriptInit" = "脚本初始化失败";
+"error.emptyResult" = "返回结果为空";
+"error.unknown" = "未知错误";
+"error.terminalNotFound" = "未找到 %@，请先安装或在设置中更换终端";
+"error.appearance" = "切换外观失败：%@（请在“系统设置 > 隐私与安全性 > 自动化”中允许 MenuTools 控制“系统事件”）";
+"error.toggle" = "操作失败：%@（如涉及“系统事件”，请在“系统设置 > 隐私与安全性 > 自动化”中允许 MenuTools）";
+"error.nightShift" = "此设备不支持夜览（Night Shift）";
+"error.cleanPartial" = "有 %d 项未能删除（可能正被 Xcode 占用）：%@";
+"error.feedInvalid" = "更新源地址无效";
+"error.feedBad" = "更新源返回异常";

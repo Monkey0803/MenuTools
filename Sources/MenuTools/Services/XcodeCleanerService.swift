@@ -9,7 +9,7 @@ enum XcodeCleanerService {
         var errorDescription: String? {
             switch self {
             case .partialFailure(let failed, let lastError):
-                return "有 \(failed) 项未能删除（可能正被 Xcode 占用）：\(lastError.localizedDescription)"
+                return L("error.cleanPartial", failed, lastError.localizedDescription)
             }
         }
     }

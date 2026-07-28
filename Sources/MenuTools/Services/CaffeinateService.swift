@@ -21,7 +21,7 @@ final class CaffeinateService: ObservableObject {
         let result = IOPMAssertionCreateWithName(
             kIOPMAssertionTypePreventUserIdleDisplaySleep as CFString,
             IOPMAssertionLevel(kIOPMAssertionLevelOn),
-            "MenuTools：防止锁屏" as CFString,
+            "MenuTools: Keep Awake" as CFString,
             &id
         )
         if result == kIOReturnSuccess {

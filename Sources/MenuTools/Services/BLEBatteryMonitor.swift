@@ -92,7 +92,7 @@ extension BLEBatteryMonitor: CBCentralManagerDelegate, CBPeripheralDelegate {
     nonisolated func peripheral(_ peripheral: CBPeripheral, didUpdateValueFor characteristic: CBCharacteristic, error: Error?) {
         guard let level = characteristic.value?.first, level <= 100 else { return }
         let id = peripheral.identifier
-        let name = peripheral.name ?? "蓝牙设备"
+        let name = peripheral.name ?? L("bt.device")
         MainActor.assumeIsolated {
             record(id: id, name: name, percent: Int(level))
         }

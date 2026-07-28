@@ -10,7 +10,7 @@ enum FinderService {
         var errorDescription: String? {
             switch self {
             case .scriptFailure(let message):
-                return "无法获取 Finder 路径：\(message)"
+                return L("error.finderPath", message)
             }
         }
     }
@@ -33,15 +33,15 @@ enum FinderService {
         """
         var errorInfo: NSDictionary?
         guard let script = NSAppleScript(source: source) else {
-            throw FinderError.scriptFailure("脚本初始化失败")
+            throw FinderError.scriptFailure(L("error.scriptInit"))
         }
         let result = script.executeAndReturnError(&errorInfo)
         if let errorInfo {
-            let message = errorInfo[NSAppleScript.errorMessage] as? String ?? "未知错误"
+            let message = errorInfo[NSAppleScript.errorMessage] as? String ?? L("error.unknown")
             throw FinderError.scriptFailure(message)
         }
         guard let path = result.stringValue, !path.isEmpty else {
-            throw FinderError.scriptFailure("返回结果为空")
+            throw FinderError.scriptFailure(L("error.emptyResult"))
         }
         return URL(fileURLWithPath: path, isDirectory: true)
     }

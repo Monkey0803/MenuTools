@@ -22,14 +22,14 @@ enum MenuBarIcon: String, CaseIterable, Identifiable {
 
     var displayName: String {
         switch self {
-        case .wrench: return "工具"
-        case .terminal: return "终端"
-        case .sparkles: return "星光"
-        case .bolt: return "闪电"
-        case .cube: return "方块"
-        case .moon: return "月亮"
-        case .gear: return "齿轮"
-        case .paw: return "爪印"
+        case .wrench: return L("icon.wrench")
+        case .terminal: return L("icon.terminal")
+        case .sparkles: return L("icon.sparkles")
+        case .bolt: return L("icon.bolt")
+        case .cube: return L("icon.cube")
+        case .moon: return L("icon.moon")
+        case .gear: return L("icon.gear")
+        case .paw: return L("icon.paw")
         }
     }
 

@@ -26,6 +26,11 @@ if [[ -f "Resources/AppIcon.icns" ]]; then
     cp "Resources/AppIcon.icns" "$APP_BUNDLE/Contents/Resources/AppIcon.icns"
 fi
 
+# 本地化资源（多语言 Localizable.strings）
+for lproj in Resources/*.lproj; do
+    [[ -d "$lproj" ]] && cp -R "$lproj" "$APP_BUNDLE/Contents/Resources/"
+done
+
 echo "==> Ad-hoc 签名"
 codesign --force --deep --sign - "$APP_BUNDLE"
 

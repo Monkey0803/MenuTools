@@ -14,7 +14,7 @@ enum TerminalApp: String, CaseIterable, Identifiable {
 
     var displayName: String {
         switch self {
-        case .terminal: return "终端 (Terminal)"
+        case .terminal: return L("terminal.builtin")
         case .iterm: return "iTerm2"
         case .warp: return "Warp"
         case .ghostty: return "Ghostty"
@@ -56,7 +56,7 @@ enum TerminalLauncher {
         var errorDescription: String? {
             switch self {
             case .appNotFound(let app):
-                return "未找到 \(app.displayName)，请先安装或在设置中更换终端"
+                return L("error.terminalNotFound", app.displayName)
             }
         }
     }

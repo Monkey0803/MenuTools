@@ -128,7 +128,7 @@ struct MenuPanelView: View {
             VStack(alignment: .leading, spacing: 1) {
                 Text("MenuTools")
                     .font(.headline)
-                Text("轻量系统工具集")
+                Text(L("panel.subtitle"))
                     .font(.caption2)
                     .foregroundStyle(.tertiary)
             }
@@ -145,7 +145,7 @@ struct MenuPanelView: View {
             .buttonStyle(.plain)
             .foregroundStyle(.secondary)
             .glassEffect(.regular.interactive(), in: .circle)
-            .help("打开设置")
+            .help(L("help.settings"))
         }
     }
 
@@ -156,7 +156,7 @@ struct MenuPanelView: View {
             Button(action: openFinderPathInTerminal) {
                 heroTileLabel(
                     symbol: "terminal.fill",
-                    title: "终端打开",
+                    title: L("panel.tile.terminal"),
                     subtitle: currentTerminal.shortName
                 )
             }
@@ -169,8 +169,8 @@ struct MenuPanelView: View {
             } label: {
                 heroTileLabel(
                     symbol: isDarkMode ? "moon.stars.fill" : "sun.max.fill",
-                    title: isDarkMode ? "深色模式" : "浅色模式",
-                    subtitle: "点按切换"
+                    title: isDarkMode ? L("panel.tile.dark") : L("panel.tile.light"),
+                    subtitle: L("panel.tile.tap")
                 )
             }
             .buttonStyle(.plain)
@@ -209,7 +209,7 @@ struct MenuPanelView: View {
         HStack(spacing: 9) {
             quickToggle(
                 symbol: caffeinate.isActive ? "lock.slash.fill" : "lock.fill",
-                help: "防止锁屏",
+                help: L("toggle.caffeinate"),
                 isOn: caffeinate.isActive,
                 pulse: caffeinate.isActive
             ) {
@@ -217,7 +217,7 @@ struct MenuPanelView: View {
             }
             quickToggle(
                 symbol: toggles.hiddenFilesShown ? "eye.fill" : "eye.slash",
-                help: "显示隐藏文件",
+                help: L("toggle.hiddenFiles"),
                 isOn: toggles.hiddenFilesShown
             ) {
                 SystemToggleService.setHiddenFilesShown(!toggles.hiddenFilesShown)
@@ -225,7 +225,7 @@ struct MenuPanelView: View {
             }
             quickToggle(
                 symbol: toggles.muted ? "speaker.slash.fill" : "speaker.wave.2.fill",
-                help: "静音",
+                help: L("toggle.mute"),
                 isOn: toggles.muted
             ) {
                 do {
@@ -237,7 +237,7 @@ struct MenuPanelView: View {
             }
             quickToggle(
                 symbol: "dock.rectangle",
-                help: "隐藏程序坞",
+                help: L("toggle.dock"),
                 isOn: toggles.dockHidden
             ) {
                 do {
@@ -249,7 +249,7 @@ struct MenuPanelView: View {
             }
             quickToggle(
                 symbol: "menubar.rectangle",
-                help: "隐藏菜单栏",
+                help: L("toggle.menubar"),
                 isOn: toggles.menuBarHidden
             ) {
                 do {
@@ -261,7 +261,7 @@ struct MenuPanelView: View {
             }
             quickToggle(
                 symbol: toggles.nightShift ? "sun.horizon.fill" : "sun.horizon",
-                help: "夜览 (Night Shift)",
+                help: L("toggle.nightShift"),
                 isOn: toggles.nightShift
             ) {
                 do {
@@ -327,7 +327,7 @@ struct MenuPanelView: View {
                         .font(.body)
                         .symbolRenderingMode(.hierarchical)
                         .foregroundStyle(.secondary)
-                    Text("未检测到蓝牙设备电量")
+                    Text(L("bt.empty"))
                         .font(.callout)
                         .foregroundStyle(.secondary)
                     Spacer()
@@ -421,7 +421,7 @@ struct MenuPanelView: View {
             Button(action: cleanDerivedData) {
                 cleanupTileLabel(
                     symbol: "hammer.fill",
-                    title: "DerivedData",
+                    title: L("cleanup.derivedData"),
                     subtitle: derivedDataSubtitle,
                     showProgress: isCleaningDerivedData
                 )
@@ -434,7 +434,7 @@ struct MenuPanelView: View {
             Button(action: clearClipboard) {
                 cleanupTileLabel(
                     symbol: "doc.on.clipboard.fill",
-                    title: "清理剪贴板",
+                    title: L("cleanup.clipboard"),
                     subtitle: clipboardSubtitle,
                     showProgress: false
                 )
@@ -475,13 +475,13 @@ struct MenuPanelView: View {
     }
 
     private var derivedDataSubtitle: String {
-        if isCleaningDerivedData { return "清理中…" }
-        guard let size = derivedDataSize else { return "计算中…" }
-        return size == 0 ? "已清空" : XcodeCleanerService.formatted(size)
+        if isCleaningDerivedData { return L("cleanup.cleaning") }
+        guard let size = derivedDataSize else { return L("cleanup.calculating") }
+        return size == 0 ? L("cleanup.cleared") : XcodeCleanerService.formatted(size)
     }
 
     private var clipboardSubtitle: String {
-        clipboardCount == 0 ? "已是空的" : "\(clipboardCount) 项内容"
+        clipboardCount == 0 ? L("cleanup.clipboardEmpty") : L("cleanup.items", clipboardCount)
     }
 
     // MARK: - 状态提示 / 底部
@@ -514,7 +514,7 @@ struct MenuPanelView: View {
                     HStack(spacing: 3) {
                         Image(systemName: "arrow.down.circle.fill")
                             .symbolEffect(.bounce, value: update)
-                        Text("新版本 v\(update.version)")
+                        Text(L("footer.newVersion", update.version))
                     }
                     .font(.caption)
                 }
@@ -524,7 +524,7 @@ struct MenuPanelView: View {
                 ProgressView()
                     .controlSize(.mini)
             } else {
-                Button("检查更新") {
+                Button(L("footer.checkUpdate")) {
                     checkForUpdate()
                 }
                 .buttonStyle(.plain)
@@ -533,7 +533,7 @@ struct MenuPanelView: View {
             }
 
             Spacer()
-            Button("退出") {
+            Button(L("footer.quit")) {
                 NSApplication.shared.terminate(nil)
             }
             .buttonStyle(.plain)
@@ -552,7 +552,7 @@ struct MenuPanelView: View {
         do {
             let directory = try FinderService.frontWindowPath()
             try TerminalLauncher.open(directory: directory, in: currentTerminal)
-            flashStatus("已在 \(currentTerminal.displayName) 打开：\(directory.path)", isError: false)
+            flashStatus(L("status.openedIn", currentTerminal.displayName, directory.path), isError: false)
         } catch {
             flashStatus(error.localizedDescription, isError: true)
         }
@@ -603,7 +603,7 @@ struct MenuPanelView: View {
                 withAnimation(.smooth(duration: 0.3)) {
                     derivedDataSize = 0
                 }
-                flashStatus("已释放 \(XcodeCleanerService.formatted(sizeBefore))", isError: false)
+                flashStatus(L("status.freed", XcodeCleanerService.formatted(sizeBefore)), isError: false)
             } catch {
                 isCleaningDerivedData = false
                 flashStatus(error.localizedDescription, isError: true)
@@ -617,7 +617,7 @@ struct MenuPanelView: View {
         withAnimation(.smooth(duration: 0.3)) {
             clipboardCount = 0
         }
-        flashStatus("剪贴板已清空", isError: false)
+        flashStatus(L("status.clipboardCleared"), isError: false)
     }
 
     private func checkForUpdate() {
@@ -631,14 +631,14 @@ struct MenuPanelView: View {
                     withAnimation(.smooth(duration: 0.3)) {
                         availableUpdate = update
                     }
-                    let notes = update.notes.map { "：\($0)" } ?? ""
-                    flashStatus("发现新版本 v\(update.version)\(notes)", isError: false)
+                    let notes = update.notes.map { " — \($0)" } ?? ""
+                    flashStatus(L("status.newVersion", update.version, notes), isError: false)
                 } else {
-                    flashStatus("当前已是最新版本 (v\(UpdateCheckerService.currentVersion))", isError: false)
+                    flashStatus(L("status.upToDate", UpdateCheckerService.currentVersion), isError: false)
                 }
             } catch {
                 isCheckingUpdate = false
-                flashStatus("检查更新失败：\(error.localizedDescription)", isError: true)
+                flashStatus(L("status.updateFailed", error.localizedDescription), isError: true)
             }
         }
     }
@@ -651,7 +651,7 @@ struct MenuPanelView: View {
             withAnimation(.smooth(duration: 0.3)) {
                 availableUpdate = update
             }
-            flashStatus("发现新版本 v\(update.version)，点击底栏下载", isError: false)
+            flashStatus(L("status.newVersionHint", update.version), isError: false)
         }
     }
 

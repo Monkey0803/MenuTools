@@ -28,8 +28,8 @@ enum UpdateCheckerService {
 
         var errorDescription: String? {
             switch self {
-            case .invalidFeedURL: return "更新源地址无效"
-            case .badResponse: return "更新源返回异常"
+            case .invalidFeedURL: return L("error.feedInvalid")
+            case .badResponse: return L("error.feedBad")
             }
         }
     }

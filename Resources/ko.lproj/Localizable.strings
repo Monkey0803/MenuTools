@@ -1,0 +1,84 @@
+/* 패널 */
+"panel.subtitle" = "가벼운 시스템 도구 모음";
+"panel.tile.terminal" = "터미널에서 열기";
+"panel.tile.tap" = "탭하여 전환";
+"panel.tile.dark" = "다크 모드";
+"panel.tile.light" = "라이트 모드";
+"help.settings" = "설정 열기";
+
+/* 빠른 전환 */
+"toggle.caffeinate" = "화면 잠금 방지";
+"toggle.hiddenFiles" = "숨김 파일 표시";
+"toggle.mute" = "음소거";
+"toggle.dock" = "Dock 자동 숨김";
+"toggle.menubar" = "메뉴 막대 자동 숨김";
+"toggle.nightShift" = "Night Shift";
+
+/* 블루투스 */
+"bt.empty" = "블루투스 기기 배터리 정보 없음";
+"bt.device" = "블루투스 기기";
+
+/* 정리 */
+"cleanup.derivedData" = "DerivedData";
+"cleanup.clipboard" = "클립보드 지우기";
+"cleanup.cleaning" = "정리 중…";
+"cleanup.calculating" = "계산 중…";
+"cleanup.cleared" = "비어 있음";
+"cleanup.clipboardEmpty" = "이미 비어 있음";
+"cleanup.items" = "%d개 항목";
+
+/* 하단 */
+"footer.checkUpdate" = "업데이트 확인";
+"footer.newVersion" = "새 버전 v%@";
+"footer.quit" = "종료";
+
+/* 상태 */
+"status.openedIn" = "%@에서 열었습니다: %@";
+"status.clipboardCleared" = "클립보드를 지웠습니다";
+"status.freed" = "%@ 확보됨";
+"status.newVersion" = "새 버전 v%@ 발견%@";
+"status.upToDate" = "최신 버전입니다 (v%@)";
+"status.updateFailed" = "업데이트 확인 실패: %@";
+"status.newVersionHint" = "새 버전 v%@ 발견, 하단에서 다운로드하세요";
+
+/* 설정 */
+"settings.title" = "MenuTools 설정";
+"settings.section.icon" = "메뉴 막대 아이콘";
+"settings.section.terminal" = "터미널 App";
+"settings.terminal.desc" = "Finder 경로를 터미널에서 열 때 사용";
+"settings.section.update" = "소프트웨어 업데이트";
+"settings.autoCheck" = "자동 업데이트 확인";
+"settings.autoCheck.desc" = "패널을 열 때 조용히 확인 (24시간마다 최대 1회)";
+"settings.currentVersion" = "현재 버전";
+"settings.manualCheck" = "수동 확인";
+"settings.checkNow" = "지금 확인";
+"settings.download" = "v%@ 다운로드";
+"settings.latest" = "최신 버전입니다";
+"settings.found" = "새 버전 v%@ 발견";
+"settings.checkFailed" = "확인 실패: %@";
+
+/* 메뉴 막대 아이콘 이름 */
+"icon.wrench" = "도구";
+"icon.terminal" = "터미널";
+"icon.sparkles" = "반짝임";
+"icon.bolt" = "번개";
+"icon.cube" = "큐브";
+"icon.moon" = "달";
+"icon.gear" = "톱니바퀴";
+"icon.paw" = "발자국";
+
+/* 터미널 */
+"terminal.builtin" = "터미널 (Terminal)";
+
+/* 오류 */
+"error.finderPath" = "Finder 경로를 가져오지 못했습니다: %@";
+"error.scriptInit" = "스크립트 초기화 실패";
+"error.emptyResult" = "결과가 비어 있습니다";
+"error.unknown" = "알 수 없는 오류";
+"error.terminalNotFound" = "%@을(를) 찾을 수 없습니다. 설치하거나 설정에서 변경하세요";
+"error.appearance" = "외관 전환 실패: %@ (시스템 설정 > 개인정보 보호 및 보안 > 자동화에서 MenuTools의 '시스템 이벤트' 제어를 허용하세요)";
+"error.toggle" = "작업 실패: %@ ('시스템 이벤트' 관련 시 시스템 설정 > 개인정보 보호 및 보안 > 자동화에서 허용하세요)";
+"error.nightShift" = "이 기기는 Night Shift를 지원하지 않습니다";
+"error.cleanPartial" = "%d개 항목을 삭제하지 못했습니다(Xcode 사용 중일 수 있음): %@";
+"error.feedInvalid" = "업데이트 피드 URL이 잘못되었습니다";
+"error.feedBad" = "업데이트 피드 응답 오류";

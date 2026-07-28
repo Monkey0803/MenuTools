@@ -12,7 +12,7 @@ enum NightShiftService {
         var errorDescription: String? {
             switch self {
             case .unavailable:
-                return "此设备不支持夜览（Night Shift）"
+                return L("error.nightShift")
             }
         }
     }

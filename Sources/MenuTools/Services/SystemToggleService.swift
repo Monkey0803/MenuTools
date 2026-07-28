@@ -11,7 +11,7 @@ enum SystemToggleService {
         var errorDescription: String? {
             switch self {
             case .scriptFailure(let message):
-                return "操作失败：\(message)（如涉及“系统事件”，请在“系统设置 > 隐私与安全性 > 自动化”中允许 MenuTools）"
+                return L("error.toggle", message)
             }
         }
     }
@@ -69,11 +69,11 @@ enum SystemToggleService {
     private static func runAppleScript(_ source: String) throws -> NSAppleEventDescriptor {
         var errorInfo: NSDictionary?
         guard let script = NSAppleScript(source: source) else {
-            throw ToggleError.scriptFailure("脚本初始化失败")
+            throw ToggleError.scriptFailure(L("error.scriptInit"))
         }
         let result = script.executeAndReturnError(&errorInfo)
         if let errorInfo {
-            let message = errorInfo[NSAppleScript.errorMessage] as? String ?? "未知错误"
+            let message = errorInfo[NSAppleScript.errorMessage] as? String ?? L("error.unknown")
             throw ToggleError.scriptFailure(message)
         }
         return result
