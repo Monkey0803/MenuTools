@@ -59,7 +59,8 @@ else
     SIGN_ARG=(--sign -)
 fi
 # 必须先签内嵌扩展，再签外层 App（否则封装校验失败）
-codesign --force "${SIGN_ARG[@]}" "$APPEX"
-codesign --force "${SIGN_ARG[@]}" "$APP_BUNDLE"
+# 扩展必须开启沙箱（pkd 硬性要求）+ App Group（与主 App 共享配置）
+codesign --force "${SIGN_ARG[@]}" --entitlements Extension/RightClickTools.entitlements "$APPEX"
+codesign --force "${SIGN_ARG[@]}" --entitlements Resources/MenuTools.entitlements "$APP_BUNDLE"
 
 echo "==> 完成：$APP_BUNDLE"

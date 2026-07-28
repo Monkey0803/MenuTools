@@ -66,8 +66,14 @@ struct RightClickConfig: Codable, Equatable {
 enum RightClickConfigStore {
 
     static let didChangeNotification = "com.qoder.menutools.rightclick.configChanged"
+    static let appGroup = "group.com.qoder.menutools"
 
     static var fileURL: URL {
+        // 优先用 App Group 共享容器（沙箱扩展与主 App 都能访问）
+        if let container = FileManager.default.containerURL(forSecurityApplicationGroupIdentifier: appGroup) {
+            return container.appendingPathComponent("rightclick.json", isDirectory: false)
+        }
+        // 回退：主 App 非沙箱时可用（扩展沙箱下读不到，仅保底）
         let dir = FileManager.default
             .homeDirectoryForCurrentUser
             .appendingPathComponent("Library/Application Support/MenuTools", isDirectory: true)
