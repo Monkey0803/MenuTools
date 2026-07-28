@@ -16,6 +16,8 @@ struct SettingsView: View {
                 .tabItem { Label(L("settings.tab.rightClick"), systemImage: "contextualmenu.and.cursorarrow") }
             ShortcutSettingsView()
                 .tabItem { Label(L("settings.tab.shortcut"), systemImage: "command") }
+            ScrollSettingsView()
+                .tabItem { Label(L("settings.tab.scroll"), systemImage: "computermouse") }
         }
         .frame(width: SettingsLayout.width, height: SettingsLayout.height)
     }

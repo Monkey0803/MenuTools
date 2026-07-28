@@ -130,3 +130,23 @@
 "sc.action.quitApp" = "退出当前应用";
 "sc.action.moveLeftSpace" = "向左移动空间";
 "sc.action.moveRightSpace" = "向右移动空间";
+
+/* 平滑滚动 */
+"settings.tab.scroll" = "平滑滚动";
+"scroll.title" = "平滑滚动";
+"scroll.subtitle" = "接管鼠标滚轮，将生硬的滚动插值成顺滑滚动。仅作用于鼠标，不影响触控板。";
+"scroll.enable" = "启用平滑滚动";
+"scroll.enable.desc" = "需在“辅助功能”中授权 MenuTools 才能接管滚轮。";
+"scroll.needAccessibility" = "尚未获得“辅助功能”权限，平滑滚动无法生效。";
+"scroll.openAccessibility" = "打开辅助功能";
+"scroll.section.smooth" = "平滑滚动";
+"scroll.gain" = "速度增益";
+"scroll.duration" = "持续时间";
+"scroll.minStep" = "最短步长";
+"scroll.touchpad" = "模拟触控板模式";
+"scroll.touchpad.desc" = "以连续像素事件输出，触发 App 的原生平滑滚动。";
+"scroll.section.axis" = "轴向独立";
+"scroll.axis.vertical" = "垂直";
+"scroll.axis.horizontal" = "水平";
+"scroll.smooth" = "平滑";
+"scroll.invert" = "反向";

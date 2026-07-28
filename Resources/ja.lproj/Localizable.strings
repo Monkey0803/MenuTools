@@ -130,3 +130,23 @@
 "sc.action.quitApp" = "現在の App を終了";
 "sc.action.moveLeftSpace" = "左の操作スペースへ";
 "sc.action.moveRightSpace" = "右の操作スペースへ";
+
+/* スムーズスクロール */
+"settings.tab.scroll" = "スムーズスクロール";
+"scroll.title" = "スムーズスクロール";
+"scroll.subtitle" = "マウスホイールを引き取り、カクつくスクロールを滑らかに補間します。トラックパッドには影響しません。";
+"scroll.enable" = "スムーズスクロールを有効にする";
+"scroll.enable.desc" = "ホイールを引き取るには「アクセシビリティ」の許可が必要です。";
+"scroll.needAccessibility" = "「アクセシビリティ」未許可のため、スムーズスクロールは無効です。";
+"scroll.openAccessibility" = "アクセシビリティを開く";
+"scroll.section.smooth" = "スムーズスクロール";
+"scroll.gain" = "速度ゲイン";
+"scroll.duration" = "継続時間";
+"scroll.minStep" = "最小ステップ";
+"scroll.touchpad" = "トラックパッドを模倣";
+"scroll.touchpad.desc" = "連続ピクセルイベントで出力し、App のネイティブな滑らかスクロールを促します。";
+"scroll.section.axis" = "軸ごと";
+"scroll.axis.vertical" = "垂直";
+"scroll.axis.horizontal" = "水平";
+"scroll.smooth" = "スムーズ";
+"scroll.invert" = "反転";

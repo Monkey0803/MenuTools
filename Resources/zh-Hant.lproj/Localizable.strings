@@ -130,3 +130,23 @@
 "sc.action.quitApp" = "結束目前應用程式";
 "sc.action.moveLeftSpace" = "向左移動空間";
 "sc.action.moveRightSpace" = "向右移動空間";
+
+/* 平滑捲動 */
+"settings.tab.scroll" = "平滑捲動";
+"scroll.title" = "平滑捲動";
+"scroll.subtitle" = "接管滑鼠滾輪，將生硬的捲動插值成順滑捲動。僅作用於滑鼠，不影響觸控板。";
+"scroll.enable" = "啟用平滑捲動";
+"scroll.enable.desc" = "需在「輔助使用」中授權 MenuTools 才能接管滾輪。";
+"scroll.needAccessibility" = "尚未取得「輔助使用」權限，平滑捲動無法生效。";
+"scroll.openAccessibility" = "打開輔助使用";
+"scroll.section.smooth" = "平滑捲動";
+"scroll.gain" = "速度增益";
+"scroll.duration" = "持續時間";
+"scroll.minStep" = "最短步長";
+"scroll.touchpad" = "模擬觸控板模式";
+"scroll.touchpad.desc" = "以連續像素事件輸出，觸發 App 的原生平滑捲動。";
+"scroll.section.axis" = "軸向獨立";
+"scroll.axis.vertical" = "垂直";
+"scroll.axis.horizontal" = "水平";
+"scroll.smooth" = "平滑";
+"scroll.invert" = "反向";

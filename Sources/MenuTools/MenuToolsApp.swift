@@ -6,6 +6,16 @@ enum SettingsKey {
     static let preferredTerminal = "preferredTerminal"
     static let autoCheckUpdate = "autoCheckUpdateEnabled"
     static let appLanguage = "appLanguage"
+    // 平滑滚动
+    static let scrollEnabled = "scrollEnabled"
+    static let scrollSmoothV = "scrollSmoothVertical"
+    static let scrollSmoothH = "scrollSmoothHorizontal"
+    static let scrollInvertV = "scrollInvertVertical"
+    static let scrollInvertH = "scrollInvertHorizontal"
+    static let scrollGain = "scrollGain"
+    static let scrollDuration = "scrollDuration"
+    static let scrollMinStep = "scrollMinStep"
+    static let scrollTouchpad = "scrollTouchpadEmulation"
 }
 
 /// 可选的菜单栏图标（SF Symbols）
@@ -44,6 +54,8 @@ struct MenuToolsApp: App {
     init() {
         // 注册已保存的全局快捷键
         ShortcutManager.shared.activate()
+        // 根据配置启动平滑滚动引擎
+        SmoothScrollEngine.shared.activateIfEnabled()
     }
 
     var body: some Scene {

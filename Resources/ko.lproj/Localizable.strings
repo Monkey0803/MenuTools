@@ -130,3 +130,23 @@
 "sc.action.quitApp" = "현재 앱 종료";
 "sc.action.moveLeftSpace" = "왼쪽 공간으로 이동";
 "sc.action.moveRightSpace" = "오른쪽 공간으로 이동";
+
+/* 부드러운 스크롤 */
+"settings.tab.scroll" = "부드러운 스크롤";
+"scroll.title" = "부드러운 스크롤";
+"scroll.subtitle" = "마우스 휠을 가로채어 뻣뻣한 스크롤을 부드럽게 보간합니다. 트랙패드에는 영향을 주지 않습니다.";
+"scroll.enable" = "부드러운 스크롤 사용";
+"scroll.enable.desc" = "휠을 가로채려면 '손쉬운 사용' 권한이 필요합니다.";
+"scroll.needAccessibility" = "'손쉬운 사용' 권한이 없어 부드러운 스크롤이 작동하지 않습니다.";
+"scroll.openAccessibility" = "손쉬운 사용 열기";
+"scroll.section.smooth" = "부드러운 스크롤";
+"scroll.gain" = "속도 게인";
+"scroll.duration" = "지속 시간";
+"scroll.minStep" = "최소 단계";
+"scroll.touchpad" = "트랙패드 시뮬레이션";
+"scroll.touchpad.desc" = "연속 픽셀 이벤트로 출력하여 앱의 기본 부드러운 스크롤을 유도합니다.";
+"scroll.section.axis" = "축별";
+"scroll.axis.vertical" = "수직";
+"scroll.axis.horizontal" = "수평";
+"scroll.smooth" = "부드럽게";
+"scroll.invert" = "반전";

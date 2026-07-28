@@ -130,3 +130,23 @@
 "sc.action.quitApp" = "Quit Current App";
 "sc.action.moveLeftSpace" = "Move Left a Space";
 "sc.action.moveRightSpace" = "Move Right a Space";
+
+/* Smooth scrolling */
+"settings.tab.scroll" = "Smooth Scroll";
+"scroll.title" = "Smooth Scrolling";
+"scroll.subtitle" = "Intercepts the mouse wheel and interpolates jerky scrolls into smooth motion. Affects the mouse only, not the trackpad.";
+"scroll.enable" = "Enable Smooth Scrolling";
+"scroll.enable.desc" = "Requires Accessibility permission for MenuTools to intercept the wheel.";
+"scroll.needAccessibility" = "Accessibility permission not granted; smooth scrolling is inactive.";
+"scroll.openAccessibility" = "Open Accessibility";
+"scroll.section.smooth" = "Smooth Scrolling";
+"scroll.gain" = "Speed Gain";
+"scroll.duration" = "Duration";
+"scroll.minStep" = "Min Step";
+"scroll.touchpad" = "Emulate Trackpad";
+"scroll.touchpad.desc" = "Emit continuous pixel events to trigger apps' native smooth scrolling.";
+"scroll.section.axis" = "Per-Axis";
+"scroll.axis.vertical" = "Vertical";
+"scroll.axis.horizontal" = "Horizontal";
+"scroll.smooth" = "Smooth";
+"scroll.invert" = "Invert";
