@@ -253,7 +253,10 @@ final class SmoothScrollEngine: ObservableObject, @unchecked Sendable {
         event.setIntegerValueField(.scrollWheelEventDeltaAxis2, value: 0)
         event.setIntegerValueField(.scrollWheelEventIsContinuous, value: continuous ? 1 : 0)
         event.setIntegerValueField(.eventSourceUserData, value: Self.syntheticMarker)
-        if pid > 0 { event.postToPid(pid) } else { event.post(tap: .cgSessionEventTap) }
+        // 投回会话事件流，由系统路由到最前台 App；不依赖 MenuTools 是否激活（postToPid 在非激活时不投递）。
+        // 合成事件带标记，重入自身 tap 时会直接放行，不死循环。
+        _ = pid
+        event.post(tap: .cgSessionEventTap)
     }
 
     private func resetState() {
