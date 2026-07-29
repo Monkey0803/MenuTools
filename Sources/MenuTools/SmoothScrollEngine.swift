@@ -29,6 +29,7 @@ final class SmoothScrollEngine: ObservableObject, @unchecked Sendable {
     private var targetPID: pid_t = 0
     private var lastFrameTime: CFTimeInterval = 0
     private var active = false              // 动画是否进行中
+    private var phaseBegan = false          // 当前手势是否已发 Began 相位
 
     private init() {}
 
@@ -103,7 +104,8 @@ final class SmoothScrollEngine: ObservableObject, @unchecked Sendable {
             if let tap = eventTap { CGEvent.tapEnable(tap: tap, enable: true) }
             return Unmanaged.passUnretained(event)
         }
-        if event.getIntegerValueField(.eventSourceUserData) == Self.syntheticMarker {
+        let marker = event.getIntegerValueField(.eventSourceUserData)
+        if marker == Self.syntheticMarker {
             return Unmanaged.passUnretained(event)
         }
         if isTrackpad(event) {
@@ -228,22 +230,30 @@ final class SmoothScrollEngine: ObservableObject, @unchecked Sendable {
         let continuous = config.touchpadEmulation
 
         if residual < deadZone && output < deadZone {
-            // 收敛：只复位状态，不停止 DisplayLink（link 常驻，避免回调内 stop 导致卡死）
+            // 收敛：复位状态（不停 DisplayLink）；若已开始相位，补发 Ended
+            let wasBegan = phaseBegan
+            phaseBegan = false
             buffer = (0, 0); current = (0, 0); lastDelta = (0, 0)
             filter.reset()
             lastFrameTime = 0
             active = false
             os_unfair_lock_unlock(&lock)
+            if wasBegan, continuous, let event = templateCopy {
+                post(event: event, y: 0, x: 0, pid: pid, continuous: continuous, phase: 4) // Ended
+            }
             return
         }
+        // 首帧 Began(1)，后续 Changed(2)
+        let phase: Int64 = phaseBegan ? 2 : 1
+        phaseBegan = true
         os_unfair_lock_unlock(&lock)
 
         if output > deadZone, let event = templateCopy {
-            post(event: event, y: frameY, x: frameX, pid: pid, continuous: continuous)
+            post(event: event, y: frameY, x: frameX, pid: pid, continuous: continuous, phase: phase)
         }
     }
 
-    private func post(event: CGEvent, y: Double, x: Double, pid: pid_t, continuous: Bool) {
+    private func post(event: CGEvent, y: Double, x: Double, pid: pid_t, continuous: Bool, phase: Int64) {
         // 三类 delta 字段全部一致改写，否则模板残留的原始 fixedPtDelta 会主导方向（导致反向失效）
         event.setDoubleValueField(.scrollWheelEventPointDeltaAxis1, value: y)
         event.setDoubleValueField(.scrollWheelEventPointDeltaAxis2, value: x)
@@ -252,9 +262,10 @@ final class SmoothScrollEngine: ObservableObject, @unchecked Sendable {
         event.setIntegerValueField(.scrollWheelEventDeltaAxis1, value: 0)
         event.setIntegerValueField(.scrollWheelEventDeltaAxis2, value: 0)
         event.setIntegerValueField(.scrollWheelEventIsContinuous, value: continuous ? 1 : 0)
+        // 连续事件必须带 scroll phase，否则 Chromium/Electron（如 Qoder）会丢弃
+        event.setIntegerValueField(.scrollWheelEventScrollPhase, value: continuous ? phase : 0)
         event.setIntegerValueField(.eventSourceUserData, value: Self.syntheticMarker)
-        // 投回会话事件流，由系统路由到最前台 App；不依赖 MenuTools 是否激活（postToPid 在非激活时不投递）。
-        // 合成事件带标记，重入自身 tap 时会直接放行，不死循环。
+        // 投回会话事件流，由系统路由到最前台 App；不依赖 MenuTools 是否激活。
         _ = pid
         event.post(tap: .cgSessionEventTap)
     }
