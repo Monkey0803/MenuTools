@@ -80,13 +80,16 @@ enum KeySimulator {
                 if held.isEmpty { break }
                 try? await Task.sleep(for: .milliseconds(20))
             }
-            let source = CGEventSource(stateID: .privateState)
-            let down = CGEvent(keyboardEventSource: source, virtualKey: key, keyDown: true)
-            down?.flags = flags
-            down?.post(tap: .cghidEventTap)
-            let up = CGEvent(keyboardEventSource: source, virtualKey: key, keyDown: false)
-            up?.flags = flags
-            up?.post(tap: .cghidEventTap)
+            // 对齐 Mos：用 hidSystemState 源（合成事件被 WindowServer 当作真实硬件事件，
+            // 空间切换等符号热键才会识别）；keyUp 时清空 flags。
+            let source = CGEventSource(stateID: .hidSystemState)
+            if let down = CGEvent(keyboardEventSource: source, virtualKey: key, keyDown: true) {
+                down.flags = flags
+                down.post(tap: .cghidEventTap)
+            }
+            if let up = CGEvent(keyboardEventSource: source, virtualKey: key, keyDown: false) {
+                up.post(tap: .cghidEventTap)
+            }
         }
     }
 }
