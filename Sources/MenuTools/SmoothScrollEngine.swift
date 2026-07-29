@@ -24,6 +24,7 @@ final class SmoothScrollEngine: ObservableObject, @unchecked Sendable {
     private var buffer = (y: 0.0, x: 0.0)   // 目标累计位移
     private var current = (y: 0.0, x: 0.0)  // 已输出位移
     private var lastDelta = (y: 0.0, x: 0.0)
+    private var filter = ScrollFilter()
     private var template: CGEvent?
     private var targetPID: pid_t = 0
     private var lastFrameTime: CFTimeInterval = 0
@@ -210,11 +211,13 @@ final class SmoothScrollEngine: ObservableObject, @unchecked Sendable {
         let tau = max(0.03, config.duration / 3.0)
         let trans = 1 - exp(-dt / tau)
 
-        let frameY = (buffer.y - current.y) * trans
-        let frameX = (buffer.x - current.x) * trans
+        var frameY = (buffer.y - current.y) * trans
+        var frameX = (buffer.x - current.x) * trans
         current.y += frameY
         current.x += frameX
-        // 指数缓动本身即平滑起步且精确收敛（current→buffer），无需额外滤波（旧滤波会造成距离缩水/起步发虚）
+
+        // 峰值滤波去起始抖动
+        (frameY, frameX) = filter.fill(y: frameY, x: frameX)
 
         let deadZone = 0.1
         let residual = max(abs(buffer.y - current.y), abs(buffer.x - current.x))
@@ -227,6 +230,7 @@ final class SmoothScrollEngine: ObservableObject, @unchecked Sendable {
         if residual < deadZone && output < deadZone {
             // 收敛：只复位状态，不停止 DisplayLink（link 常驻，避免回调内 stop 导致卡死）
             buffer = (0, 0); current = (0, 0); lastDelta = (0, 0)
+            filter.reset()
             lastFrameTime = 0
             active = false
             os_unfair_lock_unlock(&lock)
@@ -258,8 +262,31 @@ final class SmoothScrollEngine: ObservableObject, @unchecked Sendable {
     private func resetState() {
         os_unfair_lock_lock(&lock)
         buffer = (0, 0); current = (0, 0); lastDelta = (0, 0)
-        template = nil; targetPID = 0; active = false
+        filter.reset(); template = nil; targetPID = 0; active = false
         os_unfair_lock_unlock(&lock)
+    }
+}
+
+/// 峰值滤波：用非线性数列平滑每帧增量，去除滚动起始的生硬跳跃（借鉴 Mos ScrollFilter）
+private struct ScrollFilter {
+    private var winY = [0.0, 0.0]
+    private var winX = [0.0, 0.0]
+
+    mutating func fill(y: Double, x: Double) -> (Double, Double) {
+        winY = polish(winY, with: y)
+        winX = polish(winX, with: x)
+        return (winY[0], winX[0])
+    }
+
+    mutating func reset() {
+        winY = [0.0, 0.0]
+        winX = [0.0, 0.0]
+    }
+
+    private func polish(_ array: [Double], with next: Double) -> [Double] {
+        let first = array[1]
+        let diff = next - first
+        return [first, first + 0.23 * diff, first + 0.5 * diff, first + 0.77 * diff, next]
     }
 }
 
