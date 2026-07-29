@@ -246,18 +246,13 @@ final class SmoothScrollEngine: ObservableObject, @unchecked Sendable {
     }
 
     private func post(event: CGEvent, y: Double, x: Double, pid: pid_t, continuous: Bool) {
-        // 合成事件尽量与真实高精度鼠标一致：pointDelta/fixedPtDelta 一致、行 delta 清零、无 phase
+        // 回到已知可用的最小格式：只写 pointDelta + 清零行 delta，不碰 fixedPtDelta/phase
         event.setDoubleValueField(.scrollWheelEventPointDeltaAxis1, value: y)
         event.setDoubleValueField(.scrollWheelEventPointDeltaAxis2, value: x)
-        event.setDoubleValueField(.scrollWheelEventFixedPtDeltaAxis1, value: y)
-        event.setDoubleValueField(.scrollWheelEventFixedPtDeltaAxis2, value: x)
         event.setIntegerValueField(.scrollWheelEventDeltaAxis1, value: 0)
         event.setIntegerValueField(.scrollWheelEventDeltaAxis2, value: 0)
         event.setIntegerValueField(.scrollWheelEventIsContinuous, value: continuous ? 1 : 0)
-        event.setIntegerValueField(.scrollWheelEventScrollPhase, value: 0)
-        event.setIntegerValueField(.scrollWheelEventMomentumPhase, value: 0)
         event.setIntegerValueField(.eventSourceUserData, value: Self.syntheticMarker)
-        // 直投目标进程（与真实鼠标事件同样直达 Qoder）；无目标时回退会话流
         if pid > 0 { event.postToPid(pid) } else { event.post(tap: .cgSessionEventTap) }
     }
 
