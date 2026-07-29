@@ -74,27 +74,31 @@ enum KeySimulator {
     /// 符号热键按实时物理修饰键状态判定，必须等 ⌥⌘ 松开后，合成的 ⌃← 才不被污染。
     @MainActor
     static func post(key: CGKeyCode, flags: CGEventFlags) {
-        guard let source = CGEventSource(stateID: .hidSystemState) else { return }
-        // 用 flagsChanged 显式按下修饰键：直接覆盖系统当前修饰键状态（即使物理 ⌥⌘ 仍按住），
-        // 形成真实的“⌃按下→方向键→⌃松开”序列，空间切换等符号热键才能识别。
-        let modKey = modifierKeyCode(for: flags)
-        if let modKey, let fc = CGEvent(keyboardEventSource: source, virtualKey: modKey, keyDown: true) {
-            fc.type = .flagsChanged
-            fc.flags = flags
-            fc.post(tap: .cghidEventTap)
-        }
-        if let down = CGEvent(keyboardEventSource: source, virtualKey: key, keyDown: true) {
-            down.flags = flags
-            down.post(tap: .cghidEventTap)
-        }
-        if let up = CGEvent(keyboardEventSource: source, virtualKey: key, keyDown: false) {
-            up.flags = flags
-            up.post(tap: .cghidEventTap)
-        }
-        if let modKey, let fc = CGEvent(keyboardEventSource: source, virtualKey: modKey, keyDown: false) {
-            fc.type = .flagsChanged
-            fc.flags = []
-            fc.post(tap: .cghidEventTap)
+        Task { @MainActor in
+            // 先给物理触发键（⌥⌘）一点时间释放，再注入干净的合成序列
+            try? await Task.sleep(for: .milliseconds(80))
+            guard let source = CGEventSource(stateID: .hidSystemState) else { return }
+            // 用 flagsChanged 显式按下修饰键：直接覆盖系统当前修饰键状态（即使物理 ⌥⌘ 仍按住），
+            // 形成真实的“⌃按下→方向键→⌃松开”序列，空间切换等符号热键才能识别。
+            let modKey = modifierKeyCode(for: flags)
+            if let modKey, let fc = CGEvent(keyboardEventSource: source, virtualKey: modKey, keyDown: true) {
+                fc.type = .flagsChanged
+                fc.flags = flags
+                fc.post(tap: .cghidEventTap)
+            }
+            if let down = CGEvent(keyboardEventSource: source, virtualKey: key, keyDown: true) {
+                down.flags = flags
+                down.post(tap: .cghidEventTap)
+            }
+            if let up = CGEvent(keyboardEventSource: source, virtualKey: key, keyDown: false) {
+                up.flags = flags
+                up.post(tap: .cghidEventTap)
+            }
+            if let modKey, let fc = CGEvent(keyboardEventSource: source, virtualKey: modKey, keyDown: false) {
+                fc.type = .flagsChanged
+                fc.flags = []
+                fc.post(tap: .cghidEventTap)
+            }
         }
     }
 
