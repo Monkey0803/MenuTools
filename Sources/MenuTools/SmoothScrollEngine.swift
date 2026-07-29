@@ -1,39 +1,18 @@
 import AppKit
 import CoreGraphics
-import CoreVideo
-import QuartzCore
-import os
 
-/// 平滑滚动引擎：CGEventTap 拦截鼠标滚轮，用 CVDisplayLink 逐帧插值为平滑像素滚动。
-/// 借鉴 Mos：buffer/current lerp 模型 + 峰值滤波去起始抖动 + 复制事件模板直投目标进程。
-/// tap 回调在主线程、DisplayLink 回调在后台线程，共享滚动状态用 os_unfair_lock 保护。
+/// 平滑滚动引擎：CGEventTap 拦截鼠标滚轮，就地改写滚动量（速度增益 / 轴向反向 / 轴转换）后放行。
+/// 不消费原事件、不注入合成事件，因此不依赖事件投递路由，前台/后台均稳定、绝不冻结。
+/// 仅作用于鼠标滚轮（按 phase 判定跳过触控板），不影响触控板。
 final class SmoothScrollEngine: ObservableObject, @unchecked Sendable {
     static let shared = SmoothScrollEngine()
-
-    private static let syntheticMarker: Int64 = 0x4D_54_53_53 // 'MTSS'
 
     @Published private(set) var isRunning = false
 
     private var config = ScrollConfig.load()
     private var eventTap: CFMachPort?
     private var runLoopSource: CFRunLoopSource?
-    private var displayLink: CVDisplayLink?
     private var activityToken: NSObjectProtocol?   // 阻止 App Nap 的活动令牌
-    private var keeper: Timer?                      // 看门狗定时器
-    private var lastTickWall: CFTimeInterval = 0    // 最近一次帧回调的壁钟（僵尸检测）
-    // 专用投递队列（userInteractive）：避免在 CVDisplayLink 线程同步投递，后台时不被降权限流
-    private let postQueue = DispatchQueue(label: "com.qoder.menutools.scrollpost", qos: .userInteractive)
-
-    // 共享滚动状态（锁保护）
-    private var lock = os_unfair_lock_s()
-    private var buffer = (y: 0.0, x: 0.0)   // 目标累计位移
-    private var current = (y: 0.0, x: 0.0)  // 已输出位移
-    private var lastDelta = (y: 0.0, x: 0.0)
-    private var filter = ScrollFilter()
-    private var template: CGEvent?
-    private var targetPID: pid_t = 0
-    private var lastFrameTime: CFTimeInterval = 0
-    private var active = false              // 动画是否进行中
 
     private init() {}
 
@@ -71,49 +50,14 @@ final class SmoothScrollEngine: ObservableObject, @unchecked Sendable {
         isRunning = true
     }
 
-    // MARK: - 看门狗：检测并重建僵尸 DisplayLink / 重启被禁用的 tap
-    private func startKeeper() {
-        keeper?.invalidate()
-        keeper = Timer.scheduledTimer(withTimeInterval: 1.0, repeats: true) { [weak self] _ in
-            self?.healthCheck()
-        }
-    }
-    private func healthCheck() {
-        guard isRunning else { return }
-        // tap 被系统禁用 → 重新启用
-        if let tap = eventTap, !CGEvent.tapIsEnabled(tap: tap) {
-            CGEvent.tapEnable(tap: tap, enable: true)
-        }
-        // DisplayLink 死亡 → 重建
-        guard let link = displayLink else { recreateLink(); return }
-        if !CVDisplayLinkIsRunning(link) { CVDisplayLinkStart(link); return }
-        // 僵尸：有待投递滚动但回调已停止跳动
-        os_unfair_lock_lock(&lock)
-        let pending = abs(buffer.y - current.y) > 0.5 || abs(buffer.x - current.x) > 0.5
-        os_unfair_lock_unlock(&lock)
-        if pending && lastTickWall > 0 && CACurrentMediaTime() - lastTickWall > 0.4 {
-            recreateLink()
-        }
-    }
-    private func recreateLink() {
-        if let link = displayLink { CVDisplayLinkStop(link) }
-        displayLink = nil
-        setupDisplayLink()
-        if let link = displayLink { CVDisplayLinkStart(link) }
-    }
-
     func stop() {
-        keeper?.invalidate(); keeper = nil
         if let token = activityToken { ProcessInfo.processInfo.endActivity(token); activityToken = nil }
-        if let link = displayLink { CVDisplayLinkStop(link) }
-        displayLink = nil
         if let tap = eventTap { CGEvent.tapEnable(tap: tap, enable: false) }
         if let source = runLoopSource {
             CFRunLoopRemoveSource(CFRunLoopGetMain(), source, .commonModes)
         }
         eventTap = nil
         runLoopSource = nil
-        resetState()
         isRunning = false
     }
 
@@ -128,7 +72,6 @@ final class SmoothScrollEngine: ObservableObject, @unchecked Sendable {
     }
 
     /// 取某轴可用位移：优先像素 delta（高精度鼠标），其次定点，最后行 delta。
-    /// 返回（值, 是否像素源）；行源需放大更多才能达到相似手感。
     private func usable(line: Double, pt: Double, fixed: Double) -> (value: Double, pixel: Bool) {
         if pt != 0 { return (pt, true) }
         if fixed != 0 { return (fixed, true) }
@@ -142,10 +85,6 @@ final class SmoothScrollEngine: ObservableObject, @unchecked Sendable {
             if let tap = eventTap { CGEvent.tapEnable(tap: tap, enable: true) }
             return Unmanaged.passUnretained(event)
         }
-        let marker = event.getIntegerValueField(.eventSourceUserData)
-        if marker == Self.syntheticMarker {
-            return Unmanaged.passUnretained(event)
-        }
         if isTrackpad(event) {
             return Unmanaged.passUnretained(event)
         }
@@ -155,11 +94,11 @@ final class SmoothScrollEngine: ObservableObject, @unchecked Sendable {
         }
 
         // 取可用位移（兼容行/像素两类鼠标）
-        let (usableY, pixelY) = usable(
+        let (usableY, _) = usable(
             line: event.getDoubleValueField(.scrollWheelEventDeltaAxis1),
             pt: event.getDoubleValueField(.scrollWheelEventPointDeltaAxis1),
             fixed: event.getDoubleValueField(.scrollWheelEventFixedPtDeltaAxis1))
-        let (usableX, pixelX) = usable(
+        let (usableX, _) = usable(
             line: event.getDoubleValueField(.scrollWheelEventDeltaAxis2),
             pt: event.getDoubleValueField(.scrollWheelEventPointDeltaAxis2),
             fixed: event.getDoubleValueField(.scrollWheelEventFixedPtDeltaAxis2))
@@ -213,106 +152,6 @@ final class SmoothScrollEngine: ObservableObject, @unchecked Sendable {
         }
         // 就地改写后放行（不消费、不注入 → 投递绝不失败、绝不冻结）
         return Unmanaged.passUnretained(event)
-    }
-
-    // MARK: - CVDisplayLink 逐帧插值
-
-    private func setupDisplayLink() {
-        var link: CVDisplayLink?
-        CVDisplayLinkCreateWithActiveCGDisplays(&link)
-        guard let link else { return }
-        CVDisplayLinkSetOutputHandler(link) { [weak self] _, inNow, _, _, _ in
-            self?.frame(now: inNow.pointee)
-            return kCVReturnSuccess
-        }
-        displayLink = link
-    }
-
-    private func frame(now: CVTimeStamp) {
-        let t = CACurrentMediaTime()
-        lastTickWall = t   // 看门狗心跳
-        os_unfair_lock_lock(&lock)
-        // 计算帧间隔与逐帧逼近系数
-        let dt = lastFrameTime > 0 ? min(0.05, t - lastFrameTime) : 1.0 / 60.0
-        lastFrameTime = t
-        let tau = max(0.03, config.duration / 3.0)
-        let trans = 1 - exp(-dt / tau)
-
-        var frameY = (buffer.y - current.y) * trans
-        var frameX = (buffer.x - current.x) * trans
-        current.y += frameY
-        current.x += frameX
-
-        // 峰值滤波去起始抖动
-        (frameY, frameX) = filter.fill(y: frameY, x: frameX)
-
-        let deadZone = 0.1
-        let residual = max(abs(buffer.y - current.y), abs(buffer.x - current.x))
-        let output = max(abs(frameY), abs(frameX))
-
-        let templateCopy = template?.copy()
-        let pid = targetPID
-        let continuous = config.touchpadEmulation
-
-        if residual < deadZone && output < deadZone {
-            // 收敛：复位状态（不停 DisplayLink）
-            buffer = (0, 0); current = (0, 0); lastDelta = (0, 0)
-            filter.reset()
-            lastFrameTime = 0
-            active = false
-            os_unfair_lock_unlock(&lock)
-            return
-        }
-        let willPost = output > deadZone
-        os_unfair_lock_unlock(&lock)
-
-        if willPost, let event = templateCopy {
-            post(event: event, y: frameY, x: frameX, pid: pid, continuous: continuous)
-        }
-    }
-
-    private func post(event: CGEvent, y: Double, x: Double, pid: pid_t, continuous: Bool) {
-        // 回到已知可用的最小格式：只写 pointDelta + 清零行 delta，不碰 fixedPtDelta/phase
-        event.setDoubleValueField(.scrollWheelEventPointDeltaAxis1, value: y)
-        event.setDoubleValueField(.scrollWheelEventPointDeltaAxis2, value: x)
-        event.setIntegerValueField(.scrollWheelEventDeltaAxis1, value: 0)
-        event.setIntegerValueField(.scrollWheelEventDeltaAxis2, value: 0)
-        event.setIntegerValueField(.scrollWheelEventIsContinuous, value: continuous ? 1 : 0)
-        event.setIntegerValueField(.eventSourceUserData, value: Self.syntheticMarker)
-        let e = event
-        postQueue.async {
-            if pid > 0 { e.postToPid(pid) } else { e.post(tap: .cgSessionEventTap) }
-        }
-    }
-
-    private func resetState() {
-        os_unfair_lock_lock(&lock)
-        buffer = (0, 0); current = (0, 0); lastDelta = (0, 0)
-        filter.reset(); template = nil; targetPID = 0; active = false
-        os_unfair_lock_unlock(&lock)
-    }
-}
-
-/// 峰值滤波：用非线性数列平滑每帧增量，去除滚动起始的生硬跳跃（借鉴 Mos ScrollFilter）
-private struct ScrollFilter {
-    private var winY = [0.0, 0.0]
-    private var winX = [0.0, 0.0]
-
-    mutating func fill(y: Double, x: Double) -> (Double, Double) {
-        winY = polish(winY, with: y)
-        winX = polish(winX, with: x)
-        return (winY[0], winX[0])
-    }
-
-    mutating func reset() {
-        winY = [0.0, 0.0]
-        winX = [0.0, 0.0]
-    }
-
-    private func polish(_ array: [Double], with next: Double) -> [Double] {
-        let first = array[1]
-        let diff = next - first
-        return [first, first + 0.23 * diff, first + 0.5 * diff, first + 0.77 * diff, next]
     }
 }
 
