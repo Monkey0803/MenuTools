@@ -64,14 +64,10 @@ final class SmoothScrollEngine: ObservableObject, @unchecked Sendable {
         runLoopSource = source
         CFRunLoopAddSource(CFRunLoopGetMain(), source, .commonModes)
         CGEvent.tapEnable(tap: tap, enable: true)
-        setupDisplayLink()
-        // DisplayLink 常驻运行（绝不在回调线程里 stop，避免 link 卡死）；空闲时不投递
-        if let link = displayLink { CVDisplayLinkStart(link) }
-        // 阻止 App Nap：后台无窗口时 macOS 会节流本进程，导致 postToPid 投递的事件不被路由
+        // 就地改写模式：不消费、不注入，无需 DisplayLink/看门狗；仅阻止 App Nap 保持后台 tap 响应
         if activityToken == nil {
-            activityToken = ProcessInfo.processInfo.beginActivity(options: [.userInitiated, .latencyCritical], reason: "SmoothScroll")
+            activityToken = ProcessInfo.processInfo.beginActivity(options: [.userInitiated], reason: "SmoothScroll")
         }
-        startKeeper()
         isRunning = true
     }
 
@@ -177,26 +173,6 @@ final class SmoothScrollEngine: ObservableObject, @unchecked Sendable {
             return Unmanaged.passUnretained(event)
         }
 
-        let smoothV = config.smoothVertical && usableY != 0
-        let smoothH = config.smoothHorizontal && usableX != 0
-        let reverseV = config.invertVertical && usableY != 0
-        let reverseH = config.invertHorizontal && usableX != 0
-
-        // 无任何平滑：若需反向则翻转原事件三个 delta 字段并放行
-        if !smoothV && !smoothH {
-            if reverseV {
-                event.setDoubleValueField(.scrollWheelEventDeltaAxis1, value: -event.getDoubleValueField(.scrollWheelEventDeltaAxis1))
-                event.setDoubleValueField(.scrollWheelEventPointDeltaAxis1, value: -event.getDoubleValueField(.scrollWheelEventPointDeltaAxis1))
-                event.setDoubleValueField(.scrollWheelEventFixedPtDeltaAxis1, value: -event.getDoubleValueField(.scrollWheelEventFixedPtDeltaAxis1))
-            }
-            if reverseH {
-                event.setDoubleValueField(.scrollWheelEventDeltaAxis2, value: -event.getDoubleValueField(.scrollWheelEventDeltaAxis2))
-                event.setDoubleValueField(.scrollWheelEventPointDeltaAxis2, value: -event.getDoubleValueField(.scrollWheelEventPointDeltaAxis2))
-                event.setDoubleValueField(.scrollWheelEventFixedPtDeltaAxis2, value: -event.getDoubleValueField(.scrollWheelEventFixedPtDeltaAxis2))
-            }
-            return Unmanaged.passUnretained(event)
-        }
-
         // 加速键按下 → 增益放大
         var accel = 1.0
         if config.accelModifier != 0 && (flags & UInt64(config.accelModifier)) == UInt64(config.accelModifier) {
@@ -204,33 +180,39 @@ final class SmoothScrollEngine: ObservableObject, @unchecked Sendable {
         }
         // 转换键按下 → 垂直滚动转为水平
         let shiftAxis = config.shiftModifier != 0 && (flags & UInt64(config.shiftModifier)) == UInt64(config.shiftModifier)
-
-        let templateCopy = event.copy()
-        let pid = pid_t(event.getIntegerValueField(.eventTargetUnixProcessID))
-        // 像素源已是像素，用较小倍率；行源需放大到像素
-        let scaleY = pixelY ? 4.0 : 48.0
-        let scaleX = pixelX ? 4.0 : 48.0
-        var dy = smoothV ? usableY * config.gain * accel * scaleY * (reverseV ? -1 : 1) : 0
-        var dx = smoothH ? usableX * config.gain * accel * scaleX * (reverseH ? -1 : 1) : 0
-        if shiftAxis && dy != 0 && dx == 0 {
-            dx = dy   // 垂直量搬到水平轴
-            dy = 0
+    
+        // 各轴倍率：平滑开启的轴应用速度增益，反向则取负
+        let multY = (config.smoothVertical ? config.gain : 1.0) * accel * (config.invertVertical ? -1.0 : 1.0)
+        let multX = (config.smoothHorizontal ? config.gain : 1.0) * accel * (config.invertHorizontal ? -1.0 : 1.0)
+    
+        // 转换键：垂直滚动搬到水平轴
+        if shiftAxis && usableY != 0 && usableX == 0 {
+            let ptY = event.getDoubleValueField(.scrollWheelEventPointDeltaAxis1)
+            let fixedY = event.getDoubleValueField(.scrollWheelEventFixedPtDeltaAxis1)
+            let lineY = event.getDoubleValueField(.scrollWheelEventDeltaAxis1)
+            event.setDoubleValueField(.scrollWheelEventPointDeltaAxis2, value: ptY * multY)
+            event.setDoubleValueField(.scrollWheelEventFixedPtDeltaAxis2, value: fixedY * multY)
+            event.setIntegerValueField(.scrollWheelEventDeltaAxis2, value: Int64((lineY * multY).rounded()))
+            event.setDoubleValueField(.scrollWheelEventPointDeltaAxis1, value: 0)
+            event.setDoubleValueField(.scrollWheelEventFixedPtDeltaAxis1, value: 0)
+            event.setIntegerValueField(.scrollWheelEventDeltaAxis1, value: 0)
+            return Unmanaged.passUnretained(event)
         }
-
-        os_unfair_lock_lock(&lock)
-        template = templateCopy
-        targetPID = pid
-        // 同向累加、反向重置（避免旧残余抵消造成滞后）
-        if dy != 0 {
-            if dy * lastDelta.y > 0 { buffer.y += dy } else { buffer.y = dy; current.y = 0 }
+    
+        // 垂直轴：就地改写三个 delta 字段
+        if usableY != 0 && multY != 1.0 {
+            event.setDoubleValueField(.scrollWheelEventPointDeltaAxis1, value: event.getDoubleValueField(.scrollWheelEventPointDeltaAxis1) * multY)
+            event.setDoubleValueField(.scrollWheelEventFixedPtDeltaAxis1, value: event.getDoubleValueField(.scrollWheelEventFixedPtDeltaAxis1) * multY)
+            event.setIntegerValueField(.scrollWheelEventDeltaAxis1, value: Int64((event.getDoubleValueField(.scrollWheelEventDeltaAxis1) * multY).rounded()))
         }
-        if dx != 0 {
-            if dx * lastDelta.x > 0 { buffer.x += dx } else { buffer.x = dx; current.x = 0 }
+        // 水平轴
+        if usableX != 0 && multX != 1.0 {
+            event.setDoubleValueField(.scrollWheelEventPointDeltaAxis2, value: event.getDoubleValueField(.scrollWheelEventPointDeltaAxis2) * multX)
+            event.setDoubleValueField(.scrollWheelEventFixedPtDeltaAxis2, value: event.getDoubleValueField(.scrollWheelEventFixedPtDeltaAxis2) * multX)
+            event.setIntegerValueField(.scrollWheelEventDeltaAxis2, value: Int64((event.getDoubleValueField(.scrollWheelEventDeltaAxis2) * multX).rounded()))
         }
-        lastDelta = (dy != 0 ? dy : lastDelta.y, dx != 0 ? dx : lastDelta.x)
-        active = true
-        os_unfair_lock_unlock(&lock)
-        return nil // 消费原始事件
+        // 就地改写后放行（不消费、不注入 → 投递绝不失败、绝不冻结）
+        return Unmanaged.passUnretained(event)
     }
 
     // MARK: - CVDisplayLink 逐帧插值
