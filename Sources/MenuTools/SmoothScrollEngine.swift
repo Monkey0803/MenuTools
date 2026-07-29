@@ -243,12 +243,16 @@ final class SmoothScrollEngine: ObservableObject, @unchecked Sendable {
             }
             return
         }
-        // 首帧 Began(1)，后续 Changed(2)
-        let phase: Int64 = phaseBegan ? 2 : 1
-        phaseBegan = true
+        // 只有真正投递时才推进相位，保证 Began 必定被发出（否则滤波首帧≈0 被死区跳过后会发 Changed 而无 Began，Chromium 拒收）
+        let willPost = output > deadZone
+        var phase: Int64 = 2
+        if willPost {
+            phase = phaseBegan ? 2 : 1
+            phaseBegan = true
+        }
         os_unfair_lock_unlock(&lock)
 
-        if output > deadZone, let event = templateCopy {
+        if willPost, let event = templateCopy {
             post(event: event, y: frameY, x: frameX, pid: pid, continuous: continuous, phase: phase)
         }
     }
