@@ -31,6 +31,7 @@ private extension View {
 /// 菜单栏弹出的主面板：液态玻璃风格，自动适配深色 / 浅色
 struct MenuPanelView: View {
     @AppStorage(SettingsKey.menuBarIcon) private var menuBarIcon = MenuBarIcon.default.rawValue
+    @AppStorage(SettingsKey.togglesShowTitle) private var togglesShowTitle = false
     @AppStorage(SettingsKey.preferredTerminal) private var preferredTerminal = TerminalApp.systemDefault.rawValue
     @AppStorage(SettingsKey.autoCheckUpdate) private var autoCheckUpdate = true
     @AppStorage(SettingsKey.appLanguage) private var appLanguage = AppLanguage.system.rawValue
@@ -208,73 +209,85 @@ struct MenuPanelView: View {
     // MARK: - 快捷开关带：防止锁屏 / 隐藏文件 / 静音 / 程序坞 / 菜单栏 / 夜览
 
     private var quickToggles: some View {
-        HStack(spacing: 9) {
-            quickToggle(
-                symbol: caffeinate.isActive ? "lock.slash.fill" : "lock.fill",
-                help: L("toggle.caffeinate"),
-                isOn: caffeinate.isActive,
-                pulse: caffeinate.isActive
-            ) {
-                caffeinate.toggle()
-            }
-            quickToggle(
-                symbol: toggles.hiddenFilesShown ? "eye.fill" : "eye.slash",
-                help: L("toggle.hiddenFiles"),
-                isOn: toggles.hiddenFilesShown
-            ) {
-                SystemToggleService.setHiddenFilesShown(!toggles.hiddenFilesShown)
-                toggles.hiddenFilesShown.toggle()
-            }
-            quickToggle(
-                symbol: toggles.muted ? "speaker.slash.fill" : "speaker.wave.2.fill",
-                help: L("toggle.mute"),
-                isOn: toggles.muted
-            ) {
-                do {
-                    try SystemToggleService.setMuted(!toggles.muted)
-                    toggles.muted.toggle()
-                } catch {
-                    flashStatus(error.localizedDescription, isError: true)
+        Group {
+            if togglesShowTitle {
+                LazyVGrid(columns: Array(repeating: GridItem(.flexible(), spacing: 9), count: 3), spacing: 9) {
+                    toggleButtons
                 }
-            }
-            quickToggle(
-                symbol: "dock.rectangle",
-                help: L("toggle.dock"),
-                isOn: toggles.dockHidden
-            ) {
-                do {
-                    try SystemToggleService.setDockHidden(!toggles.dockHidden)
-                    toggles.dockHidden.toggle()
-                } catch {
-                    flashStatus(error.localizedDescription, isError: true)
-                }
-            }
-            quickToggle(
-                symbol: "menubar.rectangle",
-                help: L("toggle.menubar"),
-                isOn: toggles.menuBarHidden
-            ) {
-                do {
-                    try SystemToggleService.setMenuBarHidden(!toggles.menuBarHidden)
-                    toggles.menuBarHidden.toggle()
-                } catch {
-                    flashStatus(error.localizedDescription, isError: true)
-                }
-            }
-            quickToggle(
-                symbol: toggles.nightShift ? "sun.horizon.fill" : "sun.horizon",
-                help: L("toggle.nightShift"),
-                isOn: toggles.nightShift
-            ) {
-                do {
-                    try NightShiftService.setEnabled(!toggles.nightShift)
-                    toggles.nightShift.toggle()
-                } catch {
-                    flashStatus(error.localizedDescription, isError: true)
+            } else {
+                HStack(spacing: 9) {
+                    toggleButtons
                 }
             }
         }
         .glassEffectID("toggles", in: glassNamespace)
+    }
+
+    @ViewBuilder private var toggleButtons: some View {
+        quickToggle(
+            symbol: caffeinate.isActive ? "lock.slash.fill" : "lock.fill",
+            help: L("toggle.caffeinate"),
+            isOn: caffeinate.isActive,
+            pulse: caffeinate.isActive
+        ) {
+            caffeinate.toggle()
+        }
+        quickToggle(
+            symbol: toggles.hiddenFilesShown ? "eye.fill" : "eye.slash",
+            help: L("toggle.hiddenFiles"),
+            isOn: toggles.hiddenFilesShown
+        ) {
+            SystemToggleService.setHiddenFilesShown(!toggles.hiddenFilesShown)
+            toggles.hiddenFilesShown.toggle()
+        }
+        quickToggle(
+            symbol: toggles.muted ? "speaker.slash.fill" : "speaker.wave.2.fill",
+            help: L("toggle.mute"),
+            isOn: toggles.muted
+        ) {
+            do {
+                try SystemToggleService.setMuted(!toggles.muted)
+                toggles.muted.toggle()
+            } catch {
+                flashStatus(error.localizedDescription, isError: true)
+            }
+        }
+        quickToggle(
+            symbol: "dock.rectangle",
+            help: L("toggle.dock"),
+            isOn: toggles.dockHidden
+        ) {
+            do {
+                try SystemToggleService.setDockHidden(!toggles.dockHidden)
+                toggles.dockHidden.toggle()
+            } catch {
+                flashStatus(error.localizedDescription, isError: true)
+            }
+        }
+        quickToggle(
+            symbol: "menubar.rectangle",
+            help: L("toggle.menubar"),
+            isOn: toggles.menuBarHidden
+        ) {
+            do {
+                try SystemToggleService.setMenuBarHidden(!toggles.menuBarHidden)
+                toggles.menuBarHidden.toggle()
+            } catch {
+                flashStatus(error.localizedDescription, isError: true)
+            }
+        }
+        quickToggle(
+            symbol: toggles.nightShift ? "sun.horizon.fill" : "sun.horizon",
+            help: L("toggle.nightShift"),
+            isOn: toggles.nightShift
+        ) {
+            do {
+                try NightShiftService.setEnabled(!toggles.nightShift)
+                toggles.nightShift.toggle()
+            } catch {
+                flashStatus(error.localizedDescription, isError: true)
+            }
+        }
     }
 
     private func quickToggle(
@@ -290,20 +303,34 @@ struct MenuPanelView: View {
             }
             bounceTrigger += 1
         } label: {
-            Image(systemName: symbol)
+            let icon = Image(systemName: symbol)
                 .font(.body.weight(.medium))
                 .symbolRenderingMode(.hierarchical)
                 .contentTransition(.symbolEffect(.replace))
                 .symbolEffect(.bounce, value: isOn)
                 .symbolEffect(.pulse, options: .repeating, isActive: pulse)
-                .frame(width: 40, height: 40)
-                .contentShape(.circle)
+            if togglesShowTitle {
+                VStack(spacing: 4) {
+                    icon.frame(height: 22)
+                    Text(help)
+                        .font(.caption2)
+                        .lineLimit(1)
+                        .minimumScaleFactor(0.7)
+                }
+                .frame(maxWidth: .infinity)
+                .padding(.vertical, 8)
+                .contentShape(.rect(cornerRadius: 12))
+            } else {
+                icon
+                    .frame(width: 40, height: 40)
+                    .contentShape(.circle)
+            }
         }
         .buttonStyle(.plain)
         .foregroundStyle(isOn ? AnyShapeStyle(.tint) : AnyShapeStyle(.primary))
         .glassEffect(
             isOn ? .regular.tint(.accentColor.opacity(0.32)).interactive() : .regular.interactive(),
-            in: .circle
+            in: togglesShowTitle ? AnyShape(.rect(cornerRadius: 12)) : AnyShape(.circle)
         )
         .help(help)
     }

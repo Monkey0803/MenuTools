@@ -27,6 +27,7 @@ struct SettingsView: View {
 struct GeneralSettingsView: View {
     @AppStorage(SettingsKey.menuBarIcon) private var menuBarIcon = MenuBarIcon.default.rawValue
     @AppStorage(SettingsKey.menuBarShowTitle) private var showMenuBarTitle = false
+    @AppStorage(SettingsKey.togglesShowTitle) private var togglesShowTitle = false
     @AppStorage(SettingsKey.preferredTerminal) private var preferredTerminal = TerminalApp.systemDefault.rawValue
     @AppStorage(SettingsKey.autoCheckUpdate) private var autoCheckUpdate = true
     @AppStorage(SettingsKey.appLanguage) private var appLanguage = AppLanguage.system.rawValue
@@ -64,6 +65,14 @@ struct GeneralSettingsView: View {
                     }
                 }
                 .padding(.vertical, 4)
+            }
+
+            Section(L("settings.section.panel")) {
+                Picker(L("settings.toggles.display"), selection: $togglesShowTitle) {
+                    Text(L("settings.menuBar.iconOnly")).tag(false)
+                    Text(L("settings.menuBar.iconTitle")).tag(true)
+                }
+                .pickerStyle(.segmented)
             }
 
             Section(L("settings.section.language")) {

@@ -47,6 +47,8 @@
 "settings.menuBar.display" = "Display";
 "settings.menuBar.iconOnly" = "Icon Only";
 "settings.menuBar.iconTitle" = "Icon and Title";
+"settings.section.panel" = "Panel Toggles";
+"settings.toggles.display" = "Display";
 "settings.section.terminal" = "Terminal App";
 "settings.terminal.desc" = "Used when opening the Finder path in terminal";
 "settings.section.update" = "Software Update";

@@ -47,6 +47,8 @@
 "settings.menuBar.display" = "显示方式";
 "settings.menuBar.iconOnly" = "仅图标";
 "settings.menuBar.iconTitle" = "图标和标题";
+"settings.section.panel" = "面板快捷开关";
+"settings.toggles.display" = "显示方式";
 "settings.section.terminal" = "终端 App";
 "settings.terminal.desc" = "在终端打开 Finder 路径时使用";
 "settings.section.update" = "软件更新";

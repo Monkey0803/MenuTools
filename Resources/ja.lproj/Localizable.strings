@@ -47,6 +47,8 @@
 "settings.menuBar.display" = "表示方法";
 "settings.menuBar.iconOnly" = "アイコンのみ";
 "settings.menuBar.iconTitle" = "アイコンとタイトル";
+"settings.section.panel" = "パネルスイッチ";
+"settings.toggles.display" = "表示方法";
 "settings.section.terminal" = "ターミナル App";
 "settings.terminal.desc" = "Finder パスをターミナルで開くときに使用";
 "settings.section.update" = "ソフトウェアアップデート";

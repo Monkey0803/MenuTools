@@ -47,6 +47,8 @@
 "settings.menuBar.display" = "표시 방식";
 "settings.menuBar.iconOnly" = "아이콘만";
 "settings.menuBar.iconTitle" = "아이콘과 제목";
+"settings.section.panel" = "패널 스위치";
+"settings.toggles.display" = "표시 방식";
 "settings.section.terminal" = "터미널 App";
 "settings.terminal.desc" = "Finder 경로를 터미널에서 열 때 사용";
 "settings.section.update" = "소프트웨어 업데이트";
