@@ -70,16 +70,24 @@ enum ShortcutAction: String, CaseIterable, Identifiable, Codable {
 
 /// 系统按键模拟（需“辅助功能”权限）
 enum KeySimulator {
+    /// 先等物理修饰键释放再投递：触发热键时用户仍按住 ⌥⌘，而系统对“移动空间”等
+    /// 符号热键按实时物理修饰键状态判定，必须等 ⌥⌘ 松开后，合成的 ⌃← 才不被污染。
+    @MainActor
     static func post(key: CGKeyCode, flags: CGEventFlags) {
-        // 用 privateState 独立事件源：合成事件的修饰键状态不与物理键盘合并，
-        // 避免触发热键时仍按住的 ⌥⌘ 等物理修饰键污染合成组合（导致空间切换等符号热键不匹配）。
-        let source = CGEventSource(stateID: .privateState)
-        let down = CGEvent(keyboardEventSource: source, virtualKey: key, keyDown: true)
-        down?.flags = flags
-        down?.post(tap: .cghidEventTap)
-        let up = CGEvent(keyboardEventSource: source, virtualKey: key, keyDown: false)
-        up?.flags = flags
-        up?.post(tap: .cghidEventTap)
+        Task { @MainActor in
+            for _ in 0..<25 {
+                let held = NSEvent.modifierFlags.intersection([.command, .option, .control, .shift])
+                if held.isEmpty { break }
+                try? await Task.sleep(for: .milliseconds(20))
+            }
+            let source = CGEventSource(stateID: .privateState)
+            let down = CGEvent(keyboardEventSource: source, virtualKey: key, keyDown: true)
+            down?.flags = flags
+            down?.post(tap: .cghidEventTap)
+            let up = CGEvent(keyboardEventSource: source, virtualKey: key, keyDown: false)
+            up?.flags = flags
+            up?.post(tap: .cghidEventTap)
+        }
     }
 }
 
