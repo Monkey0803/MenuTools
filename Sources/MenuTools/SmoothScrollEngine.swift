@@ -60,6 +60,8 @@ final class SmoothScrollEngine: ObservableObject, @unchecked Sendable {
         CFRunLoopAddSource(CFRunLoopGetMain(), source, .commonModes)
         CGEvent.tapEnable(tap: tap, enable: true)
         setupDisplayLink()
+        // DisplayLink 常驻运行（绝不在回调线程里 stop，避免 link 卡死）；空闲时不投递
+        if let link = displayLink { CVDisplayLinkStart(link) }
         isRunning = true
     }
 
@@ -184,11 +186,6 @@ final class SmoothScrollEngine: ObservableObject, @unchecked Sendable {
         lastDelta = (dy != 0 ? dy : lastDelta.y, dx != 0 ? dx : lastDelta.x)
         active = true
         os_unfair_lock_unlock(&lock)
-
-        if let link = displayLink, !CVDisplayLinkIsRunning(link) {
-            lastFrameTime = 0
-            CVDisplayLinkStart(link)
-        }
         return nil // 消费原始事件
     }
 
@@ -231,12 +228,12 @@ final class SmoothScrollEngine: ObservableObject, @unchecked Sendable {
         let continuous = config.touchpadEmulation
 
         if residual < deadZone && output < deadZone {
-            // 收敛：停止并复位
-            active = false
+            // 收敛：只复位状态，不停止 DisplayLink（link 常驻，避免回调内 stop 导致卡死）
             buffer = (0, 0); current = (0, 0); lastDelta = (0, 0)
             filter.reset()
+            lastFrameTime = 0
+            active = false
             os_unfair_lock_unlock(&lock)
-            if let link = displayLink { CVDisplayLinkStop(link) }
             return
         }
         os_unfair_lock_unlock(&lock)
