@@ -71,7 +71,9 @@ enum ShortcutAction: String, CaseIterable, Identifiable, Codable {
 /// 系统按键模拟（需“辅助功能”权限）
 enum KeySimulator {
     static func post(key: CGKeyCode, flags: CGEventFlags) {
-        let source = CGEventSource(stateID: .combinedSessionState)
+        // 用 privateState 独立事件源：合成事件的修饰键状态不与物理键盘合并，
+        // 避免触发热键时仍按住的 ⌥⌘ 等物理修饰键污染合成组合（导致空间切换等符号热键不匹配）。
+        let source = CGEventSource(stateID: .privateState)
         let down = CGEvent(keyboardEventSource: source, virtualKey: key, keyDown: true)
         down?.flags = flags
         down?.post(tap: .cghidEventTap)
