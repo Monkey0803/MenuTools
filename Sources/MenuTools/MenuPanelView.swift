@@ -83,6 +83,22 @@ struct MenuPanelView: View {
         }
         .padding(16)
         .frame(width: 320)
+        .overlayPreferenceValue(ToggleTooltipKey.self) { tip in
+            GeometryReader { proxy in
+                if let tip {
+                    let rect = proxy[tip.anchor]
+                    Text(tip.text)
+                        .font(.caption2)
+                        .fixedSize()
+                        .padding(.horizontal, 9)
+                        .padding(.vertical, 5)
+                        .glassEffect(.regular, in: .capsule)
+                        .position(x: rect.midX, y: rect.minY - 16)
+                        .transition(.opacity.combined(with: .scale(scale: 0.9, anchor: .bottom)))
+                        .allowsHitTesting(false)
+                }
+            }
+        }
         .id(appLanguage)   // 切换语言时重建面板，文案即时生效
         .onAppear {
             appeared = true
@@ -718,20 +734,23 @@ private struct QuickToggleButton: View {
             withAnimation(.easeOut(duration: 0.12)) { hovering = h }
         }
         .accessibilityLabel(title)
-        // 仅“仅图标”模式需要提示（带标题时文字已可见）
-        .overlay(alignment: .top) {
-            if hovering && !showTitle {
-                Text(title)
-                    .font(.caption2)
-                    .fixedSize()
-                    .padding(.horizontal, 9)
-                    .padding(.vertical, 5)
-                    .glassEffect(.regular, in: .capsule)
-                    .offset(y: -36)
-                    .transition(.opacity.combined(with: .scale(scale: 0.9, anchor: .bottom)))
-                    .allowsHitTesting(false)
-                    .zIndex(10)
-            }
+        // 仅“仅图标”模式上报悬停位置，由面板层统一渲染提示气泡（避免被容器裁剪）
+        .anchorPreference(key: ToggleTooltipKey.self, value: .bounds) { anchor in
+            (hovering && !showTitle) ? ToggleTooltip(text: title, anchor: anchor) : nil
         }
+    }
+}
+
+/// 悬停提示的位置与文本（通过 anchor preference 从子按钮上报到面板层）
+private struct ToggleTooltip: Equatable {
+    let text: String
+    let anchor: Anchor<CGRect>
+    static func == (lhs: ToggleTooltip, rhs: ToggleTooltip) -> Bool { lhs.text == rhs.text }
+}
+
+private struct ToggleTooltipKey: PreferenceKey {
+    static let defaultValue: ToggleTooltip? = nil
+    static func reduce(value: inout ToggleTooltip?, nextValue: () -> ToggleTooltip?) {
+        if let next = nextValue() { value = next }
     }
 }
