@@ -69,6 +69,7 @@ struct MenuToolsApp: App {
         } label: {
             if showMenuBarTitle {
                 Label("MenuTools", systemImage: menuBarIcon)
+                    .labelStyle(.titleAndIcon)
             } else {
                 Image(systemName: menuBarIcon)
             }
