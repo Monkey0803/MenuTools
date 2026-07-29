@@ -18,6 +18,8 @@ final class SmoothScrollEngine: ObservableObject, @unchecked Sendable {
     private var eventTap: CFMachPort?
     private var runLoopSource: CFRunLoopSource?
     private var displayLink: CVDisplayLink?
+    // 专用投递队列（userInteractive）：避免在 CVDisplayLink 线程同步投递，后台时不被降权限流
+    private let postQueue = DispatchQueue(label: "com.qoder.menutools.scrollpost", qos: .userInteractive)
 
     // 共享滚动状态（锁保护）
     private var lock = os_unfair_lock_s()
@@ -48,7 +50,7 @@ final class SmoothScrollEngine: ObservableObject, @unchecked Sendable {
         let mask = CGEventMask(1 << CGEventType.scrollWheel.rawValue)
         let refcon = Unmanaged.passUnretained(self).toOpaque()
         guard let tap = CGEvent.tapCreate(
-            tap: .cgAnnotatedSessionEventTap, place: .tailAppendEventTap, options: .defaultTap,
+            tap: .cgSessionEventTap, place: .headInsertEventTap, options: .defaultTap,
             eventsOfInterest: mask, callback: scrollTapCallback, userInfo: refcon
         ) else {
             isRunning = false // 通常因缺少“辅助功能”权限
@@ -253,7 +255,11 @@ final class SmoothScrollEngine: ObservableObject, @unchecked Sendable {
         event.setIntegerValueField(.scrollWheelEventDeltaAxis2, value: 0)
         event.setIntegerValueField(.scrollWheelEventIsContinuous, value: continuous ? 1 : 0)
         event.setIntegerValueField(.eventSourceUserData, value: Self.syntheticMarker)
-        if pid > 0 { event.postToPid(pid) } else { event.post(tap: .cgSessionEventTap) }
+        // 在专用 userInteractive 队列异步投递（对齐 Mos），避免 CVDisplayLink 线程后台降权导致投递失败
+        let e = event
+        postQueue.async {
+            if pid > 0 { e.postToPid(pid) } else { e.post(tap: .cgSessionEventTap) }
+        }
     }
 
     private func resetState() {
