@@ -109,11 +109,11 @@ struct ScrollSettingsView: View {
         VStack(alignment: .leading, spacing: 8) {
             sectionLabel(icon: "slider.horizontal.3", title: L("scroll.section.smooth"))
             VStack(alignment: .leading, spacing: 14) {
-                sliderRow(title: L("scroll.gain"), value: $gain, range: 0.5...3.0, unit: "×")
+                sliderRow(title: L("scroll.gain"), value: $gain, range: 0.1...10.0, unit: "×")
                 Divider()
-                sliderRow(title: L("scroll.duration"), value: $duration, range: 0.1...0.8, unit: "s")
+                sliderRow(title: L("scroll.duration"), value: $duration, range: 0.05...2.0, unit: "s")
                 Divider()
-                sliderRow(title: L("scroll.minStep"), value: $minStep, range: 1...30, unit: "px")
+                sliderRow(title: L("scroll.minStep"), value: $minStep, range: 1...100, unit: "px")
                 Divider()
                 HStack(spacing: 12) {
                     VStack(alignment: .leading, spacing: 2) {
