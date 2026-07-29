@@ -50,6 +50,7 @@ struct MenuPanelView: View {
     @State private var statusMessage: String?
     @State private var statusIsError = false
     @State private var appeared = false
+    @State private var tooltipWidth: CGFloat = 0
     @Namespace private var glassNamespace
 
     private let themeChanged = DistributedNotificationCenter.default().publisher(
@@ -87,13 +88,23 @@ struct MenuPanelView: View {
             GeometryReader { proxy in
                 if let tip {
                     let rect = proxy[tip.anchor]
+                    let margin: CGFloat = 6
+                    let halfW = tooltipWidth / 2
+                    let clampedX = min(max(rect.midX, halfW + margin), proxy.size.width - halfW - margin)
                     Text(tip.text)
                         .font(.caption2)
                         .fixedSize()
                         .padding(.horizontal, 9)
                         .padding(.vertical, 5)
                         .glassEffect(.regular, in: .capsule)
-                        .position(x: rect.midX, y: rect.minY - 16)
+                        .background {
+                            GeometryReader { g in
+                                Color.clear
+                                    .onAppear { tooltipWidth = g.size.width }
+                                    .onChange(of: g.size.width) { _, w in tooltipWidth = w }
+                            }
+                        }
+                        .position(x: clampedX, y: rect.minY - 16)
                         .transition(.opacity.combined(with: .scale(scale: 0.9, anchor: .bottom)))
                         .allowsHitTesting(false)
                 }
