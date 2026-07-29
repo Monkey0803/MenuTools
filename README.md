@@ -117,6 +117,10 @@ defaults delete com.qoder.menutools updateFeedURL   # 恢复默认 GitHub 源
 - 不上报电量的蓝牙设备（部分白牌耳机）无法显示电量
 - AirPods 充电盒电量仅在开盖/刚连接时由系统上报
 
+## 🙏 鸣谢
+
+- 平滑滚动功能的技术思路参考了 [Mos](https://github.com/Caldis/Mos)（复制事件模板改写 pointDelta 直投目标进程、CVDisplayLink 逐帧插值、峰值滤波去起始抖动、buffer/current 缓动模型、加速/转换/禁用修饰键等）。本项目为**独立实现**、未直接复制其源码；Mos 采用 [CC BY-NC 4.0](https://creativecommons.org/licenses/by-nc/4.0/) 许可，与本项目 MIT 许可不兼容，故仅作思路参考并在此署名致谢。
+
 ## 📄 License
 
 [MIT](LICENSE)

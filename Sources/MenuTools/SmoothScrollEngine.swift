@@ -78,11 +78,10 @@ final class SmoothScrollEngine: ObservableObject, @unchecked Sendable {
 
     // MARK: - 触控板判定（增强：不止看 isContinuous）
 
+    /// 只用 isContinuous 区分：鼠标滚轮=0，触控板/妙控鼠标=1。
+    /// （之前额外查 Phase/Count 会误将部分鼠标当成触控板而整体放行）
     private func isTrackpad(_ e: CGEvent) -> Bool {
-        if e.getDoubleValueField(.scrollWheelEventMomentumPhase) != 0 { return true }
-        if e.getDoubleValueField(.scrollWheelEventScrollPhase) != 0 { return true }
-        if e.getDoubleValueField(.scrollWheelEventScrollCount) != 0 { return true }
-        return e.getIntegerValueField(.scrollWheelEventIsContinuous) != 0
+        e.getIntegerValueField(.scrollWheelEventIsContinuous) != 0
     }
 
     // MARK: - 事件处理（主线程）
@@ -101,17 +100,36 @@ final class SmoothScrollEngine: ObservableObject, @unchecked Sendable {
 
         let rawY = event.getDoubleValueField(.scrollWheelEventDeltaAxis1)
         let rawX = event.getDoubleValueField(.scrollWheelEventDeltaAxis2)
-        let handleV = config.smoothVertical && rawY != 0
-        let handleH = config.smoothHorizontal && rawX != 0
-        if !handleV && !handleH {
+        if rawY == 0 && rawX == 0 {
             return Unmanaged.passUnretained(event)
         }
 
-        // 修饰键：禁用键按下 → 放行原始事件（临时关闭平滑）
+        // 禁用键按下 → 完全放行（既不平滑也不反向）
         let flags = event.flags.rawValue
         if config.disableModifier != 0 && (flags & UInt64(config.disableModifier)) == UInt64(config.disableModifier) {
             return Unmanaged.passUnretained(event)
         }
+
+        let smoothV = config.smoothVertical && rawY != 0
+        let smoothH = config.smoothHorizontal && rawX != 0
+        let reverseV = config.invertVertical && rawY != 0
+        let reverseH = config.invertHorizontal && rawX != 0
+
+        // 无任何平滑：若需反向则直接翻转原事件并放行（反向不依赖平滑）
+        if !smoothV && !smoothH {
+            if reverseV {
+                event.setDoubleValueField(.scrollWheelEventDeltaAxis1, value: -rawY)
+                event.setDoubleValueField(.scrollWheelEventPointDeltaAxis1, value: -event.getDoubleValueField(.scrollWheelEventPointDeltaAxis1))
+                event.setDoubleValueField(.scrollWheelEventFixedPtDeltaAxis1, value: -event.getDoubleValueField(.scrollWheelEventFixedPtDeltaAxis1))
+            }
+            if reverseH {
+                event.setDoubleValueField(.scrollWheelEventDeltaAxis2, value: -rawX)
+                event.setDoubleValueField(.scrollWheelEventPointDeltaAxis2, value: -event.getDoubleValueField(.scrollWheelEventPointDeltaAxis2))
+                event.setDoubleValueField(.scrollWheelEventFixedPtDeltaAxis2, value: -event.getDoubleValueField(.scrollWheelEventFixedPtDeltaAxis2))
+            }
+            return Unmanaged.passUnretained(event)
+        }
+
         // 加速键按下 → 增益放大
         var accel = 1.0
         if config.accelModifier != 0 && (flags & UInt64(config.accelModifier)) == UInt64(config.accelModifier) {
@@ -123,8 +141,8 @@ final class SmoothScrollEngine: ObservableObject, @unchecked Sendable {
         let templateCopy = event.copy()
         let pid = pid_t(event.getIntegerValueField(.eventTargetUnixProcessID))
         let lineToPixel = 48.0 * config.gain * accel
-        var dy = handleV ? rawY * lineToPixel * (config.invertVertical ? -1 : 1) : 0
-        var dx = handleH ? rawX * lineToPixel * (config.invertHorizontal ? -1 : 1) : 0
+        var dy = smoothV ? rawY * lineToPixel * (reverseV ? -1 : 1) : 0
+        var dx = smoothH ? rawX * lineToPixel * (reverseH ? -1 : 1) : 0
         if shiftAxis && dy != 0 && dx == 0 {
             dx = dy   // 垂直量搬到水平轴
             dy = 0
