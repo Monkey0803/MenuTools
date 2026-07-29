@@ -50,7 +50,6 @@ struct MenuPanelView: View {
     @State private var statusMessage: String?
     @State private var statusIsError = false
     @State private var appeared = false
-    @State private var bounceTrigger = 0
     @Namespace private var glassNamespace
 
     private let themeChanged = DistributedNotificationCenter.default().publisher(
@@ -297,42 +296,14 @@ struct MenuPanelView: View {
         pulse: Bool = false,
         action: @escaping () -> Void
     ) -> some View {
-        Button {
-            withAnimation(.spring(response: 0.35, dampingFraction: 0.7)) {
-                action()
-            }
-            bounceTrigger += 1
-        } label: {
-            let icon = Image(systemName: symbol)
-                .font(.body.weight(.medium))
-                .symbolRenderingMode(.hierarchical)
-                .contentTransition(.symbolEffect(.replace))
-                .symbolEffect(.bounce, value: isOn)
-                .symbolEffect(.pulse, options: .repeating, isActive: pulse)
-            if togglesShowTitle {
-                VStack(spacing: 4) {
-                    icon.frame(height: 22)
-                    Text(help)
-                        .font(.caption2)
-                        .lineLimit(1)
-                        .minimumScaleFactor(0.7)
-                }
-                .frame(maxWidth: .infinity)
-                .padding(.vertical, 8)
-                .contentShape(.rect(cornerRadius: 12))
-            } else {
-                icon
-                    .frame(width: 40, height: 40)
-                    .contentShape(.circle)
-            }
-        }
-        .buttonStyle(.plain)
-        .foregroundStyle(isOn ? AnyShapeStyle(.tint) : AnyShapeStyle(.primary))
-        .glassEffect(
-            isOn ? .regular.tint(.accentColor.opacity(0.32)).interactive() : .regular.interactive(),
-            in: togglesShowTitle ? AnyShape(.rect(cornerRadius: 12)) : AnyShape(.circle)
+        QuickToggleButton(
+            symbol: symbol,
+            title: help,
+            isOn: isOn,
+            pulse: pulse,
+            showTitle: togglesShowTitle,
+            action: action
         )
-        .help(help)
     }
 
     // MARK: - 蓝牙设备电量
@@ -695,6 +666,71 @@ struct MenuPanelView: View {
                 if statusMessage == message {
                     statusMessage = nil
                 }
+            }
+        }
+    }
+}
+
+/// 单个快捷开关按钮：自带悬停状态，以液态玻璃胶囊即时展示提示（替代延迟高的系统 .help 提示）
+private struct QuickToggleButton: View {
+    let symbol: String
+    let title: String
+    let isOn: Bool
+    let pulse: Bool
+    let showTitle: Bool
+    let action: () -> Void
+    @State private var hovering = false
+
+    var body: some View {
+        Button {
+            withAnimation(.spring(response: 0.35, dampingFraction: 0.7)) { action() }
+        } label: {
+            let icon = Image(systemName: symbol)
+                .font(.body.weight(.medium))
+                .symbolRenderingMode(.hierarchical)
+                .contentTransition(.symbolEffect(.replace))
+                .symbolEffect(.bounce, value: isOn)
+                .symbolEffect(.pulse, options: .repeating, isActive: pulse)
+            if showTitle {
+                VStack(spacing: 4) {
+                    icon.frame(height: 22)
+                    Text(title)
+                        .font(.caption2)
+                        .lineLimit(1)
+                        .minimumScaleFactor(0.7)
+                }
+                .frame(maxWidth: .infinity)
+                .padding(.vertical, 8)
+                .contentShape(.rect(cornerRadius: 12))
+            } else {
+                icon
+                    .frame(width: 40, height: 40)
+                    .contentShape(.circle)
+            }
+        }
+        .buttonStyle(.plain)
+        .foregroundStyle(isOn ? AnyShapeStyle(.tint) : AnyShapeStyle(.primary))
+        .glassEffect(
+            isOn ? .regular.tint(.accentColor.opacity(0.32)).interactive() : .regular.interactive(),
+            in: showTitle ? AnyShape(.rect(cornerRadius: 12)) : AnyShape(.circle)
+        )
+        .onHover { h in
+            withAnimation(.easeOut(duration: 0.12)) { hovering = h }
+        }
+        .accessibilityLabel(title)
+        // 仅“仅图标”模式需要提示（带标题时文字已可见）
+        .overlay(alignment: .top) {
+            if hovering && !showTitle {
+                Text(title)
+                    .font(.caption2)
+                    .fixedSize()
+                    .padding(.horizontal, 9)
+                    .padding(.vertical, 5)
+                    .glassEffect(.regular, in: .capsule)
+                    .offset(y: -36)
+                    .transition(.opacity.combined(with: .scale(scale: 0.9, anchor: .bottom)))
+                    .allowsHitTesting(false)
+                    .zIndex(10)
             }
         }
     }
