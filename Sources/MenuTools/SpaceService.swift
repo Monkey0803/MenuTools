@@ -7,6 +7,7 @@ enum SpaceService {
     private typealias MainConnFn = @convention(c) () -> Int32
     private typealias CopySpacesFn = @convention(c) (Int32) -> Unmanaged<CFArray>?
     private typealias SetSpaceFn = @convention(c) (Int32, CFString, UInt64) -> Void
+    private typealias ActiveSpaceFn = @convention(c) (Int32) -> UInt64
 
     private nonisolated(unsafe) static let handle: UnsafeMutableRawPointer? =
         dlopen("/System/Library/PrivateFrameworks/SkyLight.framework/SkyLight", RTLD_NOW)
@@ -20,18 +21,20 @@ enum SpaceService {
     static func move(next: Bool) -> Bool {
         guard let mainConn = symbol("SLSMainConnectionID", as: MainConnFn.self),
               let copySpaces = symbol("SLSCopyManagedDisplaySpaces", as: CopySpacesFn.self),
+              let getActive = symbol("SLSGetActiveSpace", as: ActiveSpaceFn.self),
               let setSpace = symbol("SLSManagedDisplaySetCurrentSpace", as: SetSpaceFn.self) else {
             return false
         }
         let cid = mainConn()
-        guard let displays = copySpaces(cid)?.takeRetainedValue() as? [[String: Any]] else { return false }
+        // 实时读取当前活跃空间（字典里的 "Current Space" 可能是缓存旧值，导致卡在前两个空间）
+        let currentID = getActive(cid)
+        guard currentID != 0,
+              let displays = copySpaces(cid)?.takeRetainedValue() as? [[String: Any]] else { return false }
 
-        // 找到当前活跃空间所在的显示器（其 Current Space 存在于自身 Spaces 列表中）
+        // 找到包含当前活跃空间的显示器，在其空间列表内取相邻项
         for display in displays {
             guard let identifier = display["Display Identifier"] as? String,
-                  let spaces = display["Spaces"] as? [[String: Any]],
-                  let current = display["Current Space"] as? [String: Any],
-                  let currentID = (current["id64"] as? NSNumber)?.uint64Value else { continue }
+                  let spaces = display["Spaces"] as? [[String: Any]] else { continue }
             let ids = spaces.compactMap { ($0["id64"] as? NSNumber)?.uint64Value }
             guard let idx = ids.firstIndex(of: currentID) else { continue }
             let target = next ? idx + 1 : idx - 1
