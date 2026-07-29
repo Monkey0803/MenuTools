@@ -51,7 +51,7 @@ final class SmoothScrollEngine: ObservableObject, @unchecked Sendable {
         let mask = CGEventMask(1 << CGEventType.scrollWheel.rawValue)
         let refcon = Unmanaged.passUnretained(self).toOpaque()
         guard let tap = CGEvent.tapCreate(
-            tap: .cgSessionEventTap, place: .headInsertEventTap, options: .defaultTap,
+            tap: .cgAnnotatedSessionEventTap, place: .tailAppendEventTap, options: .defaultTap,
             eventsOfInterest: mask, callback: scrollTapCallback, userInfo: refcon
         ) else {
             isRunning = false // 通常因缺少“辅助功能”权限
