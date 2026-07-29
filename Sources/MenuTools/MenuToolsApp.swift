@@ -3,6 +3,7 @@ import SwiftUI
 /// 全局设置的存取 Key
 enum SettingsKey {
     static let menuBarIcon = "menuBarIcon"
+    static let menuBarShowTitle = "menuBarShowTitle"   // 菜单栏是否同时显示标题
     static let preferredTerminal = "preferredTerminal"
     static let autoCheckUpdate = "autoCheckUpdateEnabled"
     static let appLanguage = "appLanguage"
@@ -53,6 +54,7 @@ enum MenuBarIcon: String, CaseIterable, Identifiable {
 @main
 struct MenuToolsApp: App {
     @AppStorage(SettingsKey.menuBarIcon) private var menuBarIcon = MenuBarIcon.default.rawValue
+    @AppStorage(SettingsKey.menuBarShowTitle) private var showMenuBarTitle = false
 
     init() {
         // 注册已保存的全局快捷键
@@ -65,7 +67,11 @@ struct MenuToolsApp: App {
         MenuBarExtra {
             MenuPanelView()
         } label: {
-            Image(systemName: menuBarIcon)
+            if showMenuBarTitle {
+                Label("MenuTools", systemImage: menuBarIcon)
+            } else {
+                Image(systemName: menuBarIcon)
+            }
         }
         .menuBarExtraStyle(.window)
 

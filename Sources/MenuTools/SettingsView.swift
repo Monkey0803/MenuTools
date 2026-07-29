@@ -26,6 +26,7 @@ struct SettingsView: View {
 /// 通用设置页
 struct GeneralSettingsView: View {
     @AppStorage(SettingsKey.menuBarIcon) private var menuBarIcon = MenuBarIcon.default.rawValue
+    @AppStorage(SettingsKey.menuBarShowTitle) private var showMenuBarTitle = false
     @AppStorage(SettingsKey.preferredTerminal) private var preferredTerminal = TerminalApp.systemDefault.rawValue
     @AppStorage(SettingsKey.autoCheckUpdate) private var autoCheckUpdate = true
     @AppStorage(SettingsKey.appLanguage) private var appLanguage = AppLanguage.system.rawValue
@@ -52,6 +53,11 @@ struct GeneralSettingsView: View {
             }
 
             Section(L("settings.section.icon")) {
+                Picker(L("settings.menuBar.display"), selection: $showMenuBarTitle) {
+                    Text(L("settings.menuBar.iconOnly")).tag(false)
+                    Text(L("settings.menuBar.iconTitle")).tag(true)
+                }
+                .pickerStyle(.segmented)
                 LazyVGrid(columns: Array(repeating: GridItem(.flexible(), spacing: 8), count: 4), spacing: 8) {
                     ForEach(MenuBarIcon.allCases) { icon in
                         iconOption(icon)

@@ -44,6 +44,9 @@
 /* 设置窗口 */
 "settings.title" = "MenuTools 设置";
 "settings.section.icon" = "菜单栏图标";
+"settings.menuBar.display" = "显示方式";
+"settings.menuBar.iconOnly" = "仅图标";
+"settings.menuBar.iconTitle" = "图标和标题";
 "settings.section.terminal" = "终端 App";
 "settings.terminal.desc" = "在终端打开 Finder 路径时使用";
 "settings.section.update" = "软件更新";

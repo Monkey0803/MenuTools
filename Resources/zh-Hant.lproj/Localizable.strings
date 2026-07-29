@@ -44,6 +44,9 @@
 /* 設定視窗 */
 "settings.title" = "MenuTools 設定";
 "settings.section.icon" = "選單列圖示";
+"settings.menuBar.display" = "顯示方式";
+"settings.menuBar.iconOnly" = "僅圖示";
+"settings.menuBar.iconTitle" = "圖示和標題";
 "settings.section.terminal" = "終端機 App";
 "settings.terminal.desc" = "在終端機開啟 Finder 路徑時使用";
 "settings.section.update" = "軟體更新";

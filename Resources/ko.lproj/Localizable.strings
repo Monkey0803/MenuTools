@@ -44,6 +44,9 @@
 /* 설정 */
 "settings.title" = "MenuTools 설정";
 "settings.section.icon" = "메뉴 막대 아이콘";
+"settings.menuBar.display" = "표시 방식";
+"settings.menuBar.iconOnly" = "아이콘만";
+"settings.menuBar.iconTitle" = "아이콘과 제목";
 "settings.section.terminal" = "터미널 App";
 "settings.terminal.desc" = "Finder 경로를 터미널에서 열 때 사용";
 "settings.section.update" = "소프트웨어 업데이트";

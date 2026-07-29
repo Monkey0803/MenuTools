@@ -44,6 +44,9 @@
 /* 設定 */
 "settings.title" = "MenuTools 設定";
 "settings.section.icon" = "メニューバーアイコン";
+"settings.menuBar.display" = "表示方法";
+"settings.menuBar.iconOnly" = "アイコンのみ";
+"settings.menuBar.iconTitle" = "アイコンとタイトル";
 "settings.section.terminal" = "ターミナル App";
 "settings.terminal.desc" = "Finder パスをターミナルで開くときに使用";
 "settings.section.update" = "ソフトウェアアップデート";
