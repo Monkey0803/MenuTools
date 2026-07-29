@@ -18,6 +18,7 @@ final class SmoothScrollEngine: ObservableObject, @unchecked Sendable {
     private var eventTap: CFMachPort?
     private var runLoopSource: CFRunLoopSource?
     private var displayLink: CVDisplayLink?
+    private var activityToken: NSObjectProtocol?   // 阻止 App Nap 的活动令牌
     // 专用投递队列（userInteractive）：避免在 CVDisplayLink 线程同步投递，后台时不被降权限流
     private let postQueue = DispatchQueue(label: "com.qoder.menutools.scrollpost", qos: .userInteractive)
 
@@ -64,10 +65,15 @@ final class SmoothScrollEngine: ObservableObject, @unchecked Sendable {
         setupDisplayLink()
         // DisplayLink 常驻运行（绝不在回调线程里 stop，避免 link 卡死）；空闲时不投递
         if let link = displayLink { CVDisplayLinkStart(link) }
+        // 阻止 App Nap：后台无窗口时 macOS 会节流本进程，导致 postToPid 投递的事件不被路由
+        if activityToken == nil {
+            activityToken = ProcessInfo.processInfo.beginActivity(options: [.userInitiated, .latencyCritical], reason: "SmoothScroll")
+        }
         isRunning = true
     }
 
     func stop() {
+        if let token = activityToken { ProcessInfo.processInfo.endActivity(token); activityToken = nil }
         if let link = displayLink { CVDisplayLinkStop(link) }
         displayLink = nil
         if let tap = eventTap { CGEvent.tapEnable(tap: tap, enable: false) }
@@ -255,7 +261,6 @@ final class SmoothScrollEngine: ObservableObject, @unchecked Sendable {
         event.setIntegerValueField(.scrollWheelEventDeltaAxis2, value: 0)
         event.setIntegerValueField(.scrollWheelEventIsContinuous, value: continuous ? 1 : 0)
         event.setIntegerValueField(.eventSourceUserData, value: Self.syntheticMarker)
-        // 在专用 userInteractive 队列异步投递（对齐 Mos），避免 CVDisplayLink 线程后台降权导致投递失败
         let e = event
         postQueue.async {
             if pid > 0 { e.postToPid(pid) } else { e.post(tap: .cgSessionEventTap) }
