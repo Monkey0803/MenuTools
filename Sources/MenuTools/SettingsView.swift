@@ -8,6 +8,7 @@ enum SettingsLayout {
 
 /// 设置窗口（⌘, / 面板齿轮按钮打开）：分标签容纳通用与右键工具
 struct SettingsView: View {
+    @AppStorage(SettingsKey.appLanguage) private var appLanguage = AppLanguage.system.rawValue
     var body: some View {
         TabView {
             GeneralSettingsView()
@@ -20,6 +21,7 @@ struct SettingsView: View {
                 .tabItem { Label(L("settings.tab.scroll"), systemImage: "computermouse") }
         }
         .frame(width: SettingsLayout.width, height: SettingsLayout.height)
+        .id(appLanguage)   // 切换语言时整体重建，连 Tab 标签一起刷新
     }
 }
 
