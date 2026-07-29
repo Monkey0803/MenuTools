@@ -19,6 +19,8 @@ final class SmoothScrollEngine: ObservableObject, @unchecked Sendable {
     private var runLoopSource: CFRunLoopSource?
     private var displayLink: CVDisplayLink?
     private var activityToken: NSObjectProtocol?   // 阻止 App Nap 的活动令牌
+    private var keeper: Timer?                      // 看门狗定时器
+    private var lastTickWall: CFTimeInterval = 0    // 最近一次帧回调的壁钟（僵尸检测）
     // 专用投递队列（userInteractive）：避免在 CVDisplayLink 线程同步投递，后台时不被降权限流
     private let postQueue = DispatchQueue(label: "com.qoder.menutools.scrollpost", qos: .userInteractive)
 
@@ -69,10 +71,43 @@ final class SmoothScrollEngine: ObservableObject, @unchecked Sendable {
         if activityToken == nil {
             activityToken = ProcessInfo.processInfo.beginActivity(options: [.userInitiated, .latencyCritical], reason: "SmoothScroll")
         }
+        startKeeper()
         isRunning = true
     }
 
+    // MARK: - 看门狗：检测并重建僵尸 DisplayLink / 重启被禁用的 tap
+    private func startKeeper() {
+        keeper?.invalidate()
+        keeper = Timer.scheduledTimer(withTimeInterval: 1.0, repeats: true) { [weak self] _ in
+            self?.healthCheck()
+        }
+    }
+    private func healthCheck() {
+        guard isRunning else { return }
+        // tap 被系统禁用 → 重新启用
+        if let tap = eventTap, !CGEvent.tapIsEnabled(tap: tap) {
+            CGEvent.tapEnable(tap: tap, enable: true)
+        }
+        // DisplayLink 死亡 → 重建
+        guard let link = displayLink else { recreateLink(); return }
+        if !CVDisplayLinkIsRunning(link) { CVDisplayLinkStart(link); return }
+        // 僵尸：有待投递滚动但回调已停止跳动
+        os_unfair_lock_lock(&lock)
+        let pending = abs(buffer.y - current.y) > 0.5 || abs(buffer.x - current.x) > 0.5
+        os_unfair_lock_unlock(&lock)
+        if pending && lastTickWall > 0 && CACurrentMediaTime() - lastTickWall > 0.4 {
+            recreateLink()
+        }
+    }
+    private func recreateLink() {
+        if let link = displayLink { CVDisplayLinkStop(link) }
+        displayLink = nil
+        setupDisplayLink()
+        if let link = displayLink { CVDisplayLinkStart(link) }
+    }
+
     func stop() {
+        keeper?.invalidate(); keeper = nil
         if let token = activityToken { ProcessInfo.processInfo.endActivity(token); activityToken = nil }
         if let link = displayLink { CVDisplayLinkStop(link) }
         displayLink = nil
@@ -213,6 +248,7 @@ final class SmoothScrollEngine: ObservableObject, @unchecked Sendable {
 
     private func frame(now: CVTimeStamp) {
         let t = CACurrentMediaTime()
+        lastTickWall = t   // 看门狗心跳
         os_unfair_lock_lock(&lock)
         // 计算帧间隔与逐帧逼近系数
         let dt = lastFrameTime > 0 ? min(0.05, t - lastFrameTime) : 1.0 / 60.0
