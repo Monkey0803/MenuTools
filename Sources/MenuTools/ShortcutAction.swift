@@ -35,9 +35,10 @@ enum ShortcutAction: String, CaseIterable, Identifiable, Codable {
     func perform() {
         switch self {
         case .missionControl:
-            launchApp("/System/Applications/Mission Control.app")
+            launchFirstAvailable(["/System/Applications/Mission Control.app"])
         case .launchpad:
-            launchApp("/System/Applications/Launchpad.app")
+            // macOS 26 以 Apps.app（“应用”启动器）取代 Launchpad；旧系统回退 Launchpad.app
+            launchFirstAvailable(["/System/Applications/Launchpad.app", "/System/Applications/Apps.app"])
         case .spotlight:
             KeySimulator.post(key: CGKeyCode(kVK_Space), flags: .maskCommand)
         case .dictation:
@@ -58,11 +59,12 @@ enum ShortcutAction: String, CaseIterable, Identifiable, Codable {
         }
     }
 
-    private func launchApp(_ path: String) {
-        let url = URL(fileURLWithPath: path)
+    /// 依次尝试多个路径，打开第一个存在的 App（适配不同 macOS 版本的系统 App）
+    private func launchFirstAvailable(_ paths: [String]) {
+        guard let path = paths.first(where: { FileManager.default.fileExists(atPath: $0) }) else { return }
         let config = NSWorkspace.OpenConfiguration()
         config.activates = true
-        NSWorkspace.shared.openApplication(at: url, configuration: config)
+        NSWorkspace.shared.openApplication(at: URL(fileURLWithPath: path), configuration: config)
     }
 }
 
