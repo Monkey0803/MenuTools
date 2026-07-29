@@ -53,9 +53,14 @@ enum ShortcutAction: String, CaseIterable, Identifiable, Codable {
         case .quitApp:
             KeySimulator.post(key: CGKeyCode(kVK_ANSI_Q), flags: .maskCommand)
         case .moveLeftSpace:
-            KeySimulator.post(key: CGKeyCode(kVK_LeftArrow), flags: .maskControl)
+            // 优先私有 SkyLight 直切空间；失败则回退模拟 ⌃←
+            if !SpaceService.move(next: false) {
+                KeySimulator.post(key: CGKeyCode(kVK_LeftArrow), flags: .maskControl)
+            }
         case .moveRightSpace:
-            KeySimulator.post(key: CGKeyCode(kVK_RightArrow), flags: .maskControl)
+            if !SpaceService.move(next: true) {
+                KeySimulator.post(key: CGKeyCode(kVK_RightArrow), flags: .maskControl)
+            }
         }
     }
 
