@@ -76,12 +76,22 @@ final class SmoothScrollEngine: ObservableObject, @unchecked Sendable {
         isRunning = false
     }
 
-    // MARK: - 触控板判定（增强：不止看 isContinuous）
+    // MARK: - 触控板判定
 
-    /// 只用 isContinuous 区分：鼠标滚轮=0，触控板/妙控鼠标=1。
-    /// （之前额外查 Phase/Count 会误将部分鼠标当成触控板而整体放行）
+    /// 只有带 phase 的才是触控板（真触控板滚动时必带 scroll/momentum phase）。
+    /// 高精度鼠标虽然 isContinuous=1，但 phase 恒为 0，因此不能单靠 isContinuous 判定。
     private func isTrackpad(_ e: CGEvent) -> Bool {
-        e.getIntegerValueField(.scrollWheelEventIsContinuous) != 0
+        if e.getDoubleValueField(.scrollWheelEventScrollPhase) != 0 { return true }
+        if e.getDoubleValueField(.scrollWheelEventMomentumPhase) != 0 { return true }
+        return false
+    }
+
+    /// 取某轴可用位移：优先像素 delta（高精度鼠标），其次定点，最后行 delta。
+    /// 返回（值, 是否像素源）；行源需放大更多才能达到相似手感。
+    private func usable(line: Double, pt: Double, fixed: Double) -> (value: Double, pixel: Bool) {
+        if pt != 0 { return (pt, true) }
+        if fixed != 0 { return (fixed, true) }
+        return (line, false)
     }
 
     // MARK: - 事件处理（主线程）
@@ -98,32 +108,39 @@ final class SmoothScrollEngine: ObservableObject, @unchecked Sendable {
             return Unmanaged.passUnretained(event)
         }
 
-        let rawY = event.getDoubleValueField(.scrollWheelEventDeltaAxis1)
-        let rawX = event.getDoubleValueField(.scrollWheelEventDeltaAxis2)
-        if rawY == 0 && rawX == 0 {
+        // 取可用位移（兼容行/像素两类鼠标）
+        let (usableY, pixelY) = usable(
+            line: event.getDoubleValueField(.scrollWheelEventDeltaAxis1),
+            pt: event.getDoubleValueField(.scrollWheelEventPointDeltaAxis1),
+            fixed: event.getDoubleValueField(.scrollWheelEventFixedPtDeltaAxis1))
+        let (usableX, pixelX) = usable(
+            line: event.getDoubleValueField(.scrollWheelEventDeltaAxis2),
+            pt: event.getDoubleValueField(.scrollWheelEventPointDeltaAxis2),
+            fixed: event.getDoubleValueField(.scrollWheelEventFixedPtDeltaAxis2))
+        if usableY == 0 && usableX == 0 {
             return Unmanaged.passUnretained(event)
         }
 
-        // 禁用键按下 → 完全放行（既不平滑也不反向）
+        // 禁用键按下 → 完全放行
         let flags = event.flags.rawValue
         if config.disableModifier != 0 && (flags & UInt64(config.disableModifier)) == UInt64(config.disableModifier) {
             return Unmanaged.passUnretained(event)
         }
 
-        let smoothV = config.smoothVertical && rawY != 0
-        let smoothH = config.smoothHorizontal && rawX != 0
-        let reverseV = config.invertVertical && rawY != 0
-        let reverseH = config.invertHorizontal && rawX != 0
+        let smoothV = config.smoothVertical && usableY != 0
+        let smoothH = config.smoothHorizontal && usableX != 0
+        let reverseV = config.invertVertical && usableY != 0
+        let reverseH = config.invertHorizontal && usableX != 0
 
-        // 无任何平滑：若需反向则直接翻转原事件并放行（反向不依赖平滑）
+        // 无任何平滑：若需反向则翻转原事件三个 delta 字段并放行
         if !smoothV && !smoothH {
             if reverseV {
-                event.setDoubleValueField(.scrollWheelEventDeltaAxis1, value: -rawY)
+                event.setDoubleValueField(.scrollWheelEventDeltaAxis1, value: -event.getDoubleValueField(.scrollWheelEventDeltaAxis1))
                 event.setDoubleValueField(.scrollWheelEventPointDeltaAxis1, value: -event.getDoubleValueField(.scrollWheelEventPointDeltaAxis1))
                 event.setDoubleValueField(.scrollWheelEventFixedPtDeltaAxis1, value: -event.getDoubleValueField(.scrollWheelEventFixedPtDeltaAxis1))
             }
             if reverseH {
-                event.setDoubleValueField(.scrollWheelEventDeltaAxis2, value: -rawX)
+                event.setDoubleValueField(.scrollWheelEventDeltaAxis2, value: -event.getDoubleValueField(.scrollWheelEventDeltaAxis2))
                 event.setDoubleValueField(.scrollWheelEventPointDeltaAxis2, value: -event.getDoubleValueField(.scrollWheelEventPointDeltaAxis2))
                 event.setDoubleValueField(.scrollWheelEventFixedPtDeltaAxis2, value: -event.getDoubleValueField(.scrollWheelEventFixedPtDeltaAxis2))
             }
@@ -140,9 +157,11 @@ final class SmoothScrollEngine: ObservableObject, @unchecked Sendable {
 
         let templateCopy = event.copy()
         let pid = pid_t(event.getIntegerValueField(.eventTargetUnixProcessID))
-        let lineToPixel = 48.0 * config.gain * accel
-        var dy = smoothV ? rawY * lineToPixel * (reverseV ? -1 : 1) : 0
-        var dx = smoothH ? rawX * lineToPixel * (reverseH ? -1 : 1) : 0
+        // 像素源已是像素，用较小倍率；行源需放大到像素
+        let scaleY = pixelY ? 4.0 : 48.0
+        let scaleX = pixelX ? 4.0 : 48.0
+        var dy = smoothV ? usableY * config.gain * accel * scaleY * (reverseV ? -1 : 1) : 0
+        var dx = smoothH ? usableX * config.gain * accel * scaleX * (reverseH ? -1 : 1) : 0
         if shiftAxis && dy != 0 && dx == 0 {
             dx = dy   // 垂直量搬到水平轴
             dy = 0
