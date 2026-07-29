@@ -107,6 +107,10 @@ final class SmoothScrollEngine: ObservableObject, @unchecked Sendable {
         if isTrackpad(event) {
             return Unmanaged.passUnretained(event)
         }
+        // 目标是 MenuTools 自身窗口（如设置面板）时放行，避免自己的 ScrollView 滚不动
+        if event.getIntegerValueField(.eventTargetUnixProcessID) == Int64(ProcessInfo.processInfo.processIdentifier) {
+            return Unmanaged.passUnretained(event)
+        }
 
         // 取可用位移（兼容行/像素两类鼠标）
         let (usableY, pixelY) = usable(
