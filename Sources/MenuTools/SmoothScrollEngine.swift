@@ -244,8 +244,11 @@ final class SmoothScrollEngine: ObservableObject, @unchecked Sendable {
     }
 
     private func post(event: CGEvent, y: Double, x: Double, pid: pid_t, continuous: Bool) {
+        // 三类 delta 字段全部一致改写，否则模板残留的原始 fixedPtDelta 会主导方向（导致反向失效）
         event.setDoubleValueField(.scrollWheelEventPointDeltaAxis1, value: y)
         event.setDoubleValueField(.scrollWheelEventPointDeltaAxis2, value: x)
+        event.setDoubleValueField(.scrollWheelEventFixedPtDeltaAxis1, value: y)
+        event.setDoubleValueField(.scrollWheelEventFixedPtDeltaAxis2, value: x)
         event.setIntegerValueField(.scrollWheelEventDeltaAxis1, value: 0)
         event.setIntegerValueField(.scrollWheelEventDeltaAxis2, value: 0)
         event.setIntegerValueField(.scrollWheelEventIsContinuous, value: continuous ? 1 : 0)
