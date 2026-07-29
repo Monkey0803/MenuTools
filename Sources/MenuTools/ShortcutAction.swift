@@ -74,23 +74,37 @@ enum KeySimulator {
     /// 符号热键按实时物理修饰键状态判定，必须等 ⌥⌘ 松开后，合成的 ⌃← 才不被污染。
     @MainActor
     static func post(key: CGKeyCode, flags: CGEventFlags) {
-        Task { @MainActor in
-            for _ in 0..<25 {
-                let held = NSEvent.modifierFlags.intersection([.command, .option, .control, .shift])
-                if held.isEmpty { break }
-                try? await Task.sleep(for: .milliseconds(20))
-            }
-            // 对齐 Mos：用 hidSystemState 源（合成事件被 WindowServer 当作真实硬件事件，
-            // 空间切换等符号热键才会识别）；keyUp 时清空 flags。
-            let source = CGEventSource(stateID: .hidSystemState)
-            if let down = CGEvent(keyboardEventSource: source, virtualKey: key, keyDown: true) {
-                down.flags = flags
-                down.post(tap: .cghidEventTap)
-            }
-            if let up = CGEvent(keyboardEventSource: source, virtualKey: key, keyDown: false) {
-                up.post(tap: .cghidEventTap)
-            }
+        guard let source = CGEventSource(stateID: .hidSystemState) else { return }
+        // 用 flagsChanged 显式按下修饰键：直接覆盖系统当前修饰键状态（即使物理 ⌥⌘ 仍按住），
+        // 形成真实的“⌃按下→方向键→⌃松开”序列，空间切换等符号热键才能识别。
+        let modKey = modifierKeyCode(for: flags)
+        if let modKey, let fc = CGEvent(keyboardEventSource: source, virtualKey: modKey, keyDown: true) {
+            fc.type = .flagsChanged
+            fc.flags = flags
+            fc.post(tap: .cghidEventTap)
         }
+        if let down = CGEvent(keyboardEventSource: source, virtualKey: key, keyDown: true) {
+            down.flags = flags
+            down.post(tap: .cghidEventTap)
+        }
+        if let up = CGEvent(keyboardEventSource: source, virtualKey: key, keyDown: false) {
+            up.flags = flags
+            up.post(tap: .cghidEventTap)
+        }
+        if let modKey, let fc = CGEvent(keyboardEventSource: source, virtualKey: modKey, keyDown: false) {
+            fc.type = .flagsChanged
+            fc.flags = []
+            fc.post(tap: .cghidEventTap)
+        }
+    }
+
+    /// 修饰键标志 → 对应修饰键的虚拟键码（用于 flagsChanged 事件）
+    private static func modifierKeyCode(for flags: CGEventFlags) -> CGKeyCode? {
+        if flags.contains(.maskControl) { return CGKeyCode(kVK_Control) }
+        if flags.contains(.maskCommand) { return CGKeyCode(kVK_Command) }
+        if flags.contains(.maskAlternate) { return CGKeyCode(kVK_Option) }
+        if flags.contains(.maskShift) { return CGKeyCode(kVK_Shift) }
+        return nil
     }
 }
 
