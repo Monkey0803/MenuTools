@@ -6,6 +6,18 @@
 "panel.tile.light" = "Light Mode";
 "help.settings" = "Open Settings";
 
+/* System resources */
+"resource.title" = "System Resources";
+"resource.cpu" = "CPU";
+"resource.memory" = "Memory";
+"resource.disk" = "Disk";
+"resource.network" = "Network";
+"resource.free" = "free";
+"resource.memoryNormal" = "Memory normal";
+"resource.memoryWarning" = "Memory pressure";
+"resource.memoryCritical" = "High memory pressure";
+"resource.loading" = "Reading system resources…";
+
 /* Quick toggles */
 "toggle.caffeinate" = "Keep Awake";
 "toggle.hiddenFiles" = "Show Hidden Files";

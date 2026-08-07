@@ -62,6 +62,8 @@ struct MenuToolsApp: App {
         SmoothScrollEngine.shared.activateIfEnabled()
         // 监听 Finder 扩展转交的右键操作指令（沙箱扩展无法直接执行文件操作）
         RightClickCommandHandler.activate()
+        // 剪贴板历史必须独立于菜单栏面板持续监听
+        ClipboardHistoryService.shared.startMonitoring()
     }
 
     var body: some Scene {

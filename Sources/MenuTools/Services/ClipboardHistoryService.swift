@@ -123,10 +123,14 @@ struct ClipboardHistoryBuffer {
 @MainActor
 @Observable
 final class ClipboardHistoryService {
+    static let shared = ClipboardHistoryService()
+
     private var buffer: ClipboardHistoryBuffer
     private var lastChangeCount: Int = -1
+    private var monitoringTask: Task<Void, Never>?
 
     private(set) var items: [ClipboardHistoryItem] = []
+    private(set) var currentItemCount = 0
 
     init(limit: Int = 50, sensitiveLifetime: TimeInterval = 60) {
         buffer = ClipboardHistoryBuffer(
@@ -135,10 +139,29 @@ final class ClipboardHistoryService {
         )
     }
 
+    /// 在 App 生命周期内持续监听剪贴板，不依赖菜单栏面板是否打开。
+    func startMonitoring(interval: Duration = .seconds(1)) {
+        guard monitoringTask == nil else { return }
+        refresh()
+        monitoringTask = Task { @MainActor [weak self] in
+            while !Task.isCancelled {
+                guard let self else { return }
+                self.refresh()
+                try? await Task.sleep(for: interval)
+            }
+        }
+    }
+
+    func stopMonitoring() {
+        monitoringTask?.cancel()
+        monitoringTask = nil
+    }
+
     /// 检查剪贴板变化；调用方负责按合适的间隔轮询。
     func refresh() {
         let pasteboard = NSPasteboard.general
         let now = Date()
+        currentItemCount = pasteboard.pasteboardItems?.count ?? 0
         buffer.pruneExpired(now: now)
 
         guard pasteboard.changeCount != lastChangeCount else {
@@ -164,6 +187,7 @@ final class ClipboardHistoryService {
             pasteboard.setData(data, forType: .tiff)
         }
         lastChangeCount = pasteboard.changeCount
+        currentItemCount = pasteboard.pasteboardItems?.count ?? 0
     }
 
     func togglePinned(id: UUID) {

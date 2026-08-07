@@ -6,6 +6,18 @@
 "panel.tile.light" = "浅色模式";
 "help.settings" = "打开设置";
 
+/* 系统资源 */
+"resource.title" = "系统资源";
+"resource.cpu" = "CPU";
+"resource.memory" = "内存";
+"resource.disk" = "磁盘";
+"resource.network" = "网络";
+"resource.free" = "可用";
+"resource.memoryNormal" = "内存正常";
+"resource.memoryWarning" = "内存有压力";
+"resource.memoryCritical" = "内存压力高";
+"resource.loading" = "正在读取系统资源…";
+
 /* 快捷开关 */
 "toggle.caffeinate" = "防止锁屏";
 "toggle.hiddenFiles" = "显示隐藏文件";

@@ -6,6 +6,18 @@
 "panel.tile.light" = "ライトモード";
 "help.settings" = "設定を開く";
 
+/* システムリソース */
+"resource.title" = "システムリソース";
+"resource.cpu" = "CPU";
+"resource.memory" = "メモリ";
+"resource.disk" = "ディスク";
+"resource.network" = "ネットワーク";
+"resource.free" = "空き";
+"resource.memoryNormal" = "メモリ正常";
+"resource.memoryWarning" = "メモリ負荷";
+"resource.memoryCritical" = "メモリ負荷高";
+"resource.loading" = "システムリソースを読み込み中…";
+
 /* クイックスイッチ */
 "toggle.caffeinate" = "スリープ防止";
 "toggle.hiddenFiles" = "隠しファイルを表示";

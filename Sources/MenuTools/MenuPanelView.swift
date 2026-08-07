@@ -45,9 +45,9 @@ struct MenuPanelView: View {
     @State private var toggles = SystemToggleStates()
     @State private var derivedDataSize: Int64?
     @State private var isCleaningDerivedData = false
-    @State private var clipboardCount = 0
-    @State private var clipboardHistoryService = ClipboardHistoryService()
+    @State private var clipboardHistoryService = ClipboardHistoryService.shared
     @State private var isShowingClipboardHistory = false
+    @State private var systemResourceService = SystemResourceService()
     @State private var isCheckingUpdate = false
     @State private var availableUpdate: UpdateInfo?
     @State private var updateDownloadService = UpdateDownloadService(
@@ -75,17 +75,19 @@ struct MenuPanelView: View {
                 VStack(spacing: 12) {
                     heroTiles
                         .entrance(1, appeared: appeared)
-                    quickToggles
+                    systemResourceCard
                         .entrance(2, appeared: appeared)
-                    bluetoothCard
+                    quickToggles
                         .entrance(3, appeared: appeared)
-                    cleanupTiles
+                    bluetoothCard
                         .entrance(4, appeared: appeared)
+                    cleanupTiles
+                        .entrance(5, appeared: appeared)
                 }
             }
 
             footer
-                .entrance(5, appeared: appeared)
+                .entrance(6, appeared: appeared)
         }
         .padding(16)
         .frame(width: 320)
@@ -138,7 +140,6 @@ struct MenuPanelView: View {
         .task {
             refreshToggles()
             refreshDerivedDataSize()
-            clipboardCount = ClipboardService.itemCount
             autoCheckUpdateIfNeeded()
             // 面板展示期间每 30 秒刷新一次蓝牙设备电量
             while !Task.isCancelled {
@@ -151,9 +152,8 @@ struct MenuPanelView: View {
         }
         .task {
             while !Task.isCancelled {
-                clipboardHistoryService.refresh()
-                clipboardCount = ClipboardService.itemCount
-                try? await Task.sleep(for: .seconds(1))
+                systemResourceService.refresh()
+                try? await Task.sleep(for: .seconds(2))
             }
         }
         .task {
@@ -262,6 +262,108 @@ struct MenuPanelView: View {
         .padding(14)
         .frame(maxWidth: .infinity, alignment: .leading)
         .contentShape(.rect(cornerRadius: 18))
+    }
+
+    // MARK: - 系统资源
+
+    private var systemResourceCard: some View {
+        VStack(alignment: .leading, spacing: 10) {
+            HStack(spacing: 6) {
+                Image(systemName: "gauge.with.dots.needle.67percent")
+                    .font(.caption.weight(.semibold))
+                    .foregroundStyle(.tint)
+                Text(L("resource.title"))
+                    .font(.caption.weight(.semibold))
+                Spacer()
+                if let snapshot = systemResourceService.snapshot {
+                    Text(memoryPressureLabel(snapshot.memoryPressure))
+                        .font(.caption2)
+                        .foregroundStyle(memoryPressureColor(snapshot.memoryPressure))
+                } else {
+                    ProgressView()
+                        .controlSize(.mini)
+                }
+            }
+
+            if let snapshot = systemResourceService.snapshot {
+                HStack(spacing: 12) {
+                    resourceMetric(
+                        symbol: "cpu",
+                        title: L("resource.cpu"),
+                        value: "\(Int((snapshot.cpuUsage * 100).rounded()))%"
+                    )
+                    resourceMetric(
+                        symbol: "memorychip",
+                        title: L("resource.memory"),
+                        value: "\(resourceBytes(snapshot.memoryUsedBytes)) / \(resourceBytes(snapshot.memoryTotalBytes))"
+                    )
+                }
+                HStack(spacing: 12) {
+                    resourceMetric(
+                        symbol: "internaldrive",
+                        title: L("resource.disk"),
+                        value: "\(resourceBytes(snapshot.diskAvailableBytes)) \(L("resource.free"))"
+                    )
+                    resourceMetric(
+                        symbol: "arrow.up.arrow.down",
+                        title: L("resource.network"),
+                        value: "↓\(resourceRate(snapshot.networkDownloadBytesPerSecond))  ↑\(resourceRate(snapshot.networkUploadBytesPerSecond))"
+                    )
+                }
+            } else {
+                Text(L("resource.loading"))
+                    .font(.caption2)
+                    .foregroundStyle(.secondary)
+            }
+        }
+        .padding(12)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .glassEffect(.regular.tint(.purple.opacity(0.16)), in: .rect(cornerRadius: 16))
+        .accessibilityElement(children: .combine)
+        .accessibilityLabel(L("resource.title"))
+    }
+
+    private func resourceMetric(symbol: String, title: String, value: String) -> some View {
+        VStack(alignment: .leading, spacing: 3) {
+            HStack(spacing: 5) {
+                Image(systemName: symbol)
+                    .font(.caption2)
+                    .foregroundStyle(.secondary)
+                Text(title)
+                    .font(.caption2)
+                    .foregroundStyle(.secondary)
+            }
+            Text(value)
+                .font(.caption.weight(.semibold))
+                .monospacedDigit()
+                .lineLimit(1)
+                .minimumScaleFactor(0.75)
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+    }
+
+    private func resourceBytes(_ value: Int64) -> String {
+        ByteCountFormatter.string(fromByteCount: value, countStyle: .binary)
+    }
+
+    private func resourceRate(_ value: Int64) -> String {
+        "\(resourceBytes(value))/s"
+    }
+
+    private func memoryPressureLabel(_ pressure: SystemMemoryPressure) -> String {
+        switch pressure {
+        case .normal: return L("resource.memoryNormal")
+        case .warning: return L("resource.memoryWarning")
+        case .critical: return L("resource.memoryCritical")
+        }
+    }
+
+    private func memoryPressureColor(_ pressure: SystemMemoryPressure) -> Color {
+        switch pressure {
+        case .normal: return .green
+        case .warning: return .orange
+        case .critical: return .red
+        }
     }
 
     // MARK: - 快捷开关带：防止锁屏 / 隐藏文件 / 静音 / 程序坞 / 菜单栏 / 夜览
@@ -513,7 +615,7 @@ struct MenuPanelView: View {
                 .foregroundStyle(.secondary)
                 .help(L("cleanup.clipboard"))
                 .accessibilityLabel(L("cleanup.clipboard"))
-                .disabled(clipboardCount == 0)
+                .disabled(clipboardHistoryService.currentItemCount == 0)
             }
             .buttonStyle(.plain)
             .glassEffect(.regular.interactive(), in: .rect(cornerRadius: 16))
@@ -744,9 +846,7 @@ struct MenuPanelView: View {
     private func clearClipboard() {
         ClipboardService.clear()
         clipboardHistoryService.clearHistory()
-        withAnimation(.smooth(duration: 0.3)) {
-            clipboardCount = ClipboardService.itemCount
-        }
+        clipboardHistoryService.refresh()
     }
 
     private func checkForUpdate() {

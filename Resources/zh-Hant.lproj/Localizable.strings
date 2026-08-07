@@ -6,6 +6,18 @@
 "panel.tile.light" = "淺色模式";
 "help.settings" = "打開設定";
 
+/* 系統資源 */
+"resource.title" = "系統資源";
+"resource.cpu" = "CPU";
+"resource.memory" = "記憶體";
+"resource.disk" = "磁碟";
+"resource.network" = "網路";
+"resource.free" = "可用";
+"resource.memoryNormal" = "記憶體正常";
+"resource.memoryWarning" = "記憶體有壓力";
+"resource.memoryCritical" = "記憶體壓力高";
+"resource.loading" = "正在讀取系統資源…";
+
 /* 快捷開關 */
 "toggle.caffeinate" = "防止鎖定螢幕";
 "toggle.hiddenFiles" = "顯示隱藏檔案";

@@ -6,6 +6,18 @@
 "panel.tile.light" = "라이트 모드";
 "help.settings" = "설정 열기";
 
+/* 시스템 리소스 */
+"resource.title" = "시스템 리소스";
+"resource.cpu" = "CPU";
+"resource.memory" = "메모리";
+"resource.disk" = "디스크";
+"resource.network" = "네트워크";
+"resource.free" = "여유";
+"resource.memoryNormal" = "메모리 정상";
+"resource.memoryWarning" = "메모리 압박";
+"resource.memoryCritical" = "메모리 압박 높음";
+"resource.loading" = "시스템 리소스 읽는 중…";
+
 /* 빠른 전환 */
 "toggle.caffeinate" = "화면 잠금 방지";
 "toggle.hiddenFiles" = "숨김 파일 표시";

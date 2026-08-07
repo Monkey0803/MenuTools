@@ -92,3 +92,9 @@ func historyClearRemovesAllItems() {
 
     #expect(history.items.isEmpty)
 }
+
+@Test("剪贴板历史服务使用应用级共享实例")
+@MainActor
+func historyServiceUsesSharedInstance() {
+    #expect(ClipboardHistoryService.shared === ClipboardHistoryService.shared)
+}
