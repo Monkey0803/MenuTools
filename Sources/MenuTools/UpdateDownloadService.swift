@@ -16,7 +16,17 @@ enum UpdateDownloadError: Error, Equatable, Sendable {
     case alreadyDownloading
     case cancelled
     case downloadFailed
+    case downloadFailedWithReason(UpdateDownloadFailureReason)
     case openFailed
+}
+
+/// 可供界面本地化的下载失败类别；不携带路径、响应体或底层错误文本。
+enum UpdateDownloadFailureReason: Error, Equatable, Sendable {
+    case invalidResponse
+    case transport
+    case fileRead
+    case fileMove
+    case cancelled
 }
 
 /// 下载边界；实现负责把文件放到传入的目标路径并报告进度。
@@ -67,25 +77,112 @@ struct DefaultUpdateDownloadFileManager: UpdateDownloadFileManaging {
 enum URLSessionUpdatePackageDownloaderError: Error, Equatable, Sendable {
     case invalidURL
     case unsupportedFileType
-    case nonSuccessfulResponse
     case alreadyDownloading
+}
+
+/// 把 URLSession delegate 的事件规整为一次性、可测试的下载结果。
+final class URLSessionDownloadLifecycle: @unchecked Sendable {
+    private let progressHandler: @Sendable (Double) -> Void
+    private let completion: @Sendable (Result<UpdateDownloadTransportResponse, Error>) -> Void
+    private let lock = NSLock()
+    private var statusCode: Int?
+    private var isFinished = false
+
+    init(
+        progress: @escaping @Sendable (Double) -> Void,
+        completion: @escaping @Sendable (Result<UpdateDownloadTransportResponse, Error>) -> Void
+    ) {
+        progressHandler = progress
+        self.completion = completion
+    }
+
+    func receiveResponse(statusCode: Int?) {
+        lock.lock()
+        if !isFinished { self.statusCode = statusCode }
+        lock.unlock()
+    }
+
+    func didWrite(totalBytesWritten: Int64, totalBytesExpectedToWrite: Int64) {
+        guard totalBytesExpectedToWrite > 0 else { return }
+        lock.lock()
+        let shouldReport = !isFinished
+        lock.unlock()
+        guard shouldReport else { return }
+        progressHandler(min(max(
+            Double(totalBytesWritten) / Double(totalBytesExpectedToWrite),
+            0
+        ), 1))
+    }
+
+    func didFinishDownloading(to location: URL) {
+        lock.lock()
+        guard !isFinished else {
+            lock.unlock()
+            return
+        }
+        isFinished = true
+        let statusCode = self.statusCode
+        lock.unlock()
+
+        completion(.success(UpdateDownloadTransportResponse(
+            statusCode: statusCode,
+            temporaryURL: location
+        )))
+    }
+
+    func didComplete(withError error: Error?) {
+        guard error != nil else { return }
+        finish(with: UpdateDownloadFailureReason.transport)
+    }
+
+    func cancel() {
+        finish(with: UpdateDownloadFailureReason.cancelled)
+    }
+
+    private func finish(with error: UpdateDownloadFailureReason) {
+        lock.lock()
+        guard !isFinished else {
+            lock.unlock()
+            return
+        }
+        isFinished = true
+        lock.unlock()
+        completion(.failure(error))
+    }
 }
 
 /// 将 URLSession 下载结果校验并安全移动到服务层指定的临时路径。
 final class URLSessionUpdatePackageDownloader: UpdatePackageDownloading, @unchecked Sendable {
     private static let supportedExtensions: Set<String> = ["zip", "dmg", "pkg"]
 
-    private let transport: any UpdateDownloadTransport
+    private struct ActiveDownload {
+        let id: Int
+        let transport: any UpdateDownloadTransport
+        let continuation: CheckedContinuation<URL, Error>
+        let destination: URL
+    }
+
+    private let transportFactory: @Sendable () -> any UpdateDownloadTransport
     private let fileManager: any UpdateDownloadFileManaging
     private let lock = NSLock()
-    private var isDownloading = false
+    private var nextDownloadID = 0
+    private var activeDownload: ActiveDownload?
 
     init(
-        transport: any UpdateDownloadTransport = URLSessionUpdateDownloadTransport(),
+        transportFactory: @escaping @Sendable () -> any UpdateDownloadTransport = {
+            URLSessionUpdateDownloadTransport()
+        },
         fileManager: any UpdateDownloadFileManaging = DefaultUpdateDownloadFileManager()
     ) {
-        self.transport = transport
+        self.transportFactory = transportFactory
         self.fileManager = fileManager
+    }
+
+    convenience init(
+        transport: any UpdateDownloadTransport,
+        fileManager: any UpdateDownloadFileManaging = DefaultUpdateDownloadFileManager()
+    ) {
+        self.init(transportFactory: { transport }, fileManager: fileManager)
     }
 
     func download(
@@ -101,28 +198,37 @@ final class URLSessionUpdatePackageDownloader: UpdatePackageDownloading, @unchec
         guard Self.supportedExtensions.contains(url.pathExtension.lowercased()) else {
             throw URLSessionUpdatePackageDownloaderError.unsupportedFileType
         }
+        try Task.checkCancellation()
 
         return try await withTaskCancellationHandler {
             try await withCheckedThrowingContinuation { continuation in
                 lock.lock()
-                guard !isDownloading else {
+                guard !Task.isCancelled else {
+                    lock.unlock()
+                    continuation.resume(throwing: UpdateDownloadFailureReason.cancelled)
+                    return
+                }
+                guard activeDownload == nil else {
                     lock.unlock()
                     continuation.resume(throwing: URLSessionUpdatePackageDownloaderError.alreadyDownloading)
                     return
                 }
-                isDownloading = true
+                nextDownloadID += 1
+                let id = nextDownloadID
+                let transport = transportFactory()
+                activeDownload = ActiveDownload(
+                    id: id,
+                    transport: transport,
+                    continuation: continuation,
+                    destination: destination
+                )
                 lock.unlock()
 
                 transport.startDownload(
                     from: url,
                     progress: progress,
                     completion: { [weak self] result in
-                        guard let self else { return }
-                        self.finish(
-                            result,
-                            destination: destination,
-                            continuation: continuation
-                        )
+                        self?.finish(result, for: id)
                     }
                 )
             }
@@ -132,35 +238,46 @@ final class URLSessionUpdatePackageDownloader: UpdatePackageDownloading, @unchec
     }
 
     func cancel() {
-        transport.cancel()
+        lock.lock()
+        let activeDownload: ActiveDownload? = self.activeDownload
+        self.activeDownload = nil
+        lock.unlock()
+
+        guard let activeDownload else { return }
+        activeDownload.transport.cancel()
+        activeDownload.continuation.resume(throwing: UpdateDownloadFailureReason.cancelled)
     }
 
     private func finish(
         _ result: Result<UpdateDownloadTransportResponse, Error>,
-        destination: URL,
-        continuation: CheckedContinuation<URL, Error>
+        for id: Int
     ) {
-        defer {
-            lock.lock()
-            isDownloading = false
+        lock.lock()
+        guard let activeDownload, activeDownload.id == id else {
             lock.unlock()
+            return
         }
+        self.activeDownload = nil
+        lock.unlock()
 
         switch result {
         case let .failure(error):
-            continuation.resume(throwing: error)
+            let reason = error as? UpdateDownloadFailureReason ?? .transport
+            activeDownload.continuation.resume(throwing: reason)
         case let .success(response):
             guard let statusCode = response.statusCode,
                   (200...299).contains(statusCode) else {
-                continuation.resume(throwing: URLSessionUpdatePackageDownloaderError.nonSuccessfulResponse)
+                activeDownload.continuation.resume(throwing: UpdateDownloadFailureReason.invalidResponse)
                 return
             }
             do {
-                try fileManager.moveItem(at: response.temporaryURL, to: destination)
-                continuation.resume(returning: destination)
+                try fileManager.moveItem(
+                    at: response.temporaryURL,
+                    to: activeDownload.destination
+                )
+                activeDownload.continuation.resume(returning: activeDownload.destination)
             } catch {
-                // 保留原始文件错误，让上层决定本地化展示方式。
-                continuation.resume(throwing: error)
+                activeDownload.continuation.resume(throwing: UpdateDownloadFailureReason.fileMove)
             }
         }
     }
@@ -175,7 +292,7 @@ private final class URLSessionUpdateDownloadTransport: NSObject, UpdateDownloadT
     )
     private let lock = NSLock()
     private var activeTask: URLSessionDownloadTask?
-    private var progressHandler: (@Sendable (Double) -> Void)?
+    private var lifecycle: URLSessionDownloadLifecycle?
     private var completion: (@Sendable (Result<UpdateDownloadTransportResponse, Error>) -> Void)?
 
     func startDownload(
@@ -188,11 +305,17 @@ private final class URLSessionUpdateDownloadTransport: NSObject, UpdateDownloadT
         lock.lock()
         guard activeTask == nil else {
             lock.unlock()
-            completion(.failure(URLSessionUpdatePackageDownloaderError.alreadyDownloading))
+            completion(.failure(UpdateDownloadFailureReason.transport))
             return
         }
+        let lifecycle = URLSessionDownloadLifecycle(
+            progress: progress,
+            completion: { [weak self] result in
+                self?.finish(taskID: task.taskIdentifier, result: result)
+            }
+        )
         activeTask = task
-        progressHandler = progress
+        self.lifecycle = lifecycle
         self.completion = completion
         lock.unlock()
 
@@ -202,7 +325,9 @@ private final class URLSessionUpdateDownloadTransport: NSObject, UpdateDownloadT
     func cancel() {
         lock.lock()
         let task = activeTask
+        let lifecycle: URLSessionDownloadLifecycle? = self.lifecycle
         lock.unlock()
+        lifecycle?.cancel()
         task?.cancel()
     }
 
@@ -214,11 +339,13 @@ private final class URLSessionUpdateDownloadTransport: NSObject, UpdateDownloadT
         totalBytesExpectedToWrite: Int64
     ) {
         guard totalBytesExpectedToWrite > 0 else { return }
-        let progress = Double(totalBytesWritten) / Double(totalBytesExpectedToWrite)
         lock.lock()
-        let handler = activeTask?.taskIdentifier == downloadTask.taskIdentifier ? progressHandler : nil
+        let lifecycle = activeTask?.taskIdentifier == downloadTask.taskIdentifier ? self.lifecycle : nil
         lock.unlock()
-        handler?(min(max(progress, 0), 1))
+        lifecycle?.didWrite(
+            totalBytesWritten: totalBytesWritten,
+            totalBytesExpectedToWrite: totalBytesExpectedToWrite
+        )
     }
 
     func urlSession(
@@ -228,17 +355,15 @@ private final class URLSessionUpdateDownloadTransport: NSObject, UpdateDownloadT
     ) {
         lock.lock()
         guard activeTask?.taskIdentifier == downloadTask.taskIdentifier,
-              let completion else {
+              let lifecycle else {
             lock.unlock()
             return
         }
-        activeTask = nil
-        progressHandler = nil
-        self.completion = nil
         lock.unlock()
 
         let statusCode = (downloadTask.response as? HTTPURLResponse)?.statusCode
-        completion(.success(UpdateDownloadTransportResponse(statusCode: statusCode, temporaryURL: location)))
+        lifecycle.receiveResponse(statusCode: statusCode)
+        lifecycle.didFinishDownloading(to: location)
     }
 
     func urlSession(
@@ -246,20 +371,33 @@ private final class URLSessionUpdateDownloadTransport: NSObject, UpdateDownloadT
         task: URLSessionTask,
         didCompleteWithError error: Error?
     ) {
-        guard let error else { return }
-
         lock.lock()
         guard activeTask?.taskIdentifier == task.taskIdentifier,
+              let lifecycle else {
+            lock.unlock()
+            return
+        }
+        lock.unlock()
+
+        lifecycle.didComplete(withError: error)
+    }
+
+    private func finish(
+        taskID: Int,
+        result: Result<UpdateDownloadTransportResponse, Error>
+    ) {
+        lock.lock()
+        guard activeTask?.taskIdentifier == taskID,
               let completion else {
             lock.unlock()
             return
         }
         activeTask = nil
-        progressHandler = nil
+        lifecycle = nil
         self.completion = nil
         lock.unlock()
 
-        completion(.failure(error))
+        completion(result)
     }
 }
 
@@ -331,6 +469,7 @@ final class UpdateDownloadService {
             }
 
             do {
+                guard self.activeGeneration == generation, !Task.isCancelled else { return }
                 let downloadedURL = try await downloader.download(
                     from: url,
                     to: destination,
@@ -350,6 +489,9 @@ final class UpdateDownloadService {
                     return
                 }
                 self.state = .completed(destination)
+            } catch let reason as UpdateDownloadFailureReason {
+                guard self.activeGeneration == generation, !Task.isCancelled else { return }
+                self.state = .failed(.downloadFailedWithReason(reason))
             } catch {
                 guard self.activeGeneration == generation, !Task.isCancelled else { return }
                 self.state = .failed(.downloadFailed)

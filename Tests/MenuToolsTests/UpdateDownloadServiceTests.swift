@@ -6,15 +6,12 @@ private enum StubDownloadError: Error, Sendable {
     case failed
 }
 
-private enum AdapterStubError: Error, Sendable {
-    case readFailed
-    case cancelled
-}
-
 private actor AdapterTransportControl {
     private var completion: (@Sendable (Result<UpdateDownloadTransportResponse, Error>) -> Void)?
     private var progress: (@Sendable (Double) -> Void)?
     private var startWaiters: [CheckedContinuation<Void, Never>] = []
+    private var completionWaiters: [CheckedContinuation<Void, Never>] = []
+    private var didDeliverCompletion = false
 
     func start(
         progress: @escaping @Sendable (Double) -> Void,
@@ -22,6 +19,7 @@ private actor AdapterTransportControl {
     ) {
         self.progress = progress
         self.completion = completion
+        didDeliverCompletion = false
         let waiters = startWaiters
         startWaiters.removeAll()
         waiters.forEach { $0.resume() }
@@ -36,11 +34,21 @@ private actor AdapterTransportControl {
 
     func finish(_ result: Result<UpdateDownloadTransportResponse, Error>) {
         completion?(result)
-        completion = nil
+        didDeliverCompletion = true
+        let waiters = completionWaiters
+        completionWaiters.removeAll()
+        waiters.forEach { $0.resume() }
     }
 
     func reportProgress(_ value: Double) {
         progress?(value)
+    }
+
+    func waitUntilCompletionDelivered() async {
+        guard !didDeliverCompletion else { return }
+        await withCheckedContinuation { continuation in
+            completionWaiters.append(continuation)
+        }
     }
 }
 
@@ -59,8 +67,23 @@ private struct ControlledAdapterTransport: UpdateDownloadTransport {
 
     func cancel() {
         Task {
-            await control.finish(.failure(AdapterStubError.cancelled))
+            await control.finish(.failure(UpdateDownloadFailureReason.cancelled))
         }
+    }
+}
+
+private final class AdapterTransportFactory: @unchecked Sendable {
+    private let lock = NSLock()
+    private var transports: [ControlledAdapterTransport]
+
+    init(controls: [AdapterTransportControl]) {
+        transports = controls.map(ControlledAdapterTransport.init(control:))
+    }
+
+    func makeTransport() -> any UpdateDownloadTransport {
+        lock.lock()
+        defer { lock.unlock() }
+        return transports.removeFirst()
     }
 }
 
@@ -106,6 +129,10 @@ private actor DownloadControl {
         startWaiters.removeAll()
         waiters.forEach { $0.resume() }
         return operation
+    }
+
+    var startedCount: Int {
+        destinations.count
     }
 
     func waitUntilStarted(_ count: Int) async {
@@ -311,6 +338,24 @@ func serviceCancelsDownload() async {
     await control.waitUntilCancelled()
 }
 
+@Test("取消尚未开始的下载不会启动下载器")
+@MainActor
+func serviceCancellationPreventsDeferredDownloadStart() async {
+    let control = DownloadControl()
+    let service = UpdateDownloadService(
+        downloader: ControlledDownloader(control: control),
+        opener: StubOpener()
+    )
+
+    #expect(service.start(update: update(url: "https://example.com/MenuTools.zip")))
+    #expect(service.cancel())
+    await control.waitUntilCancelled()
+    await Task.yield()
+
+    #expect(await control.startedCount == 0)
+    #expect(service.state == .failed(.cancelled))
+}
+
 @Test("取消后的迟到结果不会覆盖新一代下载")
 @MainActor
 func serviceIgnoresLateCompletionFromCancelledGeneration() async {
@@ -381,6 +426,32 @@ func serviceTransitionsToFailedAfterDownloadError() async {
     #expect(service.state == .failed(.downloadFailed))
 }
 
+@Test("服务保留安全的下载失败类别")
+@MainActor
+func servicePreservesTypedDownloadFailureReason() async {
+    let control = AdapterTransportControl()
+    let service = UpdateDownloadService(
+        downloader: URLSessionUpdatePackageDownloader(
+            transport: ControlledAdapterTransport(control: control),
+            fileManager: DefaultUpdateDownloadFileManager()
+        ),
+        opener: StubOpener()
+    )
+
+    #expect(service.start(update: update(url: "https://example.com/MenuTools.zip")))
+    await control.waitUntilStarted()
+    await control.finish(.success(.init(
+        statusCode: 503,
+        temporaryURL: URL(fileURLWithPath: "/tmp/response.zip")
+    )))
+    await waitForState(
+        service,
+        .failed(.downloadFailedWithReason(.invalidResponse))
+    )
+
+    #expect(service.state == .failed(.downloadFailedWithReason(.invalidResponse)))
+}
+
 @Test("完成后可通过主 actor 打开的注入打开器打开临时安装包")
 @MainActor
 func serviceOpensCompletedPackage() async {
@@ -422,7 +493,7 @@ func adapterRejectsNonSuccessfulHTTPResponse() async {
     await control.waitUntilStarted()
     await control.finish(.success(.init(statusCode: 404, temporaryURL: temporaryURL)))
 
-    await #expect(throws: URLSessionUpdatePackageDownloaderError.nonSuccessfulResponse) {
+    await #expect(throws: UpdateDownloadFailureReason.invalidResponse) {
         try await task.value
     }
 }
@@ -459,9 +530,9 @@ func adapterPreservesReadError() async {
         )
     }
     await control.waitUntilStarted()
-    await control.finish(.failure(AdapterStubError.readFailed))
+    await control.finish(.failure(UpdateDownloadFailureReason.fileRead))
 
-    await #expect(throws: AdapterStubError.readFailed) {
+    await #expect(throws: UpdateDownloadFailureReason.fileRead) {
         try await task.value
     }
 }
@@ -486,7 +557,7 @@ func adapterRejectsMoveError() async {
         temporaryURL: URL(fileURLWithPath: "/tmp/source.zip")
     )))
 
-    await #expect(throws: FileMoveStubError.moveFailed) {
+    await #expect(throws: UpdateDownloadFailureReason.fileMove) {
         try await task.value
     }
 }
@@ -520,7 +591,7 @@ func adapterReportsProgressAndFinalizesDestination() async throws {
 
     let result = try await task.value
     #expect(result == destination)
-    #expect(await progress.values == [0.4, 1.0])
+    #expect(await progress.waitForValues(2) == [0.4, 1.0])
     #expect(fileManager.source == URL(fileURLWithPath: "/tmp/source.zip"))
     #expect(fileManager.destination == destination)
 }
@@ -542,15 +613,142 @@ func adapterSupportsCancellation() async {
     await control.waitUntilStarted()
     task.cancel()
 
-    await #expect(throws: AdapterStubError.cancelled) {
+    await #expect(throws: UpdateDownloadFailureReason.cancelled) {
         try await task.value
     }
 }
 
+@Test("旧传输清理期间新下载使用独立传输且忽略旧回调")
+func adapterAllowsRetryBeforeOldTransportFinishes() async throws {
+    let oldControl = AdapterTransportControl()
+    let newControl = AdapterTransportControl()
+    let factory = AdapterTransportFactory(controls: [oldControl, newControl])
+    let adapter = URLSessionUpdatePackageDownloader(
+        transportFactory: { factory.makeTransport() },
+        fileManager: RecordingFileManager(moveError: nil)
+    )
+    let oldDestination = URL(fileURLWithPath: "/tmp/old.zip")
+    let newDestination = URL(fileURLWithPath: "/tmp/new.zip")
+
+    let oldTask = Task {
+        try await adapter.download(
+            from: URL(string: "https://example.com/old.zip")!,
+            to: oldDestination,
+            progress: { _ in }
+        )
+    }
+    await oldControl.waitUntilStarted()
+    adapter.cancel()
+    await oldControl.waitUntilCompletionDelivered()
+    await #expect(throws: UpdateDownloadFailureReason.cancelled) {
+        try await oldTask.value
+    }
+
+    let newTask = Task {
+        try await adapter.download(
+            from: URL(string: "https://example.com/new.zip")!,
+            to: newDestination,
+            progress: { _ in }
+        )
+    }
+    await newControl.waitUntilStarted()
+    await oldControl.finish(.success(.init(
+        statusCode: 200,
+        temporaryURL: URL(fileURLWithPath: "/tmp/old-source.zip")
+    )))
+    await newControl.finish(.success(.init(
+        statusCode: 200,
+        temporaryURL: URL(fileURLWithPath: "/tmp/new-source.zip")
+    )))
+
+    #expect(try await newTask.value == newDestination)
+}
+
+@Test("URLSession 生命周期按响应、进度、完成顺序只回调一次")
+func delegateLifecycleReportsResponseProgressAndFinish() {
+    let recorder = LifecycleRecorder()
+    let lifecycle = URLSessionDownloadLifecycle(
+        progress: { recorder.progress.append($0) },
+        completion: { recorder.results.append($0) }
+    )
+    let temporaryURL = URL(fileURLWithPath: "/tmp/lifecycle.zip")
+
+    lifecycle.receiveResponse(statusCode: 200)
+    lifecycle.didWrite(totalBytesWritten: 50, totalBytesExpectedToWrite: 100)
+    lifecycle.didFinishDownloading(to: temporaryURL)
+    lifecycle.didComplete(withError: UpdateDownloadFailureReason.transport)
+
+    #expect(recorder.progress == [0.5])
+    #expect(recorder.results.count == 1)
+    guard case let .success(response) = recorder.results.first else {
+        Issue.record("生命周期应返回成功响应")
+        return
+    }
+    #expect(response.statusCode == 200)
+    #expect(response.temporaryURL == temporaryURL)
+}
+
+@Test("URLSession 生命周期取消后忽略迟到完成")
+func delegateLifecycleIgnoresLateCompletionAfterCancel() {
+    let recorder = LifecycleRecorder()
+    let lifecycle = URLSessionDownloadLifecycle(
+        progress: { recorder.progress.append($0) },
+        completion: { recorder.results.append($0) }
+    )
+
+    lifecycle.cancel()
+    lifecycle.didFinishDownloading(to: URL(fileURLWithPath: "/tmp/late.zip"))
+    lifecycle.didComplete(withError: UpdateDownloadFailureReason.transport)
+
+    #expect(recorder.progress.isEmpty)
+    #expect(recorder.results.count == 1)
+    guard case let .failure(error) = recorder.results.first else {
+        Issue.record("取消后生命周期应返回失败结果")
+        return
+    }
+    #expect(error as? UpdateDownloadFailureReason == .cancelled)
+}
+
+@Test("URLSession 生命周期错误先于完成时忽略迟到文件")
+func delegateLifecycleReportsErrorBeforeFinish() {
+    let recorder = LifecycleRecorder()
+    let lifecycle = URLSessionDownloadLifecycle(
+        progress: { recorder.progress.append($0) },
+        completion: { recorder.results.append($0) }
+    )
+
+    lifecycle.receiveResponse(statusCode: 200)
+    lifecycle.didComplete(withError: UpdateDownloadFailureReason.transport)
+    lifecycle.didFinishDownloading(to: URL(fileURLWithPath: "/tmp/late-error.zip"))
+
+    #expect(recorder.results.count == 1)
+    guard case let .failure(error) = recorder.results.first else {
+        Issue.record("错误事件应先结束生命周期")
+        return
+    }
+    #expect(error as? UpdateDownloadFailureReason == .transport)
+}
+
 private actor ProgressRecorder {
     private(set) var values: [Double] = []
+    private var waiters: [(Int, CheckedContinuation<[Double], Never>)] = []
 
     func record(_ value: Double) {
         values.append(value)
+        let ready = waiters.filter { values.count >= $0.0 }
+        waiters.removeAll { values.count >= $0.0 }
+        ready.forEach { $0.1.resume(returning: values) }
     }
+
+    func waitForValues(_ count: Int) async -> [Double] {
+        if values.count >= count { return values }
+        return await withCheckedContinuation { continuation in
+            waiters.append((count, continuation))
+        }
+    }
+}
+
+private final class LifecycleRecorder: @unchecked Sendable {
+    var progress: [Double] = []
+    var results: [Result<UpdateDownloadTransportResponse, Error>] = []
 }
