@@ -63,6 +63,22 @@ struct RightClickConfig: Codable, Equatable, Sendable {
     }
 }
 
+/// 右键配置的持久化边界，避免备份服务依赖具体文件系统实现。
+protocol RightClickConfigPersisting: Sendable {
+    func load() -> RightClickConfig
+    func replace(_ config: RightClickConfig) throws
+}
+
+struct LocalRightClickConfigStore: RightClickConfigPersisting {
+    func load() -> RightClickConfig {
+        RightClickConfigStore.load()
+    }
+
+    func replace(_ config: RightClickConfig) throws {
+        try RightClickConfigStore.replace(config)
+    }
+}
+
 /// 配置读写与同步：不用 App Group 共享容器——自签名/ad-hoc 签名无真实 Team ID，
 /// macOS 15+ 无法校验成员资格，主 App 一碰共享容器就弹 TCC“想访问其他 App 的数据”。
 /// 改为：配置以 JSON 字符串放分布式通知的 object 广播（沙箱进程不能带 userInfo，
@@ -96,10 +112,15 @@ enum RightClickConfigStore {
 
     /// 仅写盘（扩展缓存广播来的配置时也用）
     static func persist(_ config: RightClickConfig) {
+        try? replace(config)
+    }
+
+    /// 校验编码并原子替换右键配置文件。
+    static func replace(_ config: RightClickConfig) throws {
         let dir = fileURL.deletingLastPathComponent()
-        try? FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true)
-        guard let data = try? JSONEncoder().encode(config) else { return }
-        try? data.write(to: fileURL)
+        try FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true)
+        let data = try JSONEncoder().encode(config)
+        try data.write(to: fileURL, options: .atomic)
     }
 
     /// 主 App 侧：保存并广播给扩展
