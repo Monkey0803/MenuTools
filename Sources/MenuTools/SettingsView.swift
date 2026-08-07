@@ -235,19 +235,21 @@ struct GeneralSettingsView: View {
         let panel = NSSavePanel()
         panel.title = L("settings.backup.export")
         panel.allowedContentTypes = [backupContentType]
-        panel.nameFieldStringValue = L("settings.backup.defaultFilename")
+        panel.nameFieldStringValue = L(
+            "settings.backup.defaultFilename",
+            UpdateCheckerService.currentVersion
+        )
 
         guard panel.runModal() == .OK, let url = panel.url else { return }
 
         do {
-            let document = AppBackupService.makeDocument(
+            try AppBackupService.export(
+                to: url,
                 userDefaults: .standard,
                 rightClick: RightClickConfigStore.load(),
-                appVersion: "1.0.1",
+                appVersion: UpdateCheckerService.currentVersion,
                 createdAt: Date()
             )
-            let data = try AppBackupService.encode(document, encoder: JSONEncoder())
-            try LocalAppBackupFileAccess().write(data, to: url)
             backupStatus = .success(L("settings.backup.exportSuccess"))
         } catch {
             backupStatus = .failure(L("settings.backup.writeFailed"))
@@ -270,8 +272,7 @@ struct GeneralSettingsView: View {
 
         let document: AppBackupDocument
         do {
-            let data = try LocalAppBackupFileAccess().read(from: url)
-            document = try AppBackupService.decode(data, decoder: JSONDecoder())
+            document = try AppBackupService.importDocument(from: url)
         } catch {
             backupStatus = .failure(L("settings.backup.invalidFile"))
             return

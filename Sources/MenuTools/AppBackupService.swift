@@ -16,6 +16,17 @@ struct LocalAppBackupFileAccess: AppBackupFileAccessing {
     }
 }
 
+enum AppBackupRestoreError: Error, LocalizedError, @unchecked Sendable {
+    case rollbackFailed(original: any Error, rollback: any Error)
+
+    var errorDescription: String? {
+        switch self {
+        case let .rollbackFailed(original, rollback):
+            return "备份恢复失败：\(original.localizedDescription)；回滚失败：\(rollback.localizedDescription)"
+        }
+    }
+}
+
 /// 应用配置备份的快照、JSON 和恢复操作。
 enum AppBackupService {
     static func makeDocument(
@@ -69,19 +80,37 @@ enum AppBackupService {
         )
     }
 
-    static func encode(
-        _ document: AppBackupDocument,
-        encoder: JSONEncoder
-    ) throws -> Data {
+    static func encode(_ document: AppBackupDocument) throws -> Data {
         let validated = try document.validated()
-        return try encoder.encode(validated)
+        return try makeEncoder().encode(validated)
     }
 
-    static func decode(
-        _ data: Data,
-        decoder: JSONDecoder
+    static func decode(_ data: Data) throws -> AppBackupDocument {
+        try makeDecoder().decode(AppBackupDocument.self, from: data).validated()
+    }
+
+    static func export(
+        to url: URL,
+        userDefaults: UserDefaults,
+        rightClick: RightClickConfig,
+        appVersion: String,
+        createdAt: Date,
+        fileAccess: any AppBackupFileAccessing = LocalAppBackupFileAccess()
+    ) throws {
+        let document = makeDocument(
+            userDefaults: userDefaults,
+            rightClick: rightClick,
+            appVersion: appVersion,
+            createdAt: createdAt
+        )
+        try fileAccess.write(try encode(document), to: url)
+    }
+
+    static func importDocument(
+        from url: URL,
+        fileAccess: any AppBackupFileAccessing = LocalAppBackupFileAccess()
     ) throws -> AppBackupDocument {
-        try decoder.decode(AppBackupDocument.self, from: data).validated()
+        try decode(fileAccess.read(from: url))
     }
 
     static func restore(
@@ -96,11 +125,30 @@ enum AppBackupService {
         do {
             apply(document.settings, to: userDefaults)
             try rightClickStore.replace(document.rightClick)
-        } catch {
+        } catch let originalError {
             restore(previousDefaults, to: userDefaults)
-            try? rightClickStore.replace(previousRightClick)
-            throw error
+            do {
+                try rightClickStore.replace(previousRightClick)
+            } catch let rollbackError {
+                throw AppBackupRestoreError.rollbackFailed(
+                    original: originalError,
+                    rollback: rollbackError
+                )
+            }
+            throw originalError
         }
+    }
+
+    private static func makeEncoder() -> JSONEncoder {
+        let encoder = JSONEncoder()
+        encoder.dateEncodingStrategy = .iso8601
+        return encoder
+    }
+
+    private static func makeDecoder() -> JSONDecoder {
+        let decoder = JSONDecoder()
+        decoder.dateDecodingStrategy = .iso8601
+        return decoder
     }
 
     private static let allowlistedKeys = [

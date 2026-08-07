@@ -26,10 +26,14 @@ struct AppBackupSettings: Codable, Equatable, Sendable {
 /// 备份文档校验失败的原因。
 enum AppBackupValidationError: Error, Equatable, Sendable {
     case unsupportedFormatVersion(Int)
+    case invalidMenuBarIcon(String)
+    case invalidPreferredTerminal(String)
+    case invalidAppLanguage(String)
     case invalidGain(Double)
     case invalidDuration(Double)
     case invalidMinimumStep(Double)
     case invalidModifier(String, UInt)
+    case invalidRightClickKey(String)
 }
 
 /// MenuTools 配置备份文档。
@@ -58,10 +62,20 @@ struct AppBackupDocument: Codable, Equatable, Sendable {
         )
     }
 
-    /// 校验版本、平滑滚动数值和修饰键，返回可安全恢复的文档。
+    /// 校验版本、允许值、平滑滚动数值和修饰键，返回可安全恢复的文档。
     func validated() throws -> AppBackupDocument {
         guard formatVersion == Self.currentFormatVersion else {
             throw AppBackupValidationError.unsupportedFormatVersion(formatVersion)
+        }
+
+        guard MenuBarIcon(rawValue: settings.menuBarIcon) != nil else {
+            throw AppBackupValidationError.invalidMenuBarIcon(settings.menuBarIcon)
+        }
+        guard TerminalApp(rawValue: settings.preferredTerminal) != nil else {
+            throw AppBackupValidationError.invalidPreferredTerminal(settings.preferredTerminal)
+        }
+        guard AppLanguage(rawValue: settings.appLanguage) != nil else {
+            throw AppBackupValidationError.invalidAppLanguage(settings.appLanguage)
         }
 
         guard settings.scrollGain.isFinite, (0.1...10.0).contains(settings.scrollGain) else {
@@ -80,6 +94,10 @@ struct AppBackupDocument: Codable, Equatable, Sendable {
             ("scrollDisableModifier", settings.scrollDisableModifier)
         ] where value & ~Self.allowedModifierMask != 0 {
             throw AppBackupValidationError.invalidModifier(name, value)
+        }
+
+        for key in rightClick.enabled.keys.sorted() where RightClickItem(rawValue: key) == nil {
+            throw AppBackupValidationError.invalidRightClickKey(key)
         }
 
         return self

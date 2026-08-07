@@ -67,7 +67,7 @@
 "settings.section.backup" = "백업 및 복원";
 "settings.backup.export" = "백업 내보내기";
 "settings.backup.import" = "백업 가져오기";
-"settings.backup.defaultFilename" = "MenuTools-1.0.1.menutoolsbackup";
+"settings.backup.defaultFilename" = "MenuTools-%@.menutoolsbackup";
 "settings.backup.exportSuccess" = "백업을 내보냈습니다";
 "settings.backup.importSuccess" = "백업을 복원했습니다";
 "settings.backup.invalidFile" = "백업 파일이 올바르지 않거나 읽을 수 없습니다";

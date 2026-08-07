@@ -67,7 +67,7 @@
 "settings.section.backup" = "バックアップと復元";
 "settings.backup.export" = "バックアップを書き出す";
 "settings.backup.import" = "バックアップを読み込む";
-"settings.backup.defaultFilename" = "MenuTools-1.0.1.menutoolsbackup";
+"settings.backup.defaultFilename" = "MenuTools-%@.menutoolsbackup";
 "settings.backup.exportSuccess" = "バックアップを書き出しました";
 "settings.backup.importSuccess" = "バックアップを復元しました";
 "settings.backup.invalidFile" = "バックアップファイルが無効か読み込めません";

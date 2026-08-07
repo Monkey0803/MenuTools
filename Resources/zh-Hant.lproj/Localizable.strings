@@ -67,7 +67,7 @@
 "settings.section.backup" = "備份與恢復";
 "settings.backup.export" = "匯出備份";
 "settings.backup.import" = "匯入恢復";
-"settings.backup.defaultFilename" = "MenuTools-1.0.1.menutoolsbackup";
+"settings.backup.defaultFilename" = "MenuTools-%@.menutoolsbackup";
 "settings.backup.exportSuccess" = "備份匯出成功";
 "settings.backup.importSuccess" = "備份恢復成功";
 "settings.backup.invalidFile" = "備份檔案無效或無法讀取";

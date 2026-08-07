@@ -8,7 +8,7 @@ func completeDocumentRoundTripsThroughJSON() throws {
         menuBarIcon: "terminal.fill",
         menuBarShowTitle: true,
         togglesShowTitle: true,
-        preferredTerminal: "iTerm2",
+        preferredTerminal: "com.googlecode.iterm2",
         autoCheckUpdate: false,
         appLanguage: "zh-Hans",
         scrollEnabled: true,
@@ -35,11 +35,24 @@ func completeDocumentRoundTripsThroughJSON() throws {
         createdAt: Date(timeIntervalSince1970: 1_754_534_400)
     )
 
-    let data = try JSONEncoder().encode(document)
-    let decoded = try JSONDecoder().decode(AppBackupDocument.self, from: data)
+    let data = try AppBackupService.encode(document)
+    let decoded = try AppBackupService.decode(data)
 
     #expect(decoded == document)
     #expect(decoded.formatVersion == 1)
+
+    let object = try #require(JSONSerialization.jsonObject(with: data) as? [String: Any])
+    #expect(object["createdAt"] as? String == "2025-08-07T02:40:00Z")
+}
+
+@Test("备份服务可以导入 ISO-8601 日期 fixture")
+func iso8601FixtureCanBeImported() throws {
+    let data = #"{"formatVersion":1,"createdAt":"2025-08-07T00:00:00Z","appVersion":"1.0.1","settings":{"menuBarIcon":"wrench.and.screwdriver.fill","menuBarShowTitle":false,"togglesShowTitle":false,"preferredTerminal":"com.apple.Terminal","autoCheckUpdate":true,"appLanguage":"system","scrollEnabled":false,"scrollSmoothVertical":true,"scrollSmoothHorizontal":true,"scrollInvertVertical":false,"scrollInvertHorizontal":false,"scrollGain":1,"scrollDuration":0.35,"scrollMinStep":8,"scrollTouchpadEmulation":true,"scrollAccelModifier":0,"scrollShiftModifier":0,"scrollDisableModifier":0},"rightClick":{"enabled":{}}}"#.data(using: .utf8)!
+
+    let document = try AppBackupService.decode(data)
+
+    #expect(document.createdAt == Date(timeIntervalSince1970: 1_754_524_800))
+    #expect(document.settings == AppBackupSettings.fixture)
 }
 
 @Test("不支持的格式版本会被拒绝")
@@ -142,16 +155,60 @@ func invalidModifierValueThrows() {
     }
 }
 
+@Test("未知菜单栏图标会被拒绝")
+func invalidMenuBarIconThrows() {
+    var settings = AppBackupSettings.fixture
+    settings.menuBarIcon = "unknown.icon"
+
+    #expect(throws: AppBackupValidationError.invalidMenuBarIcon("unknown.icon")) {
+        try document(settings: settings).validated()
+    }
+}
+
+@Test("未知终端标识会被拒绝")
+func invalidTerminalThrows() {
+    var settings = AppBackupSettings.fixture
+    settings.preferredTerminal = "com.example.UnknownTerminal"
+
+    #expect(throws: AppBackupValidationError.invalidPreferredTerminal("com.example.UnknownTerminal")) {
+        try document(settings: settings).validated()
+    }
+}
+
+@Test("未知语言标识会被拒绝")
+func invalidLanguageThrows() {
+    var settings = AppBackupSettings.fixture
+    settings.appLanguage = "xx"
+
+    #expect(throws: AppBackupValidationError.invalidAppLanguage("xx")) {
+        try document(settings: settings).validated()
+    }
+}
+
+@Test("未知右键配置项会被拒绝")
+func invalidRightClickKeyThrows() {
+    let document = AppBackupDocument.current(
+        settings: .fixture,
+        rightClick: RightClickConfig(enabled: ["unknownAction": true]),
+        appVersion: "1.0.1",
+        createdAt: Date()
+    )
+
+    #expect(throws: AppBackupValidationError.invalidRightClickKey("unknownAction")) {
+        try document.validated()
+    }
+}
+
 @Test("未知 JSON 字段会被忽略")
 func unknownJSONFieldsAreIgnored() throws {
-    let data = #"{"formatVersion":1,"createdAt":0,"appVersion":"1.0.1","settings":{"menuBarIcon":"wrench.and.screwdriver.fill","menuBarShowTitle":false,"togglesShowTitle":false,"preferredTerminal":"system","autoCheckUpdate":true,"appLanguage":"system","scrollEnabled":false,"scrollSmoothVertical":true,"scrollSmoothHorizontal":true,"scrollInvertVertical":false,"scrollInvertHorizontal":false,"scrollGain":1,"scrollDuration":0.35,"scrollMinStep":8,"scrollTouchpadEmulation":true,"scrollAccelModifier":0,"scrollShiftModifier":0,"scrollDisableModifier":0,"unexpectedSetting":"do not execute"},"rightClick":{"enabled":{},"unexpectedAction":"do not execute"},"unexpectedTopLevel":"do not execute"}"#.data(using: .utf8)!
+    let data = #"{"formatVersion":1,"createdAt":"2025-08-07T00:00:00Z","appVersion":"1.0.1","settings":{"menuBarIcon":"wrench.and.screwdriver.fill","menuBarShowTitle":false,"togglesShowTitle":false,"preferredTerminal":"com.apple.Terminal","autoCheckUpdate":true,"appLanguage":"system","scrollEnabled":false,"scrollSmoothVertical":true,"scrollSmoothHorizontal":true,"scrollInvertVertical":false,"scrollInvertHorizontal":false,"scrollGain":1,"scrollDuration":0.35,"scrollMinStep":8,"scrollTouchpadEmulation":true,"scrollAccelModifier":0,"scrollShiftModifier":0,"scrollDisableModifier":0,"unexpectedSetting":"do not execute"},"rightClick":{"enabled":{},"unexpectedAction":"do not execute"},"unexpectedTopLevel":"do not execute"}"#.data(using: .utf8)!
 
-    let document = try JSONDecoder().decode(AppBackupDocument.self, from: data)
+    let document = try AppBackupService.decode(data)
 
-    #expect(document.settings == .fixture)
+    #expect(document.settings == AppBackupSettings.fixture)
     #expect(document.rightClick == RightClickConfig(enabled: [:]))
 
-    let reencodedData = try JSONEncoder().encode(document)
+    let reencodedData = try AppBackupService.encode(document)
     let topLevel = try #require(
         JSONSerialization.jsonObject(with: reencodedData) as? [String: Any]
     )
@@ -177,7 +234,7 @@ private extension AppBackupSettings {
         menuBarIcon: "wrench.and.screwdriver.fill",
         menuBarShowTitle: false,
         togglesShowTitle: false,
-        preferredTerminal: "system",
+        preferredTerminal: "com.apple.Terminal",
         autoCheckUpdate: true,
         appLanguage: "system",
         scrollEnabled: false,

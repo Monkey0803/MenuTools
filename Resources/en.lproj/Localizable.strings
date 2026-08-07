@@ -67,7 +67,7 @@
 "settings.section.backup" = "Backup and Restore";
 "settings.backup.export" = "Export Backup";
 "settings.backup.import" = "Import Backup";
-"settings.backup.defaultFilename" = "MenuTools-1.0.1.menutoolsbackup";
+"settings.backup.defaultFilename" = "MenuTools-%@.menutoolsbackup";
 "settings.backup.exportSuccess" = "Backup exported successfully";
 "settings.backup.importSuccess" = "Backup restored successfully";
 "settings.backup.invalidFile" = "The backup file is invalid or unreadable";

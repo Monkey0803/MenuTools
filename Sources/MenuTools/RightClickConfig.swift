@@ -61,6 +61,17 @@ struct RightClickConfig: Codable, Equatable, Sendable {
     var enabledItems: [RightClickItem] {
         RightClickItem.allCases.filter { isEnabled($0) }
     }
+
+    func validated() throws -> RightClickConfig {
+        for key in enabled.keys.sorted() where RightClickItem(rawValue: key) == nil {
+            throw RightClickConfigValidationError.unknownItem(key)
+        }
+        return self
+    }
+}
+
+enum RightClickConfigValidationError: Error, Equatable, Sendable {
+    case unknownItem(String)
 }
 
 /// 右键配置的持久化边界，避免备份服务依赖具体文件系统实现。
@@ -103,7 +114,9 @@ enum RightClickConfigStore {
             return .default
         }
         // 合并新增项的缺省值，兼容旧配置
-        var merged = config
+        var merged = RightClickConfig(
+            enabled: config.enabled.filter { RightClickItem(rawValue: $0.key) != nil }
+        )
         for item in RightClickItem.allCases where merged.enabled[item.rawValue] == nil {
             merged.enabled[item.rawValue] = true
         }
@@ -117,6 +130,7 @@ enum RightClickConfigStore {
 
     /// 校验编码并原子替换右键配置文件。
     static func replace(_ config: RightClickConfig) throws {
+        let config = try config.validated()
         let dir = fileURL.deletingLastPathComponent()
         try FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true)
         let data = try JSONEncoder().encode(config)
