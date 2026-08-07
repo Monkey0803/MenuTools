@@ -30,6 +30,7 @@ protocol UpdatePackageDownloading: Sendable {
 }
 
 /// 安装包打开边界，避免服务层直接依赖 AppKit。
+@MainActor
 protocol UpdatePackageOpening: Sendable {
     func open(_ url: URL) -> Bool
 }
@@ -41,19 +42,20 @@ final class UpdateDownloadService {
 
     private let downloader: any UpdatePackageDownloading
     private let opener: any UpdatePackageOpening
-    private let temporaryDirectory: URL
+    private let temporaryDirectory = FileManager.default.temporaryDirectory
     private var downloadTask: Task<Void, Never>?
+    private var nextGeneration = 0
+    private var activeGeneration: Int?
+    private var activeDestination: URL?
 
     private(set) var state: UpdateDownloadState = .idle
 
     init(
         downloader: any UpdatePackageDownloading,
-        opener: any UpdatePackageOpening,
-        temporaryDirectory: URL = FileManager.default.temporaryDirectory
+        opener: any UpdatePackageOpening
     ) {
         self.downloader = downloader
         self.opener = opener
-        self.temporaryDirectory = temporaryDirectory
     }
 
     /// 校验更新地址并开始下载；已有下载任务时不改变当前状态。
@@ -75,12 +77,22 @@ final class UpdateDownloadService {
         let destination = temporaryDirectory.appendingPathComponent(
             "MenuTools-\(UUID().uuidString).\(fileExtension)"
         )
+        nextGeneration += 1
+        let generation = nextGeneration
+        activeGeneration = generation
+        activeDestination = destination
         state = .downloading(progress: 0)
 
         let downloader = self.downloader
         downloadTask = Task { @MainActor [weak self] in
             guard let self else { return }
-            defer { self.downloadTask = nil }
+            defer {
+                if self.activeGeneration == generation {
+                    self.activeGeneration = nil
+                    self.activeDestination = nil
+                    self.downloadTask = nil
+                }
+            }
 
             do {
                 let downloadedURL = try await downloader.download(
@@ -88,15 +100,22 @@ final class UpdateDownloadService {
                     to: destination,
                     progress: { [weak self] progress in
                         Task { @MainActor [weak self] in
-                            guard let self, case .downloading = self.state else { return }
+                            guard let self,
+                                  self.activeGeneration == generation,
+                                  case .downloading = self.state else { return }
                             self.state = .downloading(progress: min(max(progress, 0), 1))
                         }
                     }
                 )
-                guard !Task.isCancelled else { return }
-                self.state = .completed(downloadedURL)
+                guard self.activeGeneration == generation,
+                      !Task.isCancelled else { return }
+                guard self.isOwnedDestination(downloadedURL, expected: destination) else {
+                    self.state = .failed(.downloadFailed)
+                    return
+                }
+                self.state = .completed(destination)
             } catch {
-                guard !Task.isCancelled else { return }
+                guard self.activeGeneration == generation, !Task.isCancelled else { return }
                 self.state = .failed(.downloadFailed)
             }
         }
@@ -106,10 +125,13 @@ final class UpdateDownloadService {
     /// 取消当前下载，并保留可供界面展示的取消状态。
     @discardableResult
     func cancel() -> Bool {
-        guard downloadTask != nil, case .downloading = state else { return false }
+        guard activeGeneration != nil, case .downloading = state else { return false }
 
         downloadTask?.cancel()
         downloader.cancel()
+        activeGeneration = nil
+        activeDestination = nil
+        downloadTask = nil
         state = .failed(.cancelled)
         return true
     }
@@ -134,5 +156,17 @@ final class UpdateDownloadService {
             return nil
         }
         return url
+    }
+
+    private func isOwnedDestination(_ url: URL, expected: URL) -> Bool {
+        guard url.isFileURL,
+              url.standardizedFileURL == expected.standardizedFileURL,
+              let activeDestination,
+              activeDestination.standardizedFileURL == expected.standardizedFileURL else {
+            return false
+        }
+
+        let temporaryPath = temporaryDirectory.standardizedFileURL.path
+        return expected.standardizedFileURL.path.hasPrefix(temporaryPath + "/")
     }
 }
