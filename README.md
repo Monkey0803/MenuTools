@@ -49,6 +49,26 @@
 
 > 当前 Release 使用自签名证书，首次打开时 macOS 可能需要在「系统设置 → 隐私与安全性」中允许打开。
 
+### 首次打开
+
+如果 macOS 阻止打开 App：
+
+1. 双击打开 App，等待 macOS 阻止。
+2. 打开「系统设置 → 隐私与安全性」。
+3. 找到底部的安全提示。
+4. 点击「仍要打开 / Open Anyway」。
+5. 在随后出现的确认窗口中再次点击「打开」。
+
+也可以在 Finder 中右键点击 `MenuTools.app`，选择「打开」。
+
+如果仍无法打开，并且你确认 App 来自本项目的 GitHub Release，可在包含 App 的目录中执行：
+
+```bash
+sudo xattr -dr com.apple.quarantine MenuTools.app
+```
+
+> `xattr` 会移除下载隔离标记，只应对可信且已校验来源的 App 使用。优先使用「仍要打开」，不要关闭系统 Gatekeeper。
+
 ### 环境要求
 - macOS 26.0+（Liquid Glass API 要求）
 - Xcode 26+ / Swift 6 工具链

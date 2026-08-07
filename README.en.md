@@ -53,6 +53,26 @@ Download `MenuTools-1.0.0.zip`, extract it, and move `MenuTools.app` to the Appl
 
 > The current release uses a self-signed certificate. macOS may require approval in **System Settings → Privacy & Security** the first time you open it.
 
+### First Launch
+
+If macOS blocks the app:
+
+1. Double-click the app and wait for macOS to block it.
+2. Open **System Settings → Privacy & Security**.
+3. Find the security warning near the bottom of the page.
+4. Click **Open Anyway**.
+5. Confirm by clicking **Open** in the dialog that appears.
+
+You can also right-click `MenuTools.app` in Finder and choose **Open**.
+
+If the app still will not open, and you have verified that it came from this project's GitHub Release, run the following command from the directory containing the app:
+
+```bash
+sudo xattr -dr com.apple.quarantine MenuTools.app
+```
+
+> `xattr` removes the downloaded-file quarantine flag. Use it only for a trusted app from a verified source. Prefer **Open Anyway** and do not disable macOS Gatekeeper globally.
+
 ### Requirements
 
 - macOS 26.0 or later. Liquid Glass APIs require macOS 26.
