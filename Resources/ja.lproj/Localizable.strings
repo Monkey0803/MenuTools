@@ -27,6 +27,20 @@
 "cleanup.clipboardEmpty" = "すでに空です";
 "cleanup.items" = "%d 項目";
 
+/* クリップボード履歴 */
+"clipboard.history" = "クリップボード履歴";
+"clipboard.historyItems" = "%d 件保存";
+"clipboard.search" = "クリップボードを検索";
+"clipboard.empty" = "クリップボード履歴なし";
+"clipboard.emptyDescription" = "コピーしたテキストと画像がここに表示されます。";
+"clipboard.image" = "画像";
+"clipboard.copied" = "クリップボードにコピーしました";
+"clipboard.clearHistory" = "履歴を消去";
+"clipboard.actions" = "クリップボード操作";
+"clipboard.pin" = "固定";
+"clipboard.unpin" = "固定を解除";
+"clipboard.delete" = "削除";
+
 /* フッター */
 "footer.checkUpdate" = "アップデートを確認";
 "footer.newVersion" = "新バージョン v%@";

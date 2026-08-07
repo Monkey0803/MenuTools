@@ -1,3 +1,4 @@
+import AppKit
 import SwiftUI
 
 /// 系统开关的当前状态快照
@@ -45,6 +46,8 @@ struct MenuPanelView: View {
     @State private var derivedDataSize: Int64?
     @State private var isCleaningDerivedData = false
     @State private var clipboardCount = 0
+    @State private var clipboardHistoryService = ClipboardHistoryService()
+    @State private var isShowingClipboardHistory = false
     @State private var isCheckingUpdate = false
     @State private var availableUpdate: UpdateInfo?
     @State private var updateDownloadService = UpdateDownloadService(
@@ -81,15 +84,19 @@ struct MenuPanelView: View {
                 }
             }
 
-            if let statusMessage {
-                statusBanner(statusMessage)
-            }
-
             footer
                 .entrance(5, appeared: appeared)
         }
         .padding(16)
         .frame(width: 320)
+        .overlay(alignment: .bottom) {
+            if let statusMessage {
+                statusBanner(statusMessage)
+                    .padding(.horizontal, 16)
+                    .padding(.bottom, 40)
+                    .allowsHitTesting(false)
+            }
+        }
         .overlayPreferenceValue(ToggleTooltipKey.self) { tip in
             GeometryReader { proxy in
                 if let tip {
@@ -140,6 +147,13 @@ struct MenuPanelView: View {
                     btDevices = BluetoothBatteryService.fetch()
                 }
                 try? await Task.sleep(for: .seconds(30))
+            }
+        }
+        .task {
+            while !Task.isCancelled {
+                clipboardHistoryService.refresh()
+                clipboardCount = ClipboardService.itemCount
+                try? await Task.sleep(for: .seconds(1))
             }
         }
         .task {
@@ -476,18 +490,55 @@ struct MenuPanelView: View {
             .glassEffect(.regular.interactive(), in: .rect(cornerRadius: 16))
             .glassEffectID("derivedData", in: glassNamespace)
 
-            Button(action: clearClipboard) {
-                cleanupTileLabel(
-                    symbol: "doc.on.clipboard.fill",
-                    title: L("cleanup.clipboard"),
-                    subtitle: clipboardSubtitle,
-                    showProgress: false
-                )
+            ZStack(alignment: .topTrailing) {
+                Button {
+                    isShowingClipboardHistory = true
+                } label: {
+                    cleanupTileLabel(
+                        symbol: "clock.arrow.circlepath",
+                        title: L("clipboard.history"),
+                        subtitle: clipboardSubtitle,
+                        showProgress: false
+                    )
+                }
+                .buttonStyle(.plain)
+
+                Button(action: clearClipboard) {
+                    Image(systemName: "trash")
+                        .font(.caption.weight(.semibold))
+                        .padding(7)
+                        .contentShape(.circle)
+                }
+                .buttonStyle(.plain)
+                .foregroundStyle(.secondary)
+                .help(L("cleanup.clipboard"))
+                .accessibilityLabel(L("cleanup.clipboard"))
+                .disabled(clipboardCount == 0)
             }
             .buttonStyle(.plain)
-            .disabled(clipboardCount == 0)
             .glassEffect(.regular.interactive(), in: .rect(cornerRadius: 16))
             .glassEffectID("clipboard", in: glassNamespace)
+            .popover(isPresented: $isShowingClipboardHistory, arrowEdge: .bottom) {
+                ClipboardHistoryPopover(
+                    items: clipboardHistoryService.items,
+                    onCopy: { item in
+                        clipboardHistoryService.copy(item)
+                        isShowingClipboardHistory = false
+                    },
+                    onTogglePinned: { id in
+                        clipboardHistoryService.togglePinned(id: id)
+                    },
+                    onRemove: { id in
+                        clipboardHistoryService.remove(id: id)
+                    },
+                    onClearHistory: {
+                        clipboardHistoryService.clearHistory()
+                    },
+                    onClearClipboard: {
+                        clearClipboard()
+                    }
+                )
+            }
         }
     }
 
@@ -526,7 +577,9 @@ struct MenuPanelView: View {
     }
 
     private var clipboardSubtitle: String {
-        clipboardCount == 0 ? L("cleanup.clipboardEmpty") : L("cleanup.items", clipboardCount)
+        clipboardHistoryService.items.isEmpty
+            ? L("clipboard.empty")
+            : L("clipboard.historyItems", clipboardHistoryService.items.count)
     }
 
     // MARK: - 状态提示 / 底部
@@ -690,10 +743,10 @@ struct MenuPanelView: View {
 
     private func clearClipboard() {
         ClipboardService.clear()
+        clipboardHistoryService.clearHistory()
         withAnimation(.smooth(duration: 0.3)) {
-            clipboardCount = 0
+            clipboardCount = ClipboardService.itemCount
         }
-        flashStatus(L("status.clipboardCleared"), isError: false)
     }
 
     private func checkForUpdate() {
@@ -866,5 +919,146 @@ private struct ToggleTooltipKey: PreferenceKey {
     static let defaultValue: ToggleTooltip? = nil
     static func reduce(value: inout ToggleTooltip?, nextValue: () -> ToggleTooltip?) {
         if let next = nextValue() { value = next }
+    }
+}
+
+/// 剪贴板历史弹出面板。
+private struct ClipboardHistoryPopover: View {
+    let items: [ClipboardHistoryItem]
+    let onCopy: (ClipboardHistoryItem) -> Void
+    let onTogglePinned: (UUID) -> Void
+    let onRemove: (UUID) -> Void
+    let onClearHistory: () -> Void
+    let onClearClipboard: () -> Void
+
+    @State private var searchText = ""
+
+    private var filteredItems: [ClipboardHistoryItem] {
+        let query = searchText.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !query.isEmpty else { return items }
+        return items.filter { item in
+            guard case let .text(text) = item.content else { return false }
+            return text.localizedCaseInsensitiveContains(query)
+        }
+    }
+
+    var body: some View {
+        VStack(spacing: 10) {
+            HStack {
+                VStack(alignment: .leading, spacing: 2) {
+                    Text(L("clipboard.history"))
+                        .font(.headline)
+                    Text(L("clipboard.historyItems", items.count))
+                        .font(.caption2)
+                        .foregroundStyle(.secondary)
+                }
+                Spacer()
+                Menu {
+                    Button(L("clipboard.clearHistory"), action: onClearHistory)
+                        .disabled(items.isEmpty)
+                    Button(L("cleanup.clipboard"), action: onClearClipboard)
+                        .disabled(items.isEmpty)
+                } label: {
+                    Image(systemName: "ellipsis.circle")
+                        .font(.title3)
+                        .foregroundStyle(.secondary)
+                }
+                .menuStyle(.borderlessButton)
+                .accessibilityLabel(L("clipboard.actions"))
+            }
+
+            HStack(spacing: 6) {
+                Image(systemName: "magnifyingglass")
+                    .foregroundStyle(.secondary)
+                TextField(L("clipboard.search"), text: $searchText)
+                    .textFieldStyle(.plain)
+            }
+            .padding(.horizontal, 9)
+            .padding(.vertical, 7)
+            .background(.quaternary.opacity(0.35), in: .rect(cornerRadius: 9))
+
+            if filteredItems.isEmpty {
+                ContentUnavailableView(
+                    L("clipboard.empty"),
+                    systemImage: "doc.on.clipboard",
+                    description: Text(L("clipboard.emptyDescription"))
+                )
+                .frame(maxHeight: .infinity)
+            } else {
+                ScrollView {
+                    LazyVStack(spacing: 6) {
+                        ForEach(filteredItems) { item in
+                            ClipboardHistoryRow(
+                                item: item,
+                                onCopy: { onCopy(item) },
+                                onTogglePinned: { onTogglePinned(item.id) },
+                                onRemove: { onRemove(item.id) }
+                            )
+                        }
+                    }
+                }
+                .scrollIndicators(.automatic)
+            }
+        }
+        .padding(14)
+        .frame(width: 300, height: 360)
+    }
+}
+
+private struct ClipboardHistoryRow: View {
+    let item: ClipboardHistoryItem
+    let onCopy: () -> Void
+    let onTogglePinned: () -> Void
+    let onRemove: () -> Void
+
+    var body: some View {
+        HStack(spacing: 8) {
+            Button(action: onCopy) {
+                contentPreview
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .contentShape(.rect(cornerRadius: 8))
+            }
+            .buttonStyle(.plain)
+
+            Button(action: onTogglePinned) {
+                Image(systemName: item.isPinned ? "pin.fill" : "pin")
+                    .foregroundStyle(item.isPinned ? AnyShapeStyle(.tint) : AnyShapeStyle(.secondary))
+            }
+            .buttonStyle(.plain)
+            .help(item.isPinned ? L("clipboard.unpin") : L("clipboard.pin"))
+            .accessibilityLabel(item.isPinned ? L("clipboard.unpin") : L("clipboard.pin"))
+
+            Button(action: onRemove) {
+                Image(systemName: "trash")
+                    .foregroundStyle(.secondary)
+            }
+            .buttonStyle(.plain)
+            .help(L("clipboard.delete"))
+            .accessibilityLabel(L("clipboard.delete"))
+        }
+        .padding(8)
+        .background(.quaternary.opacity(0.25), in: .rect(cornerRadius: 10))
+    }
+
+    @ViewBuilder
+    private var contentPreview: some View {
+        switch item.content {
+        case let .text(text):
+            Text(text)
+                .font(.caption)
+                .lineLimit(2)
+                .multilineTextAlignment(.leading)
+        case let .image(data):
+            if let image = NSImage(data: data) {
+                Image(nsImage: image)
+                    .resizable()
+                    .scaledToFit()
+                    .frame(height: 48)
+            } else {
+                Label(L("clipboard.image"), systemImage: "photo")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+            }
+        }
     }
 }

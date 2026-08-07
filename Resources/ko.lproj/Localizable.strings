@@ -27,6 +27,20 @@
 "cleanup.clipboardEmpty" = "이미 비어 있음";
 "cleanup.items" = "%d개 항목";
 
+/* 클립보드 기록 */
+"clipboard.history" = "클립보드 기록";
+"clipboard.historyItems" = "%d개 저장됨";
+"clipboard.search" = "클립보드 검색";
+"clipboard.empty" = "클립보드 기록 없음";
+"clipboard.emptyDescription" = "복사한 텍스트와 이미지가 여기에 표시됩니다.";
+"clipboard.image" = "이미지";
+"clipboard.copied" = "클립보드에 복사했습니다";
+"clipboard.clearHistory" = "기록 지우기";
+"clipboard.actions" = "클립보드 작업";
+"clipboard.pin" = "고정";
+"clipboard.unpin" = "고정 해제";
+"clipboard.delete" = "삭제";
+
 /* 하단 */
 "footer.checkUpdate" = "업데이트 확인";
 "footer.newVersion" = "새 버전 v%@";

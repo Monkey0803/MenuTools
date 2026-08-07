@@ -27,6 +27,20 @@
 "cleanup.clipboardEmpty" = "已是空的";
 "cleanup.items" = "%d 項內容";
 
+/* 剪貼板歷史 */
+"clipboard.history" = "剪貼板歷史";
+"clipboard.historyItems" = "%d 筆記錄";
+"clipboard.search" = "搜尋剪貼板";
+"clipboard.empty" = "暫無剪貼板歷史";
+"clipboard.emptyDescription" = "複製的文字和圖片會顯示在這裡。";
+"clipboard.image" = "圖片";
+"clipboard.copied" = "已複製到剪貼板";
+"clipboard.clearHistory" = "清空歷史";
+"clipboard.actions" = "剪貼板操作";
+"clipboard.pin" = "固定";
+"clipboard.unpin" = "取消固定";
+"clipboard.delete" = "刪除";
+
 /* 底欄 */
 "footer.checkUpdate" = "檢查更新";
 "footer.newVersion" = "新版本 v%@";

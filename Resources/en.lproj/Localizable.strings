@@ -27,6 +27,20 @@
 "cleanup.clipboardEmpty" = "Already empty";
 "cleanup.items" = "%d item(s)";
 
+/* Clipboard history */
+"clipboard.history" = "Clipboard History";
+"clipboard.historyItems" = "%d saved item(s)";
+"clipboard.search" = "Search clipboard";
+"clipboard.empty" = "No clipboard history";
+"clipboard.emptyDescription" = "Copied text and images will appear here.";
+"clipboard.image" = "Image";
+"clipboard.copied" = "Copied to clipboard";
+"clipboard.clearHistory" = "Clear History";
+"clipboard.actions" = "Clipboard actions";
+"clipboard.pin" = "Pin";
+"clipboard.unpin" = "Unpin";
+"clipboard.delete" = "Delete";
+
 /* Footer */
 "footer.checkUpdate" = "Check for Updates";
 "footer.newVersion" = "New version v%@";
