@@ -1,5 +1,7 @@
 # MenuTools
 
+[English](README.en.md) | 简体中文
+
 一个常驻 macOS 菜单栏的轻量系统工具集，采用 macOS 26 原生 **Liquid Glass（液态玻璃）** 设计，自动适配深色 / 浅色模式。
 
 ![platform](https://img.shields.io/badge/platform-macOS%2026%2B-blue)
@@ -38,6 +40,14 @@
 - 动画：区块错峰入场、SF Symbol 弹跳/脉冲/替换、数字滚动过渡
 
 ## 📦 安装与构建
+
+### 下载
+
+最新版本：[MenuTools v1.0.0](https://github.com/Monkey0803/MenuTools/releases/tag/v1.0.0)
+
+下载 `MenuTools-1.0.0.zip`，解压后将 `MenuTools.app` 拖入「应用程序」文件夹。
+
+> 当前 Release 使用自签名证书，首次打开时 macOS 可能需要在「系统设置 → 隐私与安全性」中允许打开。
 
 ### 环境要求
 - macOS 26.0+（Liquid Glass API 要求）
