@@ -25,14 +25,71 @@ func parse(_ data: Data) throws -> UpdateInfo {
     return try JSONDecoder().decode(UpdateInfo.self, from: data)
 }
 
-func isVersion(_ candidate: String, newerThan current: String) -> Bool {
-    let a = candidate.split(separator: ".").map { Int($0.trimmingCharacters(in: .letters)) ?? 0 }
-    let b = current.split(separator: ".").map { Int($0.trimmingCharacters(in: .letters)) ?? 0 }
-    for i in 0..<max(a.count, b.count) {
-        let x = i < a.count ? a[i] : 0, y = i < b.count ? b[i] : 0
-        if x != y { return x > y }
+func normalizedVersion(_ raw: String) -> String {
+    var version = raw.trimmingCharacters(in: .whitespacesAndNewlines)
+    if version.first == "v" || version.first == "V" { version.removeFirst() }
+    if let buildIndex = version.firstIndex(of: "+") {
+        version = String(version[..<buildIndex])
     }
-    return false
+    return version
+}
+
+enum VersionIdentifier {
+    case numeric(Int)
+    case text(String)
+}
+
+struct SemanticVersion: Comparable {
+    let numbers: [Int]
+    let prerelease: [VersionIdentifier]
+
+    init?(_ raw: String) {
+        let parts = normalizedVersion(raw).split(separator: "-", maxSplits: 1, omittingEmptySubsequences: false)
+        guard let core = parts.first, !core.isEmpty else { return nil }
+        let numberStrings = core.split(separator: ".", omittingEmptySubsequences: false)
+        guard !numberStrings.isEmpty, numberStrings.allSatisfy({ Int($0) != nil }) else { return nil }
+        numbers = numberStrings.map { Int($0)! }
+        if parts.count == 1 {
+            prerelease = []
+        } else {
+            let identifiers = parts[1].split(separator: ".", omittingEmptySubsequences: false)
+            guard !identifiers.isEmpty, !identifiers.contains(where: { $0.isEmpty }) else { return nil }
+            prerelease = identifiers.map { Int($0).map(VersionIdentifier.numeric) ?? .text(String($0)) }
+        }
+    }
+
+    static func == (lhs: Self, rhs: Self) -> Bool { compare(lhs, rhs) == 0 }
+
+    static func < (lhs: Self, rhs: Self) -> Bool { compare(lhs, rhs) < 0 }
+
+    private static func compare(_ lhs: Self, _ rhs: Self) -> Int {
+        for index in 0..<max(lhs.numbers.count, rhs.numbers.count) {
+            let left = index < lhs.numbers.count ? lhs.numbers[index] : 0
+            let right = index < rhs.numbers.count ? rhs.numbers[index] : 0
+            if left != right { return left < right ? -1 : 1 }
+        }
+        if lhs.prerelease.isEmpty != rhs.prerelease.isEmpty {
+            return lhs.prerelease.isEmpty ? 1 : -1
+        }
+        for index in 0..<max(lhs.prerelease.count, rhs.prerelease.count) {
+            guard index < lhs.prerelease.count else { return -1 }
+            guard index < rhs.prerelease.count else { return 1 }
+            switch (lhs.prerelease[index], rhs.prerelease[index]) {
+            case let (.numeric(left), .numeric(right)):
+                if left != right { return left < right ? -1 : 1 }
+            case (.numeric, .text): return -1
+            case (.text, .numeric): return 1
+            case let (.text(left), .text(right)):
+                if left != right { return left < right ? -1 : 1 }
+            }
+        }
+        return 0
+    }
+}
+
+func isVersion(_ candidate: String, newerThan current: String) -> Bool {
+    guard let candidate = SemanticVersion(candidate), let current = SemanticVersion(current) else { return false }
+    return candidate > current
 }
 
 let semaphore = DispatchSemaphore(value: 0)
@@ -54,8 +111,8 @@ fetch("https://api.github.com/repos/sparkle-project/Sparkle/releases/latest") { 
     print("1 GitHub 解析: v\(info.version) newerThan 1.0.0=\(newer) url=\(info.url?.prefix(60) ?? "") \(newer && info.url != nil ? "PASS" : "FAIL")")
 }
 
-// 2. 本仓库 404
-fetch("https://api.github.com/repos/Monkey0803/MenuTools/releases/latest") { _, code in
+// 2. 明确不存在的仓库 404
+fetch("https://api.github.com/repos/Monkey0803/MenuTools-update-check-no-release/releases/latest") { _, code in
     print("2 无 Release 仓库: code=\(code) \(code == 404 ? "PASS(视为已最新)" : "FAIL")")
 }
 
@@ -68,6 +125,6 @@ if let info = try? parse(appcast), info.version == "9.9.9" {
 }
 
 // 4. 版本比较边界
-let cases: [(String, String, Bool)] = [("1.10.0", "1.9.9", true), ("1.0.0", "1.0.0", false), ("2.0", "1.9.9", true), ("1.0.0", "1.0.1", false)]
+let cases: [(String, String, Bool)] = [("1.10.0", "1.9.9", true), ("1.0.0", "1.0.0", false), ("2.0", "1.9.9", true), ("1.0.0", "1.0.1", false), ("1.0.1-beta", "1.0.0", true), ("1.0.1-beta", "1.0.1", false)]
 let ok = cases.allSatisfy { isVersion($0.0, newerThan: $0.1) == $0.2 }
 print("4 版本比较边界: \(ok ? "PASS" : "FAIL")")

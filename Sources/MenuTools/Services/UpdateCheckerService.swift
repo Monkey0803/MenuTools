@@ -1,6 +1,17 @@
 import AppKit
 import Foundation
 
+private func normalizedUpdateVersion(_ raw: String) -> String {
+    var version = raw.trimmingCharacters(in: .whitespacesAndNewlines)
+    if version.first == "v" || version.first == "V" {
+        version.removeFirst()
+    }
+    if let buildIndex = version.firstIndex(of: "+") {
+        version = String(version[..<buildIndex])
+    }
+    return version
+}
+
 /// 一次可用更新的信息
 struct UpdateInfo: Codable, Equatable {
     let version: String
@@ -86,25 +97,26 @@ enum UpdateCheckerService {
     // MARK: - 内部实现
 
     /// 优先按 GitHub Release 解析，失败则回退到 appcast 格式
-    private static func parse(_ data: Data) throws -> UpdateInfo {
+    static func parse(_ data: Data) throws -> UpdateInfo {
         let decoder = JSONDecoder()
         decoder.keyDecodingStrategy = .convertFromSnakeCase
         if let release = try? decoder.decode(GitHubRelease.self, from: data) {
-            // tag 允许带 v 前缀（v1.2.0 / 1.2.0）
-            let version = release.tagName.hasPrefix("v") || release.tagName.hasPrefix("V")
-                ? String(release.tagName.dropFirst())
-                : release.tagName
             // 优先直链安装包资产，否则跳转 Release 页面
             let asset = release.assets.first {
                 $0.name.hasSuffix(".dmg") || $0.name.hasSuffix(".zip") || $0.name.hasSuffix(".pkg")
             }
             return UpdateInfo(
-                version: version,
+                version: normalizedVersion(release.tagName),
                 notes: release.body?.trimmingCharacters(in: .whitespacesAndNewlines),
                 url: asset?.browserDownloadUrl ?? release.htmlUrl
             )
         }
-        return try JSONDecoder().decode(UpdateInfo.self, from: data)
+        let info = try JSONDecoder().decode(UpdateInfo.self, from: data)
+        return UpdateInfo(
+            version: normalizedVersion(info.version),
+            notes: info.notes,
+            url: info.url
+        )
     }
 
     private static func recordCheckAndReturn(_ info: UpdateInfo?) -> UpdateInfo? {
@@ -112,15 +124,85 @@ enum UpdateCheckerService {
         return info
     }
 
-    /// 语义化版本比较：按 "." 分段逐位比较数字，缺位补 0
+    /// 规范化版本号，兼容 v1.2.0 和 1.2.0+build.1。
+    static func normalizedVersion(_ raw: String) -> String {
+        normalizedUpdateVersion(raw)
+    }
+
+    /// 按 SemVer 规则比较版本，支持预发布标识符和 build metadata。
     static func isVersion(_ candidate: String, newerThan current: String) -> Bool {
-        let a = candidate.split(separator: ".").map { Int($0.trimmingCharacters(in: .letters)) ?? 0 }
-        let b = current.split(separator: ".").map { Int($0.trimmingCharacters(in: .letters)) ?? 0 }
-        for i in 0..<max(a.count, b.count) {
-            let x = i < a.count ? a[i] : 0
-            let y = i < b.count ? b[i] : 0
-            if x != y { return x > y }
+        guard let candidate = SemanticVersion(candidate),
+              let current = SemanticVersion(current) else { return false }
+        return candidate > current
+    }
+
+    private struct SemanticVersion: Comparable {
+        private enum Identifier {
+            case numeric(Int)
+            case text(String)
         }
-        return false
+
+        let numbers: [Int]
+        private let prerelease: [Identifier]
+
+        init?(_ raw: String) {
+            let normalized = normalizedUpdateVersion(raw)
+            let parts = normalized.split(separator: "-", maxSplits: 1, omittingEmptySubsequences: false)
+            guard let core = parts.first, !core.isEmpty else { return nil }
+
+            let numberStrings = core.split(separator: ".", omittingEmptySubsequences: false)
+            guard !numberStrings.isEmpty,
+                  numberStrings.allSatisfy({ Int($0) != nil }) else { return nil }
+            numbers = numberStrings.map { Int($0)! }
+
+            if parts.count == 1 {
+                prerelease = []
+            } else {
+                let identifiers = parts[1].split(separator: ".", omittingEmptySubsequences: false)
+                guard !identifiers.isEmpty, !identifiers.contains(where: { $0.isEmpty }) else { return nil }
+                prerelease = identifiers.map { identifier in
+                    if let number = Int(identifier) {
+                        return .numeric(number)
+                    }
+                    return .text(String(identifier))
+                }
+            }
+        }
+
+        static func == (lhs: Self, rhs: Self) -> Bool {
+            compare(lhs, rhs) == 0
+        }
+
+        static func < (lhs: Self, rhs: Self) -> Bool {
+            compare(lhs, rhs) < 0
+        }
+
+        private static func compare(_ lhs: Self, _ rhs: Self) -> Int {
+            for index in 0..<max(lhs.numbers.count, rhs.numbers.count) {
+                let left = index < lhs.numbers.count ? lhs.numbers[index] : 0
+                let right = index < rhs.numbers.count ? rhs.numbers[index] : 0
+                if left != right { return left < right ? -1 : 1 }
+            }
+
+            if lhs.prerelease.isEmpty != rhs.prerelease.isEmpty {
+                return lhs.prerelease.isEmpty ? 1 : -1
+            }
+
+            for index in 0..<max(lhs.prerelease.count, rhs.prerelease.count) {
+                guard index < lhs.prerelease.count else { return -1 }
+                guard index < rhs.prerelease.count else { return 1 }
+                switch (lhs.prerelease[index], rhs.prerelease[index]) {
+                case let (.numeric(left), .numeric(right)):
+                    if left != right { return left < right ? -1 : 1 }
+                case (.numeric, .text):
+                    return -1
+                case (.text, .numeric):
+                    return 1
+                case let (.text(left), .text(right)):
+                    if left != right { return left < right ? -1 : 1 }
+                }
+            }
+            return 0
+        }
     }
 }
