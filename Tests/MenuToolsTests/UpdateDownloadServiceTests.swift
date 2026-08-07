@@ -577,7 +577,7 @@ func adapterReportsProgressAndFinalizesDestination() async throws {
             from: URL(string: "https://example.com/source.zip")!,
             to: destination,
             progress: { value in
-                Task { await progress.record(value) }
+                progress.record(value)
             }
         )
     }
@@ -729,21 +729,33 @@ func delegateLifecycleReportsErrorBeforeFinish() {
     #expect(error as? UpdateDownloadFailureReason == .transport)
 }
 
-private actor ProgressRecorder {
-    private(set) var values: [Double] = []
+private final class ProgressRecorder: @unchecked Sendable {
+    private let lock = NSLock()
+    private var values: [Double] = []
     private var waiters: [(Int, CheckedContinuation<[Double], Never>)] = []
 
     func record(_ value: Double) {
+        lock.lock()
         values.append(value)
         let ready = waiters.filter { values.count >= $0.0 }
         waiters.removeAll { values.count >= $0.0 }
-        ready.forEach { $0.1.resume(returning: values) }
+        let snapshot = values
+        lock.unlock()
+
+        ready.forEach { $0.1.resume(returning: snapshot) }
     }
 
     func waitForValues(_ count: Int) async -> [Double] {
-        if values.count >= count { return values }
-        return await withCheckedContinuation { continuation in
+        await withCheckedContinuation { continuation in
+            lock.lock()
+            if values.count >= count {
+                let snapshot = values
+                lock.unlock()
+                continuation.resume(returning: snapshot)
+                return
+            }
             waiters.append((count, continuation))
+            lock.unlock()
         }
     }
 }
