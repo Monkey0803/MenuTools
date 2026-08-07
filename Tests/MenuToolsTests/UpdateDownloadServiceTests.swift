@@ -12,6 +12,7 @@ private actor AdapterTransportControl {
     private var startWaiters: [CheckedContinuation<Void, Never>] = []
     private var completionWaiters: [CheckedContinuation<Void, Never>] = []
     private var didDeliverCompletion = false
+    private var startCount = 0
 
     func start(
         progress: @escaping @Sendable (Double) -> Void,
@@ -20,6 +21,7 @@ private actor AdapterTransportControl {
         self.progress = progress
         self.completion = completion
         didDeliverCompletion = false
+        startCount += 1
         let waiters = startWaiters
         startWaiters.removeAll()
         waiters.forEach { $0.resume() }
@@ -30,6 +32,10 @@ private actor AdapterTransportControl {
         await withCheckedContinuation { continuation in
             startWaiters.append(continuation)
         }
+    }
+
+    var startedCount: Int {
+        startCount
     }
 
     func finish(_ result: Result<UpdateDownloadTransportResponse, Error>) {
@@ -84,6 +90,21 @@ private final class AdapterTransportFactory: @unchecked Sendable {
         lock.lock()
         defer { lock.unlock() }
         return transports.removeFirst()
+    }
+}
+
+private final class DownloadStartGateFactory: @unchecked Sendable {
+    private let lock = NSLock()
+    private var gates: [DownloadStartGate]
+
+    init(gates: [DownloadStartGate]) {
+        self.gates = gates
+    }
+
+    func makeGate() -> DownloadStartGate {
+        lock.lock()
+        defer { lock.unlock() }
+        return gates.removeFirst()
     }
 }
 
@@ -350,10 +371,14 @@ func serviceCancellationPreventsDeferredDownloadStart() async {
     #expect(service.start(update: update(url: "https://example.com/MenuTools.zip")))
     #expect(service.cancel())
     await control.waitUntilCancelled()
-    await Task.yield()
 
-    #expect(await control.startedCount == 0)
-    #expect(service.state == .failed(.cancelled))
+    #expect(service.start(update: update(url: "https://example.com/retry.zip")))
+    await control.waitUntilStarted(1)
+    #expect(await control.startedCount == 1)
+    #expect(service.state == .downloading(progress: 0))
+
+    service.cancel()
+    await control.waitUntilCancelled()
 }
 
 @Test("取消后的迟到结果不会覆盖新一代下载")
@@ -664,6 +689,162 @@ func adapterAllowsRetryBeforeOldTransportFinishes() async throws {
     #expect(try await newTask.value == newDestination)
 }
 
+@Test("取消在启动评估前不会启动传输，新的下载可以重试")
+func adapterCancellationBeforeStartEvaluationAllowsRetry() async {
+    let firstControl = AdapterTransportControl()
+    let secondControl = AdapterTransportControl()
+    let evaluation = StartEvaluationSignal()
+    let barrier = StartEvaluationBarrier(signal: evaluation)
+    let transportFactory = AdapterTransportFactory(controls: [firstControl, secondControl])
+    let startGateFactory = DownloadStartGateFactory(gates: [
+        DownloadStartGate(beforeEvaluation: { barrier.evaluate() }),
+        DownloadStartGate()
+    ])
+    let adapter = URLSessionUpdatePackageDownloader(
+        transportFactory: { transportFactory.makeTransport() },
+        startGateFactory: { startGateFactory.makeGate() },
+        fileManager: RecordingFileManager(moveError: nil)
+    )
+
+    let firstTask = Task {
+        try await adapter.download(
+            from: URL(string: "https://example.com/first.zip")!,
+            to: URL(fileURLWithPath: "/tmp/first.zip"),
+            progress: { _ in }
+        )
+    }
+    await evaluation.waitUntilEvaluated()
+    adapter.cancel()
+    barrier.release()
+
+    await #expect(throws: UpdateDownloadFailureReason.cancelled) {
+        try await firstTask.value
+    }
+    #expect(await firstControl.startedCount == 0)
+
+    let retryTask = Task {
+        try await adapter.download(
+            from: URL(string: "https://example.com/retry.zip")!,
+            to: URL(fileURLWithPath: "/tmp/retry.zip"),
+            progress: { _ in }
+        )
+    }
+    await secondControl.waitUntilStarted()
+    await secondControl.finish(.success(.init(
+        statusCode: 200,
+        temporaryURL: URL(fileURLWithPath: "/tmp/retry-source.zip")
+    )))
+    let retryResult = try? await retryTask.value
+    #expect(retryResult == URL(fileURLWithPath: "/tmp/retry.zip"))
+}
+
+@Test("URLSession delegate 转发响应并过滤其他任务")
+func transportDelegateForwardsResponseAndFiltersOtherTask() {
+    let configuration = URLSessionConfiguration.ephemeral
+    configuration.protocolClasses = [HangingURLProtocol.self]
+    let transport = URLSessionUpdateDownloadTransport(configuration: configuration)
+    let recorder = TransportResultRecorder()
+    let temporaryURL = URL(fileURLWithPath: "/tmp/delegate-response.zip")
+
+    transport.startDownload(
+        from: URL(string: "https://example.com/source.zip")!,
+        progress: { _ in },
+        completion: { recorder.record($0) }
+    )
+    guard let activeTask = transport.activeTask else {
+        Issue.record("transport 应保存活动任务")
+        return
+    }
+    let otherTask = transport.session.downloadTask(
+        with: URL(string: "https://example.com/other.zip")!
+    )
+
+    transport.urlSession(
+        transport.session,
+        downloadTask: otherTask,
+        didFinishDownloadingTo: URL(fileURLWithPath: "/tmp/ignored.zip")
+    )
+    #expect(recorder.results.isEmpty)
+
+    transport.urlSession(
+        transport.session,
+        downloadTask: activeTask,
+        didFinishDownloadingTo: temporaryURL
+    )
+
+    guard case let .success(response) = recorder.results.first else {
+        Issue.record("delegate 应转发完成响应")
+        return
+    }
+    #expect(response.statusCode == nil)
+    #expect(response.temporaryURL == temporaryURL)
+    #expect(transport.activeTask == nil)
+}
+
+@Test("URLSession delegate 转发错误并将文件读取错误安全归类")
+func transportDelegateForwardsAndMapsErrors() {
+    let configuration = URLSessionConfiguration.ephemeral
+    configuration.protocolClasses = [HangingURLProtocol.self]
+    let transport = URLSessionUpdateDownloadTransport(configuration: configuration)
+    let recorder = TransportResultRecorder()
+
+    transport.startDownload(
+        from: URL(string: "https://example.com/source.zip")!,
+        progress: { _ in },
+        completion: { recorder.record($0) }
+    )
+    guard let activeTask = transport.activeTask else {
+        Issue.record("transport 应保存活动任务")
+        return
+    }
+    let otherTask = transport.session.downloadTask(
+        with: URL(string: "https://example.com/other.zip")!
+    )
+
+    transport.urlSession(
+        transport.session,
+        task: otherTask,
+        didCompleteWithError: URLError(.cannotOpenFile)
+    )
+    #expect(recorder.results.isEmpty)
+
+    transport.urlSession(
+        transport.session,
+        task: activeTask,
+        didCompleteWithError: URLError(.cannotOpenFile)
+    )
+
+    guard case let .failure(error) = recorder.results.first else {
+        Issue.record("delegate 应转发错误响应")
+        return
+    }
+    #expect(error as? UpdateDownloadFailureReason == .fileRead)
+    #expect(transport.activeTask == nil)
+}
+
+@Test("URLSession transport 终止后失效并释放 delegate 生命周期")
+func transportInvalidatesSessionAfterCancellation() async {
+    let invalidation = InvalidationSignal()
+    let configuration = URLSessionConfiguration.ephemeral
+    configuration.protocolClasses = [HangingURLProtocol.self]
+    let transport = URLSessionUpdateDownloadTransport(
+        configuration: configuration,
+        onSessionInvalidated: {
+            Task { await invalidation.mark() }
+        }
+    )
+
+    transport.startDownload(
+        from: URL(string: "https://example.com/source.zip")!,
+        progress: { _ in },
+        completion: { _ in }
+    )
+    transport.cancel()
+
+    await invalidation.wait()
+    #expect(transport.activeTask == nil)
+}
+
 @Test("URLSession 生命周期按响应、进度、完成顺序只回调一次")
 func delegateLifecycleReportsResponseProgressAndFinish() {
     let recorder = LifecycleRecorder()
@@ -729,6 +910,76 @@ func delegateLifecycleReportsErrorBeforeFinish() {
     #expect(error as? UpdateDownloadFailureReason == .transport)
 }
 
+@Test("URLSession 生命周期将取消错误映射为取消类别")
+func delegateLifecycleMapsCancellationError() {
+    let recorder = LifecycleRecorder()
+    let lifecycle = URLSessionDownloadLifecycle(
+        progress: { recorder.progress.append($0) },
+        completion: { recorder.results.append($0) }
+    )
+
+    lifecycle.didComplete(withError: URLError(.cancelled))
+
+    guard case let .failure(error) = recorder.results.first else {
+        Issue.record("取消错误应结束生命周期")
+        return
+    }
+    #expect(error as? UpdateDownloadFailureReason == .cancelled)
+}
+
+@Test("URLSession 生命周期将文件读取错误映射为文件读取类别")
+func delegateLifecycleMapsFileReadError() {
+    let recorder = LifecycleRecorder()
+    let lifecycle = URLSessionDownloadLifecycle(
+        progress: { recorder.progress.append($0) },
+        completion: { recorder.results.append($0) }
+    )
+
+    lifecycle.didComplete(withError: URLError(.cannotOpenFile))
+
+    guard case let .failure(error) = recorder.results.first else {
+        Issue.record("文件读取错误应结束生命周期")
+        return
+    }
+    #expect(error as? UpdateDownloadFailureReason == .fileRead)
+}
+
+@Test("生命周期终止不会越过进行中的进度回调")
+func delegateLifecycleSerializesProgressAndTerminalEvents() {
+    let progressEntered = DispatchSemaphore(value: 0)
+    let releaseProgress = DispatchSemaphore(value: 0)
+    let finishStarted = DispatchSemaphore(value: 0)
+    let finishReturned = DispatchSemaphore(value: 0)
+    let recorder = TerminalOrderingRecorder()
+    let lifecycle = URLSessionDownloadLifecycle(
+        progress: { value in
+            recorder.recordProgress(value)
+            progressEntered.signal()
+            releaseProgress.wait()
+        },
+        completion: { _ in
+            recorder.recordCompletion()
+        }
+    )
+
+    DispatchQueue.global().async {
+        lifecycle.didWrite(totalBytesWritten: 50, totalBytesExpectedToWrite: 100)
+    }
+    progressEntered.wait()
+
+    DispatchQueue.global().async {
+        finishStarted.signal()
+        lifecycle.didFinishDownloading(to: URL(fileURLWithPath: "/tmp/ordered.zip"))
+        finishReturned.signal()
+    }
+    finishStarted.wait()
+    #expect(!recorder.completionWasCalled)
+
+    releaseProgress.signal()
+    finishReturned.wait()
+    #expect(recorder.events == ["progress", "completion"])
+}
+
 private final class ProgressRecorder: @unchecked Sendable {
     private let lock = NSLock()
     private var values: [Double] = []
@@ -763,4 +1014,109 @@ private final class ProgressRecorder: @unchecked Sendable {
 private final class LifecycleRecorder: @unchecked Sendable {
     var progress: [Double] = []
     var results: [Result<UpdateDownloadTransportResponse, Error>] = []
+}
+
+private final class TransportResultRecorder: @unchecked Sendable {
+    private let lock = NSLock()
+    private(set) var results: [Result<UpdateDownloadTransportResponse, Error>] = []
+
+    func record(_ result: Result<UpdateDownloadTransportResponse, Error>) {
+        lock.lock()
+        results.append(result)
+        lock.unlock()
+    }
+}
+
+private final class HangingURLProtocol: URLProtocol {
+    override class func canInit(with request: URLRequest) -> Bool {
+        true
+    }
+
+    override class func canonicalRequest(for request: URLRequest) -> URLRequest {
+        request
+    }
+
+    override func startLoading() {}
+
+    override func stopLoading() {}
+}
+
+private actor InvalidationSignal {
+    private var didInvalidate = false
+    private var waiters: [CheckedContinuation<Void, Never>] = []
+
+    func mark() {
+        didInvalidate = true
+        let waiters = waiters
+        self.waiters.removeAll()
+        waiters.forEach { $0.resume() }
+    }
+
+    func wait() async {
+        guard !didInvalidate else { return }
+        await withCheckedContinuation { continuation in
+            waiters.append(continuation)
+        }
+    }
+}
+
+private actor StartEvaluationSignal {
+    private var didEvaluate = false
+    private var waiters: [CheckedContinuation<Void, Never>] = []
+
+    func mark() {
+        didEvaluate = true
+        let waiters = waiters
+        self.waiters.removeAll()
+        waiters.forEach { $0.resume() }
+    }
+
+    func waitUntilEvaluated() async {
+        guard !didEvaluate else { return }
+        await withCheckedContinuation { continuation in
+            waiters.append(continuation)
+        }
+    }
+}
+
+private final class StartEvaluationBarrier: @unchecked Sendable {
+    private let releaseSemaphore = DispatchSemaphore(value: 0)
+    private let signal: StartEvaluationSignal
+
+    init(signal: StartEvaluationSignal) {
+        self.signal = signal
+    }
+
+    func evaluate() {
+        Task { await signal.mark() }
+        releaseSemaphore.wait()
+    }
+
+    func release() {
+        releaseSemaphore.signal()
+    }
+}
+
+private final class TerminalOrderingRecorder: @unchecked Sendable {
+    private let lock = NSLock()
+    private(set) var events: [String] = []
+
+    var completionWasCalled: Bool {
+        lock.lock()
+        defer { lock.unlock() }
+        return events.contains("completion")
+    }
+
+    func recordProgress(_ value: Double) {
+        #expect(value == 0.5)
+        lock.lock()
+        events.append("progress")
+        lock.unlock()
+    }
+
+    func recordCompletion() {
+        lock.lock()
+        events.append("completion")
+        lock.unlock()
+    }
 }
