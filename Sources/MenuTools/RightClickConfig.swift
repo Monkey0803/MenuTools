@@ -148,6 +148,13 @@ enum RightClickConfigStore {
     }
 }
 
+/// 将配置变更通知转换为视图状态，无法解码时保留当前配置。
+enum RightClickConfigNotification {
+    static func applying(_ notification: Notification, to current: RightClickConfig) -> RightClickConfig {
+        RightClickConfigStore.decode(notification) ?? current
+    }
+}
+
 /// 扩展 → 主 App 的操作指令：沙箱扩展没有任意目录写权限（新建文件/文件夹），
 /// 也无法携带目录打开其它 App（在终端打开），转交非沙箱的常驻主 App 执行。
 /// 指令同样以 JSON 字符串走通知 object，不落盘

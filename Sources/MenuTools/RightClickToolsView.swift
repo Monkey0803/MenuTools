@@ -25,9 +25,7 @@ struct RightClickToolsView: View {
             extensionEnabled = FIFinderSyncController.isExtensionEnabled
         }
         .onReceive(configChanges) { notification in
-            if let newConfig = RightClickConfigStore.decode(notification) {
-                config = newConfig
-            }
+            config = RightClickConfigNotification.applying(notification, to: config)
         }
     }
 
