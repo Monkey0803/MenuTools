@@ -45,7 +45,7 @@ enum RightClickItem: String, CaseIterable, Identifiable, Codable {
 
 /// App 与 Finder 扩展共享的配置：以 JSON 存于 Application Support，
 /// 扩展进程（非沙箱）与主 App 都读写同一文件，实现跨进程同步
-struct RightClickConfig: Codable, Equatable {
+struct RightClickConfig: Codable, Equatable, Sendable {
     /// 各菜单项是否启用（缺省视为启用）
     var enabled: [String: Bool]
 

@@ -57,27 +57,63 @@ func unsupportedFormatVersionThrows() {
     }
 }
 
-@Test("增益、时长和最小步长必须在支持范围内")
-func outOfRangeScrollValuesThrow() {
-    let invalidValues: [(inout AppBackupSettings) -> Void] = [
-        { $0.scrollGain = 0.09 },
-        { $0.scrollDuration = 0.04 },
-        { $0.scrollMinStep = 0.99 }
-    ]
+@Test("低于增益下限会抛出精确校验错误")
+func gainBelowLowerBoundThrowsExactError() {
+    var settings = AppBackupSettings.fixture
+    settings.scrollGain = 0.09
 
-    for mutate in invalidValues {
-        var settings = AppBackupSettings.fixture
-        mutate(&settings)
-        let document = AppBackupDocument.current(
-            settings: settings,
-            rightClick: .default,
-            appVersion: "1.0.1",
-            createdAt: Date()
-        )
+    #expect(throws: AppBackupValidationError.invalidGain(0.09)) {
+        try document(settings: settings).validated()
+    }
+}
 
-        #expect(throws: (any Error).self) {
-            try document.validated()
-        }
+@Test("高于增益上限会抛出精确校验错误")
+func gainAboveUpperBoundThrowsExactError() {
+    var settings = AppBackupSettings.fixture
+    settings.scrollGain = 10.01
+
+    #expect(throws: AppBackupValidationError.invalidGain(10.01)) {
+        try document(settings: settings).validated()
+    }
+}
+
+@Test("低于时长下限会抛出精确校验错误")
+func durationBelowLowerBoundThrowsExactError() {
+    var settings = AppBackupSettings.fixture
+    settings.scrollDuration = 0.04
+
+    #expect(throws: AppBackupValidationError.invalidDuration(0.04)) {
+        try document(settings: settings).validated()
+    }
+}
+
+@Test("高于时长上限会抛出精确校验错误")
+func durationAboveUpperBoundThrowsExactError() {
+    var settings = AppBackupSettings.fixture
+    settings.scrollDuration = 2.01
+
+    #expect(throws: AppBackupValidationError.invalidDuration(2.01)) {
+        try document(settings: settings).validated()
+    }
+}
+
+@Test("低于最小步长下限会抛出精确校验错误")
+func minimumStepBelowLowerBoundThrowsExactError() {
+    var settings = AppBackupSettings.fixture
+    settings.scrollMinStep = 0.99
+
+    #expect(throws: AppBackupValidationError.invalidMinimumStep(0.99)) {
+        try document(settings: settings).validated()
+    }
+}
+
+@Test("高于最小步长上限会抛出精确校验错误")
+func minimumStepAboveUpperBoundThrowsExactError() {
+    var settings = AppBackupSettings.fixture
+    settings.scrollMinStep = 100.01
+
+    #expect(throws: AppBackupValidationError.invalidMinimumStep(100.01)) {
+        try document(settings: settings).validated()
     }
 }
 
@@ -101,15 +137,8 @@ func currentScrollRangeBoundariesAreAccepted() throws {
 func invalidModifierValueThrows() {
     var settings = AppBackupSettings.fixture
     settings.scrollAccelModifier = 1 << 16
-    let document = AppBackupDocument.current(
-        settings: settings,
-        rightClick: .default,
-        appVersion: "1.0.1",
-        createdAt: Date()
-    )
-
-    #expect(throws: (any Error).self) {
-        try document.validated()
+    #expect(throws: AppBackupValidationError.invalidModifier("scrollAccelModifier", 1 << 16)) {
+        try document(settings: settings).validated()
     }
 }
 
@@ -121,6 +150,26 @@ func unknownJSONFieldsAreIgnored() throws {
 
     #expect(document.settings == .fixture)
     #expect(document.rightClick == RightClickConfig(enabled: [:]))
+
+    let reencodedData = try JSONEncoder().encode(document)
+    let topLevel = try #require(
+        JSONSerialization.jsonObject(with: reencodedData) as? [String: Any]
+    )
+    let reencodedSettings = try #require(topLevel["settings"] as? [String: Any])
+    let reencodedRightClick = try #require(topLevel["rightClick"] as? [String: Any])
+
+    #expect(topLevel["unexpectedTopLevel"] == nil)
+    #expect(reencodedSettings["unexpectedSetting"] == nil)
+    #expect(reencodedRightClick["unexpectedAction"] == nil)
+}
+
+private func document(settings: AppBackupSettings) -> AppBackupDocument {
+    AppBackupDocument.current(
+        settings: settings,
+        rightClick: .default,
+        appVersion: "1.0.1",
+        createdAt: Date()
+    )
 }
 
 private extension AppBackupSettings {

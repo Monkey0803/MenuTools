@@ -88,6 +88,3 @@ struct AppBackupDocument: Codable, Equatable, Sendable {
     private static let allowedModifierMask: UInt =
         (1 << 17) | (1 << 18) | (1 << 19) | (1 << 20)
 }
-
-// RightClickConfig 只包含 String、Bool 字段，可安全随备份文档跨并发边界传递。
-extension RightClickConfig: @unchecked Sendable {}
