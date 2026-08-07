@@ -1,3 +1,4 @@
+import AppKit
 import Foundation
 
 /// 更新安装包的下载状态。
@@ -33,6 +34,241 @@ protocol UpdatePackageDownloading: Sendable {
 @MainActor
 protocol UpdatePackageOpening: Sendable {
     func open(_ url: URL) -> Bool
+}
+
+/// URLSession 下载传输层返回的临时文件和 HTTP 状态。
+struct UpdateDownloadTransportResponse: Sendable {
+    let statusCode: Int?
+    let temporaryURL: URL
+}
+
+/// URLSession 下载传输边界，便于在不访问网络的情况下验证适配器。
+protocol UpdateDownloadTransport: Sendable {
+    func startDownload(
+        from url: URL,
+        progress: @escaping @Sendable (Double) -> Void,
+        completion: @escaping @Sendable (Result<UpdateDownloadTransportResponse, Error>) -> Void
+    )
+
+    func cancel()
+}
+
+/// 临时文件移动边界，确保下载适配器不会直接依赖文件系统实现。
+protocol UpdateDownloadFileManaging: Sendable {
+    func moveItem(at source: URL, to destination: URL) throws
+}
+
+struct DefaultUpdateDownloadFileManager: UpdateDownloadFileManaging {
+    func moveItem(at source: URL, to destination: URL) throws {
+        try FileManager.default.moveItem(at: source, to: destination)
+    }
+}
+
+enum URLSessionUpdatePackageDownloaderError: Error, Equatable, Sendable {
+    case invalidURL
+    case unsupportedFileType
+    case nonSuccessfulResponse
+    case alreadyDownloading
+}
+
+/// 将 URLSession 下载结果校验并安全移动到服务层指定的临时路径。
+final class URLSessionUpdatePackageDownloader: UpdatePackageDownloading, @unchecked Sendable {
+    private static let supportedExtensions: Set<String> = ["zip", "dmg", "pkg"]
+
+    private let transport: any UpdateDownloadTransport
+    private let fileManager: any UpdateDownloadFileManaging
+    private let lock = NSLock()
+    private var isDownloading = false
+
+    init(
+        transport: any UpdateDownloadTransport = URLSessionUpdateDownloadTransport(),
+        fileManager: any UpdateDownloadFileManaging = DefaultUpdateDownloadFileManager()
+    ) {
+        self.transport = transport
+        self.fileManager = fileManager
+    }
+
+    func download(
+        from url: URL,
+        to destination: URL,
+        progress: @escaping @Sendable (Double) -> Void
+    ) async throws -> URL {
+        guard let scheme = url.scheme?.lowercased(),
+              scheme == "http" || scheme == "https",
+              url.host != nil else {
+            throw URLSessionUpdatePackageDownloaderError.invalidURL
+        }
+        guard Self.supportedExtensions.contains(url.pathExtension.lowercased()) else {
+            throw URLSessionUpdatePackageDownloaderError.unsupportedFileType
+        }
+
+        return try await withTaskCancellationHandler {
+            try await withCheckedThrowingContinuation { continuation in
+                lock.lock()
+                guard !isDownloading else {
+                    lock.unlock()
+                    continuation.resume(throwing: URLSessionUpdatePackageDownloaderError.alreadyDownloading)
+                    return
+                }
+                isDownloading = true
+                lock.unlock()
+
+                transport.startDownload(
+                    from: url,
+                    progress: progress,
+                    completion: { [weak self] result in
+                        guard let self else { return }
+                        self.finish(
+                            result,
+                            destination: destination,
+                            continuation: continuation
+                        )
+                    }
+                )
+            }
+        } onCancel: {
+            self.cancel()
+        }
+    }
+
+    func cancel() {
+        transport.cancel()
+    }
+
+    private func finish(
+        _ result: Result<UpdateDownloadTransportResponse, Error>,
+        destination: URL,
+        continuation: CheckedContinuation<URL, Error>
+    ) {
+        defer {
+            lock.lock()
+            isDownloading = false
+            lock.unlock()
+        }
+
+        switch result {
+        case let .failure(error):
+            continuation.resume(throwing: error)
+        case let .success(response):
+            guard let statusCode = response.statusCode,
+                  (200...299).contains(statusCode) else {
+                continuation.resume(throwing: URLSessionUpdatePackageDownloaderError.nonSuccessfulResponse)
+                return
+            }
+            do {
+                try fileManager.moveItem(at: response.temporaryURL, to: destination)
+                continuation.resume(returning: destination)
+            } catch {
+                // 保留原始文件错误，让上层决定本地化展示方式。
+                continuation.resume(throwing: error)
+            }
+        }
+    }
+}
+
+/// 使用 URLSessionDownloadDelegate 提供下载进度和临时文件路径。
+private final class URLSessionUpdateDownloadTransport: NSObject, UpdateDownloadTransport, URLSessionDownloadDelegate, @unchecked Sendable {
+    private lazy var session: URLSession = URLSession(
+        configuration: .ephemeral,
+        delegate: self,
+        delegateQueue: nil
+    )
+    private let lock = NSLock()
+    private var activeTask: URLSessionDownloadTask?
+    private var progressHandler: (@Sendable (Double) -> Void)?
+    private var completion: (@Sendable (Result<UpdateDownloadTransportResponse, Error>) -> Void)?
+
+    func startDownload(
+        from url: URL,
+        progress: @escaping @Sendable (Double) -> Void,
+        completion: @escaping @Sendable (Result<UpdateDownloadTransportResponse, Error>) -> Void
+    ) {
+        let task = session.downloadTask(with: url)
+
+        lock.lock()
+        guard activeTask == nil else {
+            lock.unlock()
+            completion(.failure(URLSessionUpdatePackageDownloaderError.alreadyDownloading))
+            return
+        }
+        activeTask = task
+        progressHandler = progress
+        self.completion = completion
+        lock.unlock()
+
+        task.resume()
+    }
+
+    func cancel() {
+        lock.lock()
+        let task = activeTask
+        lock.unlock()
+        task?.cancel()
+    }
+
+    func urlSession(
+        _: URLSession,
+        downloadTask: URLSessionDownloadTask,
+        didWriteData _: Int64,
+        totalBytesWritten: Int64,
+        totalBytesExpectedToWrite: Int64
+    ) {
+        guard totalBytesExpectedToWrite > 0 else { return }
+        let progress = Double(totalBytesWritten) / Double(totalBytesExpectedToWrite)
+        lock.lock()
+        let handler = activeTask?.taskIdentifier == downloadTask.taskIdentifier ? progressHandler : nil
+        lock.unlock()
+        handler?(min(max(progress, 0), 1))
+    }
+
+    func urlSession(
+        _: URLSession,
+        downloadTask: URLSessionDownloadTask,
+        didFinishDownloadingTo location: URL
+    ) {
+        lock.lock()
+        guard activeTask?.taskIdentifier == downloadTask.taskIdentifier,
+              let completion else {
+            lock.unlock()
+            return
+        }
+        activeTask = nil
+        progressHandler = nil
+        self.completion = nil
+        lock.unlock()
+
+        let statusCode = (downloadTask.response as? HTTPURLResponse)?.statusCode
+        completion(.success(UpdateDownloadTransportResponse(statusCode: statusCode, temporaryURL: location)))
+    }
+
+    func urlSession(
+        _: URLSession,
+        task: URLSessionTask,
+        didCompleteWithError error: Error?
+    ) {
+        guard let error else { return }
+
+        lock.lock()
+        guard activeTask?.taskIdentifier == task.taskIdentifier,
+              let completion else {
+            lock.unlock()
+            return
+        }
+        activeTask = nil
+        progressHandler = nil
+        self.completion = nil
+        lock.unlock()
+
+        completion(.failure(error))
+    }
+}
+
+/// 在主 actor 上调用系统默认程序打开已完成的安装包。
+@MainActor
+struct NSWorkspaceUpdatePackageOpener: UpdatePackageOpening {
+    func open(_ url: URL) -> Bool {
+        NSWorkspace.shared.open(url)
+    }
 }
 
 /// 管理更新安装包的校验、下载状态和取消操作。

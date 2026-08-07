@@ -6,6 +6,84 @@ private enum StubDownloadError: Error, Sendable {
     case failed
 }
 
+private enum AdapterStubError: Error, Sendable {
+    case readFailed
+    case cancelled
+}
+
+private actor AdapterTransportControl {
+    private var completion: (@Sendable (Result<UpdateDownloadTransportResponse, Error>) -> Void)?
+    private var progress: (@Sendable (Double) -> Void)?
+    private var startWaiters: [CheckedContinuation<Void, Never>] = []
+
+    func start(
+        progress: @escaping @Sendable (Double) -> Void,
+        completion: @escaping @Sendable (Result<UpdateDownloadTransportResponse, Error>) -> Void
+    ) {
+        self.progress = progress
+        self.completion = completion
+        let waiters = startWaiters
+        startWaiters.removeAll()
+        waiters.forEach { $0.resume() }
+    }
+
+    func waitUntilStarted() async {
+        guard completion == nil else { return }
+        await withCheckedContinuation { continuation in
+            startWaiters.append(continuation)
+        }
+    }
+
+    func finish(_ result: Result<UpdateDownloadTransportResponse, Error>) {
+        completion?(result)
+        completion = nil
+    }
+
+    func reportProgress(_ value: Double) {
+        progress?(value)
+    }
+}
+
+private struct ControlledAdapterTransport: UpdateDownloadTransport {
+    let control: AdapterTransportControl
+
+    func startDownload(
+        from _: URL,
+        progress: @escaping @Sendable (Double) -> Void,
+        completion: @escaping @Sendable (Result<UpdateDownloadTransportResponse, Error>) -> Void
+    ) {
+        Task {
+            await control.start(progress: progress, completion: completion)
+        }
+    }
+
+    func cancel() {
+        Task {
+            await control.finish(.failure(AdapterStubError.cancelled))
+        }
+    }
+}
+
+private enum FileMoveStubError: Error, Sendable {
+    case moveFailed
+}
+
+private final class RecordingFileManager: UpdateDownloadFileManaging, @unchecked Sendable {
+    let moveError: FileMoveStubError?
+    private(set) var source: URL?
+    private(set) var destination: URL?
+
+    init(moveError: FileMoveStubError?) {
+        self.moveError = moveError
+    }
+
+    func moveItem(at source: URL, to destination: URL) throws {
+        self.source = source
+        self.destination = destination
+        if let moveError { throw moveError }
+    }
+}
+
 private enum ControlledDownloadResult: Sendable {
     case success(URL?)
     case failure
@@ -322,4 +400,157 @@ func serviceOpensCompletedPackage() async {
 
     #expect(service.openCompletedPackage())
     #expect(opener.openedURL == destination)
+}
+
+@Test("下载适配器拒绝非成功 HTTP 响应")
+func adapterRejectsNonSuccessfulHTTPResponse() async {
+    let control = AdapterTransportControl()
+    let adapter = URLSessionUpdatePackageDownloader(
+        transport: ControlledAdapterTransport(control: control),
+        fileManager: DefaultUpdateDownloadFileManager()
+    )
+    let temporaryURL = URL(fileURLWithPath: "/tmp/source.zip")
+    let destination = URL(fileURLWithPath: "/tmp/destination.zip")
+
+    let task = Task {
+        try await adapter.download(
+            from: URL(string: "https://example.com/source.zip")!,
+            to: destination,
+            progress: { _ in }
+        )
+    }
+    await control.waitUntilStarted()
+    await control.finish(.success(.init(statusCode: 404, temporaryURL: temporaryURL)))
+
+    await #expect(throws: URLSessionUpdatePackageDownloaderError.nonSuccessfulResponse) {
+        try await task.value
+    }
+}
+
+@Test("下载适配器拒绝不支持的扩展名")
+func adapterRejectsUnsupportedExtension() async {
+    let control = AdapterTransportControl()
+    let adapter = URLSessionUpdatePackageDownloader(
+        transport: ControlledAdapterTransport(control: control),
+        fileManager: DefaultUpdateDownloadFileManager()
+    )
+
+    await #expect(throws: URLSessionUpdatePackageDownloaderError.unsupportedFileType) {
+        try await adapter.download(
+            from: URL(string: "https://example.com/source.tar.gz")!,
+            to: URL(fileURLWithPath: "/tmp/destination.tar.gz"),
+            progress: { _ in }
+        )
+    }
+}
+
+@Test("下载适配器保留下载源的文件错误")
+func adapterPreservesReadError() async {
+    let control = AdapterTransportControl()
+    let adapter = URLSessionUpdatePackageDownloader(
+        transport: ControlledAdapterTransport(control: control),
+        fileManager: RecordingFileManager(moveError: nil)
+    )
+    let task = Task {
+        try await adapter.download(
+            from: URL(string: "https://example.com/source.zip")!,
+            to: URL(fileURLWithPath: "/tmp/destination.zip"),
+            progress: { _ in }
+        )
+    }
+    await control.waitUntilStarted()
+    await control.finish(.failure(AdapterStubError.readFailed))
+
+    await #expect(throws: AdapterStubError.readFailed) {
+        try await task.value
+    }
+}
+
+@Test("下载适配器在移动失败时不返回完成路径")
+func adapterRejectsMoveError() async {
+    let control = AdapterTransportControl()
+    let adapter = URLSessionUpdatePackageDownloader(
+        transport: ControlledAdapterTransport(control: control),
+        fileManager: RecordingFileManager(moveError: .moveFailed)
+    )
+    let task = Task {
+        try await adapter.download(
+            from: URL(string: "https://example.com/source.zip")!,
+            to: URL(fileURLWithPath: "/tmp/destination.zip"),
+            progress: { _ in }
+        )
+    }
+    await control.waitUntilStarted()
+    await control.finish(.success(.init(
+        statusCode: 200,
+        temporaryURL: URL(fileURLWithPath: "/tmp/source.zip")
+    )))
+
+    await #expect(throws: FileMoveStubError.moveFailed) {
+        try await task.value
+    }
+}
+
+@Test("下载适配器转发进度并在成功后返回目标路径")
+func adapterReportsProgressAndFinalizesDestination() async throws {
+    let control = AdapterTransportControl()
+    let fileManager = RecordingFileManager(moveError: nil)
+    let adapter = URLSessionUpdatePackageDownloader(
+        transport: ControlledAdapterTransport(control: control),
+        fileManager: fileManager
+    )
+    let progress = ProgressRecorder()
+    let destination = URL(fileURLWithPath: "/tmp/destination.zip")
+    let task = Task {
+        try await adapter.download(
+            from: URL(string: "https://example.com/source.zip")!,
+            to: destination,
+            progress: { value in
+                Task { await progress.record(value) }
+            }
+        )
+    }
+    await control.waitUntilStarted()
+    await control.reportProgress(0.4)
+    await control.reportProgress(1.0)
+    await control.finish(.success(.init(
+        statusCode: 200,
+        temporaryURL: URL(fileURLWithPath: "/tmp/source.zip")
+    )))
+
+    let result = try await task.value
+    #expect(result == destination)
+    #expect(await progress.values == [0.4, 1.0])
+    #expect(fileManager.source == URL(fileURLWithPath: "/tmp/source.zip"))
+    #expect(fileManager.destination == destination)
+}
+
+@Test("取消下载会取消传输并抛出取消错误")
+func adapterSupportsCancellation() async {
+    let control = AdapterTransportControl()
+    let adapter = URLSessionUpdatePackageDownloader(
+        transport: ControlledAdapterTransport(control: control),
+        fileManager: DefaultUpdateDownloadFileManager()
+    )
+    let task = Task {
+        try await adapter.download(
+            from: URL(string: "https://example.com/source.zip")!,
+            to: URL(fileURLWithPath: "/tmp/destination.zip"),
+            progress: { _ in }
+        )
+    }
+    await control.waitUntilStarted()
+    task.cancel()
+
+    await #expect(throws: AdapterStubError.cancelled) {
+        try await task.value
+    }
+}
+
+private actor ProgressRecorder {
+    private(set) var values: [Double] = []
+
+    func record(_ value: Double) {
+        values.append(value)
+    }
 }
