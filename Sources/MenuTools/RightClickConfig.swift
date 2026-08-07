@@ -142,6 +142,10 @@ enum RightClickConfigStore {
         guard let object, let data = object.data(using: .utf8) else { return nil }
         return try? JSONDecoder().decode(RightClickConfig.self, from: data)
     }
+
+    static func decode(_ notification: Notification) -> RightClickConfig? {
+        decode(notification.object as? String)
+    }
 }
 
 /// 扩展 → 主 App 的操作指令：沙箱扩展没有任意目录写权限（新建文件/文件夹），

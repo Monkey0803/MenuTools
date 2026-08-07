@@ -7,6 +7,8 @@ struct RightClickToolsView: View {
     @State private var extensionEnabled = FIFinderSyncController.isExtensionEnabled
 
     private let refreshTimer = Timer.publish(every: 2, on: .main, in: .common).autoconnect()
+    private let configChanges = DistributedNotificationCenter.default()
+        .publisher(for: Notification.Name(RightClickConfigStore.didChangeNotification))
 
     var body: some View {
         ScrollView {
@@ -21,6 +23,11 @@ struct RightClickToolsView: View {
         .frame(width: SettingsLayout.width, height: SettingsLayout.height)
         .onReceive(refreshTimer) { _ in
             extensionEnabled = FIFinderSyncController.isExtensionEnabled
+        }
+        .onReceive(configChanges) { notification in
+            if let newConfig = RightClickConfigStore.decode(notification) {
+                config = newConfig
+            }
         }
     }
 
