@@ -9,14 +9,13 @@ enum SettingsLayout {
 /// 设置窗口（⌘, / 面板齿轮按钮打开）：分标签容纳通用与右键工具
 struct SettingsView: View {
     @AppStorage(SettingsKey.appLanguage) private var appLanguage = AppLanguage.system.rawValue
+
     var body: some View {
         TabView {
             GeneralSettingsView()
                 .tabItem { Label(L("settings.tab.general"), systemImage: "gearshape") }
             RightClickToolsView()
                 .tabItem { Label(L("settings.tab.rightClick"), systemImage: "contextualmenu.and.cursorarrow") }
-            ShortcutSettingsView()
-                .tabItem { Label(L("settings.tab.shortcut"), systemImage: "command") }
             ScrollSettingsView()
                 .tabItem { Label(L("settings.tab.scroll"), systemImage: "computermouse") }
         }

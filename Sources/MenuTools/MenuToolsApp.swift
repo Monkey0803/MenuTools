@@ -58,10 +58,10 @@ struct MenuToolsApp: App {
     @AppStorage(SettingsKey.menuBarShowTitle) private var showMenuBarTitle = false
 
     init() {
-        // 注册已保存的全局快捷键
-        ShortcutManager.shared.activate()
         // 根据配置启动平滑滚动引擎
         SmoothScrollEngine.shared.activateIfEnabled()
+        // 监听 Finder 扩展转交的右键操作指令（沙箱扩展无法直接执行文件操作）
+        RightClickCommandHandler.activate()
     }
 
     var body: some Scene {

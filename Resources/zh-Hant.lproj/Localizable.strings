@@ -108,33 +108,22 @@
 "rc.group.copy" = "複製選單項";
 "rc.item.newFolder" = "新增檔案夾";
 "rc.item.newFile" = "新增檔案";
-"rc.item.newFile.desc" = "支援 .txt / .md / .json";
+"rc.item.newFile.desc" = "支援 .txt / .md / .json / .html / .py 等常用格式";
 "rc.item.openInTerminal" = "在終端機打開";
 "rc.item.copyFilename" = "複製檔案名稱";
 "rc.item.copyAbsolutePath" = "複製絕對路徑";
 "rc.item.copyRelativePath" = "複製相對路徑";
+"rc.item.copyRelativePath.desc" = "相對使用者目錄，以 ~ 開頭";
 "rc.item.copyEscapedPath" = "複製轉義路徑";
 "rc.item.copyEscapedPath.desc" = "適合終端機指令";
 "rc.item.copyFileURL" = "複製 file:// 連結";
 "rc.default.newFolder" = "未命名檔案夾";
 "rc.default.newFile" = "未命名.txt";
 
-/* 快捷鍵綁定 */
-"settings.tab.shortcut" = "快捷鍵綁定";
-"sc.title" = "快捷鍵綁定";
-"sc.subtitle" = "為系統動作綁定全域快捷鍵。按鍵模擬類動作需在「輔助使用」中授權。";
-"sc.unset" = "未設定";
-"sc.recording" = "請按快捷鍵…";
-"sc.clear" = "清除";
-"sc.action.missionControl" = "調度中心";
-"sc.action.launchpad" = "啟動台";
-"sc.action.spotlight" = "聚焦搜尋 (系統)";
-"sc.action.dictation" = "聽寫";
-"sc.action.doNotDisturb" = "勿擾模式";
-"sc.action.showDesktop" = "顯示桌面";
-"sc.action.quitApp" = "結束目前應用程式";
-"sc.action.moveLeftSpace" = "向左移動空間";
-"sc.action.moveRightSpace" = "向右移動空間";
+"settings.recording" = "請按快捷鍵…";
+"settings.unset" = "未設定";
+"space.scriptInitFailed" = "空間切換腳本建立失敗。";
+"space.executionFailed" = "空間切換失敗：%@";
 
 /* 平滑捲動 */
 "settings.tab.scroll" = "平滑捲動";

@@ -267,7 +267,7 @@ private struct ModifierRecorder: View {
             Button {
                 recording.toggle()
             } label: {
-                Text(recording ? L("sc.recording") : (display.isEmpty ? L("sc.unset") : display))
+                Text(recording ? L("settings.recording") : (display.isEmpty ? L("settings.unset") : display))
                     .font(.callout)
                     .frame(minWidth: 96)
                     .padding(.horizontal, 10)

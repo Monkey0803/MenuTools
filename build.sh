@@ -63,4 +63,11 @@ fi
 codesign --force "${SIGN_ARG[@]}" --entitlements Extension/RightClickTools.entitlements "$APPEX"
 codesign --force "${SIGN_ARG[@]}" --entitlements Resources/MenuTools.entitlements "$APP_BUNDLE"
 
+# 清理残留的旧扩展进程：替换 App 后 Finder 可能同时连着新旧两个实例，导致右键菜单出现两个 MenuTools
+if pgrep -f "RightClickTools.appex" >/dev/null 2>&1; then
+    echo "==> 清理旧 Finder 扩展进程并重启 Finder"
+    pkill -f "RightClickTools.appex" || true
+    killall Finder 2>/dev/null || true
+fi
+
 echo "==> 完成：$APP_BUNDLE"

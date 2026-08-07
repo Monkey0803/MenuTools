@@ -108,33 +108,22 @@
 "rc.group.copy" = "复制菜单项";
 "rc.item.newFolder" = "新建文件夹";
 "rc.item.newFile" = "新建文件";
-"rc.item.newFile.desc" = "支持 .txt / .md / .json";
+"rc.item.newFile.desc" = "支持 .txt / .md / .json / .html / .py 等常用格式";
 "rc.item.openInTerminal" = "在终端打开";
 "rc.item.copyFilename" = "复制文件名";
 "rc.item.copyAbsolutePath" = "复制绝对路径";
 "rc.item.copyRelativePath" = "复制相对路径";
+"rc.item.copyRelativePath.desc" = "相对用户目录，以 ~ 开头";
 "rc.item.copyEscapedPath" = "复制转义路径";
 "rc.item.copyEscapedPath.desc" = "适合终端命令";
 "rc.item.copyFileURL" = "复制 file:// 链接";
 "rc.default.newFolder" = "未命名文件夹";
 "rc.default.newFile" = "未命名.txt";
 
-/* 快捷键绑定 */
-"settings.tab.shortcut" = "快捷键绑定";
-"sc.title" = "快捷键绑定";
-"sc.subtitle" = "为系统动作绑定全局快捷键。按键模拟类动作需在“辅助功能”中授权。";
-"sc.unset" = "未设置";
-"sc.recording" = "请按快捷键…";
-"sc.clear" = "清除";
-"sc.action.missionControl" = "调度中心";
-"sc.action.launchpad" = "启动台";
-"sc.action.spotlight" = "聚焦搜索 (系统)";
-"sc.action.dictation" = "听写";
-"sc.action.doNotDisturb" = "勿扰模式";
-"sc.action.showDesktop" = "显示桌面";
-"sc.action.quitApp" = "退出当前应用";
-"sc.action.moveLeftSpace" = "向左移动空间";
-"sc.action.moveRightSpace" = "向右移动空间";
+"settings.recording" = "请按快捷键…";
+"settings.unset" = "未设置";
+"space.scriptInitFailed" = "空间切换脚本创建失败。";
+"space.executionFailed" = "空间切换失败：%@";
 
 /* 平滑滚动 */
 "settings.tab.scroll" = "平滑滚动";

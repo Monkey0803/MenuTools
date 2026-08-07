@@ -1,6 +1,9 @@
 import AppKit
 import FinderSync
 
+/// 新建文件可选类型（子菜单顺序即 tag 值）
+private let newFileTypes = ["txt", "md", "json", "yaml", "xml", "csv", "html", "css", "js", "py", "sh"]
+
 /// Finder 右键扩展主类：根据共享配置动态构建右键菜单，执行文件操作
 @objc(FinderSyncExtension)
 final class FinderSyncExtension: FIFinderSync {
@@ -9,18 +12,26 @@ final class FinderSyncExtension: FIFinderSync {
 
     override init() {
         super.init()
-        // 监控整个用户目录，使右键菜单在任意位置可用
+        // 监控整个文件系统，使右键菜单在任意位置可用。
+        // 注意：扩展跑在沙箱里，NSHomeDirectory() 返回的是沙箱容器路径而非真实用户目录，
+        // 监控它会导致菜单在真实目录中永远不出现；directoryURLs 只是菜单作用域声明，
+        // 不需要文件访问权限，直接监控 "/" 即可覆盖所有位置（含外置卷）。
         FIFinderSyncController.default().directoryURLs = [
-            URL(fileURLWithPath: NSHomeDirectory()),
-            URL(fileURLWithPath: "/Volumes")
+            URL(fileURLWithPath: "/")
         ]
-        // 配置变更时热重载
+        // 配置变更时热重载：配置随通知 object 广播而来，缓存到自身沙箱容器供冷启动用
         DistributedNotificationCenter.default().addObserver(
             forName: Notification.Name(RightClickConfigStore.didChangeNotification),
             object: nil, queue: .main
-        ) { [weak self] _ in
-            self?.config = RightClickConfigStore.load()
+        ) { [weak self] note in
+            guard let config = RightClickConfigStore.decode(note.object as? String) else { return }
+            self?.config = config
+            RightClickConfigStore.persist(config)
         }
+        // 冷启动时向主 App 要一次最新配置（本地缓存可能落后）
+        DistributedNotificationCenter.default().postNotificationName(
+            Notification.Name(RightClickConfigStore.requestNotification), object: nil, deliverImmediately: true
+        )
     }
 
     // MARK: - 菜单构建
@@ -42,6 +53,23 @@ final class FinderSyncExtension: FIFinderSync {
             let menuItem = NSMenuItem(title: title(for: item), action: selector(for: item), keyEquivalent: "")
             menuItem.target = self
             menuItem.representedObject = item.rawValue
+            // 新建文件提供类型子菜单（.txt / .md / .json）
+            if item == .newFile {
+                menuItem.action = nil
+                let typeMenu = NSMenu(title: menuItem.title)
+                for (index, ext) in newFileTypes.enumerated() {
+                    // 文本 / 数据 / 代码三类之间加分隔线
+                    if ext == "json" || ext == "html" {
+                        typeMenu.addItem(.separator())
+                    }
+                    let typeItem = NSMenuItem(title: ".\(ext)", action: #selector(newFileWithType(_:)), keyEquivalent: "")
+                    typeItem.target = self
+                    // FinderSync 菜单跨进程序列化，representedObject 不会保留，只能用 tag 传类型
+                    typeItem.tag = index
+                    typeMenu.addItem(typeItem)
+                }
+                menuItem.submenu = typeMenu
+            }
             submenu.addItem(menuItem)
             lastGroup = item.group
         }
@@ -55,10 +83,10 @@ final class FinderSyncExtension: FIFinderSync {
         NSLocalizedString(item.titleKey, comment: "")
     }
 
-    private func selector(for item: RightClickItem) -> Selector {
+    private func selector(for item: RightClickItem) -> Selector? {
         switch item {
         case .newFolder: return #selector(newFolder(_:))
-        case .newFile: return #selector(newFile(_:))
+        case .newFile: return nil  // 由类型子菜单承担动作
         case .openInTerminal: return #selector(openInTerminal(_:))
         case .copyFilename: return #selector(copyFilename(_:))
         case .copyAbsolutePath: return #selector(copyAbsolutePath(_:))
@@ -86,27 +114,28 @@ final class FinderSyncExtension: FIFinderSync {
         return selected.isEmpty ? [targetDirectory] : selected
     }
 
-    // MARK: - 目录操作
+    // MARK: - 目录操作（转交主 App 执行：沙箱扩展无任意目录写权限，也无法携目录打开终端）
 
-    @objc private func newFolder(_ sender: AnyObject?) {
-        let base = targetDirectory
-        let url = uniqueURL(in: base, name: NSLocalizedString("rc.default.newFolder", comment: ""), isDirectory: true)
-        try? FileManager.default.createDirectory(at: url, withIntermediateDirectories: false)
+    private func relay(_ item: RightClickItem, paths: [String], fileExtension: String? = nil) {
+        RightClickCommandStore.send(
+            RightClickCommand(action: item.rawValue, paths: paths, fileExtension: fileExtension)
+        )
     }
 
-    @objc private func newFile(_ sender: AnyObject?) {
-        let base = targetDirectory
-        let url = uniqueURL(in: base, name: NSLocalizedString("rc.default.newFile", comment: ""), isDirectory: false)
-        FileManager.default.createFile(atPath: url.path, contents: Data())
+    @objc private func newFolder(_ sender: AnyObject?) {
+        relay(.newFolder, paths: [targetDirectory.path])
+    }
+
+    @objc private func newFileWithType(_ sender: NSMenuItem) {
+        let index = sender.tag
+        let ext = newFileTypes.indices.contains(index) ? newFileTypes[index] : "txt"
+        relay(.newFile, paths: [targetDirectory.path], fileExtension: ext)
     }
 
     @objc private func openInTerminal(_ sender: AnyObject?) {
         let dir = selectedURLs.first(where: { (try? $0.resourceValues(forKeys: [.isDirectoryKey]))?.isDirectory == true })
             ?? targetDirectory
-        if let terminal = NSWorkspace.shared.urlForApplication(withBundleIdentifier: "com.apple.Terminal") {
-            let config = NSWorkspace.OpenConfiguration()
-            NSWorkspace.shared.open([dir], withApplicationAt: terminal, configuration: config)
-        }
+        relay(.openInTerminal, paths: [dir.path])
     }
 
     // MARK: - 复制操作
@@ -120,9 +149,13 @@ final class FinderSyncExtension: FIFinderSync {
     }
 
     @objc private func copyRelativePath(_ sender: AnyObject?) {
-        let base = targetDirectory.path
+        // 相对用户目录的 ~ 路径；沙箱里 NSHomeDirectory() 是容器路径，真实用户目录要从 passwd 取
+        let home = realHomeDirectory()
         copyToPasteboard(affectedURLs.map { url in
-            url.path.hasPrefix(base) ? String(url.path.dropFirst(base.count)).trimmingCharacters(in: CharacterSet(charactersIn: "/")) : url.lastPathComponent
+            let path = url.path
+            if path == home { return "~" }
+            if path.hasPrefix(home + "/") { return "~" + path.dropFirst(home.count) }
+            return path
         })
     }
 
@@ -148,17 +181,11 @@ final class FinderSyncExtension: FIFinderSync {
         "'" + path.replacingOccurrences(of: "'", with: "'\\''") + "'"
     }
 
-    /// 在目录下生成不重名的路径（重名追加序号）
-    private func uniqueURL(in directory: URL, name: String, isDirectory: Bool) -> URL {
-        let ext = (name as NSString).pathExtension
-        let base = (name as NSString).deletingPathExtension
-        var candidate = directory.appendingPathComponent(name)
-        var index = 2
-        while FileManager.default.fileExists(atPath: candidate.path) {
-            let newName = ext.isEmpty ? "\(base) \(index)" : "\(base) \(index).\(ext)"
-            candidate = directory.appendingPathComponent(newName)
-            index += 1
+    /// 真实用户目录：沙箱进程下 NSHomeDirectory() 返回容器路径，getpwuid 不受影响
+    private func realHomeDirectory() -> String {
+        if let pw = getpwuid(getuid()), let dir = pw.pointee.pw_dir {
+            return String(cString: dir)
         }
-        return candidate
+        return NSHomeDirectory()
     }
 }

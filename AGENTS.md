@@ -11,6 +11,8 @@ MenuTools 是常驻 macOS 菜单栏的系统工具集（SPM 可执行工程，�
 ```bash
 ./build.sh                  # 一键：swift build -c release + 组装 .app + ad-hoc 签名 → dist/MenuTools.app
 swift build -c release      # 仅编译（Swift 6 严格并发检查在此暴露错误）
+swift test                  # 运行 Swift Testing 单元测试
+swift test --filter MenuToolsTests  # 运行指定测试 target
 
 # 修改代码后的标准重启验证流程：
 pkill -f MenuTools.app/Contents/MacOS/MenuTools; ./build.sh && open dist/MenuTools.app
@@ -19,7 +21,9 @@ pkill -f MenuTools.app/Contents/MacOS/MenuTools; ./build.sh && open dist/MenuToo
 swift Scripts/make_icon.swift /tmp/icon/AppIcon.iconset && iconutil -c icns /tmp/icon/AppIcon.iconset -o Resources/AppIcon.icns
 ```
 
-- 无单元测试 target。`Scripts/test_*.swift` 是**私有 API / 系统能力的独立验证脚本**，用 `swift Scripts/test_xxx.swift` 直接运行；系统大版本升级或相关功能失效时先跑对应脚本回归。
+- 单元测试放在 `Tests/`，使用 Swift Testing；新增功能、修复缺陷和重构必须遵循 TDD：先写一个能证明需求的失败测试，确认 RED 后写最小实现，再确认 GREEN，最后才重构。
+- 测试优先覆盖纯逻辑、状态转换、数据编解码和错误处理；AppKit、Carbon、TCC、IOKit、私有 API 等系统依赖通过协议/状态边界隔离，无法稳定自动化的部分使用 `Scripts/test_*.swift` 做独立验证。
+- `Scripts/test_*.swift` 是**私有 API / 系统能力的独立验证脚本**，用 `swift Scripts/test_xxx.swift` 直接运行；系统大版本升级或相关功能失效时先跑对应脚本回归。
 - 沙箱环境中 `swift build` 可能因 xcrun 缓存写入被拒（`/var/folders` permission denied），需在沙箱外执行。
 - 发版：改 `Resources/Info.plist` 的 `CFBundleShortVersionString` → 打包 → GitHub 发 Release（tag `v1.x.x`，附件 .zip/.dmg/.pkg），客户端更新检查自动生效。
 

@@ -108,33 +108,22 @@
 "rc.group.copy" = "Copy Items";
 "rc.item.newFolder" = "New Folder";
 "rc.item.newFile" = "New File";
-"rc.item.newFile.desc" = "Supports .txt / .md / .json";
+"rc.item.newFile.desc" = "Supports .txt / .md / .json / .html / .py and more";
 "rc.item.openInTerminal" = "Open in Terminal";
 "rc.item.copyFilename" = "Copy Filename";
 "rc.item.copyAbsolutePath" = "Copy Absolute Path";
 "rc.item.copyRelativePath" = "Copy Relative Path";
+"rc.item.copyRelativePath.desc" = "Relative to home folder, starts with ~";
 "rc.item.copyEscapedPath" = "Copy Escaped Path";
 "rc.item.copyEscapedPath.desc" = "For terminal commands";
 "rc.item.copyFileURL" = "Copy file:// Link";
 "rc.default.newFolder" = "untitled folder";
 "rc.default.newFile" = "untitled.txt";
 
-/* Shortcut binding */
-"settings.tab.shortcut" = "Shortcuts";
-"sc.title" = "Keyboard Shortcuts";
-"sc.subtitle" = "Bind global shortcuts to system actions. Key-simulation actions require Accessibility permission.";
-"sc.unset" = "Not Set";
-"sc.recording" = "Press keys…";
-"sc.clear" = "Clear";
-"sc.action.missionControl" = "Mission Control";
-"sc.action.launchpad" = "Launchpad";
-"sc.action.spotlight" = "Spotlight (System)";
-"sc.action.dictation" = "Dictation";
-"sc.action.doNotDisturb" = "Do Not Disturb";
-"sc.action.showDesktop" = "Show Desktop";
-"sc.action.quitApp" = "Quit Current App";
-"sc.action.moveLeftSpace" = "Move Left a Space";
-"sc.action.moveRightSpace" = "Move Right a Space";
+"settings.recording" = "Press keys…";
+"settings.unset" = "Not Set";
+"space.scriptInitFailed" = "Failed to create the space-switching script.";
+"space.executionFailed" = "Space switch failed: %@";
 
 /* Smooth scrolling */
 "settings.tab.scroll" = "Smooth Scroll";
