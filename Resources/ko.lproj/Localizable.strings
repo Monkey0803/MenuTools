@@ -64,6 +64,14 @@
 "settings.section.language" = "언어";
 "settings.language.label" = "앱 언어";
 "settings.language.system" = "시스템 따르기";
+"settings.section.backup" = "백업 및 복원";
+"settings.backup.export" = "백업 내보내기";
+"settings.backup.import" = "백업 가져오기";
+"settings.backup.defaultFilename" = "MenuTools-1.0.1.menutoolsbackup";
+"settings.backup.exportSuccess" = "백업을 내보냈습니다";
+"settings.backup.importSuccess" = "백업을 복원했습니다";
+"settings.backup.invalidFile" = "백업 파일이 올바르지 않거나 읽을 수 없습니다";
+"settings.backup.writeFailed" = "백업 작업을 완료하지 못했습니다";
 
 /* 메뉴 막대 아이콘 이름 */
 "icon.wrench" = "도구";

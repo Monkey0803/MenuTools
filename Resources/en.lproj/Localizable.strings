@@ -64,6 +64,14 @@
 "settings.section.language" = "Language";
 "settings.language.label" = "App Language";
 "settings.language.system" = "Follow System";
+"settings.section.backup" = "Backup and Restore";
+"settings.backup.export" = "Export Backup";
+"settings.backup.import" = "Import Backup";
+"settings.backup.defaultFilename" = "MenuTools-1.0.1.menutoolsbackup";
+"settings.backup.exportSuccess" = "Backup exported successfully";
+"settings.backup.importSuccess" = "Backup restored successfully";
+"settings.backup.invalidFile" = "The backup file is invalid or unreadable";
+"settings.backup.writeFailed" = "The backup operation could not be completed";
 
 /* Menu bar icon names */
 "icon.wrench" = "Wrench";

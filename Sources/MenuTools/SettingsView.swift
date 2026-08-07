@@ -1,4 +1,6 @@
+import AppKit
 import SwiftUI
+import UniformTypeIdentifiers
 
 /// 设置窗口统一尺寸（各 Tab 一致，避免切换时窗口重置闪烁）
 enum SettingsLayout {
@@ -37,6 +39,26 @@ struct GeneralSettingsView: View {
     @State private var checkResult: String?
     @State private var availableUpdate: UpdateInfo?
     @State private var launchAtLogin = LoginItemService.isEnabled
+    @State private var backupStatus: BackupStatus?
+    @State private var isBackupOperationInProgress = false
+
+    private enum BackupStatus {
+        case success(String)
+        case failure(String)
+
+        var message: String {
+            switch self {
+            case .success(let message), .failure(let message): return message
+            }
+        }
+
+        var isSuccess: Bool {
+            switch self {
+            case .success: return true
+            case .failure: return false
+            }
+        }
+    }
 
     var body: some View {
         Form {
@@ -124,6 +146,29 @@ struct GeneralSettingsView: View {
                     Text(L("settings.manualCheck"))
                 }
             }
+
+            Section(L("settings.section.backup")) {
+                HStack(spacing: 10) {
+                    Button {
+                        exportBackup()
+                    } label: {
+                        Label(L("settings.backup.export"), systemImage: "square.and.arrow.up")
+                    }
+
+                    Button {
+                        importBackup()
+                    } label: {
+                        Label(L("settings.backup.import"), systemImage: "square.and.arrow.down")
+                    }
+                }
+                .disabled(isBackupOperationInProgress)
+
+                if let backupStatus {
+                    Text(backupStatus.message)
+                        .font(.caption)
+                        .foregroundStyle(backupStatus.isSuccess ? .green : .red)
+                }
+            }
         }
         .formStyle(.grouped)
         .frame(width: SettingsLayout.width, height: SettingsLayout.height)
@@ -180,5 +225,73 @@ struct GeneralSettingsView: View {
                 checkResult = L("settings.checkFailed", error.localizedDescription)
             }
         }
+    }
+
+    private func exportBackup() {
+        guard !isBackupOperationInProgress else { return }
+        isBackupOperationInProgress = true
+        defer { isBackupOperationInProgress = false }
+
+        let panel = NSSavePanel()
+        panel.title = L("settings.backup.export")
+        panel.allowedContentTypes = [backupContentType]
+        panel.nameFieldStringValue = L("settings.backup.defaultFilename")
+
+        guard panel.runModal() == .OK, let url = panel.url else { return }
+
+        do {
+            let document = AppBackupService.makeDocument(
+                userDefaults: .standard,
+                rightClick: RightClickConfigStore.load(),
+                appVersion: "1.0.1",
+                createdAt: Date()
+            )
+            let data = try AppBackupService.encode(document, encoder: JSONEncoder())
+            try LocalAppBackupFileAccess().write(data, to: url)
+            backupStatus = .success(L("settings.backup.exportSuccess"))
+        } catch {
+            backupStatus = .failure(L("settings.backup.writeFailed"))
+        }
+    }
+
+    private func importBackup() {
+        guard !isBackupOperationInProgress else { return }
+        isBackupOperationInProgress = true
+        defer { isBackupOperationInProgress = false }
+
+        let panel = NSOpenPanel()
+        panel.title = L("settings.backup.import")
+        panel.allowedContentTypes = [backupContentType]
+        panel.allowsMultipleSelection = false
+        panel.canChooseDirectories = false
+        panel.canChooseFiles = true
+
+        guard panel.runModal() == .OK, let url = panel.url else { return }
+
+        let document: AppBackupDocument
+        do {
+            let data = try LocalAppBackupFileAccess().read(from: url)
+            document = try AppBackupService.decode(data, decoder: JSONDecoder())
+        } catch {
+            backupStatus = .failure(L("settings.backup.invalidFile"))
+            return
+        }
+
+        do {
+            try AppBackupService.restore(
+                document,
+                userDefaults: .standard,
+                rightClickStore: LocalRightClickConfigStore()
+            )
+            RightClickConfigStore.broadcast(document.rightClick)
+            SmoothScrollEngine.shared.reload()
+            backupStatus = .success(L("settings.backup.importSuccess"))
+        } catch {
+            backupStatus = .failure(L("settings.backup.writeFailed"))
+        }
+    }
+
+    private var backupContentType: UTType {
+        UTType(filenameExtension: "menutoolsbackup") ?? .data
     }
 }

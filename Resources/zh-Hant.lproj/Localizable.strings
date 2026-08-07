@@ -64,6 +64,14 @@
 "settings.section.language" = "語言";
 "settings.language.label" = "介面語言";
 "settings.language.system" = "跟隨系統";
+"settings.section.backup" = "備份與恢復";
+"settings.backup.export" = "匯出備份";
+"settings.backup.import" = "匯入恢復";
+"settings.backup.defaultFilename" = "MenuTools-1.0.1.menutoolsbackup";
+"settings.backup.exportSuccess" = "備份匯出成功";
+"settings.backup.importSuccess" = "備份恢復成功";
+"settings.backup.invalidFile" = "備份檔案無效或無法讀取";
+"settings.backup.writeFailed" = "備份操作無法完成";
 
 /* 選單列圖示名 */
 "icon.wrench" = "工具";
