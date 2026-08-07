@@ -41,6 +41,19 @@
 "status.updateFailed" = "アップデート確認に失敗：%@";
 "status.newVersionHint" = "新バージョン v%@ があります。下部からダウンロード";
 
+/* アップデートのダウンロード */
+"update.downloading" = "アップデートをダウンロード中…";
+"update.progress" = "%d%%";
+"update.cancel" = "キャンセル";
+"update.completed" = "アップデートをダウンロードしました";
+"update.open" = "開く";
+"update.confirmOpen.title" = "ダウンロードしたアップデートを開きますか？";
+"update.confirmOpen.message" = "ダウンロードしたパッケージをデフォルトのアプリで開きます。";
+"update.cancelled" = "アップデートのダウンロードをキャンセルしました";
+"update.unsupportedPackage" = "サポートされていないアップデートパッケージです";
+"update.downloadFailed" = "アップデートのダウンロードに失敗しました";
+"update.openFailed" = "ダウンロードしたアップデートを開けませんでした";
+
 /* 設定 */
 "settings.title" = "MenuTools 設定";
 "settings.section.icon" = "メニューバーアイコン";

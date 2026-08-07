@@ -38,6 +38,12 @@ struct GeneralSettingsView: View {
     @State private var isCheckingUpdate = false
     @State private var checkResult: String?
     @State private var availableUpdate: UpdateInfo?
+    @State private var updateDownloadService = UpdateDownloadService(
+        downloader: URLSessionUpdatePackageDownloader(),
+        opener: NSWorkspaceUpdatePackageOpener()
+    )
+    @State private var updateDownloadState: UpdateDownloadState = .idle
+    @State private var isConfirmingPackageOpen = false
     @State private var launchAtLogin = LoginItemService.isEnabled
     @State private var backupStatus: BackupStatus?
     @State private var isBackupOperationInProgress = false
@@ -129,17 +135,40 @@ struct GeneralSettingsView: View {
                                 .font(.caption)
                                 .foregroundStyle(availableUpdate == nil ? .secondary : .primary)
                         }
-                        if isCheckingUpdate {
+                        if case let .downloading(progress) = updateDownloadState {
+                            VStack(alignment: .leading, spacing: 4) {
+                                Text(L("update.downloading"))
+                                    .font(.caption)
+                                ProgressView(value: progress)
+                                Text(L("update.progress", Int(progress * 100)))
+                                    .font(.caption2)
+                                    .foregroundStyle(.secondary)
+                                    .monospacedDigit()
+                            }
+                            Button(L("update.cancel")) {
+                                cancelUpdateDownload()
+                            }
+                            .disabled(!isDownloadingUpdate)
+                        } else if case .completed = updateDownloadState {
+                            Text(L("update.completed"))
+                                .font(.caption)
+                                .foregroundStyle(.green)
+                            Button(L("update.open")) {
+                                isConfirmingPackageOpen = true
+                            }
+                        } else if isCheckingUpdate {
                             ProgressView()
                                 .controlSize(.small)
                         } else if let update = availableUpdate {
                             Button(L("settings.download", update.version)) {
-                                UpdateCheckerService.openDownloadPage(update)
+                                startUpdateDownload(update)
                             }
+                            .disabled(isDownloadingUpdate)
                         } else {
                             Button(L("settings.checkNow")) {
                                 checkForUpdate()
                             }
+                            .disabled(isDownloadingUpdate)
                         }
                     }
                 } label: {
@@ -173,6 +202,18 @@ struct GeneralSettingsView: View {
         .formStyle(.grouped)
         .frame(width: SettingsLayout.width, height: SettingsLayout.height)
         .navigationTitle(L("settings.title"))
+        .task {
+            await observeUpdateDownload()
+        }
+        .alert(L("update.confirmOpen.title"), isPresented: $isConfirmingPackageOpen) {
+            Button(L("update.open")) {
+                _ = updateDownloadService.openCompletedPackage()
+                updateDownloadState = updateDownloadService.state
+            }
+            Button(L("update.cancel"), role: .cancel) {}
+        } message: {
+            Text(L("update.confirmOpen.message"))
+        }
     }
 
     private func iconOption(_ icon: MenuBarIcon) -> some View {
@@ -224,6 +265,60 @@ struct GeneralSettingsView: View {
                 isCheckingUpdate = false
                 checkResult = L("settings.checkFailed", error.localizedDescription)
             }
+        }
+    }
+
+    private var isDownloadingUpdate: Bool {
+        if case .downloading = updateDownloadState { return true }
+        return false
+    }
+
+    private func startUpdateDownload(_ update: UpdateInfo) {
+        guard !isDownloadingUpdate else { return }
+        _ = updateDownloadService.start(update: update)
+        updateDownloadState = updateDownloadService.state
+        handleUpdateDownloadState(updateDownloadState)
+    }
+
+    private func cancelUpdateDownload() {
+        guard updateDownloadService.cancel() else { return }
+        updateDownloadState = updateDownloadService.state
+        handleUpdateDownloadState(updateDownloadState)
+    }
+
+    /// 轮询服务状态，将非 ObservableObject 的下载服务状态同步到视图。
+    private func observeUpdateDownload() async {
+        while !Task.isCancelled {
+            let state = updateDownloadService.state
+            if state != updateDownloadState {
+                updateDownloadState = state
+                handleUpdateDownloadState(state)
+            }
+            try? await Task.sleep(for: .milliseconds(100))
+        }
+    }
+
+    private func handleUpdateDownloadState(_ state: UpdateDownloadState) {
+        switch state {
+        case .idle, .downloading:
+            break
+        case .completed:
+            checkResult = L("update.completed")
+        case let .failed(error):
+            checkResult = updateDownloadErrorMessage(error)
+        }
+    }
+
+    private func updateDownloadErrorMessage(_ error: UpdateDownloadError) -> String {
+        switch error {
+        case .unsupportedFileType:
+            return L("update.unsupportedPackage")
+        case .openFailed:
+            return L("update.openFailed")
+        case .cancelled:
+            return L("update.cancelled")
+        case .invalidURL, .alreadyDownloading, .downloadFailed, .downloadFailedWithReason:
+            return L("update.downloadFailed")
         }
     }
 

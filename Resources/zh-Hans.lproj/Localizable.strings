@@ -41,6 +41,19 @@
 "status.updateFailed" = "检查更新失败：%@";
 "status.newVersionHint" = "发现新版本 v%@，点击底栏下载";
 
+/* 更新下载 */
+"update.downloading" = "正在下载更新…";
+"update.progress" = "%d%%";
+"update.cancel" = "取消";
+"update.completed" = "更新下载完成";
+"update.open" = "打开";
+"update.confirmOpen.title" = "打开已下载的更新？";
+"update.confirmOpen.message" = "将使用默认 App 打开已下载的安装包。";
+"update.cancelled" = "已取消更新下载";
+"update.unsupportedPackage" = "不支持的更新安装包";
+"update.downloadFailed" = "更新下载失败";
+"update.openFailed" = "无法打开已下载的更新";
+
 /* 设置窗口 */
 "settings.title" = "MenuTools 设置";
 "settings.section.icon" = "菜单栏图标";

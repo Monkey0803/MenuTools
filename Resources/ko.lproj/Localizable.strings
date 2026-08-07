@@ -41,6 +41,19 @@
 "status.updateFailed" = "업데이트 확인 실패: %@";
 "status.newVersionHint" = "새 버전 v%@ 발견, 하단에서 다운로드하세요";
 
+/* 업데이트 다운로드 */
+"update.downloading" = "업데이트 다운로드 중…";
+"update.progress" = "%d%%";
+"update.cancel" = "취소";
+"update.completed" = "업데이트 다운로드 완료";
+"update.open" = "열기";
+"update.confirmOpen.title" = "다운로드한 업데이트를 여시겠습니까?";
+"update.confirmOpen.message" = "다운로드한 패키지를 기본 앱에서 엽니다.";
+"update.cancelled" = "업데이트 다운로드가 취소되었습니다";
+"update.unsupportedPackage" = "지원되지 않는 업데이트 패키지입니다";
+"update.downloadFailed" = "업데이트 다운로드 실패";
+"update.openFailed" = "다운로드한 업데이트를 열 수 없습니다";
+
 /* 설정 */
 "settings.title" = "MenuTools 설정";
 "settings.section.icon" = "메뉴 막대 아이콘";

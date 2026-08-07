@@ -41,6 +41,19 @@
 "status.updateFailed" = "Update check failed: %@";
 "status.newVersionHint" = "New version v%@ available, tap the footer to download";
 
+/* Update download */
+"update.downloading" = "Downloading update…";
+"update.progress" = "%d%%";
+"update.cancel" = "Cancel";
+"update.completed" = "Update downloaded";
+"update.open" = "Open";
+"update.confirmOpen.title" = "Open downloaded update?";
+"update.confirmOpen.message" = "The downloaded package will open in the default app.";
+"update.cancelled" = "Update download cancelled";
+"update.unsupportedPackage" = "Unsupported update package";
+"update.downloadFailed" = "Update download failed";
+"update.openFailed" = "Failed to open downloaded update";
+
 /* Settings */
 "settings.title" = "MenuTools Settings";
 "settings.section.icon" = "Menu Bar Icon";

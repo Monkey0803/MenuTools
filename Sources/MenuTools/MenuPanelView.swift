@@ -47,6 +47,12 @@ struct MenuPanelView: View {
     @State private var clipboardCount = 0
     @State private var isCheckingUpdate = false
     @State private var availableUpdate: UpdateInfo?
+    @State private var updateDownloadService = UpdateDownloadService(
+        downloader: URLSessionUpdatePackageDownloader(),
+        opener: NSWorkspaceUpdatePackageOpener()
+    )
+    @State private var updateDownloadState: UpdateDownloadState = .idle
+    @State private var isConfirmingPackageOpen = false
     @State private var statusMessage: String?
     @State private var statusIsError = false
     @State private var appeared = false
@@ -135,6 +141,18 @@ struct MenuPanelView: View {
                 }
                 try? await Task.sleep(for: .seconds(30))
             }
+        }
+        .task {
+            await observeUpdateDownload()
+        }
+        .alert(L("update.confirmOpen.title"), isPresented: $isConfirmingPackageOpen) {
+            Button(L("update.open")) {
+                _ = updateDownloadService.openCompletedPackage()
+                updateDownloadState = updateDownloadService.state
+            }
+            Button(L("update.cancel"), role: .cancel) {}
+        } message: {
+            Text(L("update.confirmOpen.message"))
         }
     }
 
@@ -534,9 +552,39 @@ struct MenuPanelView: View {
                 .font(.caption2)
                 .foregroundStyle(.tertiary)
 
-            if let update = availableUpdate {
+            if case let .downloading(progress) = updateDownloadState {
+                HStack(spacing: 5) {
+                    ProgressView(value: progress)
+                        .frame(width: 42)
+                    VStack(alignment: .leading, spacing: 0) {
+                        Text(L("update.downloading"))
+                            .font(.caption2)
+                        Text(L("update.progress", Int(progress * 100)))
+                            .font(.caption2)
+                            .foregroundStyle(.secondary)
+                            .monospacedDigit()
+                    }
+                    Button(L("update.cancel")) {
+                        cancelUpdateDownload()
+                    }
+                    .buttonStyle(.plain)
+                    .font(.caption2)
+                    .foregroundStyle(.secondary)
+                    .disabled(!isDownloadingUpdate)
+                }
+            } else if case .completed = updateDownloadState {
+                Text(L("update.completed"))
+                    .font(.caption2)
+                    .foregroundStyle(.green)
+                Button(L("update.open")) {
+                    isConfirmingPackageOpen = true
+                }
+                .buttonStyle(.plain)
+                .font(.caption2)
+                .foregroundStyle(.tint)
+            } else if let update = availableUpdate {
                 Button {
-                    UpdateCheckerService.openDownloadPage(update)
+                    startUpdateDownload(update)
                 } label: {
                     HStack(spacing: 3) {
                         Image(systemName: "arrow.down.circle.fill")
@@ -547,6 +595,7 @@ struct MenuPanelView: View {
                 }
                 .buttonStyle(.plain)
                 .foregroundStyle(.tint)
+                .disabled(isDownloadingUpdate)
             } else if isCheckingUpdate {
                 ProgressView()
                     .controlSize(.mini)
@@ -667,6 +716,60 @@ struct MenuPanelView: View {
                 isCheckingUpdate = false
                 flashStatus(L("status.updateFailed", error.localizedDescription), isError: true)
             }
+        }
+    }
+
+    private var isDownloadingUpdate: Bool {
+        if case .downloading = updateDownloadState { return true }
+        return false
+    }
+
+    private func startUpdateDownload(_ update: UpdateInfo) {
+        guard !isDownloadingUpdate else { return }
+        _ = updateDownloadService.start(update: update)
+        updateDownloadState = updateDownloadService.state
+        handleUpdateDownloadState(updateDownloadState)
+    }
+
+    private func cancelUpdateDownload() {
+        guard updateDownloadService.cancel() else { return }
+        updateDownloadState = updateDownloadService.state
+        handleUpdateDownloadState(updateDownloadState)
+    }
+
+    /// 轮询服务状态，将非 ObservableObject 的下载服务状态同步到视图。
+    private func observeUpdateDownload() async {
+        while !Task.isCancelled {
+            let state = updateDownloadService.state
+            if state != updateDownloadState {
+                updateDownloadState = state
+                handleUpdateDownloadState(state)
+            }
+            try? await Task.sleep(for: .milliseconds(100))
+        }
+    }
+
+    private func handleUpdateDownloadState(_ state: UpdateDownloadState) {
+        switch state {
+        case .idle, .downloading:
+            break
+        case .completed:
+            flashStatus(L("update.completed"), isError: false)
+        case let .failed(error):
+            flashStatus(updateDownloadErrorMessage(error), isError: true)
+        }
+    }
+
+    private func updateDownloadErrorMessage(_ error: UpdateDownloadError) -> String {
+        switch error {
+        case .unsupportedFileType:
+            return L("update.unsupportedPackage")
+        case .openFailed:
+            return L("update.openFailed")
+        case .cancelled:
+            return L("update.cancelled")
+        case .invalidURL, .alreadyDownloading, .downloadFailed, .downloadFailedWithReason:
+            return L("update.downloadFailed")
         }
     }
 
