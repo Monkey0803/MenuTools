@@ -18,6 +18,52 @@
 "resource.memoryCritical" = "メモリ負荷高";
 "resource.loading" = "システムリソースを読み込み中…";
 
+/* ネットワーク状態 */
+"network.title" = "ネットワーク状態";
+"network.refresh" = "ネットワーク状態を更新";
+"network.connection" = "接続";
+"network.offline" = "未接続";
+"network.localIP" = "ローカル IP";
+"network.publicIP" = "パブリック IP を取得";
+"network.testLatency" = "遅延を測定";
+"network.latencyValue" = "%d ms";
+"network.vpnOn" = "VPN 接続中";
+"network.vpnOff" = "VPN 未接続";
+
+/* バッテリーの状態 */
+"batteryHealth.title" = "バッテリーの状態";
+"batteryHealth.refresh" = "バッテリー状態を更新";
+"batteryHealth.health" = "健康度";
+"batteryHealth.cycles" = "サイクル";
+"batteryHealth.charge" = "充電量";
+"batteryHealth.notCharging" = "充電していません";
+"batteryHealth.unavailable" = "内蔵バッテリー情報なし";
+
+/* ディスプレイ */
+"display.title" = "ディスプレイ";
+"display.refresh" = "ディスプレイを更新";
+"display.builtIn" = "内蔵";
+"display.external" = "外部";
+"display.unavailable" = "ディスプレイ情報なし";
+"display.changeMode" = "解像度とリフレッシュレートを変更";
+"display.changed" = "%@ に切り替えました";
+"display.changeFailed" = "ディスプレイモードの変更に失敗";
+
+/* ストレージ */
+"storage.title" = "ストレージ分析";
+"storage.refresh" = "ストレージ分析を更新";
+"storage.derivedData" = "DerivedData";
+"storage.caches" = "キャッシュ";
+"storage.logs" = "ログ";
+"storage.downloads" = "ダウンロード";
+"storage.loading" = "ディレクトリを分析中…";
+"storage.unavailable" = "ストレージ情報を取得できません";
+"storage.clean" = "消去";
+"storage.cleaned" = "%@ を消去しました";
+"storage.cleanFailed" = "このディレクトリは安全に消去できません";
+"storage.confirm.title" = "ディレクトリを消去しますか？";
+"storage.confirm.message" = "ディレクトリ自体は残し、内容のみを削除します。ダウンロードは自動消去しません。";
+
 /* クイックスイッチ */
 "toggle.caffeinate" = "スリープ防止";
 "toggle.hiddenFiles" = "隠しファイルを表示";
@@ -25,6 +71,19 @@
 "toggle.dock" = "Dock を自動的に隠す";
 "toggle.menubar" = "メニューバーを自動的に隠す";
 "toggle.nightShift" = "Night Shift";
+
+/* クイックアクション */
+"quickAction.title" = "クイックアクション";
+"quickAction.subtitle" = "ワンタップ";
+"quickAction.lockScreen" = "画面をロック";
+"quickAction.emptyTrash" = "ゴミ箱を空にする";
+"quickAction.restartFinder" = "Finder を再起動";
+"quickAction.flushDNS" = "DNS を更新";
+"quickAction.openSystemSettings" = "システム設定";
+"quickAction.screenshot" = "スクリーンショットをコピー";
+"quickAction.success" = "実行しました：%@";
+"quickAction.error" = "%@に失敗：%@";
+"quickAction.openFailed" = "%@を開けません";
 
 /* Bluetooth */
 "bt.empty" = "Bluetooth デバイスのバッテリー情報なし";
@@ -205,3 +264,50 @@
 "scroll.disableKey" = "無効化キー";
 "scroll.disableKey.desc" = "押している間スムーズスクロールを一時的に無効化します。";
 "scroll.reset" = "デフォルトに戻す";
+
+/* 効率ツール */
+"launcher.title" = "App ランチャー";
+"launcher.subtitle" = "検索して起動";
+"launcher.search" = "インストール済み App を検索";
+"launcher.empty" = "一致する App がありません";
+"launcher.favorite" = "App をお気に入りに追加";
+"launcher.launchFailed" = "%@ を起動できません";
+"scene.title" = "シーン";
+"scene.work" = "仕事";
+"scene.work.desc" = "お気に入りの App、ダークモード、集中モードを有効化";
+"scene.demo" = "プレゼン";
+"scene.demo.desc" = "スリープを防ぎ、デスクトップアイコンを隠して集中モードを有効化";
+"scene.night" = "夜間";
+"scene.night.desc" = "ダークモード、Night Shift、消音、集中モード";
+"scene.applied" = "シーンを適用しました：%@";
+"window.title" = "ウインドウ管理";
+"window.subtitle" = "レイアウトとサイズ保存";
+"window.leftHalf" = "左半分";
+"window.rightHalf" = "右半分";
+"window.topLeft" = "左上 4 分の 1";
+"window.topRight" = "右上 4 分の 1";
+"window.bottomLeft" = "左下 4 分の 1";
+"window.bottomRight" = "右下 4 分の 1";
+"window.centered" = "ウインドウを中央に配置";
+"window.moveNextDisplay" = "次のディスプレイへ移動";
+"window.save" = "サイズを保存";
+"window.restore" = "サイズを復元";
+"window.applied" = "適用しました：%@";
+"window.saved" = "現在のウインドウサイズを保存しました";
+"window.restored" = "ウインドウサイズを復元しました";
+"window.error.noWindow" = "操作できる前面ウインドウがありません";
+"window.error.permission" = "システム設定 > プライバシーとセキュリティ > アクセシビリティで MenuTools を許可してください";
+"window.error.operation" = "ウインドウ操作に失敗しました：%@";
+"window.error.noScreen" = "使用できるディスプレイがありません";
+"window.error.noSavedFrame" = "保存されたウインドウサイズがありません";
+"window.error.readFrame" = "ウインドウの位置またはサイズを読み取れません";
+"window.error.writeFrame" = "ウインドウの位置またはサイズを設定できません";
+"focus.title" = "集中モード";
+"focus.enabled" = "オン";
+"focus.disabled" = "オフ";
+"focus.unknown" = "macOS によって管理";
+"focus.toggle" = "切り替え";
+"focus.openSettings" = "集中モード設定を開く";
+"focus.toggled" = "集中モードを切り替えました";
+"focus.error.unavailable" = "集中モードを操作できません。システム設定を開いてください";
+"focus.error.operation" = "集中モードの操作に失敗しました：%@";

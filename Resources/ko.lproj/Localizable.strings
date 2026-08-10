@@ -18,6 +18,52 @@
 "resource.memoryCritical" = "메모리 압박 높음";
 "resource.loading" = "시스템 리소스 읽는 중…";
 
+/* 네트워크 상태 */
+"network.title" = "네트워크 상태";
+"network.refresh" = "네트워크 상태 새로고침";
+"network.connection" = "연결";
+"network.offline" = "연결 안 됨";
+"network.localIP" = "로컬 IP";
+"network.publicIP" = "공인 IP 가져오기";
+"network.testLatency" = "지연 시간 테스트";
+"network.latencyValue" = "%dms";
+"network.vpnOn" = "VPN 연결됨";
+"network.vpnOff" = "VPN 연결 안 됨";
+
+/* 배터리 상태 */
+"batteryHealth.title" = "배터리 상태";
+"batteryHealth.refresh" = "배터리 상태 새로고침";
+"batteryHealth.health" = "건강도";
+"batteryHealth.cycles" = "사이클";
+"batteryHealth.charge" = "충전량";
+"batteryHealth.notCharging" = "충전 안 함";
+"batteryHealth.unavailable" = "내장 배터리 정보 없음";
+
+/* 디스플레이 */
+"display.title" = "디스플레이";
+"display.refresh" = "디스플레이 새로고침";
+"display.builtIn" = "내장";
+"display.external" = "외장";
+"display.unavailable" = "디스플레이 정보 없음";
+"display.changeMode" = "해상도 및 재생률 변경";
+"display.changed" = "%@(으)로 전환됨";
+"display.changeFailed" = "디스플레이 모드 변경 실패";
+
+/* 저장 공간 */
+"storage.title" = "저장 공간 분석";
+"storage.refresh" = "저장 공간 분석 새로고침";
+"storage.derivedData" = "DerivedData";
+"storage.caches" = "캐시";
+"storage.logs" = "로그";
+"storage.downloads" = "다운로드";
+"storage.loading" = "디렉터리 분석 중…";
+"storage.unavailable" = "저장 공간 정보를 사용할 수 없음";
+"storage.clean" = "정리";
+"storage.cleaned" = "%@ 정리됨";
+"storage.cleanFailed" = "이 디렉터리는 안전하게 정리할 수 없음";
+"storage.confirm.title" = "이 디렉터리를 정리하시겠습니까?";
+"storage.confirm.message" = "디렉터리 자체는 유지하고 내용만 삭제합니다. 다운로드 폴더는 자동으로 정리하지 않습니다.";
+
 /* 빠른 전환 */
 "toggle.caffeinate" = "화면 잠금 방지";
 "toggle.hiddenFiles" = "숨김 파일 표시";
@@ -25,6 +71,19 @@
 "toggle.dock" = "Dock 자동 숨김";
 "toggle.menubar" = "메뉴 막대 자동 숨김";
 "toggle.nightShift" = "Night Shift";
+
+/* 빠른 작업 */
+"quickAction.title" = "빠른 작업";
+"quickAction.subtitle" = "한 번 탭";
+"quickAction.lockScreen" = "화면 잠금";
+"quickAction.emptyTrash" = "휴지통 비우기";
+"quickAction.restartFinder" = "Finder 재시작";
+"quickAction.flushDNS" = "DNS 새로고침";
+"quickAction.openSystemSettings" = "시스템 설정";
+"quickAction.screenshot" = "스크린샷을 클립보드에 복사";
+"quickAction.success" = "실행됨: %@";
+"quickAction.error" = "%@ 실패: %@";
+"quickAction.openFailed" = "%@을(를) 열 수 없습니다";
 
 /* 블루투스 */
 "bt.empty" = "블루투스 기기 배터리 정보 없음";
@@ -205,3 +264,50 @@
 "scroll.disableKey" = "비활성화 키";
 "scroll.disableKey.desc" = "누르고 있는 동안 부드러운 스크롤을 일시 비활성화합니다.";
 "scroll.reset" = "기본값으로 복원";
+
+/* 효율 도구 */
+"launcher.title" = "앱 실행기";
+"launcher.subtitle" = "검색 및 실행";
+"launcher.search" = "설치된 앱 검색";
+"launcher.empty" = "일치하는 앱이 없습니다";
+"launcher.favorite" = "앱 즐겨찾기";
+"launcher.launchFailed" = "%@을(를) 실행할 수 없습니다";
+"scene.title" = "구성 장면";
+"scene.work" = "업무";
+"scene.work.desc" = "즐겨찾기 앱, 다크 모드 및 집중 모드 실행";
+"scene.demo" = "발표";
+"scene.demo.desc" = "잠자기 방지, 데스크탑 아이콘 숨기기 및 집중 모드 실행";
+"scene.night" = "야간";
+"scene.night.desc" = "다크 모드, Night Shift, 음소거 및 집중 모드";
+"scene.applied" = "장면 적용됨: %@";
+"window.title" = "윈도우 관리";
+"window.subtitle" = "배치 및 크기 저장";
+"window.leftHalf" = "왼쪽 절반";
+"window.rightHalf" = "오른쪽 절반";
+"window.topLeft" = "왼쪽 위 4분할";
+"window.topRight" = "오른쪽 위 4분할";
+"window.bottomLeft" = "왼쪽 아래 4분할";
+"window.bottomRight" = "오른쪽 아래 4분할";
+"window.centered" = "윈도우 가운데";
+"window.moveNextDisplay" = "다음 디스플레이로 이동";
+"window.save" = "크기 저장";
+"window.restore" = "크기 복원";
+"window.applied" = "적용됨: %@";
+"window.saved" = "현재 윈도우 크기를 저장했습니다";
+"window.restored" = "윈도우 크기를 복원했습니다";
+"window.error.noWindow" = "조작할 전면 윈도우가 없습니다";
+"window.error.permission" = "시스템 설정 > 개인정보 보호 및 보안 > 손쉬운 사용에서 MenuTools를 허용하세요";
+"window.error.operation" = "윈도우 작업 실패: %@";
+"window.error.noScreen" = "사용 가능한 디스플레이가 없습니다";
+"window.error.noSavedFrame" = "저장된 윈도우 크기가 없습니다";
+"window.error.readFrame" = "윈도우 위치 또는 크기를 읽을 수 없습니다";
+"window.error.writeFrame" = "윈도우 위치 또는 크기를 설정할 수 없습니다";
+"focus.title" = "집중 모드";
+"focus.enabled" = "켜짐";
+"focus.disabled" = "꺼짐";
+"focus.unknown" = "macOS에서 제어됨";
+"focus.toggle" = "전환";
+"focus.openSettings" = "집중 모드 설정 열기";
+"focus.toggled" = "집중 모드를 전환했습니다";
+"focus.error.unavailable" = "집중 모드를 제어할 수 없습니다. 시스템 설정을 여세요";
+"focus.error.operation" = "집중 모드 작업 실패: %@";

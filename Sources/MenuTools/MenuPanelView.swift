@@ -48,6 +48,17 @@ struct MenuPanelView: View {
     @State private var clipboardHistoryService = ClipboardHistoryService.shared
     @State private var isShowingClipboardHistory = false
     @State private var systemResourceService = SystemResourceService()
+    @State private var networkService = NetworkStatusService()
+    @State private var batteryHealthService = BatteryHealthService()
+    @State private var displayService = DisplayService()
+    @State private var storageAnalysisService = StorageAnalysisService()
+    @State private var storageCategoryToConfirm: StorageCategory?
+    @State private var quickActionService = QuickActionService()
+    @State private var activeQuickAction: QuickAction?
+    @State private var appLauncherService = AppLauncherService()
+    @State private var sceneService = SceneService()
+    @State private var windowManagementService = WindowManagementService()
+    @State private var focusModeService = FocusModeService()
     @State private var isCheckingUpdate = false
     @State private var availableUpdate: UpdateInfo?
     @State private var updateDownloadService = UpdateDownloadService(
@@ -71,23 +82,52 @@ struct MenuPanelView: View {
             header
                 .entrance(0, appeared: appeared)
 
-            GlassEffectContainer(spacing: 12) {
-                VStack(spacing: 12) {
+            ScrollView(.vertical, showsIndicators: false) {
+                GlassEffectContainer(spacing: 12) {
+                    VStack(spacing: 12) {
                     heroTiles
                         .entrance(1, appeared: appeared)
-                    systemResourceCard
+                    quickActionsCard
                         .entrance(2, appeared: appeared)
-                    quickToggles
+                    AppLauncherCard(service: appLauncherService, report: flashStatus)
                         .entrance(3, appeared: appeared)
-                    bluetoothCard
+                    ScenePresetsCard(activeScene: sceneService.activeScene, apply: applyScene)
                         .entrance(4, appeared: appeared)
+                    WindowManagementCard(
+                        perform: performWindowLayout,
+                        save: saveWindowFrame,
+                        restore: restoreWindowFrame
+                    )
+                    .entrance(5, appeared: appeared)
+                    FocusModeCard(
+                        isEnabled: focusModeService.isEnabled,
+                        isBusy: focusModeService.isBusy,
+                        toggle: toggleFocusMode,
+                        openSettings: openFocusSettings
+                    )
+                    .entrance(6, appeared: appeared)
+                    systemResourceCard
+                        .entrance(7, appeared: appeared)
+                    networkCard
+                        .entrance(8, appeared: appeared)
+                    batteryHealthCard
+                        .entrance(9, appeared: appeared)
+                    displayCard
+                        .entrance(10, appeared: appeared)
+                    storageCard
+                        .entrance(11, appeared: appeared)
+                    quickToggles
+                        .entrance(12, appeared: appeared)
+                    bluetoothCard
+                        .entrance(13, appeared: appeared)
                     cleanupTiles
-                        .entrance(5, appeared: appeared)
+                        .entrance(14, appeared: appeared)
+                    }
                 }
             }
 
             footer
-                .entrance(6, appeared: appeared)
+                .entrance(15, appeared: appeared)
         }
         .padding(16)
         .frame(width: 320)
@@ -140,6 +180,8 @@ struct MenuPanelView: View {
         .task {
             refreshToggles()
             refreshDerivedDataSize()
+            appLauncherService.refresh()
+            focusModeService.refresh()
             autoCheckUpdateIfNeeded()
             // 面板展示期间每 30 秒刷新一次蓝牙设备电量
             while !Task.isCancelled {
@@ -157,6 +199,20 @@ struct MenuPanelView: View {
             }
         }
         .task {
+            networkService.refresh()
+            batteryHealthService.refresh()
+            displayService.refresh()
+            storageAnalysisService.refresh()
+            while !Task.isCancelled {
+                try? await Task.sleep(for: .seconds(30))
+                guard !Task.isCancelled else { return }
+                networkService.refresh()
+                batteryHealthService.refresh()
+                displayService.refresh()
+                storageAnalysisService.refresh()
+            }
+        }
+        .task {
             await observeUpdateDownload()
         }
         .alert(L("update.confirmOpen.title"), isPresented: $isConfirmingPackageOpen) {
@@ -167,6 +223,22 @@ struct MenuPanelView: View {
             Button(L("update.cancel"), role: .cancel) {}
         } message: {
             Text(L("update.confirmOpen.message"))
+        }
+        .alert(L("storage.confirm.title"), isPresented: Binding(
+            get: { storageCategoryToConfirm != nil },
+            set: { if !$0 { storageCategoryToConfirm = nil } }
+        )) {
+            Button(L("storage.clean"), role: .destructive) {
+                if let category = storageCategoryToConfirm {
+                    storageCategoryToConfirm = nil
+                    cleanStorage(category)
+                }
+            }
+            Button(L("update.cancel"), role: .cancel) {
+                storageCategoryToConfirm = nil
+            }
+        } message: {
+            Text(L("storage.confirm.message"))
         }
     }
 
@@ -264,6 +336,64 @@ struct MenuPanelView: View {
         .contentShape(.rect(cornerRadius: 18))
     }
 
+    // MARK: - 快捷操作中心
+
+    private var quickActionsCard: some View {
+        VStack(alignment: .leading, spacing: 10) {
+            HStack(spacing: 6) {
+                Image(systemName: "sparkles.rectangle.stack.fill")
+                    .font(.caption.weight(.semibold))
+                    .foregroundStyle(.tint)
+                Text(L("quickAction.title"))
+                    .font(.caption.weight(.semibold))
+                Spacer()
+                Text(L("quickAction.subtitle"))
+                    .font(.caption2)
+                    .foregroundStyle(.secondary)
+            }
+
+            LazyVGrid(
+                columns: Array(repeating: GridItem(.flexible(), spacing: 8), count: 2),
+                spacing: 8
+            ) {
+                ForEach(QuickAction.allCases) { action in
+                    Button {
+                        performQuickAction(action)
+                    } label: {
+                        HStack(spacing: 7) {
+                            if activeQuickAction == action {
+                                ProgressView()
+                                    .controlSize(.mini)
+                            } else {
+                                Image(systemName: action.symbol)
+                                    .font(.caption.weight(.semibold))
+                                    .symbolRenderingMode(.hierarchical)
+                            }
+                            Text(L(action.titleKey))
+                                .font(.caption2.weight(.medium))
+                                .lineLimit(1)
+                                .minimumScaleFactor(0.8)
+                            Spacer(minLength: 0)
+                        }
+                        .padding(.horizontal, 9)
+                        .padding(.vertical, 9)
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                        .contentShape(.rect(cornerRadius: 12))
+                    }
+                    .buttonStyle(.plain)
+                    .foregroundStyle(.primary)
+                    .glassEffect(.regular.interactive(), in: .rect(cornerRadius: 12))
+                    .disabled(activeQuickAction != nil)
+                    .accessibilityLabel(L(action.titleKey))
+                }
+            }
+        }
+        .padding(12)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .glassEffect(.regular.tint(.blue.opacity(0.14)), in: .rect(cornerRadius: 16))
+        .glassEffectID("quickActions", in: glassNamespace)
+    }
+
     // MARK: - 系统资源
 
     private var systemResourceCard: some View {
@@ -321,6 +451,335 @@ struct MenuPanelView: View {
         .glassEffect(.regular.tint(.purple.opacity(0.16)), in: .rect(cornerRadius: 16))
         .accessibilityElement(children: .combine)
         .accessibilityLabel(L("resource.title"))
+    }
+
+    // MARK: - 网络状态
+
+    private var networkCard: some View {
+        let snapshot = networkService.snapshot
+        return VStack(alignment: .leading, spacing: 9) {
+            infoCardHeader(symbol: "wifi", title: L("network.title")) {
+                Button {
+                    networkService.refresh()
+                } label: {
+                    Image(systemName: "arrow.clockwise")
+                        .font(.caption)
+                }
+                .buttonStyle(.plain)
+                .foregroundStyle(.secondary)
+                .accessibilityLabel(L("network.refresh"))
+            }
+
+            HStack(spacing: 12) {
+                infoMetric(
+                    symbol: snapshot.isConnected ? "checkmark.circle.fill" : "wifi.slash",
+                    title: L("network.connection"),
+                    value: networkConnectionName(snapshot),
+                    color: snapshot.isConnected ? .green : .secondary
+                )
+                infoMetric(
+                    symbol: "network",
+                    title: L("network.localIP"),
+                    value: snapshot.localIPv4 ?? "--"
+                )
+            }
+
+            HStack(spacing: 8) {
+                networkProbeButton(
+                    title: snapshot.publicIPv4 ?? L("network.publicIP"),
+                    symbol: "globe",
+                    isLoading: networkService.isPublicIPLoading
+                ) {
+                    networkService.fetchPublicIP()
+                }
+                networkProbeButton(
+                    title: snapshot.latencyMilliseconds.map { L("network.latencyValue", $0) } ?? L("network.testLatency"),
+                    symbol: "speedometer",
+                    isLoading: networkService.isLatencyTesting
+                ) {
+                    networkService.testLatency()
+                }
+                Text(snapshot.vpnConnected ? L("network.vpnOn") : L("network.vpnOff"))
+                    .font(.caption2)
+                    .foregroundStyle(snapshot.vpnConnected ? .green : .secondary)
+            }
+        }
+        .padding(12)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .glassEffect(.regular.tint(.cyan.opacity(0.14)), in: .rect(cornerRadius: 16))
+        .accessibilityElement(children: .contain)
+        .accessibilityLabel(L("network.title"))
+    }
+
+    private func networkConnectionName(_ snapshot: NetworkStatusSnapshot) -> String {
+        if let wifiName = snapshot.wifiName, !wifiName.isEmpty { return wifiName }
+        if let interfaceName = snapshot.interfaceName, snapshot.isConnected { return interfaceName }
+        return L("network.offline")
+    }
+
+    private func networkProbeButton(
+        title: String,
+        symbol: String,
+        isLoading: Bool,
+        action: @escaping () -> Void
+    ) -> some View {
+        Button(action: action) {
+            HStack(spacing: 4) {
+                if isLoading {
+                    ProgressView().controlSize(.mini)
+                } else {
+                    Image(systemName: symbol)
+                }
+                Text(title)
+                    .lineLimit(1)
+                    .minimumScaleFactor(0.75)
+            }
+            .font(.caption2)
+        }
+        .buttonStyle(.plain)
+        .foregroundStyle(.tint)
+        .disabled(isLoading)
+    }
+
+    // MARK: - 电池健康
+
+    private var batteryHealthCard: some View {
+        VStack(alignment: .leading, spacing: 9) {
+            infoCardHeader(symbol: "battery.100percent", title: L("batteryHealth.title")) {
+                Button {
+                    batteryHealthService.refresh()
+                } label: {
+                    Image(systemName: "arrow.clockwise")
+                        .font(.caption)
+                }
+                .buttonStyle(.plain)
+                .foregroundStyle(.secondary)
+                .accessibilityLabel(L("batteryHealth.refresh"))
+            }
+
+            if let snapshot = batteryHealthService.snapshot {
+                HStack(spacing: 12) {
+                    infoMetric(
+                        symbol: "heart.fill",
+                        title: L("batteryHealth.health"),
+                        value: snapshot.healthPercent.map { "\($0)%" } ?? "--",
+                        color: batteryHealthColor(snapshot.healthPercent)
+                    )
+                    infoMetric(
+                        symbol: "arrow.triangle.2.circlepath",
+                        title: L("batteryHealth.cycles"),
+                        value: snapshot.cycleCount.map(String.init) ?? "--"
+                    )
+                    infoMetric(
+                        symbol: snapshot.isCharging ? "bolt.fill" : "battery.75percent",
+                        title: L("batteryHealth.charge"),
+                        value: snapshot.currentPercent.map { "\($0)%" } ?? L("batteryHealth.notCharging"),
+                        color: snapshot.isCharging ? .orange : nil
+                    )
+                }
+                if let condition = snapshot.condition {
+                    Text(condition)
+                        .font(.caption2)
+                        .foregroundStyle(.secondary)
+                }
+            } else {
+                Text(L("batteryHealth.unavailable"))
+                    .font(.caption2)
+                    .foregroundStyle(.secondary)
+            }
+        }
+        .padding(12)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .glassEffect(.regular.tint(.green.opacity(0.12)), in: .rect(cornerRadius: 16))
+        .accessibilityElement(children: .combine)
+        .accessibilityLabel(L("batteryHealth.title"))
+    }
+
+    private func batteryHealthColor(_ percent: Int?) -> Color {
+        guard let percent else { return .secondary }
+        switch percent {
+        case ..<60: return .red
+        case ..<80: return .orange
+        default: return .green
+        }
+    }
+
+    // MARK: - 显示器工具
+
+    private var displayCard: some View {
+        VStack(alignment: .leading, spacing: 9) {
+            infoCardHeader(symbol: "display.2", title: L("display.title")) {
+                Button {
+                    displayService.refresh()
+                } label: {
+                    Image(systemName: "arrow.clockwise")
+                        .font(.caption)
+                }
+                .buttonStyle(.plain)
+                .foregroundStyle(.secondary)
+                .accessibilityLabel(L("display.refresh"))
+            }
+
+            if displayService.displays.isEmpty {
+                Text(L("display.unavailable"))
+                    .font(.caption2)
+                    .foregroundStyle(.secondary)
+            } else {
+                ForEach(displayService.displays) { display in
+                    HStack(spacing: 8) {
+                        Image(systemName: display.isBuiltIn ? "laptopcomputer" : "display")
+                            .font(.body)
+                            .foregroundStyle(.tint)
+                            .frame(width: 22)
+                        VStack(alignment: .leading, spacing: 1) {
+                            HStack(spacing: 5) {
+                                Text(display.name)
+                                    .font(.caption.weight(.semibold))
+                                    .lineLimit(1)
+                                Text(display.isBuiltIn ? L("display.builtIn") : L("display.external"))
+                                    .font(.caption2)
+                                    .foregroundStyle(.secondary)
+                            }
+                            Text(display.currentMode.label)
+                                .font(.caption2)
+                                .foregroundStyle(.secondary)
+                                .monospacedDigit()
+                        }
+                        Spacer(minLength: 4)
+                        Menu {
+                            ForEach(display.modes) { mode in
+                                Button {
+                                    setDisplayMode(display, mode: mode)
+                                } label: {
+                                    HStack {
+                                        Text(mode.label)
+                                        if mode.isCurrent { Text("✓") }
+                                    }
+                                }
+                            }
+                        } label: {
+                            Image(systemName: "slider.horizontal.3")
+                                .font(.caption)
+                                .frame(width: 24, height: 24)
+                        }
+                        .menuStyle(.borderlessButton)
+                        .foregroundStyle(.secondary)
+                        .accessibilityLabel(L("display.changeMode"))
+                    }
+                }
+            }
+        }
+        .padding(12)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .glassEffect(.regular.tint(.orange.opacity(0.12)), in: .rect(cornerRadius: 16))
+        .accessibilityElement(children: .contain)
+        .accessibilityLabel(L("display.title"))
+    }
+
+    // MARK: - 存储分析
+
+    private var storageCard: some View {
+        VStack(alignment: .leading, spacing: 9) {
+            infoCardHeader(symbol: "internaldrive.fill", title: L("storage.title")) {
+                Button {
+                    storageAnalysisService.refresh()
+                } label: {
+                    Image(systemName: "arrow.clockwise")
+                        .font(.caption)
+                }
+                .buttonStyle(.plain)
+                .foregroundStyle(.secondary)
+                .accessibilityLabel(L("storage.refresh"))
+            }
+
+            if let snapshot = storageAnalysisService.snapshot {
+                ForEach(snapshot.entries) { entry in
+                    HStack(spacing: 8) {
+                        Image(systemName: entry.category.symbol)
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                            .frame(width: 20)
+                        Text(L(entry.category.titleKey))
+                            .font(.caption2)
+                        Spacer(minLength: 4)
+                        Text(entry.exists ? formattedStorage(entry.bytes) : "--")
+                            .font(.caption2.weight(.semibold))
+                            .monospacedDigit()
+                            .foregroundStyle(.secondary)
+                        if entry.category.isSafeToClean && entry.bytes > 0 {
+                            Button {
+                                storageCategoryToConfirm = entry.category
+                            } label: {
+                                if storageAnalysisService.cleaningCategory == entry.category {
+                                    ProgressView().controlSize(.mini)
+                                } else {
+                                    Image(systemName: "trash")
+                                        .font(.caption2)
+                                }
+                            }
+                            .buttonStyle(.plain)
+                            .foregroundStyle(.secondary)
+                            .disabled(storageAnalysisService.cleaningCategory != nil)
+                            .accessibilityLabel(L("storage.clean"))
+                        }
+                    }
+                }
+            } else if storageAnalysisService.isLoading {
+                HStack {
+                    ProgressView().controlSize(.mini)
+                    Text(L("storage.loading"))
+                        .font(.caption2)
+                        .foregroundStyle(.secondary)
+                }
+            } else {
+                Text(L("storage.unavailable"))
+                    .font(.caption2)
+                    .foregroundStyle(.secondary)
+            }
+        }
+        .padding(12)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .glassEffect(.regular.tint(.indigo.opacity(0.12)), in: .rect(cornerRadius: 16))
+        .accessibilityElement(children: .contain)
+        .accessibilityLabel(L("storage.title"))
+    }
+
+    private func formattedStorage(_ bytes: Int64) -> String {
+        ByteCountFormatter.string(fromByteCount: bytes, countStyle: .file)
+    }
+
+    private func infoCardHeader(
+        symbol: String,
+        title: String,
+        @ViewBuilder trailing: () -> some View
+    ) -> some View {
+        HStack(spacing: 6) {
+            Image(systemName: symbol)
+                .font(.caption.weight(.semibold))
+                .foregroundStyle(.tint)
+            Text(title)
+                .font(.caption.weight(.semibold))
+            Spacer()
+            trailing()
+        }
+    }
+
+    private func infoMetric(symbol: String, title: String, value: String, color: Color? = nil) -> some View {
+        VStack(alignment: .leading, spacing: 3) {
+            HStack(spacing: 4) {
+                Image(systemName: symbol)
+                    .font(.caption2)
+                    .foregroundStyle(color ?? .secondary)
+                Text(title)
+                    .font(.caption2)
+                    .foregroundStyle(.secondary)
+            }
+            Text(value)
+                .font(.caption.weight(.semibold))
+                .lineLimit(1)
+                .minimumScaleFactor(0.7)
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
     }
 
     private func resourceMetric(symbol: String, title: String, value: String) -> some View {
@@ -797,6 +1256,92 @@ struct MenuPanelView: View {
             }
         } catch {
             flashStatus(error.localizedDescription, isError: true)
+        }
+    }
+
+    private func performQuickAction(_ action: QuickAction) {
+        guard activeQuickAction == nil else { return }
+        activeQuickAction = action
+        defer { activeQuickAction = nil }
+
+        do {
+            try quickActionService.perform(action)
+            flashStatus(L("quickAction.success", L(action.titleKey)), isError: false)
+        } catch {
+            flashStatus(error.localizedDescription, isError: true)
+        }
+    }
+
+    private func applyScene(_ scene: ScenePreset) {
+        do {
+            try sceneService.apply(scene, launcher: appLauncherService, focusService: focusModeService)
+            flashStatus(L("scene.applied", L(scene.titleKey)), isError: false)
+        } catch {
+            flashStatus(error.localizedDescription, isError: true)
+        }
+    }
+
+    private func performWindowLayout(_ layout: WindowLayout) {
+        do {
+            try windowManagementService.apply(layout)
+            flashStatus(L("window.applied", L(layout.titleKey)), isError: false)
+        } catch {
+            flashStatus(error.localizedDescription, isError: true)
+        }
+    }
+
+    private func saveWindowFrame() {
+        do {
+            try windowManagementService.saveFocusedWindowFrame()
+            flashStatus(L("window.saved"), isError: false)
+        } catch {
+            flashStatus(error.localizedDescription, isError: true)
+        }
+    }
+
+    private func restoreWindowFrame() {
+        do {
+            try windowManagementService.restoreFocusedWindowFrame()
+            flashStatus(L("window.restored"), isError: false)
+        } catch {
+            flashStatus(error.localizedDescription, isError: true)
+        }
+    }
+
+    private func toggleFocusMode() {
+        do {
+            try focusModeService.toggle()
+            flashStatus(L("focus.toggled"), isError: false)
+        } catch {
+            flashStatus(error.localizedDescription, isError: true)
+        }
+    }
+
+    private func openFocusSettings() {
+        do {
+            try focusModeService.openSettings()
+        } catch {
+            flashStatus(error.localizedDescription, isError: true)
+        }
+    }
+
+    private func setDisplayMode(_ display: DisplayInfo, mode: DisplayModeInfo) {
+        do {
+            try displayService.setMode(displayID: display.id, mode: mode)
+            flashStatus(L("display.changed", mode.label), isError: false)
+        } catch {
+            flashStatus(error.localizedDescription, isError: true)
+        }
+    }
+
+    private func cleanStorage(_ category: StorageCategory) {
+        Task {
+            do {
+                try await storageAnalysisService.clean(category)
+                flashStatus(L("storage.cleaned", L(category.titleKey)), isError: false)
+            } catch {
+                flashStatus(error.localizedDescription, isError: true)
+            }
         }
     }
 

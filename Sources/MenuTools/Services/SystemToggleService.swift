@@ -28,6 +28,17 @@ enum SystemToggleService {
         runProcess("/usr/bin/killall", ["Finder"])
     }
 
+    // MARK: - 桌面图标
+
+    static var desktopIconsShown: Bool {
+        runProcess("/usr/bin/defaults", ["read", "com.apple.finder", "CreateDesktop"]).output != "0"
+    }
+
+    static func setDesktopIconsShown(_ shown: Bool) {
+        runProcess("/usr/bin/defaults", ["write", "com.apple.finder", "CreateDesktop", "-bool", shown ? "true" : "false"])
+        runProcess("/usr/bin/killall", ["Finder"])
+    }
+
     // MARK: - 静音
 
     static var isMuted: Bool {

@@ -36,6 +36,8 @@
 	<true/>
 	<key>NSAppleEventsUsageDescription</key>
 	<string>MenuTools 需要访问 Finder 以获取当前窗口路径，并通过“系统事件”切换深色/浅色外观。</string>
+	<key>NSAccessibilityUsageDescription</key>
+	<string>MenuTools 需要辅助功能权限来调整窗口布局、移动窗口和保存窗口尺寸。</string>
 	<key>NSBluetoothAlwaysUsageDescription</key>
 	<string>MenuTools 需要访问蓝牙以读取已连接设备（键盘、鼠标、耳机）的电量。</string>
 	<key>NSHumanReadableCopyright</key>

@@ -18,6 +18,52 @@
 "resource.memoryCritical" = "High memory pressure";
 "resource.loading" = "Reading system resources…";
 
+/* Network Status */
+"network.title" = "Network Status";
+"network.refresh" = "Refresh network status";
+"network.connection" = "Connection";
+"network.offline" = "Offline";
+"network.localIP" = "Local IP";
+"network.publicIP" = "Get public IP";
+"network.testLatency" = "Test latency";
+"network.latencyValue" = "%d ms";
+"network.vpnOn" = "VPN connected";
+"network.vpnOff" = "VPN not connected";
+
+/* Battery Health */
+"batteryHealth.title" = "Battery Health";
+"batteryHealth.refresh" = "Refresh battery health";
+"batteryHealth.health" = "Health";
+"batteryHealth.cycles" = "Cycles";
+"batteryHealth.charge" = "Charge";
+"batteryHealth.notCharging" = "Not charging";
+"batteryHealth.unavailable" = "No built-in battery data";
+
+/* Displays */
+"display.title" = "Displays";
+"display.refresh" = "Refresh displays";
+"display.builtIn" = "Built-in";
+"display.external" = "External";
+"display.unavailable" = "No display information";
+"display.changeMode" = "Change resolution and refresh rate";
+"display.changed" = "Switched to %@";
+"display.changeFailed" = "Failed to change display mode";
+
+/* Storage */
+"storage.title" = "Storage Analysis";
+"storage.refresh" = "Refresh storage analysis";
+"storage.derivedData" = "DerivedData";
+"storage.caches" = "Caches";
+"storage.logs" = "Logs";
+"storage.downloads" = "Downloads";
+"storage.loading" = "Analyzing directories…";
+"storage.unavailable" = "Storage information unavailable";
+"storage.clean" = "Clean";
+"storage.cleaned" = "Cleaned %@";
+"storage.cleanFailed" = "This directory cannot be safely cleaned";
+"storage.confirm.title" = "Clean this directory?";
+"storage.confirm.message" = "Only the contents will be removed; the directory itself will remain. Downloads are never cleaned automatically.";
+
 /* Quick toggles */
 "toggle.caffeinate" = "Keep Awake";
 "toggle.hiddenFiles" = "Show Hidden Files";
@@ -25,6 +71,19 @@
 "toggle.dock" = "Auto-hide Dock";
 "toggle.menubar" = "Auto-hide Menu Bar";
 "toggle.nightShift" = "Night Shift";
+
+/* Quick Action Center */
+"quickAction.title" = "Quick Actions";
+"quickAction.subtitle" = "One tap";
+"quickAction.lockScreen" = "Lock Screen";
+"quickAction.emptyTrash" = "Empty Trash";
+"quickAction.restartFinder" = "Restart Finder";
+"quickAction.flushDNS" = "Flush DNS";
+"quickAction.openSystemSettings" = "System Settings";
+"quickAction.screenshot" = "Screenshot to Clipboard";
+"quickAction.success" = "Executed: %@";
+"quickAction.error" = "%@ failed: %@";
+"quickAction.openFailed" = "Could not open %@";
 
 /* Bluetooth */
 "bt.empty" = "No Bluetooth battery info";
@@ -205,3 +264,50 @@
 "scroll.disableKey" = "Disable";
 "scroll.disableKey.desc" = "Hold to temporarily disable smooth scrolling.";
 "scroll.reset" = "Restore Defaults";
+
+/* Productivity tools */
+"launcher.title" = "App Launcher";
+"launcher.subtitle" = "Search and launch";
+"launcher.search" = "Search installed apps";
+"launcher.empty" = "No matching apps";
+"launcher.favorite" = "Favorite app";
+"launcher.launchFailed" = "Unable to launch %@";
+"scene.title" = "Scenes";
+"scene.work" = "Work";
+"scene.work.desc" = "Open favorite apps, dark mode and Focus";
+"scene.demo" = "Presentation";
+"scene.demo.desc" = "Prevent sleep, hide desktop icons and enable Focus";
+"scene.night" = "Night";
+"scene.night.desc" = "Dark mode, Night Shift, mute and Focus";
+"scene.applied" = "Scene applied: %@";
+"window.title" = "Window Management";
+"window.subtitle" = "Layouts and saved size";
+"window.leftHalf" = "Left half";
+"window.rightHalf" = "Right half";
+"window.topLeft" = "Top left quarter";
+"window.topRight" = "Top right quarter";
+"window.bottomLeft" = "Bottom left quarter";
+"window.bottomRight" = "Bottom right quarter";
+"window.centered" = "Center window";
+"window.moveNextDisplay" = "Move to next display";
+"window.save" = "Remember size";
+"window.restore" = "Restore size";
+"window.applied" = "Applied: %@";
+"window.saved" = "Current window size saved";
+"window.restored" = "Window size restored";
+"window.error.noWindow" = "No frontmost window is available";
+"window.error.permission" = "Allow MenuTools in System Settings > Privacy & Security > Accessibility";
+"window.error.operation" = "Window operation failed: %@";
+"window.error.noScreen" = "No usable display was found";
+"window.error.noSavedFrame" = "No saved window size";
+"window.error.readFrame" = "Unable to read the window frame";
+"window.error.writeFrame" = "Unable to set the window frame";
+"focus.title" = "Focus";
+"focus.enabled" = "Enabled";
+"focus.disabled" = "Disabled";
+"focus.unknown" = "Controlled by macOS";
+"focus.toggle" = "Toggle";
+"focus.openSettings" = "Open Focus settings";
+"focus.toggled" = "Focus mode toggled";
+"focus.error.unavailable" = "Focus control is unavailable; open System Settings";
+"focus.error.operation" = "Focus operation failed: %@";

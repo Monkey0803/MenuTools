@@ -18,6 +18,52 @@
 "resource.memoryCritical" = "内存压力高";
 "resource.loading" = "正在读取系统资源…";
 
+/* 网络状态 */
+"network.title" = "网络状态";
+"network.refresh" = "刷新网络状态";
+"network.connection" = "连接";
+"network.offline" = "未连接";
+"network.localIP" = "本机 IP";
+"network.publicIP" = "获取公网 IP";
+"network.testLatency" = "测试延迟";
+"network.latencyValue" = "%d ms";
+"network.vpnOn" = "VPN 已连接";
+"network.vpnOff" = "VPN 未连接";
+
+/* 电池健康 */
+"batteryHealth.title" = "电池健康";
+"batteryHealth.refresh" = "刷新电池健康";
+"batteryHealth.health" = "健康度";
+"batteryHealth.cycles" = "循环次数";
+"batteryHealth.charge" = "当前电量";
+"batteryHealth.notCharging" = "未充电";
+"batteryHealth.unavailable" = "未检测到内置电池数据";
+
+/* 显示器 */
+"display.title" = "显示器工具";
+"display.refresh" = "刷新显示器";
+"display.builtIn" = "内置";
+"display.external" = "外接";
+"display.unavailable" = "未检测到显示器信息";
+"display.changeMode" = "切换分辨率和刷新率";
+"display.changed" = "已切换到 %@";
+"display.changeFailed" = "显示器模式切换失败";
+
+/* 存储分析 */
+"storage.title" = "存储分析";
+"storage.refresh" = "刷新存储分析";
+"storage.derivedData" = "DerivedData";
+"storage.caches" = "缓存";
+"storage.logs" = "日志";
+"storage.downloads" = "下载";
+"storage.loading" = "正在分析目录…";
+"storage.unavailable" = "暂时无法读取存储信息";
+"storage.clean" = "清理";
+"storage.cleaned" = "已清理 %@";
+"storage.cleanFailed" = "该目录无法安全清理";
+"storage.confirm.title" = "确认清理目录？";
+"storage.confirm.message" = "只会删除该目录中的内容，不会删除目录本身。下载目录不会自动清理。";
+
 /* 快捷开关 */
 "toggle.caffeinate" = "防止锁屏";
 "toggle.hiddenFiles" = "显示隐藏文件";
@@ -25,6 +71,19 @@
 "toggle.dock" = "隐藏程序坞";
 "toggle.menubar" = "隐藏菜单栏";
 "toggle.nightShift" = "夜览 (Night Shift)";
+
+/* 快捷操作中心 */
+"quickAction.title" = "快捷操作中心";
+"quickAction.subtitle" = "一键执行";
+"quickAction.lockScreen" = "锁定屏幕";
+"quickAction.emptyTrash" = "清空废纸篓";
+"quickAction.restartFinder" = "重启 Finder";
+"quickAction.flushDNS" = "刷新 DNS";
+"quickAction.openSystemSettings" = "系统设置";
+"quickAction.screenshot" = "截屏到剪贴板";
+"quickAction.success" = "已执行：%@";
+"quickAction.error" = "%@失败：%@";
+"quickAction.openFailed" = "无法打开：%@";
 
 /* 蓝牙 */
 "bt.empty" = "未检测到蓝牙设备电量";
@@ -205,3 +264,50 @@
 "scroll.disableKey" = "禁用键";
 "scroll.disableKey.desc" = "按住时临时禁用平滑滚动。";
 "scroll.reset" = "恢复为预设值";
+
+/* 效率工具 */
+"launcher.title" = "App 启动器";
+"launcher.subtitle" = "搜索并启动";
+"launcher.search" = "搜索已安装的 App";
+"launcher.empty" = "未找到匹配的 App";
+"launcher.favorite" = "收藏 App";
+"launcher.launchFailed" = "无法启动 %@";
+"scene.title" = "配置场景";
+"scene.work" = "工作";
+"scene.work.desc" = "打开收藏 App、深色模式和专注模式";
+"scene.demo" = "演示";
+"scene.demo.desc" = "防止锁屏、隐藏桌面图标并开启专注模式";
+"scene.night" = "夜间";
+"scene.night.desc" = "深色模式、夜览、静音和专注模式";
+"scene.applied" = "已应用场景：%@";
+"window.title" = "窗口管理";
+"window.subtitle" = "布局与尺寸记忆";
+"window.leftHalf" = "左半屏";
+"window.rightHalf" = "右半屏";
+"window.topLeft" = "左上四分之一";
+"window.topRight" = "右上四分之一";
+"window.bottomLeft" = "左下四分之一";
+"window.bottomRight" = "右下四分之一";
+"window.centered" = "窗口居中";
+"window.moveNextDisplay" = "移动到下一台显示器";
+"window.save" = "记住尺寸";
+"window.restore" = "恢复尺寸";
+"window.applied" = "已应用：%@";
+"window.saved" = "已记住当前窗口尺寸";
+"window.restored" = "已恢复窗口尺寸";
+"window.error.noWindow" = "没有可操作的前台窗口";
+"window.error.permission" = "请在系统设置的“隐私与安全性 > 辅助功能”中允许 MenuTools";
+"window.error.operation" = "窗口操作失败：%@";
+"window.error.noScreen" = "未检测到可用显示器";
+"window.error.noSavedFrame" = "还没有保存的窗口尺寸";
+"window.error.readFrame" = "无法读取窗口位置或尺寸";
+"window.error.writeFrame" = "无法设置窗口位置或尺寸";
+"focus.title" = "专注模式";
+"focus.enabled" = "已开启";
+"focus.disabled" = "已关闭";
+"focus.unknown" = "状态由系统控制";
+"focus.toggle" = "切换";
+"focus.openSettings" = "打开专注模式设置";
+"focus.toggled" = "已切换专注模式";
+"focus.error.unavailable" = "专注模式控制不可用，请打开系统设置";
+"focus.error.operation" = "专注模式操作失败：%@";

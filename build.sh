@@ -50,9 +50,15 @@ for lproj in Resources/*.lproj; do
 done
 
 echo "==> 签名"
-# 优先用稳定的自签名证书（使 TCC 权限授予可跨重编译保留）；未安装时回退 ad-hoc
-SIGN_IDENTITY="MenuTools Self-Signed"
-if security find-identity -p codesigning 2>/dev/null | grep -q "$SIGN_IDENTITY"; then
+# 正式发布通过 CODESIGN_IDENTITY 显式传入 Developer ID；普通本地构建继续优先使用稳定的自签名证书。
+SIGN_IDENTITY="${CODESIGN_IDENTITY:-MenuTools Self-Signed}"
+if [[ -n "${CODESIGN_IDENTITY:-}" ]]; then
+    if ! security find-identity -p codesigning 2>/dev/null | grep -Fq "$SIGN_IDENTITY"; then
+        echo "错误：未找到签名证书 '$SIGN_IDENTITY'" >&2
+        exit 1
+    fi
+    SIGN_ARG=(--sign "$SIGN_IDENTITY")
+elif security find-identity -p codesigning 2>/dev/null | grep -q "$SIGN_IDENTITY"; then
     SIGN_ARG=(--sign "$SIGN_IDENTITY")
 else
     echo "   （未找到 '$SIGN_IDENTITY' 证书，回退 ad-hoc 签名）"

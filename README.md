@@ -16,6 +16,24 @@
 | 🖥 终端打开 Finder 路径 | 一键在终端中打开当前 Finder 最前窗口的目录，支持 Terminal / iTerm2 / Warp / Ghostty / kitty / Alacritty |
 | 🌗 深浅色切换 | 一键切换系统外观，面板实时跟随系统主题 |
 
+### 快捷操作中心
+| 功能 | 说明 |
+|---|---|
+| 🔒 锁定屏幕 | 立即锁定当前用户会话 |
+| 🗑 清空废纸篓 | 通过 Finder 清空废纸篓 |
+| 🔄 重启 Finder | 重启 Finder 以恢复异常状态 |
+| 🌐 刷新 DNS | 刷新本机 DNS 缓存并重启 mDNSResponder |
+| ⚙️ 系统设置 | 打开 macOS 系统设置 |
+| 📷 截屏到剪贴板 | 截取当前屏幕并直接复制到剪贴板 |
+
+### 效率工具
+| 功能 | 说明 |
+|---|---|
+| 🚀 App 快速启动器 | 搜索并启动已安装 App，支持收藏和最近使用排序 |
+| 🧩 配置场景 | 工作、演示、夜间三种预设，可手动一键应用 |
+| 🪟 窗口管理 | 左右分屏、四象限、居中、跨显示器移动，并支持尺寸记忆 |
+| 🌙 专注模式 | 快速切换系统 Focus 状态，并可打开系统专注模式设置 |
+
 ### 系统开关（六钮玻璃开关带）
 | 开关 | 说明 |
 |---|---|
@@ -32,7 +50,17 @@
 | 🎧 蓝牙设备电量 | AirPods（左耳/右耳/充电盒分量）、罗技等 BLE 键鼠、索尼等经典蓝牙耳机，多设备列表实时显示 |
 | 🔨 清理 DerivedData | 显示 Xcode DerivedData 占用容量，一键清理并统计释放空间 |
 | 📋 清理剪贴板 | 显示当前剪贴板项数，一键清空 |
+| 🕘 剪贴板历史 | 保存最近文本和图片，支持搜索、固定、删除和一键复制 |
+| 📊 系统资源 | 显示 CPU、内存压力、磁盘可用空间和网络速率 |
 | ⬇️ 检查更新 | 应用内检查新版本，发现更新可直接跳转下载 |
+
+### 系统信息
+| 功能 | 说明 |
+|---|---|
+| 🌐 网络状态 | 显示 Wi-Fi、网络名称、本机 IP、VPN 状态；公网 IP 和延迟支持按需查询 |
+| 🔋 电池健康 | 显示内置电池健康度、循环次数、当前电量和充电状态；无数据时静默降级 |
+| 🖥 显示器工具 | 显示内置/外接显示器、分辨率和刷新率，可切换系统支持的显示模式 |
+| 💾 存储分析 | 分析 DerivedData、缓存、日志和下载目录，并对安全目录提供确认后清理 |
 
 ### 个性化
 - 8 款可切换的菜单栏图标（SF Symbols），即点即换
@@ -43,11 +71,11 @@
 
 ### 下载
 
-最新版本：[MenuTools v1.0.0](https://github.com/Monkey0803/MenuTools/releases/tag/v1.0.0)
+当前目标版本：[MenuTools v1.0.3](https://github.com/Monkey0803/MenuTools/releases/tag/v1.0.3)
 
-下载 `MenuTools-1.0.0.zip`，解压后将 `MenuTools.app` 拖入「应用程序」文件夹。
+下载 `MenuTools-1.0.3.zip`，解压后将 `MenuTools.app` 拖入「应用程序」文件夹。
 
-> 当前 Release 使用自签名证书，首次打开时 macOS 可能需要在「系统设置 → 隐私与安全性」中允许打开。
+> 正式 Release 使用 Developer ID 签名并经过 notarization；本地直接运行 `./build.sh` 生成的包仍使用自签名或 ad-hoc 签名。
 
 ### 首次打开
 
@@ -92,8 +120,11 @@ open dist/MenuTools.app
 | 权限 | 用途 | 触发功能 |
 |---|---|---|
 | 自动化 → Finder | 读取最前窗口路径 | 终端打开 |
+| 自动化 → Finder | 清空废纸篓 | 快捷操作中心 |
 | 自动化 → 系统事件 | 外观/程序坞/菜单栏设置 | 深浅色、程序坞、菜单栏 |
 | 蓝牙 | 读取 BLE 设备电量 | 蓝牙设备电量 |
+| 屏幕录制 | 允许截取屏幕内容 | 截屏到剪贴板 |
+| 辅助功能 | 读取和设置前台窗口位置、尺寸 | 窗口管理 |
 
 若误点拒绝，可在 **系统设置 → 隐私与安全性** 中重新开启。静音、防止锁屏、夜览、清理类功能无需任何权限。
 
@@ -109,6 +140,15 @@ open dist/MenuTools.app
 | 夜览 | CoreBrightness 私有框架 `CBBlueLightClient`（运行时动态调用，带能力检查） |
 | 蓝牙电量 | 三通道合并：IORegistry（AirPods）+ IOBluetooth 私有 getter（经典蓝牙耳机）+ CoreBluetooth GATT 180F/2A19（BLE 键鼠） |
 | DerivedData | FileManager 递归容量统计（后台线程）+ 清理 |
+| 快捷操作中心 | Process、Finder AppleScript、系统设置 URL 和 `screencapture` |
+| 网络状态 | CoreWLAN、网络接口地址、VPN 状态和按需 URLSession 探针 |
+| 电池健康 | `system_profiler SPPowerDataType -json`，无内置电池时静默降级 |
+| 显示器工具 | `NSScreen` + CoreGraphics 显示模式枚举和切换 |
+| 存储分析 | 后台递归统计指定目录，清理时保留目录本身且不操作 Downloads |
+| App 启动器 | NSWorkspace 应用发现、搜索、收藏和启动 | App 快速启动器 |
+| 配置场景 | 组合应用启动、外观、专注、音频、桌面图标和防止锁屏动作 | 配置场景 |
+| 窗口管理 | Accessibility API 调整窗口位置、尺寸和显示器 | 窗口管理 |
+| 专注模式 | Control Center 辅助功能脚本，失败时回退到系统设置 | 专注模式 |
 | 检查更新 | 轻量 appcast JSON + 语义化版本比较 |
 
 项目结构：
@@ -117,6 +157,7 @@ open dist/MenuTools.app
 MenuTools/
 ├── Package.swift               # SPM 工程
 ├── build.sh                    # 一键打包脚本
+├── release.sh                  # 正式发布预检、notarization 和安装包生成
 ├── appcast.json                # 更新源模板
 ├── Resources/                  # Info.plist / 图标
 ├── Scripts/                    # 图标生成与 API 验证脚本
@@ -128,11 +169,17 @@ MenuTools/
 
 ## 🔄 发布更新
 
-更新检查已对接 **GitHub Releases API**，发版流程：
+更新检查已对接 **GitHub Releases API**，正式发版流程：
 
-1. 修改 `Resources/Info.plist` 中的 `CFBundleShortVersionString`，构建并打包 `MenuTools.app`（可压缩为 zip）
-2. 在 GitHub 上发布 Release：tag 使用 `v1.1.0` 或 `1.1.0`，描述即更新说明，附件上传安装包（.zip / .dmg / .pkg）
-3. 用户端自动生效：打开面板时静默自动检查（24 小时节流），或手动点击「检查更新」；发现新版本后底栏出现下载按钮，优先直链 Release 附件，无附件则跳转 Release 页面
+1. 修改 `Resources/Info.plist` 中的 `CFBundleShortVersionString` 和 `CFBundleVersion`。
+2. 配置 Developer ID 证书和 notarization profile：
+   ```bash
+   export CODESIGN_IDENTITY="Developer ID Application: ..."
+   export NOTARY_PROFILE="menutools-notary"
+   ```
+3. 运行 `./release.sh`，脚本会执行测试、Release 构建、签名验证、ZIP/DMG 打包、notarization 和 stapling。
+4. 在 GitHub 上发布 Release：tag 使用 `v1.0.3` 或 `1.0.3`，描述即更新说明，附件上传脚本生成的 `.zip` 和 `.dmg`。
+5. 用户端自动生效：打开面板时静默自动检查（24 小时节流），或手动点击「检查更新」；发现新版本后底栏可直接下载 Release 附件。
 
 也兼容简单 appcast JSON（`{"version","notes","url"}`，见 `appcast.json` 模板），便于私有部署。更新源可通过命令行覆盖（便于测试）：
 
@@ -146,6 +193,7 @@ defaults delete com.qoder.menutools updateFeedURL   # 恢复默认 GitHub 源
 - 夜览与经典蓝牙耳机电量依赖系统私有 API，系统大版本升级后可能失效（代码已做能力检查，失效时静默降级不会崩溃；`Scripts/` 内有验证脚本可快速回归）
 - 不上报电量的蓝牙设备（部分白牌耳机）无法显示电量
 - AirPods 充电盒电量仅在开盖/刚连接时由系统上报
+- 清空废纸篓和截屏功能受 macOS 的自动化、屏幕录制权限控制；拒绝权限时会在面板显示失败原因
 
 ## 🙏 鸣谢
 

@@ -18,6 +18,52 @@
 "resource.memoryCritical" = "記憶體壓力高";
 "resource.loading" = "正在讀取系統資源…";
 
+/* 網路狀態 */
+"network.title" = "網路狀態";
+"network.refresh" = "重新整理網路狀態";
+"network.connection" = "連線";
+"network.offline" = "未連線";
+"network.localIP" = "本機 IP";
+"network.publicIP" = "取得公開 IP";
+"network.testLatency" = "測試延遲";
+"network.latencyValue" = "%d ms";
+"network.vpnOn" = "VPN 已連線";
+"network.vpnOff" = "VPN 未連線";
+
+/* 電池健康度 */
+"batteryHealth.title" = "電池健康度";
+"batteryHealth.refresh" = "重新整理電池健康度";
+"batteryHealth.health" = "健康度";
+"batteryHealth.cycles" = "循環次數";
+"batteryHealth.charge" = "目前電量";
+"batteryHealth.notCharging" = "未充電";
+"batteryHealth.unavailable" = "未偵測到內建電池資料";
+
+/* 顯示器 */
+"display.title" = "顯示器工具";
+"display.refresh" = "重新整理顯示器";
+"display.builtIn" = "內建";
+"display.external" = "外接";
+"display.unavailable" = "未偵測到顯示器資訊";
+"display.changeMode" = "切換解析度和更新率";
+"display.changed" = "已切換至 %@";
+"display.changeFailed" = "顯示器模式切換失敗";
+
+/* 儲存空間分析 */
+"storage.title" = "儲存空間分析";
+"storage.refresh" = "重新整理儲存空間分析";
+"storage.derivedData" = "DerivedData";
+"storage.caches" = "快取";
+"storage.logs" = "日誌";
+"storage.downloads" = "下載";
+"storage.loading" = "正在分析目錄…";
+"storage.unavailable" = "暫時無法讀取儲存空間資訊";
+"storage.clean" = "清理";
+"storage.cleaned" = "已清理 %@";
+"storage.cleanFailed" = "此目錄無法安全清理";
+"storage.confirm.title" = "確認清理目錄？";
+"storage.confirm.message" = "只會刪除目錄內容，不會刪除目錄本身。下載目錄不會自動清理。";
+
 /* 快捷開關 */
 "toggle.caffeinate" = "防止鎖定螢幕";
 "toggle.hiddenFiles" = "顯示隱藏檔案";
@@ -25,6 +71,19 @@
 "toggle.dock" = "隱藏 Dock";
 "toggle.menubar" = "隱藏選單列";
 "toggle.nightShift" = "夜覽 (Night Shift)";
+
+/* 快捷操作中心 */
+"quickAction.title" = "快捷操作中心";
+"quickAction.subtitle" = "一鍵執行";
+"quickAction.lockScreen" = "鎖定螢幕";
+"quickAction.emptyTrash" = "清空垃圾桶";
+"quickAction.restartFinder" = "重新啟動 Finder";
+"quickAction.flushDNS" = "重新整理 DNS";
+"quickAction.openSystemSettings" = "系統設定";
+"quickAction.screenshot" = "截圖到剪貼簿";
+"quickAction.success" = "已執行：%@";
+"quickAction.error" = "%@失敗：%@";
+"quickAction.openFailed" = "無法開啟：%@";
 
 /* 藍牙 */
 "bt.empty" = "未偵測到藍牙裝置電量";
@@ -205,3 +264,50 @@
 "scroll.disableKey" = "停用鍵";
 "scroll.disableKey.desc" = "按住時暫時停用平滑捲動。";
 "scroll.reset" = "恢復為預設值";
+
+/* 效率工具 */
+"launcher.title" = "App 啟動器";
+"launcher.subtitle" = "搜尋並啟動";
+"launcher.search" = "搜尋已安裝的 App";
+"launcher.empty" = "找不到符合的 App";
+"launcher.favorite" = "收藏 App";
+"launcher.launchFailed" = "無法啟動 %@";
+"scene.title" = "配置場景";
+"scene.work" = "工作";
+"scene.work.desc" = "打開收藏 App、深色模式和專注模式";
+"scene.demo" = "演示";
+"scene.demo.desc" = "防止鎖定螢幕、隱藏桌面圖示並開啟專注模式";
+"scene.night" = "夜間";
+"scene.night.desc" = "深色模式、夜覽、靜音和專注模式";
+"scene.applied" = "已套用場景：%@";
+"window.title" = "視窗管理";
+"window.subtitle" = "版面與尺寸記憶";
+"window.leftHalf" = "左半螢幕";
+"window.rightHalf" = "右半螢幕";
+"window.topLeft" = "左上四分之一";
+"window.topRight" = "右上四分之一";
+"window.bottomLeft" = "左下四分之一";
+"window.bottomRight" = "右下四分之一";
+"window.centered" = "視窗置中";
+"window.moveNextDisplay" = "移到下一台顯示器";
+"window.save" = "記住尺寸";
+"window.restore" = "恢復尺寸";
+"window.applied" = "已套用：%@";
+"window.saved" = "已記住目前視窗尺寸";
+"window.restored" = "已恢復視窗尺寸";
+"window.error.noWindow" = "沒有可操作的前景視窗";
+"window.error.permission" = "請在系統設定的「隱私權與安全性 > 輔助使用」中允許 MenuTools";
+"window.error.operation" = "視窗操作失敗：%@";
+"window.error.noScreen" = "未偵測到可用顯示器";
+"window.error.noSavedFrame" = "尚未儲存視窗尺寸";
+"window.error.readFrame" = "無法讀取視窗位置或尺寸";
+"window.error.writeFrame" = "無法設定視窗位置或尺寸";
+"focus.title" = "專注模式";
+"focus.enabled" = "已開啟";
+"focus.disabled" = "已關閉";
+"focus.unknown" = "狀態由系統控制";
+"focus.toggle" = "切換";
+"focus.openSettings" = "開啟專注模式設定";
+"focus.toggled" = "已切換專注模式";
+"focus.error.unavailable" = "專注模式控制不可用，請開啟系統設定";
+"focus.error.operation" = "專注模式操作失敗：%@";

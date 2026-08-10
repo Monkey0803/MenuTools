@@ -17,6 +17,26 @@ A lightweight system toolkit that lives in the macOS menu bar. MenuTools uses th
 | Open Finder path in a terminal | Opens the directory of the frontmost Finder window in Terminal, iTerm2, Warp, Ghostty, kitty, Alacritty, or the selected terminal app. |
 | Toggle appearance | Switches between light and dark appearance and follows the system theme in real time. |
 
+### Quick Action Center
+
+| Feature | Description |
+|---|---|
+| Lock Screen | Immediately locks the current user session. |
+| Empty Trash | Empties the Trash through Finder. |
+| Restart Finder | Restarts Finder to recover from an abnormal state. |
+| Flush DNS | Flushes the local DNS cache and restarts mDNSResponder. |
+| System Settings | Opens macOS System Settings. |
+| Screenshot to Clipboard | Captures the screen and copies it directly to the clipboard. |
+
+### Productivity Tools
+
+| Feature | Description |
+|---|---|
+| App Launcher | Search and launch installed apps, with favorites and recent-app ordering. |
+| Scenes | Apply Work, Presentation, or Night presets manually. |
+| Window Management | Use halves, quarters, centering, cross-display movement, and saved window sizes. |
+| Focus | Toggle the system Focus state and open Focus settings. |
+
 ### System Toggles
 
 | Toggle | Description |
@@ -35,7 +55,18 @@ A lightweight system toolkit that lives in the macOS menu bar. MenuTools uses th
 | Bluetooth battery levels | Shows AirPods left/right/case levels, BLE keyboard and mouse batteries, and classic Bluetooth headset levels when reported by macOS. |
 | Clean DerivedData | Shows the size of Xcode DerivedData and cleans it with one click. |
 | Clear clipboard | Shows the current clipboard item count and clears the clipboard. |
+| Clipboard History | Keeps recent text and images with search, pin, delete, and copy actions. |
+| System Resources | Shows CPU, memory pressure, free disk space, and network rates. |
 | Check for updates | Checks for new releases and opens the download page when an update is available. |
+
+### System Information
+
+| Feature | Description |
+|---|---|
+| Network Status | Shows Wi-Fi, network name, local IP, and VPN status; public IP and latency are on-demand. |
+| Battery Health | Shows built-in battery health, cycle count, charge, and charging state; unavailable data degrades silently. |
+| Displays | Shows built-in/external displays and their modes, with supported resolution and refresh-rate switching. |
+| Storage Analysis | Analyzes DerivedData, caches, logs, and Downloads, with confirmation-gated cleanup for safe directories. |
 
 ### Personalization
 
@@ -47,11 +78,11 @@ A lightweight system toolkit that lives in the macOS menu bar. MenuTools uses th
 
 ### Download
 
-Latest release: [MenuTools v1.0.0](https://github.com/Monkey0803/MenuTools/releases/tag/v1.0.0)
+Current target release: [MenuTools v1.0.3](https://github.com/Monkey0803/MenuTools/releases/tag/v1.0.3)
 
-Download `MenuTools-1.0.0.zip`, extract it, and move `MenuTools.app` to the Applications folder.
+Download `MenuTools-1.0.3.zip`, extract it, and move `MenuTools.app` to the Applications folder.
 
-> The current release uses a self-signed certificate. macOS may require approval in **System Settings → Privacy & Security** the first time you open it.
+> The formal release uses Developer ID signing and notarization. Packages built locally with `./build.sh` still use self-signed or ad-hoc signing.
 
 ### First Launch
 
@@ -97,8 +128,11 @@ Some features request permissions the first time they are used:
 | Permission | Purpose | Features |
 |---|---|---|
 | Automation → Finder | Reads the path of the frontmost Finder window. | Open Finder path in a terminal |
+| Automation → Finder | Empties the Trash. | Quick Action Center |
 | Automation → System Events | Changes appearance, Dock, and menu bar settings. | Appearance, Dock, and menu bar toggles |
 | Bluetooth | Reads battery levels from connected Bluetooth devices. | Bluetooth battery levels |
+| Screen Recording | Allows screen capture. | Screenshot to Clipboard |
+| Accessibility | Reads and sets the position and size of the frontmost window. | Window Management |
 
 If permission was denied, enable it again in **System Settings → Privacy & Security**. Mute, prevent sleep, Night Shift, cleanup features, and clipboard cleanup do not require these permissions.
 
@@ -114,6 +148,15 @@ If permission was denied, enable it again in **System Settings → Privacy & Sec
 | Night Shift | Runtime calls to the private CoreBrightness `CBBlueLightClient` API with capability checks |
 | Bluetooth battery levels | IORegistry for AirPods, private IOBluetooth getters for classic Bluetooth devices, and CoreBluetooth GATT service `180F/2A19` for BLE devices |
 | DerivedData | Background file-system size calculation and cleanup |
+| Quick Action Center | Process commands, Finder AppleScript, System Settings URL, and `screencapture` |
+| Network Status | CoreWLAN, interface addresses, VPN state, and on-demand URLSession probes |
+| Battery Health | `system_profiler SPPowerDataType -json`, with silent fallback when unavailable |
+| Displays | `NSScreen` and CoreGraphics display mode enumeration and switching |
+| Storage Analysis | Background recursive measurement of selected directories; cleanup keeps directories and never touches Downloads |
+| App Launcher | NSWorkspace app discovery, search, favorites, and launching |
+| Scenes | Composes app launching, appearance, Focus, audio, desktop icons, and prevent-sleep actions |
+| Window Management | Accessibility API for window position, size, and display movement |
+| Focus | Control Center accessibility script with a System Settings fallback |
 | Update checks | GitHub Releases API with a lightweight appcast JSON fallback |
 
 Project structure:
@@ -122,6 +165,7 @@ Project structure:
 MenuTools/
 ├── Package.swift               # Swift Package Manager manifest
 ├── build.sh                    # Build, package, and sign script
+├── release.sh                  # Release checks, notarization, and packages
 ├── Resources/                  # Info.plist, entitlements, and icon
 ├── Scripts/                    # Icon generation and API validation scripts
 └── Sources/MenuTools/
@@ -134,9 +178,14 @@ MenuTools/
 
 The update checker uses the GitHub Releases API by default. To publish a release:
 
-1. Update `CFBundleShortVersionString` in `Resources/Info.plist`.
-2. Build and package `MenuTools.app`, optionally as a zip, DMG, or PKG.
-3. Create a GitHub Release with a tag such as `v1.1.0` and attach the installer package.
+1. Update `CFBundleShortVersionString` and `CFBundleVersion` in `Resources/Info.plist`.
+2. Configure a Developer ID certificate and a `notarytool` Keychain profile:
+   ```bash
+   export CODESIGN_IDENTITY="Developer ID Application: ..."
+   export NOTARY_PROFILE="menutools-notary"
+   ```
+3. Run `./release.sh` to execute tests, build, sign, verify, package ZIP/DMG, notarize, and staple the release assets.
+4. Create a GitHub Release with a tag such as `v1.0.3` and attach the generated `.zip` and `.dmg` files.
 
 The app checks for updates automatically with a 24-hour throttle. Users can also trigger a manual check from the settings window. When an update is available, MenuTools opens the direct release asset when possible, or the release page as a fallback.
 
@@ -162,7 +211,7 @@ defaults delete com.qoder.menutools updateFeedURL
 - Night Shift and classic Bluetooth headset battery levels depend on private system APIs. They may stop working after a major macOS update; capability checks make the app fail gracefully when the APIs are unavailable. Validation scripts are included in `Scripts/`.
 - Bluetooth devices that do not report battery levels cannot be displayed with a percentage.
 - AirPods case battery levels may only be reported when the case is open or the device has just connected.
-- The current release is self-signed and is not notarized by Apple.
+- Empty Trash and screenshot actions depend on macOS Automation and Screen Recording permissions; denied access is reported in the panel.
 
 ## Acknowledgements
 
