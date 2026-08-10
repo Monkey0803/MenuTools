@@ -54,31 +54,22 @@ enum MenuBarIcon: String, CaseIterable, Identifiable {
 
 @main
 struct MenuToolsApp: App {
-    @AppStorage(SettingsKey.menuBarIcon) private var menuBarIcon = MenuBarIcon.default.rawValue
-    @AppStorage(SettingsKey.menuBarShowTitle) private var showMenuBarTitle = false
-
     init() {
+        // 使用 AppKit 原生状态项接收鼠标点击，面板内容仍由 SwiftUI 渲染。
+        MenuBarStatusItemController.shared.start()
         // 根据配置启动平滑滚动引擎
         SmoothScrollEngine.shared.activateIfEnabled()
         // 监听 Finder 扩展转交的右键操作指令（沙箱扩展无法直接执行文件操作）
         RightClickCommandHandler.activate()
         // 剪贴板历史必须独立于菜单栏面板持续监听
         ClipboardHistoryService.shared.startMonitoring()
+        // 全局快捷键必须独立于面板生命周期持续监听
+        GlobalShortcutService.shared.start()
+        // 窗口布局快捷键必须独立于设置页面生命周期持续监听
+        WindowShortcutService.shared.start()
     }
 
     var body: some Scene {
-        MenuBarExtra {
-            MenuPanelView()
-        } label: {
-            if showMenuBarTitle {
-                Label("MenuTools", systemImage: menuBarIcon)
-                    .labelStyle(.titleAndIcon)
-            } else {
-                Image(systemName: menuBarIcon)
-            }
-        }
-        .menuBarExtraStyle(.window)
-
         Settings {
             SettingsView()
         }

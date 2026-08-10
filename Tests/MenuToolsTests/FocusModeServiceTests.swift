@@ -13,5 +13,15 @@ func focusModeScriptTargetsControlCenter() {
     let script = FocusModeScript.toggle
 
     #expect(script.contains("ControlCenter"))
+    #expect(script.contains("whose description contains"))
+    #expect(!script.contains("click menu bar item \"Control Center\""))
     #expect(script.contains("Focus"))
+}
+
+@Test("独立勿扰模式脚本包含勿扰目标")
+func doNotDisturbScriptTargetsDedicatedMode() {
+    let script = FocusModeScript.toggleDoNotDisturb
+
+    #expect(script.contains("Do Not Disturb"))
+    #expect(script.contains("ControlCenter"))
 }

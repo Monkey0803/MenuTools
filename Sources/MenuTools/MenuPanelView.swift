@@ -31,6 +31,7 @@ private extension View {
 
 /// 菜单栏弹出的主面板：液态玻璃风格，自动适配深色 / 浅色
 struct MenuPanelView: View {
+    private let openSettingsAction: (() -> Void)?
     @AppStorage(SettingsKey.menuBarIcon) private var menuBarIcon = MenuBarIcon.default.rawValue
     @AppStorage(SettingsKey.togglesShowTitle) private var togglesShowTitle = false
     @AppStorage(SettingsKey.preferredTerminal) private var preferredTerminal = TerminalApp.systemDefault.rawValue
@@ -55,10 +56,10 @@ struct MenuPanelView: View {
     @State private var storageCategoryToConfirm: StorageCategory?
     @State private var quickActionService = QuickActionService()
     @State private var activeQuickAction: QuickAction?
-    @State private var appLauncherService = AppLauncherService()
-    @State private var sceneService = SceneService()
-    @State private var windowManagementService = WindowManagementService()
-    @State private var focusModeService = FocusModeService()
+    @State private var appLauncherService = AppLauncherService.shared
+    @State private var sceneService = SceneService.shared
+    @State private var focusModeService = FocusModeService.shared
+    @State private var globalShortcutService = GlobalShortcutService.shared
     @State private var isCheckingUpdate = false
     @State private var availableUpdate: UpdateInfo?
     @State private var updateDownloadService = UpdateDownloadService(
@@ -72,6 +73,10 @@ struct MenuPanelView: View {
     @State private var appeared = false
     @State private var tooltipWidth: CGFloat = 0
     @Namespace private var glassNamespace
+
+    init(openSettingsAction: (() -> Void)? = nil) {
+        self.openSettingsAction = openSettingsAction
+    }
 
     private let themeChanged = DistributedNotificationCenter.default().publisher(
         for: Notification.Name("AppleInterfaceThemeChangedNotification")
@@ -93,16 +98,14 @@ struct MenuPanelView: View {
                         .entrance(3, appeared: appeared)
                     ScenePresetsCard(activeScene: sceneService.activeScene, apply: applyScene)
                         .entrance(4, appeared: appeared)
-                    WindowManagementCard(
-                        perform: performWindowLayout,
-                        save: saveWindowFrame,
-                        restore: restoreWindowFrame
-                    )
-                    .entrance(5, appeared: appeared)
+                    GlobalShortcutCard(service: globalShortcutService, report: flashStatus)
+                        .entrance(5, appeared: appeared)
                     FocusModeCard(
                         isEnabled: focusModeService.isEnabled,
+                        isDoNotDisturbEnabled: focusModeService.isDoNotDisturbEnabled,
                         isBusy: focusModeService.isBusy,
                         toggle: toggleFocusMode,
+                        toggleDoNotDisturb: toggleDoNotDisturb,
                         openSettings: openFocusSettings
                     )
                     .entrance(6, appeared: appeared)
@@ -130,7 +133,9 @@ struct MenuPanelView: View {
                 .entrance(15, appeared: appeared)
         }
         .padding(16)
-        .frame(width: 320)
+        // 菜单栏窗口必须有明确高度，否则 ScrollView 会按全部卡片的理想高度展开，
+        // 在菜单栏屏幕上无法正常显示弹出面板。
+        .frame(width: 320, height: 640)
         .overlay(alignment: .bottom) {
             if let statusMessage {
                 statusBanner(statusMessage)
@@ -181,7 +186,9 @@ struct MenuPanelView: View {
             refreshToggles()
             refreshDerivedDataSize()
             appLauncherService.refresh()
-            focusModeService.refresh()
+            globalShortcutService.start()
+            // 不在面板打开瞬间读取 Focus：读取会点击 Control Center，可能抢走菜单弹层焦点。
+            // 状态在用户执行切换后刷新；未读取前由卡片显示“状态由系统控制”。
             autoCheckUpdateIfNeeded()
             // 面板展示期间每 30 秒刷新一次蓝牙设备电量
             while !Task.isCancelled {
@@ -267,8 +274,12 @@ struct MenuPanelView: View {
             }
             Spacer()
             Button {
-                NSApp.activate(ignoringOtherApps: true)
-                openSettings()
+                if let openSettingsAction {
+                    openSettingsAction()
+                } else {
+                    NSApp.activate(ignoringOtherApps: true)
+                    openSettings()
+                }
             } label: {
                 Image(systemName: "gearshape.fill")
                     .font(.callout)
@@ -1281,37 +1292,19 @@ struct MenuPanelView: View {
         }
     }
 
-    private func performWindowLayout(_ layout: WindowLayout) {
-        do {
-            try windowManagementService.apply(layout)
-            flashStatus(L("window.applied", L(layout.titleKey)), isError: false)
-        } catch {
-            flashStatus(error.localizedDescription, isError: true)
-        }
-    }
-
-    private func saveWindowFrame() {
-        do {
-            try windowManagementService.saveFocusedWindowFrame()
-            flashStatus(L("window.saved"), isError: false)
-        } catch {
-            flashStatus(error.localizedDescription, isError: true)
-        }
-    }
-
-    private func restoreWindowFrame() {
-        do {
-            try windowManagementService.restoreFocusedWindowFrame()
-            flashStatus(L("window.restored"), isError: false)
-        } catch {
-            flashStatus(error.localizedDescription, isError: true)
-        }
-    }
-
     private func toggleFocusMode() {
         do {
             try focusModeService.toggle()
             flashStatus(L("focus.toggled"), isError: false)
+        } catch {
+            flashStatus(error.localizedDescription, isError: true)
+        }
+    }
+
+    private func toggleDoNotDisturb() {
+        do {
+            try focusModeService.toggleDoNotDisturb()
+            flashStatus(L("focus.doNotDisturbToggled"), isError: false)
         } catch {
             flashStatus(error.localizedDescription, isError: true)
         }

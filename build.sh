@@ -11,6 +11,14 @@ BUILD_DIR=".build/$CONFIG"
 OUT_DIR="$SCRIPT_DIR/dist"
 APP_BUNDLE="$OUT_DIR/$APP_NAME.app"
 
+# 菜单栏应用不会随着 .app 文件替换而自动重新加载，先结束同路径的旧实例，
+# 否则菜单栏仍可能连接到旧进程，导致重新构建后的点击行为看起来没有变化。
+if pgrep -f "$APP_BUNDLE/Contents/MacOS/$APP_NAME" >/dev/null 2>&1; then
+    echo "==> 关闭旧的 $APP_NAME 实例"
+    pkill -f "$APP_BUNDLE/Contents/MacOS/$APP_NAME" || true
+    sleep 1
+fi
+
 echo "==> swift build -c $CONFIG"
 swift build -c "$CONFIG"
 
@@ -76,4 +84,6 @@ if pgrep -f "RightClickTools.appex" >/dev/null 2>&1; then
     killall Finder 2>/dev/null || true
 fi
 
+echo "==> 启动：$APP_BUNDLE"
+open "$APP_BUNDLE"
 echo "==> 完成：$APP_BUNDLE"

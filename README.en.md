@@ -36,6 +36,7 @@ A lightweight system toolkit that lives in the macOS menu bar. MenuTools uses th
 | Scenes | Apply Work, Presentation, or Night presets manually. |
 | Window Management | Use halves, quarters, centering, cross-display movement, and saved window sizes. |
 | Focus | Toggle the system Focus state and open Focus settings. |
+| Global scene shortcuts | Record global shortcuts for Work, Presentation, and Night scenes. |
 
 ### System Toggles
 
@@ -133,6 +134,7 @@ Some features request permissions the first time they are used:
 | Bluetooth | Reads battery levels from connected Bluetooth devices. | Bluetooth battery levels |
 | Screen Recording | Allows screen capture. | Screenshot to Clipboard |
 | Accessibility | Reads and sets the position and size of the frontmost window. | Window Management |
+| Accessibility | Receives global keyboard events and triggers scenes. | Global scene shortcuts, Focus |
 
 If permission was denied, enable it again in **System Settings → Privacy & Security**. Mute, prevent sleep, Night Shift, cleanup features, and clipboard cleanup do not require these permissions.
 
@@ -157,6 +159,7 @@ If permission was denied, enable it again in **System Settings → Privacy & Sec
 | Scenes | Composes app launching, appearance, Focus, audio, desktop icons, and prevent-sleep actions |
 | Window Management | Accessibility API for window position, size, and display movement |
 | Focus | Control Center accessibility script with a System Settings fallback |
+| Global shortcuts | NSEvent global/local keyboard monitors, persistent bindings, and conflict detection |
 | Update checks | GitHub Releases API with a lightweight appcast JSON fallback |
 
 Project structure:

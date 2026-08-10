@@ -13,7 +13,7 @@ enum SceneAction: String, CaseIterable, Equatable, Sendable {
     case muteAudio
 }
 
-enum ScenePreset: String, CaseIterable, Identifiable, Sendable {
+enum ScenePreset: String, CaseIterable, Codable, Identifiable, Hashable, Sendable {
     case work
     case demo
     case night
@@ -43,6 +43,8 @@ enum ScenePreset: String, CaseIterable, Identifiable, Sendable {
 @MainActor
 @Observable
 final class SceneService {
+    static let shared = SceneService()
+
     private(set) var activeScene: ScenePreset?
 
     func apply(_ scene: ScenePreset) throws {

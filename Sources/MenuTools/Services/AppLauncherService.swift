@@ -51,6 +51,8 @@ enum AppLauncherCatalog {
 @MainActor
 @Observable
 final class AppLauncherService {
+    static let shared = AppLauncherService()
+
     static let favoritesKey = "appLauncher.favoritePaths"
     static let recentKey = "appLauncher.recentPaths"
 

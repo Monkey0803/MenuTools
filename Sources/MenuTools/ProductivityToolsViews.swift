@@ -134,60 +134,144 @@ struct ScenePresetsCard: View {
     }
 }
 
-/// 窗口布局卡片。
-struct WindowManagementCard: View {
-    let perform: (WindowLayout) -> Void
-    let save: () -> Void
-    let restore: () -> Void
+/// 场景全局快捷键配置卡片。
+struct GlobalShortcutCard: View {
+    @Bindable var service: GlobalShortcutService
+    let report: (String, Bool) -> Void
+    @State private var recordingScene: ScenePreset?
 
     var body: some View {
         VStack(alignment: .leading, spacing: 9) {
             HStack(spacing: 6) {
-                Image(systemName: "macwindow.on.rectangle")
+                Image(systemName: "keyboard.badge.ellipsis")
                     .font(.caption.weight(.semibold))
                     .foregroundStyle(.tint)
-                Text(L("window.title"))
+                Text(L("shortcut.title"))
                     .font(.caption.weight(.semibold))
                 Spacer()
-                Text(L("window.subtitle"))
+                Text(!service.isAccessibilityTrusted ? L("shortcut.permission") : (service.isRunning ? L("shortcut.active") : L("shortcut.inactive")))
                     .font(.caption2)
-                    .foregroundStyle(.secondary)
-            }
-
-            LazyVGrid(columns: Array(repeating: GridItem(.flexible(), spacing: 6), count: 4), spacing: 6) {
-                ForEach(WindowLayout.allCases) { layout in
-                    Button { perform(layout) } label: {
-                        Image(systemName: layout.symbol)
-                            .font(.caption)
-                            .frame(maxWidth: .infinity)
-                            .padding(.vertical, 7)
+                    .foregroundStyle(!service.isAccessibilityTrusted ? .orange : (service.isRunning ? .green : .secondary))
+                if !service.isAccessibilityTrusted {
+                    Button {
+                        if let url = URL(string: "x-apple.systempreferences:com.apple.preference.security?Privacy_Accessibility") {
+                            NSWorkspace.shared.open(url)
+                        }
+                    } label: {
+                        Image(systemName: "arrow.up.forward.app")
                     }
                     .buttonStyle(.plain)
-                    .foregroundStyle(.primary)
-                    .glassEffect(.regular.interactive(), in: .rect(cornerRadius: 8))
-                    .help(L(layout.titleKey))
-                    .accessibilityLabel(L(layout.titleKey))
+                    .foregroundStyle(.orange)
+                    .accessibilityLabel(L("shortcut.openPermission"))
                 }
             }
 
-            HStack(spacing: 8) {
-                Button(L("window.save"), action: save)
-                Button(L("window.restore"), action: restore)
+            ForEach(ScenePreset.allCases) { scene in
+                HStack(spacing: 8) {
+                    Image(systemName: scene.symbol)
+                        .font(.caption)
+                        .frame(width: 18)
+                    Text(L(scene.titleKey))
+                        .font(.caption)
+                    Spacer()
+                    Text(recordingScene == scene ? L("shortcut.recording") : (service.binding(for: scene)?.displayName ?? L("settings.unset")))
+                        .font(.caption2.monospaced())
+                        .foregroundStyle(
+                            recordingScene == scene
+                                ? AnyShapeStyle(.tint)
+                                : AnyShapeStyle(.secondary)
+                        )
+                    Button {
+                        recordingScene = recordingScene == scene ? nil : scene
+                    } label: {
+                        Image(systemName: recordingScene == scene ? "xmark" : "record.circle")
+                    }
+                    .buttonStyle(.plain)
+                    .foregroundStyle(.tint)
+                    .accessibilityLabel(L("shortcut.record"))
+                    if service.binding(for: scene) != nil {
+                        Button {
+                            service.clearBinding(for: scene)
+                        } label: {
+                            Image(systemName: "trash")
+                        }
+                        .buttonStyle(.plain)
+                        .foregroundStyle(.secondary)
+                        .accessibilityLabel(L("shortcut.clear"))
+                    }
+                }
+                .padding(.horizontal, 7)
+                .padding(.vertical, 5)
+                .glassEffect(.regular.interactive(), in: .rect(cornerRadius: 9))
             }
-            .font(.caption2)
-            .buttonStyle(.borderless)
+
+            ShortcutCaptureView(isRecording: recordingScene != nil) { shortcut in
+                guard let scene = recordingScene else { return }
+                recordingScene = nil
+                guard let shortcut else { return }
+                do {
+                    try service.setBinding(shortcut, for: scene)
+                } catch {
+                    report(error.localizedDescription, true)
+                }
+            }
+            .frame(width: 1, height: 1)
         }
         .padding(12)
         .frame(maxWidth: .infinity, alignment: .leading)
-        .glassEffect(.regular.tint(.green.opacity(0.14)), in: .rect(cornerRadius: 16))
+        .glassEffect(.regular.tint(.pink.opacity(0.14)), in: .rect(cornerRadius: 16))
+        .task { service.start() }
+    }
+}
+
+private struct ShortcutCaptureView: NSViewRepresentable {
+    let isRecording: Bool
+    let onCapture: (GlobalShortcut?) -> Void
+
+    func makeNSView(context: Context) -> RecorderView {
+        let view = RecorderView()
+        view.onCapture = onCapture
+        return view
+    }
+
+    func updateNSView(_ nsView: RecorderView, context: Context) {
+        nsView.onCapture = onCapture
+        nsView.isRecording = isRecording
+        if isRecording {
+            nsView.window?.makeFirstResponder(nsView)
+        }
+    }
+
+    final class RecorderView: NSView {
+        var onCapture: ((GlobalShortcut?) -> Void)?
+        var isRecording = false
+
+        override var acceptsFirstResponder: Bool { true }
+
+        override func keyDown(with event: NSEvent) {
+            guard isRecording else {
+                super.keyDown(with: event)
+                return
+            }
+            if event.keyCode == 53 {
+                onCapture?(nil)
+                return
+            }
+            onCapture?(GlobalShortcut(
+                keyCode: event.keyCode,
+                modifiers: GlobalShortcutCatalog.normalizedModifiers(event.modifierFlags)
+            ))
+        }
     }
 }
 
 /// 专注模式卡片。
 struct FocusModeCard: View {
     let isEnabled: Bool?
+    let isDoNotDisturbEnabled: Bool?
     let isBusy: Bool
     let toggle: () -> Void
+    let toggleDoNotDisturb: () -> Void
     let openSettings: () -> Void
 
     var body: some View {
@@ -217,6 +301,16 @@ struct FocusModeCard: View {
             .buttonStyle(.borderedProminent)
             .controlSize(.small)
             .disabled(isBusy)
+            Button {
+                toggleDoNotDisturb()
+            } label: {
+                Image(systemName: isDoNotDisturbEnabled == true ? "bell.slash.fill" : "bell.slash")
+            }
+            .buttonStyle(.plain)
+            .foregroundStyle(isDoNotDisturbEnabled == true ? .orange : .secondary)
+            .disabled(isBusy)
+            .help(L("focus.doNotDisturb"))
+            .accessibilityLabel(L("focus.doNotDisturb"))
             Button {
                 openSettings()
             } label: {

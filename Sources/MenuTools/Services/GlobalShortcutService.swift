@@ -1,0 +1,189 @@
+import AppKit
+import ApplicationServices
+import Foundation
+import Observation
+
+enum GlobalShortcutModifier {
+    static let controlOption = NSEvent.ModifierFlags([.control, .option]).rawValue
+    static let relevantMask = NSEvent.ModifierFlags([.command, .option, .control, .shift]).rawValue
+}
+
+struct GlobalShortcut: Codable, Equatable, Hashable, Sendable {
+    let keyCode: UInt16
+    let modifiers: UInt
+
+    var displayName: String {
+        let flags = NSEvent.ModifierFlags(rawValue: modifiers)
+        var prefix = ""
+        if flags.contains(.control) { prefix += "⌃" }
+        if flags.contains(.option) { prefix += "⌥" }
+        if flags.contains(.shift) { prefix += "⇧" }
+        if flags.contains(.command) { prefix += "⌘" }
+        return prefix + Self.keyName(for: keyCode)
+    }
+
+    static func keyName(for keyCode: UInt16) -> String {
+        switch keyCode {
+        case 18: return "1"
+        case 19: return "2"
+        case 20: return "3"
+        case 21: return "4"
+        case 23: return "5"
+        case 22: return "6"
+        case 26: return "7"
+        case 28: return "8"
+        case 25: return "9"
+        case 29: return "0"
+        case 49: return "Space"
+        case 36: return "↩"
+        case 48: return "⇥"
+        case 53: return "Esc"
+        case 123: return "←"
+        case 124: return "→"
+        case 125: return "↓"
+        case 126: return "↑"
+        default: return "Key (keyCode)"
+        }
+    }
+}
+
+enum GlobalShortcutCatalog {
+    static let defaults: [ScenePreset: GlobalShortcut] = [
+        .work: GlobalShortcut(keyCode: 18, modifiers: GlobalShortcutModifier.controlOption),
+        .demo: GlobalShortcut(keyCode: 19, modifiers: GlobalShortcutModifier.controlOption),
+        .night: GlobalShortcut(keyCode: 20, modifiers: GlobalShortcutModifier.controlOption)
+    ]
+
+    static func match(
+        keyCode: UInt16,
+        modifiers: UInt,
+        bindings: [ScenePreset: GlobalShortcut]
+    ) -> ScenePreset? {
+        bindings.first { $0.value.keyCode == keyCode && $0.value.modifiers == modifiers }?.key
+    }
+
+    static func conflict(
+        for binding: GlobalShortcut,
+        excluding scene: ScenePreset,
+        in bindings: [ScenePreset: GlobalShortcut]
+    ) -> ScenePreset? {
+        bindings.first { $0.key != scene && $0.value == binding }?.key
+    }
+
+    static func normalizedModifiers(_ flags: NSEvent.ModifierFlags) -> UInt {
+        flags.intersection([.command, .option, .control, .shift]).rawValue
+    }
+}
+
+enum GlobalShortcutError: LocalizedError, Equatable {
+    case modifierRequired
+    case conflict(ScenePreset)
+
+    var errorDescription: String? {
+        switch self {
+        case .modifierRequired: return L("shortcut.error.modifierRequired")
+        case let .conflict(scene): return L("shortcut.error.conflict", L(scene.titleKey))
+        }
+    }
+}
+
+@MainActor
+@Observable
+final class GlobalShortcutService {
+    static let shared = GlobalShortcutService()
+
+    private(set) var bindings: [ScenePreset: GlobalShortcut]
+    private(set) var lastTriggeredScene: ScenePreset?
+    private(set) var lastError: String?
+    private(set) var isRunning = false
+    private(set) var isAccessibilityTrusted = AXIsProcessTrusted()
+    private let defaults: UserDefaults
+    private var globalMonitor: Any?
+    private var localMonitor: Any?
+
+    init(defaults: UserDefaults = .standard) {
+        self.defaults = defaults
+        self.bindings = GlobalShortcutService.loadBindings(from: defaults)
+    }
+
+    func start() {
+        guard globalMonitor == nil && localMonitor == nil else { return }
+        isAccessibilityTrusted = AXIsProcessTrusted()
+        globalMonitor = NSEvent.addGlobalMonitorForEvents(matching: .keyDown) { [weak self] event in
+            let keyCode = event.keyCode
+            let modifiers = GlobalShortcutCatalog.normalizedModifiers(event.modifierFlags)
+            Task { @MainActor [weak self] in
+                self?.handle(keyCode: keyCode, modifiers: modifiers)
+            }
+        }
+        localMonitor = NSEvent.addLocalMonitorForEvents(matching: .keyDown) { [weak self] event in
+            let keyCode = event.keyCode
+            let modifiers = GlobalShortcutCatalog.normalizedModifiers(event.modifierFlags)
+            Task { @MainActor [weak self] in
+                self?.handle(keyCode: keyCode, modifiers: modifiers)
+            }
+            return event
+        }
+        isRunning = globalMonitor != nil || localMonitor != nil
+    }
+
+    func stop() {
+        if let globalMonitor { NSEvent.removeMonitor(globalMonitor) }
+        if let localMonitor { NSEvent.removeMonitor(localMonitor) }
+        globalMonitor = nil
+        localMonitor = nil
+        isRunning = false
+        isAccessibilityTrusted = AXIsProcessTrusted()
+    }
+
+    func binding(for scene: ScenePreset) -> GlobalShortcut? {
+        bindings[scene]
+    }
+
+    func setBinding(_ binding: GlobalShortcut, for scene: ScenePreset) throws {
+        guard binding.modifiers & GlobalShortcutModifier.relevantMask != 0 else {
+            throw GlobalShortcutError.modifierRequired
+        }
+        if let conflict = GlobalShortcutCatalog.conflict(for: binding, excluding: scene, in: bindings) {
+            throw GlobalShortcutError.conflict(conflict)
+        }
+        bindings[scene] = binding
+        saveBindings()
+    }
+
+    func clearBinding(for scene: ScenePreset) {
+        bindings.removeValue(forKey: scene)
+        saveBindings()
+    }
+
+    private func handle(keyCode: UInt16, modifiers: UInt) {
+        guard let scene = GlobalShortcutCatalog.match(keyCode: keyCode, modifiers: modifiers, bindings: bindings) else {
+            return
+        }
+        do {
+            try SceneService.shared.apply(
+                scene,
+                launcher: AppLauncherService.shared,
+                focusService: FocusModeService.shared
+            )
+            lastTriggeredScene = scene
+            lastError = nil
+        } catch {
+            lastError = error.localizedDescription
+        }
+    }
+
+    private func saveBindings() {
+        guard let data = try? JSONEncoder().encode(bindings) else { return }
+        defaults.set(data, forKey: "globalShortcuts.bindings")
+    }
+
+    private static func loadBindings(from defaults: UserDefaults) -> [ScenePreset: GlobalShortcut] {
+        guard let data = defaults.data(forKey: "globalShortcuts.bindings"),
+              let values = try? JSONDecoder().decode([ScenePreset: GlobalShortcut].self, from: data) else {
+            return GlobalShortcutCatalog.defaults
+        }
+        return values
+    }
+
+}

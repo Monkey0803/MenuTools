@@ -20,6 +20,8 @@ struct SettingsView: View {
                 .tabItem { Label(L("settings.tab.rightClick"), systemImage: "contextualmenu.and.cursorarrow") }
             ScrollSettingsView()
                 .tabItem { Label(L("settings.tab.scroll"), systemImage: "computermouse") }
+            WindowManagementSettingsView()
+                .tabItem { Label(L("settings.tab.windowManagement"), systemImage: "macwindow.on.rectangle") }
         }
         .frame(width: SettingsLayout.width, height: SettingsLayout.height)
         .id(appLanguage)   // 切换语言时整体重建，连 Tab 标签一起刷新
