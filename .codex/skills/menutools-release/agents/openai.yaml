@@ -1,0 +1,4 @@
+interface:
+  display_name: "MenuTools 发布"
+  short_description: "按项目流程构建并发布 MenuTools GitHub Release"
+  default_prompt: "使用 $menutools-release 按项目既定流程发布 MenuTools 版本。"
