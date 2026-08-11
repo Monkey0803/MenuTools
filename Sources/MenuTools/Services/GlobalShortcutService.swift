@@ -81,6 +81,7 @@ enum GlobalShortcutError: LocalizedError, Equatable {
     case systemConflict
     case otherApplicationConflict
     case windowConflict(WindowLayout)
+    case appConflict(String)
 
     var errorDescription: String? {
         switch self {
@@ -89,6 +90,11 @@ enum GlobalShortcutError: LocalizedError, Equatable {
         case .systemConflict: return L("shortcut.error.systemConflict")
         case .otherApplicationConflict: return L("shortcut.error.otherApplicationConflict")
         case let .windowConflict(layout): return L("shortcut.error.conflict", L(layout.titleKey))
+        case let .appConflict(path):
+            return L(
+                "shortcut.error.conflict",
+                URL(fileURLWithPath: path).deletingPathExtension().lastPathComponent
+            )
         }
     }
 }
@@ -106,17 +112,20 @@ final class GlobalShortcutService {
     private let defaults: UserDefaults
     private let conflictChecker: any ShortcutConflictChecking
     private let windowBindingsProvider: @MainActor () -> [WindowLayout: GlobalShortcut]
+    private let appBindingsProvider: @MainActor () -> [String: GlobalShortcut]
     private var globalMonitor: Any?
     private var localMonitor: Any?
 
     init(
         defaults: UserDefaults = .standard,
         conflictChecker: any ShortcutConflictChecking = DefaultShortcutConflictChecker(),
-        windowBindingsProvider: @escaping @MainActor () -> [WindowLayout: GlobalShortcut] = { WindowShortcutService.shared.bindings }
+        windowBindingsProvider: @escaping @MainActor () -> [WindowLayout: GlobalShortcut] = { WindowShortcutService.shared.bindings },
+        appBindingsProvider: @escaping @MainActor () -> [String: GlobalShortcut] = { AppShortcutService.shared.bindings }
     ) {
         self.defaults = defaults
         self.conflictChecker = conflictChecker
         self.windowBindingsProvider = windowBindingsProvider
+        self.appBindingsProvider = appBindingsProvider
         self.bindings = GlobalShortcutService.loadBindings(from: defaults)
     }
 
@@ -164,8 +173,10 @@ final class GlobalShortcutService {
         let context = ShortcutConflictContext(
             sceneBindings: bindings,
             windowBindings: windowBindingsProvider(),
+            appBindings: appBindingsProvider(),
             excludingScene: scene,
-            excludingWindow: nil
+            excludingWindow: nil,
+            excludingAppPath: nil
         )
         switch conflictChecker.conflict(for: binding, context: context) {
         case .system:
@@ -176,6 +187,8 @@ final class GlobalShortcutService {
             throw GlobalShortcutError.windowConflict(layout)
         case let .scene(conflict):
             throw GlobalShortcutError.conflict(conflict)
+        case let .app(path):
+            throw GlobalShortcutError.appConflict(path)
         case nil:
             break
         }

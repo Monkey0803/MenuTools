@@ -238,6 +238,23 @@
 /* 平滑捲動 */
 "settings.tab.scroll" = "平滑捲動";
 "settings.tab.windowManagement" = "視窗管理";
+"settings.tab.appLaunch" = "應用程式啟動";
+"appShortcut.title" = "應用程式啟動快捷鍵";
+"appShortcut.subtitle" = "為應用程式綁定全域快捷鍵，按下後直接啟動對應應用程式。";
+"appShortcut.frontmost" = "目前最前端應用程式";
+"appShortcut.refresh" = "重新整理目前應用程式";
+"appShortcut.bindCurrent" = "綁定目前應用程式";
+"appShortcut.noFrontmost" = "未偵測到外部應用程式";
+"appShortcut.select" = "選擇應用程式";
+"appShortcut.bound" = "已綁定應用程式";
+"appShortcut.add" = "新增應用程式";
+"appShortcut.addTitle" = "新增應用程式快捷鍵";
+"appShortcut.currentBinding" = "目前快捷鍵";
+"appShortcut.save" = "儲存綁定";
+"appShortcut.search" = "搜尋已安裝的應用程式";
+"appShortcut.empty" = "找不到應用程式";
+"appShortcut.emptyBound" = "尚未綁定應用程式，點擊「新增應用程式」開始設定。";
+"appShortcut.launchFailed" = "無法啟動 %@";
 "scroll.title" = "平滑捲動";
 "scroll.subtitle" = "接管滑鼠滾輪，將生硬的捲動插值成順滑捲動。僅作用於滑鼠，不影響觸控板。";
 "scroll.enable" = "啟用平滑捲動";

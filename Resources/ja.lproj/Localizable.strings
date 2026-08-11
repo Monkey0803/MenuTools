@@ -238,6 +238,23 @@
 /* スムーズスクロール */
 "settings.tab.scroll" = "スムーズスクロール";
 "settings.tab.windowManagement" = "ウインドウ管理";
+"settings.tab.appLaunch" = "アプリ起動";
+"appShortcut.title" = "アプリ起動ショートカット";
+"appShortcut.subtitle" = "アプリを直接起動するグローバルショートカットを割り当てます。";
+"appShortcut.frontmost" = "現在の最前面アプリ";
+"appShortcut.refresh" = "最前面アプリを更新";
+"appShortcut.bindCurrent" = "現在のアプリを割り当て";
+"appShortcut.noFrontmost" = "外部アプリが見つかりません";
+"appShortcut.select" = "アプリを選択";
+"appShortcut.bound" = "割り当て済みアプリ";
+"appShortcut.add" = "アプリを追加";
+"appShortcut.addTitle" = "アプリ起動ショートカットを追加";
+"appShortcut.currentBinding" = "現在のショートカット";
+"appShortcut.save" = "割り当てを保存";
+"appShortcut.search" = "インストール済みアプリを検索";
+"appShortcut.empty" = "アプリが見つかりません";
+"appShortcut.emptyBound" = "割り当て済みアプリはありません。「アプリを追加」から設定してください。";
+"appShortcut.launchFailed" = "%@ を起動できません";
 "scroll.title" = "スムーズスクロール";
 "scroll.subtitle" = "マウスホイールを引き取り、カクつくスクロールを滑らかに補間します。トラックパッドには影響しません。";
 "scroll.enable" = "スムーズスクロールを有効にする";

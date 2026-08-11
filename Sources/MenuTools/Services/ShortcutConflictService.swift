@@ -8,13 +8,16 @@ enum ShortcutConflictSource: Equatable, Sendable {
     case otherApplication
     case scene(ScenePreset)
     case window(WindowLayout)
+    case app(String)
 }
 
 struct ShortcutConflictContext: Sendable {
     let sceneBindings: [ScenePreset: GlobalShortcut]
     let windowBindings: [WindowLayout: GlobalShortcut]
+    let appBindings: [String: GlobalShortcut]
     let excludingScene: ScenePreset?
     let excludingWindow: WindowLayout?
+    let excludingAppPath: String?
 }
 
 /// 快捷键冲突检测边界，便于测试时替换系统能力。
@@ -129,6 +132,11 @@ struct DefaultShortcutConflictChecker: ShortcutConflictChecking {
             $0.key != context.excludingWindow && $0.value == shortcut
         })?.key {
             return .window(conflict)
+        }
+        if let conflict = context.appBindings.first(where: {
+            $0.key != context.excludingAppPath && $0.value == shortcut
+        })?.key {
+            return .app(conflict)
         }
         if systemProvider.contains(shortcut) { return .system }
         if externalProbe.contains(shortcut) { return .otherApplication }

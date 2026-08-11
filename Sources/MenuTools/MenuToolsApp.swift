@@ -65,6 +65,8 @@ struct MenuToolsApp: App {
         ClipboardHistoryService.shared.startMonitoring()
         // 全局快捷键必须独立于面板生命周期持续监听
         GlobalShortcutService.shared.start()
+        // 应用快捷键必须独立于设置页面生命周期持续监听
+        AppShortcutService.shared.start()
         // 窗口布局快捷键必须独立于设置页面生命周期持续监听
         WindowShortcutService.shared.start()
         // 窗口管理器的应用规则和边缘吸附必须独立于设置页面持续运行

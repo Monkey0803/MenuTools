@@ -23,10 +23,13 @@ enum AppLauncherCatalog {
         let normalizedQuery = query.trimmingCharacters(in: .whitespacesAndNewlines)
             .folding(options: [.diacriticInsensitive, .caseInsensitive], locale: .current)
         let filtered = apps.filter { app in
-            normalizedQuery.isEmpty || app.name.folding(
-                options: [.diacriticInsensitive, .caseInsensitive],
-                locale: .current
-            ).contains(normalizedQuery)
+            guard !normalizedQuery.isEmpty else { return true }
+            let packageName = URL(fileURLWithPath: app.path)
+                .deletingPathExtension()
+                .lastPathComponent
+            let searchableText = "\(app.name) \(packageName)"
+                .folding(options: [.diacriticInsensitive, .caseInsensitive], locale: .current)
+            return searchableText.contains(normalizedQuery)
         }
         let recentRank = Dictionary(uniqueKeysWithValues: recentPaths.enumerated().map { ($1, $0) })
         return filtered.sorted { lhs, rhs in
@@ -134,11 +137,38 @@ final class AppLauncherService {
         return true
     }
 
+    func application(atPath path: String) -> LaunchableApp? {
+        if let app = apps.first(where: { $0.path == path }) {
+            return app
+        }
+        return Self.descriptor(for: URL(fileURLWithPath: path))
+    }
+
+    /// 返回最近的外部前台应用；设置窗口激活后不会把 MenuTools 自身返回给调用方。
+    func frontmostExternalApplication() -> LaunchableApp? {
+        let ownProcessIdentifier = ProcessInfo.processInfo.processIdentifier
+        let frontmostProcess = NSWorkspace.shared.frontmostApplication
+        let process: NSRunningApplication?
+
+        if frontmostProcess?.processIdentifier == ownProcessIdentifier {
+            guard let info = WindowManagementService.shared.focusedApplicationInfo() else { return nil }
+            process = NSRunningApplication(processIdentifier: info.processIdentifier)
+        } else {
+            process = frontmostProcess
+        }
+
+        guard let url = process?.bundleURL else { return nil }
+        return Self.descriptor(for: url)
+    }
+
     private static func descriptor(for url: URL) -> LaunchableApp? {
         guard let bundle = Bundle(url: url) else { return nil }
-        let name = (bundle.object(forInfoDictionaryKey: "CFBundleDisplayName") as? String)
+        let packageName = url.deletingPathExtension().lastPathComponent
+        let bundleName = (bundle.object(forInfoDictionaryKey: "CFBundleDisplayName") as? String)
             ?? (bundle.object(forInfoDictionaryKey: "CFBundleName") as? String)
-            ?? url.deletingPathExtension().lastPathComponent
+        // Finder 中显示的是应用包名称；例如 VS Code 的 Bundle 名称是 Code，
+        // 但用户实际选择的是“Visual Studio Code.app”。
+        let name = packageName.isEmpty ? (bundleName ?? url.lastPathComponent) : packageName
         return LaunchableApp(
             path: url.path,
             name: name,

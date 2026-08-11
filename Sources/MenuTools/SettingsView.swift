@@ -4,7 +4,7 @@ import UniformTypeIdentifiers
 
 /// 设置窗口统一尺寸（各 Tab 一致，避免切换时窗口重置闪烁）
 enum SettingsLayout {
-    static let width: CGFloat = 480
+    static let width: CGFloat = 600
     static let height: CGFloat = 580
     static let tabBarHeight: CGFloat = 44
     static let windowHeight: CGFloat = height + tabBarHeight
@@ -15,6 +15,7 @@ private enum SettingsTab: String, CaseIterable, Hashable, Identifiable {
     case rightClick
     case scroll
     case windowManagement
+    case appLaunch
 
     var id: String { rawValue }
 
@@ -24,6 +25,7 @@ private enum SettingsTab: String, CaseIterable, Hashable, Identifiable {
         case .rightClick: return "settings.tab.rightClick"
         case .scroll: return "settings.tab.scroll"
         case .windowManagement: return "settings.tab.windowManagement"
+        case .appLaunch: return "settings.tab.appLaunch"
         }
     }
 
@@ -33,6 +35,7 @@ private enum SettingsTab: String, CaseIterable, Hashable, Identifiable {
         case .rightClick: return "contextualmenu.and.cursorarrow"
         case .scroll: return "computermouse"
         case .windowManagement: return "macwindow.on.rectangle"
+        case .appLaunch: return "app.badge"
         }
     }
 }
@@ -68,6 +71,8 @@ struct SettingsView: View {
                     ScrollSettingsView()
                 case .windowManagement:
                     WindowManagementSettingsView()
+                case .appLaunch:
+                    AppLaunchSettingsView()
                 }
             }
             .frame(width: SettingsLayout.width, height: SettingsLayout.height)

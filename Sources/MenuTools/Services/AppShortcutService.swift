@@ -3,41 +3,12 @@ import ApplicationServices
 import Foundation
 import Observation
 
-enum WindowShortcutError: LocalizedError, Equatable {
-    case modifierRequired
-    case conflict(WindowLayout)
-    case systemConflict
-    case otherApplicationConflict
-    case sceneConflict(ScenePreset)
-    case appConflict(String)
-
-    var errorDescription: String? {
-        switch self {
-        case .modifierRequired:
-            return L("shortcut.error.modifierRequired")
-        case let .conflict(layout):
-            return L("shortcut.error.conflict", L(layout.titleKey))
-        case .systemConflict:
-            return L("shortcut.error.systemConflict")
-        case .otherApplicationConflict:
-            return L("shortcut.error.otherApplicationConflict")
-        case let .sceneConflict(scene):
-            return L("shortcut.error.conflict", L(scene.titleKey))
-        case let .appConflict(path):
-            return L(
-                "shortcut.error.conflict",
-                URL(fileURLWithPath: path).deletingPathExtension().lastPathComponent
-            )
-        }
-    }
-}
-
-enum WindowShortcutCatalog {
+enum AppShortcutCatalog {
     static func match(
         keyCode: UInt16,
         modifiers: UInt,
-        bindings: [WindowLayout: GlobalShortcut]
-    ) -> WindowLayout? {
+        bindings: [String: GlobalShortcut]
+    ) -> String? {
         bindings.first {
             $0.value.keyCode == keyCode && $0.value.modifiers == modifiers
         }?.key
@@ -45,42 +16,78 @@ enum WindowShortcutCatalog {
 
     static func conflict(
         for binding: GlobalShortcut,
-        excluding layout: WindowLayout,
-        in bindings: [WindowLayout: GlobalShortcut]
-    ) -> WindowLayout? {
-        bindings.first { $0.key != layout && $0.value == binding }?.key
+        excluding path: String,
+        in bindings: [String: GlobalShortcut]
+    ) -> String? {
+        bindings.first { $0.key != path && $0.value == binding }?.key
     }
 }
 
-/// 窗口布局快捷键的持久化与全局监听服务。
+enum AppShortcutError: LocalizedError, Equatable {
+    case modifierRequired
+    case conflict(String)
+    case systemConflict
+    case otherApplicationConflict
+    case sceneConflict(ScenePreset)
+    case windowConflict(WindowLayout)
+    case launchFailed(String)
+
+    var errorDescription: String? {
+        switch self {
+        case .modifierRequired:
+            return L("shortcut.error.modifierRequired")
+        case let .conflict(path):
+            return L(
+                "shortcut.error.conflict",
+                URL(fileURLWithPath: path).deletingPathExtension().lastPathComponent
+            )
+        case .systemConflict:
+            return L("shortcut.error.systemConflict")
+        case .otherApplicationConflict:
+            return L("shortcut.error.otherApplicationConflict")
+        case let .sceneConflict(scene):
+            return L("shortcut.error.conflict", L(scene.titleKey))
+        case let .windowConflict(layout):
+            return L("shortcut.error.conflict", L(layout.titleKey))
+        case let .launchFailed(name):
+            return L("appShortcut.launchFailed", name)
+        }
+    }
+}
+
+/// 应用快捷键服务，独立于设置窗口持续监听并启动指定应用。
 @MainActor
 @Observable
-final class WindowShortcutService {
-    static let shared = WindowShortcutService()
+final class AppShortcutService {
+    static let shared = AppShortcutService()
 
-    private(set) var bindings: [WindowLayout: GlobalShortcut]
+    private(set) var bindings: [String: GlobalShortcut]
+    private(set) var lastTriggeredPath: String?
     private(set) var lastError: String?
     private(set) var isRunning = false
     private(set) var isAccessibilityTrusted = AXIsProcessTrusted()
 
     private let defaults: UserDefaults
+    private let launcher: AppLauncherService
     private let conflictChecker: any ShortcutConflictChecking
     private let sceneBindingsProvider: @MainActor () -> [ScenePreset: GlobalShortcut]
-    private let appBindingsProvider: @MainActor () -> [String: GlobalShortcut]
+    private let windowBindingsProvider: @MainActor () -> [WindowLayout: GlobalShortcut]
     private var globalMonitor: Any?
     private var localMonitor: Any?
 
     init(
         defaults: UserDefaults = .standard,
+        launcher: AppLauncherService = .shared,
         conflictChecker: any ShortcutConflictChecking = DefaultShortcutConflictChecker(),
         sceneBindingsProvider: @escaping @MainActor () -> [ScenePreset: GlobalShortcut] = { GlobalShortcutService.shared.bindings },
-        appBindingsProvider: @escaping @MainActor () -> [String: GlobalShortcut] = { AppShortcutService.shared.bindings }
+        windowBindingsProvider: @escaping @MainActor () -> [WindowLayout: GlobalShortcut] = { WindowShortcutService.shared.bindings }
     ) {
         self.defaults = defaults
-        self.bindings = Self.loadBindings(from: defaults)
+        self.launcher = launcher
         self.conflictChecker = conflictChecker
         self.sceneBindingsProvider = sceneBindingsProvider
-        self.appBindingsProvider = appBindingsProvider
+        self.windowBindingsProvider = windowBindingsProvider
+        self.bindings = Self.loadBindings(from: defaults)
     }
 
     func start() {
@@ -113,77 +120,81 @@ final class WindowShortcutService {
         isAccessibilityTrusted = AXIsProcessTrusted()
     }
 
-    func binding(for layout: WindowLayout) -> GlobalShortcut? {
-        bindings[layout]
+    func binding(for app: LaunchableApp) -> GlobalShortcut? {
+        bindings[app.path]
     }
 
-    func setBinding(_ binding: GlobalShortcut, for layout: WindowLayout) throws {
+    func binding(for path: String) -> GlobalShortcut? {
+        bindings[path]
+    }
+
+    func setBinding(_ binding: GlobalShortcut, for app: LaunchableApp) throws {
         guard binding.modifiers & GlobalShortcutModifier.relevantMask != 0 else {
-            throw WindowShortcutError.modifierRequired
+            throw AppShortcutError.modifierRequired
         }
-        if let conflict = WindowShortcutCatalog.conflict(for: binding, excluding: layout, in: bindings) {
-            throw WindowShortcutError.conflict(conflict)
+        if let conflict = AppShortcutCatalog.conflict(for: binding, excluding: app.path, in: bindings) {
+            throw AppShortcutError.conflict(conflict)
         }
+
         let context = ShortcutConflictContext(
             sceneBindings: sceneBindingsProvider(),
-            windowBindings: bindings,
-            appBindings: appBindingsProvider(),
+            windowBindings: windowBindingsProvider(),
+            appBindings: bindings,
             excludingScene: nil,
-            excludingWindow: layout,
-            excludingAppPath: nil
+            excludingWindow: nil,
+            excludingAppPath: app.path
         )
         switch conflictChecker.conflict(for: binding, context: context) {
         case .system:
-            throw WindowShortcutError.systemConflict
+            throw AppShortcutError.systemConflict
         case .otherApplication:
-            throw WindowShortcutError.otherApplicationConflict
+            throw AppShortcutError.otherApplicationConflict
         case let .scene(scene):
-            throw WindowShortcutError.sceneConflict(scene)
-        case let .window(conflict):
-            throw WindowShortcutError.conflict(conflict)
+            throw AppShortcutError.sceneConflict(scene)
+        case let .window(layout):
+            throw AppShortcutError.windowConflict(layout)
         case let .app(path):
-            throw WindowShortcutError.appConflict(path)
+            throw AppShortcutError.conflict(path)
         case nil:
             break
         }
-        bindings[layout] = binding
+
+        bindings[app.path] = binding
         lastError = nil
         saveBindings()
     }
 
-    func clearBinding(for layout: WindowLayout) {
-        bindings.removeValue(forKey: layout)
+    func clearBinding(for app: LaunchableApp) {
+        bindings.removeValue(forKey: app.path)
         lastError = nil
         saveBindings()
     }
 
     private func handle(keyCode: UInt16, modifiers: UInt) {
-        guard let layout = WindowShortcutCatalog.match(
+        guard let path = AppShortcutCatalog.match(
             keyCode: keyCode,
             modifiers: modifiers,
             bindings: bindings
-        ) else {
+        ), let app = launcher.application(atPath: path) else {
             return
         }
 
-        do {
-            try WindowManagementService.shared.apply(layout)
-            lastError = nil
-        } catch {
-            lastError = error.localizedDescription
+        guard launcher.launch(app) else {
+            lastError = AppShortcutError.launchFailed(app.name).localizedDescription
+            return
         }
+        lastTriggeredPath = path
+        lastError = nil
     }
 
     private func saveBindings() {
         guard let data = try? JSONEncoder().encode(bindings) else { return }
-        defaults.set(data, forKey: Self.bindingsKey)
+        defaults.set(data, forKey: "appShortcuts.bindings")
     }
 
-    private static let bindingsKey = "windowManagement.shortcuts"
-
-    private static func loadBindings(from defaults: UserDefaults) -> [WindowLayout: GlobalShortcut] {
-        guard let data = defaults.data(forKey: bindingsKey),
-              let values = try? JSONDecoder().decode([WindowLayout: GlobalShortcut].self, from: data) else {
+    private static func loadBindings(from defaults: UserDefaults) -> [String: GlobalShortcut] {
+        guard let data = defaults.data(forKey: "appShortcuts.bindings"),
+              let values = try? JSONDecoder().decode([String: GlobalShortcut].self, from: data) else {
             return [:]
         }
         return values

@@ -94,12 +94,10 @@ struct MenuPanelView: View {
                         .entrance(1, appeared: appeared)
                     quickActionsCard
                         .entrance(2, appeared: appeared)
-                    AppLauncherCard(service: appLauncherService, report: flashStatus)
-                        .entrance(3, appeared: appeared)
                     ScenePresetsCard(activeScene: sceneService.activeScene, apply: applyScene)
-                        .entrance(4, appeared: appeared)
+                        .entrance(3, appeared: appeared)
                     GlobalShortcutCard(service: globalShortcutService, report: flashStatus)
-                        .entrance(5, appeared: appeared)
+                        .entrance(4, appeared: appeared)
                     FocusModeCard(
                         isEnabled: focusModeService.isEnabled,
                         isDoNotDisturbEnabled: focusModeService.isDoNotDisturbEnabled,
@@ -108,29 +106,29 @@ struct MenuPanelView: View {
                         toggleDoNotDisturb: toggleDoNotDisturb,
                         openSettings: openFocusSettings
                     )
-                    .entrance(6, appeared: appeared)
+                    .entrance(5, appeared: appeared)
                     systemResourceCard
-                        .entrance(7, appeared: appeared)
+                        .entrance(6, appeared: appeared)
                     networkCard
-                        .entrance(8, appeared: appeared)
+                        .entrance(7, appeared: appeared)
                     batteryHealthCard
-                        .entrance(9, appeared: appeared)
+                        .entrance(8, appeared: appeared)
                     displayCard
-                        .entrance(10, appeared: appeared)
+                        .entrance(9, appeared: appeared)
                     storageCard
-                        .entrance(11, appeared: appeared)
+                        .entrance(10, appeared: appeared)
                     quickToggles
-                        .entrance(12, appeared: appeared)
+                        .entrance(11, appeared: appeared)
                     bluetoothCard
-                        .entrance(13, appeared: appeared)
+                        .entrance(12, appeared: appeared)
                     cleanupTiles
-                        .entrance(14, appeared: appeared)
+                        .entrance(13, appeared: appeared)
                     }
                 }
             }
 
             footer
-                .entrance(15, appeared: appeared)
+                .entrance(14, appeared: appeared)
         }
         .padding(16)
         // 菜单栏窗口必须有明确高度，否则 ScrollView 会按全部卡片的理想高度展开，
@@ -1635,6 +1633,8 @@ private struct ClipboardHistoryPopover: View {
                         .foregroundStyle(.secondary)
                 }
                 .menuStyle(.borderlessButton)
+                .focusable(false)
+                .focusEffectDisabled()
                 .accessibilityLabel(L("clipboard.actions"))
             }
 
@@ -1682,6 +1682,8 @@ private struct ClipboardHistoryRow: View {
     let onTogglePinned: () -> Void
     let onRemove: () -> Void
 
+    @State private var isImageHovered = false
+
     var body: some View {
         HStack(spacing: 8) {
             Button(action: onCopy) {
@@ -1725,6 +1727,21 @@ private struct ClipboardHistoryRow: View {
                     .resizable()
                     .scaledToFit()
                     .frame(height: 48)
+                    .onHover { isImageHovered = $0 }
+                    .popover(
+                        isPresented: $isImageHovered,
+                        attachmentAnchor: .rect(.bounds),
+                        arrowEdge: .leading
+                    ) {
+                        Image(nsImage: image)
+                            .resizable()
+                            .scaledToFit()
+                            .frame(width: 240, height: 180)
+                            .padding(10)
+                            .background(.regularMaterial, in: .rect(cornerRadius: 12))
+                            .shadow(color: .black.opacity(0.18), radius: 12, y: 5)
+                            .allowsHitTesting(false)
+                    }
             } else {
                 Label(L("clipboard.image"), systemImage: "photo")
                     .font(.caption)

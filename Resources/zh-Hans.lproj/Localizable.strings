@@ -238,6 +238,23 @@
 /* 平滑滚动 */
 "settings.tab.scroll" = "平滑滚动";
 "settings.tab.windowManagement" = "窗口管理";
+"settings.tab.appLaunch" = "应用启动";
+"appShortcut.title" = "应用启动快捷键";
+"appShortcut.subtitle" = "为应用绑定全局快捷键，按下后直接启动对应应用。";
+"appShortcut.frontmost" = "当前最前端应用";
+"appShortcut.refresh" = "刷新当前应用";
+"appShortcut.bindCurrent" = "绑定当前应用";
+"appShortcut.noFrontmost" = "未检测到外部应用";
+"appShortcut.select" = "选择应用";
+"appShortcut.bound" = "已绑定应用";
+"appShortcut.add" = "添加应用";
+"appShortcut.addTitle" = "添加应用快捷键";
+"appShortcut.currentBinding" = "当前快捷键";
+"appShortcut.save" = "保存绑定";
+"appShortcut.search" = "搜索已安装的应用";
+"appShortcut.empty" = "未找到应用";
+"appShortcut.emptyBound" = "暂未绑定应用，点击“添加应用”开始设置。";
+"appShortcut.launchFailed" = "无法启动 %@";
 "scroll.title" = "平滑滚动";
 "scroll.subtitle" = "接管鼠标滚轮，将生硬的滚动插值成顺滑滚动。仅作用于鼠标，不影响触控板。";
 "scroll.enable" = "启用平滑滚动";

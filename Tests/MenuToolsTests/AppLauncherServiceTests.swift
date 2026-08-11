@@ -35,3 +35,23 @@ func appLauncherSearchMatchesName() {
 
     #expect(result.map(\.name) == ["Safari"])
 }
+
+@Test("应用启动器搜索支持应用包目录名称")
+func appLauncherSearchMatchesPackageName() {
+    let apps = [
+        LaunchableApp(
+            path: "/Applications/Visual Studio Code.app",
+            name: "Code",
+            bundleIdentifier: "com.microsoft.VSCode"
+        )
+    ]
+
+    let result = AppLauncherCatalog.visibleApps(
+        apps,
+        query: "vis",
+        favoritePaths: [],
+        recentPaths: []
+    )
+
+    #expect(result.map(\.path) == ["/Applications/Visual Studio Code.app"])
+}

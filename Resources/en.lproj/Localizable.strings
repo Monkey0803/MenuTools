@@ -238,6 +238,23 @@
 /* Smooth scrolling */
 "settings.tab.scroll" = "Smooth Scroll";
 "settings.tab.windowManagement" = "Window Management";
+"settings.tab.appLaunch" = "App Launch";
+"appShortcut.title" = "App Launch Shortcuts";
+"appShortcut.subtitle" = "Bind global shortcuts to launch an app directly.";
+"appShortcut.frontmost" = "Current Frontmost App";
+"appShortcut.refresh" = "Refresh frontmost app";
+"appShortcut.bindCurrent" = "Bind Current App";
+"appShortcut.noFrontmost" = "No external app detected";
+"appShortcut.select" = "Select an App";
+"appShortcut.bound" = "Bound Apps";
+"appShortcut.add" = "Add App";
+"appShortcut.addTitle" = "Add App Shortcut";
+"appShortcut.currentBinding" = "Current Shortcut";
+"appShortcut.save" = "Save Binding";
+"appShortcut.search" = "Search installed apps";
+"appShortcut.empty" = "No apps found";
+"appShortcut.emptyBound" = "No apps are bound yet. Click “Add App” to get started.";
+"appShortcut.launchFailed" = "Unable to launch %@";
 "scroll.title" = "Smooth Scrolling";
 "scroll.subtitle" = "Intercepts the mouse wheel and interpolates jerky scrolls into smooth motion. Affects the mouse only, not the trackpad.";
 "scroll.enable" = "Enable Smooth Scrolling";
