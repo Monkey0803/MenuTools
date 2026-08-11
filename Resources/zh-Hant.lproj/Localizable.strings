@@ -374,7 +374,7 @@
 "window.manager.excludeCurrent" = "排除目前應用程式：%@";
 "window.apply" = "套用";
 "window.arrange" = "排列目前應用程式視窗";
-"window.arranged" = "已排列 %@ 個視窗";
+"window.arranged" = "已排列 %ld 個視窗";
 "focus.title" = "專注模式";
 "focus.enabled" = "已開啟";
 "focus.disabled" = "已關閉";

@@ -374,7 +374,7 @@
 "window.manager.excludeCurrent" = "현재 앱 제외: %@";
 "window.apply" = "적용";
 "window.arrange" = "현재 앱 윈도우 정렬";
-"window.arranged" = "%@개 윈도우를 정렬했습니다";
+"window.arranged" = "%ld개 윈도우를 정렬했습니다";
 "focus.title" = "집중 모드";
 "focus.enabled" = "켜짐";
 "focus.disabled" = "꺼짐";

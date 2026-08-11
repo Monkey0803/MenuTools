@@ -374,7 +374,7 @@
 "window.manager.excludeCurrent" = "Exclude current app: %@";
 "window.apply" = "Apply";
 "window.arrange" = "Arrange current app windows";
-"window.arranged" = "%@ windows arranged";
+"window.arranged" = "%ld windows arranged";
 "focus.title" = "Focus";
 "focus.enabled" = "Enabled";
 "focus.disabled" = "Disabled";

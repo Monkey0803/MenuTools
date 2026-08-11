@@ -374,7 +374,7 @@
 "window.manager.excludeCurrent" = "現在のアプリを除外：%@";
 "window.apply" = "適用";
 "window.arrange" = "現在のアプリのウインドウを整列";
-"window.arranged" = "%@ 個のウインドウを整列しました";
+"window.arranged" = "%ld 個のウインドウを整列しました";
 "focus.title" = "集中モード";
 "focus.enabled" = "オン";
 "focus.disabled" = "オフ";
