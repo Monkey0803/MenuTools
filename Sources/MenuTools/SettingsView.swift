@@ -6,24 +6,73 @@ import UniformTypeIdentifiers
 enum SettingsLayout {
     static let width: CGFloat = 480
     static let height: CGFloat = 580
+    static let tabBarHeight: CGFloat = 44
+    static let windowHeight: CGFloat = height + tabBarHeight
+}
+
+private enum SettingsTab: String, CaseIterable, Hashable, Identifiable {
+    case general
+    case rightClick
+    case scroll
+    case windowManagement
+
+    var id: String { rawValue }
+
+    var titleKey: String {
+        switch self {
+        case .general: return "settings.tab.general"
+        case .rightClick: return "settings.tab.rightClick"
+        case .scroll: return "settings.tab.scroll"
+        case .windowManagement: return "settings.tab.windowManagement"
+        }
+    }
+
+    var symbol: String {
+        switch self {
+        case .general: return "gearshape"
+        case .rightClick: return "contextualmenu.and.cursorarrow"
+        case .scroll: return "computermouse"
+        case .windowManagement: return "macwindow.on.rectangle"
+        }
+    }
 }
 
 /// 设置窗口（⌘, / 面板齿轮按钮打开）：分标签容纳通用与右键工具
 struct SettingsView: View {
     @AppStorage(SettingsKey.appLanguage) private var appLanguage = AppLanguage.system.rawValue
+    @State private var selectedTab: SettingsTab = .general
 
     var body: some View {
-        TabView {
-            GeneralSettingsView()
-                .tabItem { Label(L("settings.tab.general"), systemImage: "gearshape") }
-            RightClickToolsView()
-                .tabItem { Label(L("settings.tab.rightClick"), systemImage: "contextualmenu.and.cursorarrow") }
-            ScrollSettingsView()
-                .tabItem { Label(L("settings.tab.scroll"), systemImage: "computermouse") }
-            WindowManagementSettingsView()
-                .tabItem { Label(L("settings.tab.windowManagement"), systemImage: "macwindow.on.rectangle") }
+        VStack(spacing: 0) {
+            Picker("", selection: $selectedTab) {
+                ForEach(SettingsTab.allCases) { tab in
+                    Label(L(tab.titleKey), systemImage: tab.symbol)
+                        .tag(tab)
+                }
+            }
+            .pickerStyle(.segmented)
+            .labelsHidden()
+            .padding(.horizontal, 12)
+            .padding(.vertical, 8)
+            .accessibilityLabel(L("settings.title"))
+
+            Divider()
+
+            Group {
+                switch selectedTab {
+                case .general:
+                    GeneralSettingsView()
+                case .rightClick:
+                    RightClickToolsView()
+                case .scroll:
+                    ScrollSettingsView()
+                case .windowManagement:
+                    WindowManagementSettingsView()
+                }
+            }
+            .frame(width: SettingsLayout.width, height: SettingsLayout.height)
         }
-        .frame(width: SettingsLayout.width, height: SettingsLayout.height)
+        .frame(width: SettingsLayout.width, height: SettingsLayout.windowHeight)
         .id(appLanguage)   // 切换语言时整体重建，连 Tab 标签一起刷新
     }
 }

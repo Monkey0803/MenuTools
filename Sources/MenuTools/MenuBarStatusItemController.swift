@@ -103,7 +103,7 @@ final class MenuBarStatusItemController: NSObject {
         let window = NSWindow(
             contentRect: NSRect(
                 origin: .zero,
-                size: NSSize(width: SettingsLayout.width, height: SettingsLayout.height)
+                size: NSSize(width: SettingsLayout.width, height: SettingsLayout.windowHeight)
             ),
             styleMask: [.titled, .closable, .miniaturizable],
             backing: .buffered,
@@ -111,10 +111,9 @@ final class MenuBarStatusItemController: NSObject {
         )
         window.contentViewController = hostingController
         window.title = L("settings.title")
-        window.setContentSize(NSSize(width: SettingsLayout.width, height: SettingsLayout.height))
-        // 菜单栏应用是 accessory activation policy，使用浮动层级确保设置窗口不会被
-        // 当前前台应用遮住；显示后仍会激活 MenuTools 并接收键盘焦点。
-        window.level = .floating
+        window.setContentSize(NSSize(width: SettingsLayout.width, height: SettingsLayout.windowHeight))
+        // 设置窗口只在打开时置前，使用普通层级，避免长期覆盖其他应用窗口。
+        window.level = .normal
         window.isReleasedWhenClosed = false
         window.isRestorable = false
         window.center()
