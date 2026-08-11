@@ -122,10 +122,11 @@ enum WindowLayoutCalculator {
     static func frame(
         for layout: WindowLayout,
         in screen: CGRect,
-        preferredSize: CGSize = CGSize(width: 900, height: 650)
+        preferredSize: CGSize = CGSize(width: 900, height: 650),
+        options: WindowManagerOptions = WindowManagerOptions()
     ) -> CGRect {
-        let gap: CGFloat = 8
-        let safe = screen.insetBy(dx: gap, dy: gap)
+        let gap = options.windowGap
+        let safe = screen.insetBy(dx: options.screenPadding, dy: options.screenPadding)
         switch layout {
         case .leftHalf:
             return grid(column: 0, columns: 2, row: 0, rows: 1, in: safe, gap: gap)
@@ -318,16 +319,24 @@ enum WindowTargetResolver {
 
 enum WindowManagementError: LocalizedError, Equatable {
     case noFocusedWindow
+    case excludedApplication
     case accessibilityPermission
     case operationFailed(String)
 
     var errorDescription: String? {
         switch self {
         case .noFocusedWindow: return L("window.error.noWindow")
+        case .excludedApplication: return L("window.error.excludedApplication")
         case .accessibilityPermission: return L("window.error.permission")
         case let .operationFailed(message): return L("window.error.operation", message)
         }
     }
+}
+
+struct WindowApplicationInfo: Equatable, Sendable {
+    let processIdentifier: pid_t
+    let bundleIdentifier: String
+    let name: String
 }
 
 @MainActor
@@ -335,11 +344,18 @@ enum WindowManagementError: LocalizedError, Equatable {
 final class WindowManagementService {
     static let shared = WindowManagementService()
 
+    private(set) var configuration: WindowManagerConfiguration
     private(set) var lastSavedFrame: CGRect?
     private var lastExternalApplicationPID: pid_t?
     private var activationObserver: NSObjectProtocol?
+    private let defaults: UserDefaults
+    private var globalMouseMonitor: Any?
+    private var localMouseMonitor: Any?
+    private var mouseDownLocation: CGPoint?
 
-    init() {
+    init(defaults: UserDefaults = .standard) {
+        self.defaults = defaults
+        self.configuration = Self.loadConfiguration(from: defaults)
         activationObserver = NSWorkspace.shared.notificationCenter.addObserver(
             forName: NSWorkspace.didActivateApplicationNotification,
             object: nil,
@@ -348,9 +364,97 @@ final class WindowManagementService {
             let processIdentifier = (notification.userInfo?[NSWorkspace.applicationUserInfoKey] as? NSRunningApplication)?.processIdentifier
             Task { @MainActor [weak self] in
                 self?.rememberExternalApplication(processIdentifier: processIdentifier)
+                self?.applyAutomaticRuleIfNeeded(processIdentifier: processIdentifier)
             }
         }
         rememberFrontmostExternalApplication()
+    }
+
+    func start() {
+        refreshMouseMonitors()
+    }
+
+    func stop() {
+        if let globalMouseMonitor { NSEvent.removeMonitor(globalMouseMonitor) }
+        if let localMouseMonitor { NSEvent.removeMonitor(localMouseMonitor) }
+        globalMouseMonitor = nil
+        localMouseMonitor = nil
+        mouseDownLocation = nil
+    }
+
+    func updateOptions(_ options: WindowManagerOptions) {
+        configuration.options = options
+        saveConfiguration()
+    }
+
+    func setEdgeSnappingEnabled(_ enabled: Bool) {
+        configuration.edgeSnappingEnabled = enabled
+        saveConfiguration()
+        refreshMouseMonitors()
+    }
+
+    func setAutomaticApplicationRulesEnabled(_ enabled: Bool) {
+        configuration.automaticApplicationRules = enabled
+        saveConfiguration()
+    }
+
+    func addPreset(name: String, layout: WindowLayout) {
+        let trimmedName = name.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !trimmedName.isEmpty else { return }
+        configuration.presets.append(WindowLayoutPreset(name: trimmedName, layout: layout))
+        saveConfiguration()
+    }
+
+    func removePreset(_ preset: WindowLayoutPreset) {
+        configuration.presets.removeAll { $0.id == preset.id }
+        saveConfiguration()
+    }
+
+    func addOrUpdateApplicationRule(for application: WindowApplicationInfo, layout: WindowLayout) {
+        let rule = WindowApplicationRule(
+            bundleIdentifier: application.bundleIdentifier,
+            applicationName: application.name,
+            layout: layout
+        )
+        if let index = configuration.applicationRules.firstIndex(where: { $0.bundleIdentifier == rule.bundleIdentifier }) {
+            configuration.applicationRules[index] = rule
+        } else {
+            configuration.applicationRules.append(rule)
+        }
+        saveConfiguration()
+    }
+
+    func setApplicationRuleEnabled(_ enabled: Bool, for rule: WindowApplicationRule) {
+        guard let index = configuration.applicationRules.firstIndex(where: { $0.id == rule.id }) else { return }
+        configuration.applicationRules[index].isEnabled = enabled
+        saveConfiguration()
+    }
+
+    func removeApplicationRule(_ rule: WindowApplicationRule) {
+        configuration.applicationRules.removeAll { $0.id == rule.id }
+        saveConfiguration()
+    }
+
+    func addExcludedApplication(_ application: WindowApplicationInfo) {
+        guard !configuration.excludedBundleIdentifiers.contains(application.bundleIdentifier) else { return }
+        configuration.excludedBundleIdentifiers.append(application.bundleIdentifier)
+        saveConfiguration()
+    }
+
+    func removeExcludedApplication(_ bundleIdentifier: String) {
+        configuration.excludedBundleIdentifiers.removeAll { $0 == bundleIdentifier }
+        saveConfiguration()
+    }
+
+    func focusedApplicationInfo() -> WindowApplicationInfo? {
+        guard let processIdentifier = try? externalProcessIdentifier(),
+              let application = NSRunningApplication(processIdentifier: processIdentifier),
+              let bundleIdentifier = application.bundleIdentifier else { return nil }
+        return WindowApplicationInfo(
+            processIdentifier: processIdentifier,
+            bundleIdentifier: bundleIdentifier,
+            name: application.localizedName ?? bundleIdentifier
+        )
     }
 
     /// 在菜单栏面板或设置窗口激活前记录当前真正要管理的外部应用。
@@ -366,7 +470,11 @@ final class WindowManagementService {
 
     func apply(_ layout: WindowLayout) throws {
         guard AXIsProcessTrusted() else { throw WindowManagementError.accessibilityPermission }
-        let window = try focusedWindow()
+        let processIdentifier = try externalProcessIdentifier()
+        guard !isExcluded(processIdentifier: processIdentifier) else {
+            throw WindowManagementError.excludedApplication
+        }
+        let window = try focusedWindow(of: processIdentifier)
         switch layout {
         case .restore:
             try restoreFocusedWindowFrame()
@@ -403,8 +511,45 @@ final class WindowManagementService {
         }
         let screen = screen(for: window) ?? NSScreen.main?.visibleFrame ?? .zero
         guard !screen.isEmpty else { throw WindowManagementError.operationFailed(L("window.error.noScreen")) }
-        let frame = WindowLayoutCalculator.frame(for: layout, in: screen, preferredSize: currentSize(of: window))
+        let frame = WindowLayoutCalculator.frame(
+            for: layout,
+            in: screen,
+            preferredSize: currentSize(of: window),
+            options: configuration.options
+        )
         try setFrame(frame, of: window)
+    }
+
+    func apply(_ preset: WindowLayoutPreset) throws {
+        if let frame = preset.frame {
+            guard AXIsProcessTrusted() else { throw WindowManagementError.accessibilityPermission }
+            let processIdentifier = try externalProcessIdentifier()
+            guard !isExcluded(processIdentifier: processIdentifier) else {
+                throw WindowManagementError.excludedApplication
+            }
+            try setFrame(frame, of: try focusedWindow(of: processIdentifier))
+        } else {
+            try apply(preset.layout)
+        }
+    }
+
+    @discardableResult
+    func arrangeFocusedApplicationWindows() throws -> Int {
+        guard AXIsProcessTrusted() else { throw WindowManagementError.accessibilityPermission }
+        let processIdentifier = try externalProcessIdentifier()
+        guard !isExcluded(processIdentifier: processIdentifier) else {
+            throw WindowManagementError.excludedApplication
+        }
+        let application = AXUIElementCreateApplication(processIdentifier)
+        let windows = try windowElements(of: application)
+        guard !windows.isEmpty else { throw WindowManagementError.noFocusedWindow }
+        let screen = screen(for: windows[0]) ?? NSScreen.main?.visibleFrame ?? .zero
+        guard !screen.isEmpty else { throw WindowManagementError.operationFailed(L("window.error.noScreen")) }
+        let frames = WindowArrangementCalculator.frames(for: windows.count, in: screen, options: configuration.options)
+        for (window, frame) in zip(windows, frames) {
+            try setFrame(frame, of: window)
+        }
+        return windows.count
     }
 
     func saveFocusedWindowFrame() throws {
@@ -431,18 +576,104 @@ final class WindowManagementService {
     }
 
     private static let savedFrameKey = "windowManagement.savedFrame"
+    private static let configurationKey = "windowManagement.configuration"
+
+    private static func loadConfiguration(from defaults: UserDefaults) -> WindowManagerConfiguration {
+        guard let data = defaults.data(forKey: configurationKey),
+              let configuration = try? JSONDecoder().decode(WindowManagerConfiguration.self, from: data) else {
+            return WindowManagerConfiguration()
+        }
+        return configuration
+    }
+
+    private func saveConfiguration() {
+        guard let data = try? JSONEncoder().encode(configuration) else { return }
+        defaults.set(data, forKey: Self.configurationKey)
+    }
+
+    private func applyAutomaticRuleIfNeeded(processIdentifier: pid_t?) {
+        guard configuration.automaticApplicationRules,
+              let processIdentifier,
+              let application = NSRunningApplication(processIdentifier: processIdentifier),
+              let bundleIdentifier = application.bundleIdentifier,
+              let layout = WindowApplicationRuleResolver.layout(
+                for: bundleIdentifier,
+                rules: configuration.applicationRules,
+                excludedBundleIdentifiers: configuration.excludedBundleIdentifiers
+              ) else { return }
+
+        Task { @MainActor [weak self] in
+            try? await Task.sleep(for: .milliseconds(150))
+            guard let self,
+                  NSWorkspace.shared.frontmostApplication?.processIdentifier == processIdentifier else { return }
+            try? self.apply(layout)
+        }
+    }
+
+    private func refreshMouseMonitors() {
+        if let globalMouseMonitor { NSEvent.removeMonitor(globalMouseMonitor) }
+        if let localMouseMonitor { NSEvent.removeMonitor(localMouseMonitor) }
+        globalMouseMonitor = nil
+        localMouseMonitor = nil
+        mouseDownLocation = nil
+        guard configuration.edgeSnappingEnabled else { return }
+
+        let eventMask: NSEvent.EventTypeMask = [.leftMouseDown, .leftMouseUp]
+        globalMouseMonitor = NSEvent.addGlobalMonitorForEvents(matching: eventMask) { [weak self] event in
+            let type = event.type
+            Task { @MainActor [weak self] in
+                self?.handleMouseEvent(type)
+            }
+        }
+    }
+
+    private func handleMouseEvent(_ type: NSEvent.EventType) {
+        switch type {
+        case .leftMouseDown:
+            mouseDownLocation = NSEvent.mouseLocation
+        case .leftMouseUp:
+            guard let start = mouseDownLocation else { return }
+            mouseDownLocation = nil
+            let end = NSEvent.mouseLocation
+            let distance = hypot(end.x - start.x, end.y - start.y)
+            guard distance > 12 else { return }
+            snapWindow(at: end)
+        default:
+            break
+        }
+    }
+
+    private func snapWindow(at point: CGPoint) {
+        guard AXIsProcessTrusted(),
+              let processIdentifier = try? externalProcessIdentifier(),
+              !isExcluded(processIdentifier: processIdentifier),
+              let window = try? focusedWindow(of: processIdentifier),
+              let screen = screen(for: window),
+              let layout = WindowSnapResolver.layout(
+                for: point,
+                in: screen,
+                threshold: configuration.options.snapDistance
+              ) else { return }
+        try? apply(layout)
+    }
 
     private func focusedWindow() throws -> AXUIElement {
+        try focusedWindow(of: externalProcessIdentifier())
+    }
+
+    private func externalProcessIdentifier() throws -> pid_t {
         let ownProcessIdentifier = ProcessInfo.processInfo.processIdentifier
         let frontmostProcessIdentifier = NSWorkspace.shared.frontmostApplication?.processIdentifier
-        let processIdentifier = WindowTargetResolver.preferredProcessIdentifier(
+        guard let processIdentifier = WindowTargetResolver.preferredProcessIdentifier(
             frontmost: frontmostProcessIdentifier,
             remembered: lastExternalApplicationPID,
             own: ownProcessIdentifier
-        )
-        guard let processIdentifier else {
-            throw WindowManagementError.noFocusedWindow
-        }
+        ) else { throw WindowManagementError.noFocusedWindow }
+        lastExternalApplicationPID = processIdentifier
+        return processIdentifier
+    }
+
+    private func focusedWindow(of processIdentifier: pid_t) throws -> AXUIElement {
         lastExternalApplicationPID = processIdentifier
         let application = AXUIElementCreateApplication(processIdentifier)
         var value: CFTypeRef?
@@ -451,6 +682,31 @@ final class WindowManagementService {
             throw WindowManagementError.noFocusedWindow
         }
         return unsafeDowncast(value, to: AXUIElement.self)
+    }
+
+    private func isExcluded(processIdentifier: pid_t) -> Bool {
+        guard let bundleIdentifier = NSRunningApplication(processIdentifier: processIdentifier)?.bundleIdentifier else {
+            return false
+        }
+        return configuration.excludedBundleIdentifiers.contains(bundleIdentifier)
+    }
+
+    private func windowElements(of application: AXUIElement) throws -> [AXUIElement] {
+        var value: CFTypeRef?
+        guard AXUIElementCopyAttributeValue(application, kAXWindowsAttribute as CFString, &value) == .success,
+              let value,
+              let windows = value as? [AXUIElement] else {
+            throw WindowManagementError.noFocusedWindow
+        }
+        return windows.filter { window in
+            var role: CFTypeRef?
+            var minimized: CFTypeRef?
+            let hasRole = AXUIElementCopyAttributeValue(window, kAXRoleAttribute as CFString, &role) == .success
+            let isWindow = (role as? String) == kAXWindowRole
+            _ = AXUIElementCopyAttributeValue(window, kAXMinimizedAttribute as CFString, &minimized)
+            let isMinimized = (minimized as? NSNumber)?.boolValue ?? false
+            return hasRole && isWindow && !isMinimized
+        }
     }
 
     private func accessibilityFrame(of window: AXUIElement) throws -> CGRect {

@@ -6,6 +6,9 @@ import Observation
 enum WindowShortcutError: LocalizedError, Equatable {
     case modifierRequired
     case conflict(WindowLayout)
+    case systemConflict
+    case otherApplicationConflict
+    case sceneConflict(ScenePreset)
 
     var errorDescription: String? {
         switch self {
@@ -13,6 +16,12 @@ enum WindowShortcutError: LocalizedError, Equatable {
             return L("shortcut.error.modifierRequired")
         case let .conflict(layout):
             return L("shortcut.error.conflict", L(layout.titleKey))
+        case .systemConflict:
+            return L("shortcut.error.systemConflict")
+        case .otherApplicationConflict:
+            return L("shortcut.error.otherApplicationConflict")
+        case let .sceneConflict(scene):
+            return L("shortcut.error.conflict", L(scene.titleKey))
         }
     }
 }
@@ -49,12 +58,20 @@ final class WindowShortcutService {
     private(set) var isAccessibilityTrusted = AXIsProcessTrusted()
 
     private let defaults: UserDefaults
+    private let conflictChecker: any ShortcutConflictChecking
+    private let sceneBindingsProvider: @MainActor () -> [ScenePreset: GlobalShortcut]
     private var globalMonitor: Any?
     private var localMonitor: Any?
 
-    init(defaults: UserDefaults = .standard) {
+    init(
+        defaults: UserDefaults = .standard,
+        conflictChecker: any ShortcutConflictChecking = DefaultShortcutConflictChecker(),
+        sceneBindingsProvider: @escaping @MainActor () -> [ScenePreset: GlobalShortcut] = { GlobalShortcutService.shared.bindings }
+    ) {
         self.defaults = defaults
         self.bindings = Self.loadBindings(from: defaults)
+        self.conflictChecker = conflictChecker
+        self.sceneBindingsProvider = sceneBindingsProvider
     }
 
     func start() {
@@ -97,6 +114,24 @@ final class WindowShortcutService {
         }
         if let conflict = WindowShortcutCatalog.conflict(for: binding, excluding: layout, in: bindings) {
             throw WindowShortcutError.conflict(conflict)
+        }
+        let context = ShortcutConflictContext(
+            sceneBindings: sceneBindingsProvider(),
+            windowBindings: bindings,
+            excludingScene: nil,
+            excludingWindow: layout
+        )
+        switch conflictChecker.conflict(for: binding, context: context) {
+        case .system:
+            throw WindowShortcutError.systemConflict
+        case .otherApplication:
+            throw WindowShortcutError.otherApplicationConflict
+        case let .scene(scene):
+            throw WindowShortcutError.sceneConflict(scene)
+        case let .window(conflict):
+            throw WindowShortcutError.conflict(conflict)
+        case nil:
+            break
         }
         bindings[layout] = binding
         lastError = nil

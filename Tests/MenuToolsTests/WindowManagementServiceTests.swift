@@ -134,3 +134,77 @@ func maximizeLayoutsUseDistinctSymbols() {
     ]
     #expect(Set(symbols).count == symbols.count)
 }
+
+@Test("窗口管理参数控制屏幕边距和窗口间距")
+func windowLayoutUsesConfigurableMetrics() {
+    let screen = CGRect(x: 0, y: 0, width: 1200, height: 800)
+    let options = WindowManagerOptions(screenPadding: 20, windowGap: 16)
+
+    let left = WindowLayoutCalculator.frame(for: .leftHalf, in: screen, options: options)
+    let right = WindowLayoutCalculator.frame(for: .rightHalf, in: screen, options: options)
+
+    #expect(left.minX == 20)
+    #expect(right.maxX == 1180)
+    #expect(abs(right.minX - left.maxX - 16) < 0.1)
+}
+
+@Test("边缘吸附按鼠标位置选择正确布局")
+func edgeSnapResolverSelectsLayout() {
+    let screen = CGRect(x: 100, y: 100, width: 1200, height: 800)
+
+    #expect(WindowSnapResolver.layout(for: CGPoint(x: 101, y: 899), in: screen, threshold: 24) == .topLeft)
+    #expect(WindowSnapResolver.layout(for: CGPoint(x: 1299, y: 101), in: screen, threshold: 24) == .bottomRight)
+    #expect(WindowSnapResolver.layout(for: CGPoint(x: 700, y: 899), in: screen, threshold: 24) == .topHalf)
+    #expect(WindowSnapResolver.layout(for: CGPoint(x: 1299, y: 500), in: screen, threshold: 24) == .rightHalf)
+    #expect(WindowSnapResolver.layout(for: CGPoint(x: 700, y: 500), in: screen, threshold: 24) == nil)
+}
+
+@Test("多窗口排列为稳定的网格帧")
+func windowArrangementCreatesGridFrames() {
+    let screen = CGRect(x: 0, y: 0, width: 1200, height: 800)
+    let options = WindowManagerOptions(screenPadding: 20, windowGap: 10)
+
+    let frames = WindowArrangementCalculator.frames(for: 4, in: screen, options: options)
+
+    #expect(frames.count == 4)
+    #expect(frames[0].minX < frames[1].minX)
+    #expect(frames[0].minY > frames[2].minY)
+    #expect(frames.allSatisfy { screen.contains($0) })
+}
+
+@Test("三个窗口排列为横向三列")
+func threeWindowArrangementUsesThreeColumns() {
+    let screen = CGRect(x: 0, y: 0, width: 1200, height: 800)
+    let frames = WindowArrangementCalculator.frames(for: 3, in: screen, options: WindowManagerOptions())
+
+    #expect(frames.count == 3)
+    #expect(frames[0].width == frames[1].width)
+    #expect(frames[0].midY == frames[1].midY)
+    #expect(frames[0].maxX < frames[1].minX)
+    #expect(frames[1].maxX < frames[2].minX)
+}
+
+@Test("窗口规则只匹配启用且未排除的应用")
+func applicationRuleResolverHonorsEnabledAndExcluded() {
+    let rule = WindowApplicationRule(bundleIdentifier: "com.example.Editor", applicationName: "Editor", layout: .leftHalf)
+
+    #expect(WindowApplicationRuleResolver.layout(for: "com.example.Editor", rules: [rule], excludedBundleIdentifiers: []) == .leftHalf)
+    #expect(WindowApplicationRuleResolver.layout(for: "com.example.Editor", rules: [rule.settingEnabled(false)], excludedBundleIdentifiers: []) == nil)
+    #expect(WindowApplicationRuleResolver.layout(for: "com.example.Editor", rules: [rule], excludedBundleIdentifiers: ["com.example.Editor"]) == nil)
+}
+
+@Test("窗口管理配置可以编码和恢复")
+func windowManagerConfigurationRoundTrips() throws {
+    let configuration = WindowManagerConfiguration(
+        options: WindowManagerOptions(screenPadding: 18, windowGap: 12, snapDistance: 30),
+        presets: [WindowLayoutPreset(name: "开发", layout: .leftHalf)],
+        applicationRules: [WindowApplicationRule(bundleIdentifier: "com.example.Editor", applicationName: "Editor", layout: .rightHalf)],
+        excludedBundleIdentifiers: ["com.example.Terminal"],
+        automaticApplicationRules: true,
+        edgeSnappingEnabled: true
+    )
+
+    let data = try JSONEncoder().encode(configuration)
+    let decoded = try JSONDecoder().decode(WindowManagerConfiguration.self, from: data)
+    #expect(decoded == configuration)
+}

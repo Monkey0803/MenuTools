@@ -4,11 +4,19 @@ import SwiftUI
 /// 窗口布局与快捷键设置。
 struct WindowManagementSettingsView: View {
     @Bindable private var shortcutService: WindowShortcutService
+    @Bindable private var windowService: WindowManagementService
     @State private var recordingLayout: WindowLayout?
     @State private var errorMessage: String?
+    @State private var newPresetName = ""
+    @State private var presetLayout: WindowLayout = .leftHalf
+    @State private var ruleLayout: WindowLayout = .leftHalf
 
-    init(shortcutService: WindowShortcutService = .shared) {
+    init(
+        shortcutService: WindowShortcutService = .shared,
+        windowService: WindowManagementService = .shared
+    ) {
         self.shortcutService = shortcutService
+        self.windowService = windowService
     }
 
     var body: some View {
@@ -23,6 +31,11 @@ struct WindowManagementSettingsView: View {
                         .font(.caption)
                         .foregroundStyle(.orange)
                 }
+
+                managerOptionsSection
+                presetSection
+                applicationRulesSection
+                exclusionSection
 
                 // 必须放在滚动内容顶部，确保窗口打开时就已创建并可成为第一响应者。
                 WindowShortcutCaptureView(isRecording: recordingLayout != nil) { shortcut in
@@ -67,6 +80,11 @@ struct WindowManagementSettingsView: View {
                             errorMessage = error.localizedDescription
                         }
                     }
+                    Button {
+                        arrangeWindows()
+                    } label: {
+                        Label(L("window.arrange"), systemImage: "square.grid.2x2")
+                    }
                 }
                 .buttonStyle(.bordered)
 
@@ -86,6 +104,197 @@ struct WindowManagementSettingsView: View {
         .frame(width: SettingsLayout.width, height: SettingsLayout.height)
         .navigationTitle(L("settings.title"))
         .task { shortcutService.start() }
+    }
+
+    private var managerOptionsSection: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            Text(L("window.manager.section"))
+                .font(.headline)
+
+            optionSlider(
+                title: L("window.manager.padding"),
+                value: optionBinding(\WindowManagerOptions.screenPadding),
+                range: 0...40
+            )
+            optionSlider(
+                title: L("window.manager.gap"),
+                value: optionBinding(\WindowManagerOptions.windowGap),
+                range: 0...40
+            )
+            optionSlider(
+                title: L("window.manager.snapDistance"),
+                value: optionBinding(\WindowManagerOptions.snapDistance),
+                range: 8...80
+            )
+
+            Toggle(L("window.manager.edgeSnapping"), isOn: Binding(
+                get: { windowService.configuration.edgeSnappingEnabled },
+                set: { windowService.setEdgeSnappingEnabled($0) }
+            ))
+            Toggle(L("window.manager.autoRules"), isOn: Binding(
+                get: { windowService.configuration.automaticApplicationRules },
+                set: { windowService.setAutomaticApplicationRulesEnabled($0) }
+            ))
+        }
+        .padding(12)
+        .glassEffect(.regular, in: .rect(cornerRadius: 12))
+    }
+
+    private var presetSection: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            Text(L("window.manager.presets"))
+                .font(.headline)
+            HStack {
+                TextField(L("window.manager.presetName"), text: $newPresetName)
+                    .textFieldStyle(.roundedBorder)
+                Picker("", selection: $presetLayout) {
+                    ForEach(WindowLayout.allCases) { layout in
+                        Text(L(layout.titleKey)).tag(layout)
+                    }
+                }
+                .labelsHidden()
+                Button {
+                    windowService.addPreset(name: newPresetName, layout: presetLayout)
+                    newPresetName = ""
+                } label: {
+                    Image(systemName: "plus")
+                }
+                .disabled(newPresetName.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
+            }
+            ForEach(windowService.configuration.presets) { preset in
+                HStack {
+                    Image(systemName: preset.layout.symbol)
+                    Text(preset.name)
+                    Spacer()
+                    Button(L("window.apply")) { apply(preset) }
+                    Button { windowService.removePreset(preset) } label: {
+                        Image(systemName: "trash")
+                    }
+                    .buttonStyle(.plain)
+                    .foregroundStyle(.secondary)
+                }
+                .font(.caption)
+            }
+        }
+        .padding(12)
+        .glassEffect(.regular, in: .rect(cornerRadius: 12))
+    }
+
+    private var applicationRulesSection: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            Text(L("window.manager.applicationRules"))
+                .font(.headline)
+            if let application = windowService.focusedApplicationInfo() {
+                HStack {
+                    Text(L("window.manager.currentApp", application.name))
+                        .lineLimit(1)
+                    Picker("", selection: $ruleLayout) {
+                        ForEach(WindowLayout.allCases) { layout in
+                            Text(L(layout.titleKey)).tag(layout)
+                        }
+                    }
+                    .labelsHidden()
+                    Button(L("window.manager.bind")) {
+                        windowService.addOrUpdateApplicationRule(for: application, layout: ruleLayout)
+                    }
+                }
+            } else {
+                Text(L("window.manager.noCurrentApp"))
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+            }
+            ForEach(windowService.configuration.applicationRules) { rule in
+                HStack {
+                    Toggle(isOn: Binding(
+                        get: { rule.isEnabled },
+                        set: { windowService.setApplicationRuleEnabled($0, for: rule) }
+                    )) {
+                        Text(rule.applicationName)
+                        Text(L(rule.layout.titleKey))
+                    }
+                    Button { windowService.removeApplicationRule(rule) } label: {
+                        Image(systemName: "trash")
+                    }
+                    .buttonStyle(.plain)
+                    .foregroundStyle(.secondary)
+                }
+                .font(.caption)
+            }
+        }
+        .padding(12)
+        .glassEffect(.regular, in: .rect(cornerRadius: 12))
+    }
+
+    private var exclusionSection: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            Text(L("window.manager.exclusions"))
+                .font(.headline)
+            if let application = windowService.focusedApplicationInfo(),
+               !windowService.configuration.excludedBundleIdentifiers.contains(application.bundleIdentifier) {
+                Button(L("window.manager.excludeCurrent", application.name)) {
+                    windowService.addExcludedApplication(application)
+                }
+                .font(.caption)
+            }
+            ForEach(windowService.configuration.excludedBundleIdentifiers, id: \.self) { bundleIdentifier in
+                HStack {
+                    Text(bundleIdentifier)
+                    Spacer()
+                    Button { windowService.removeExcludedApplication(bundleIdentifier) } label: {
+                        Image(systemName: "trash")
+                    }
+                    .buttonStyle(.plain)
+                    .foregroundStyle(.secondary)
+                }
+                .font(.caption)
+            }
+        }
+        .padding(12)
+        .glassEffect(.regular, in: .rect(cornerRadius: 12))
+    }
+
+    private func optionSlider(
+        title: String,
+        value: Binding<Double>,
+        range: ClosedRange<Double>
+    ) -> some View {
+        HStack(spacing: 8) {
+            Text(title)
+                .font(.caption)
+            Slider(value: value, in: range, step: 1)
+            Text("\(Int(value.wrappedValue))")
+                .font(.caption.monospacedDigit())
+                .frame(width: 28, alignment: .trailing)
+        }
+    }
+
+    private func optionBinding(_ keyPath: WritableKeyPath<WindowManagerOptions, CGFloat>) -> Binding<Double> {
+        Binding(
+            get: { Double(windowService.configuration.options[keyPath: keyPath]) },
+            set: { newValue in
+                var options = windowService.configuration.options
+                options[keyPath: keyPath] = CGFloat(newValue)
+                windowService.updateOptions(options)
+            }
+        )
+    }
+
+    private func apply(_ preset: WindowLayoutPreset) {
+        do {
+            try windowService.apply(preset)
+            errorMessage = nil
+        } catch {
+            errorMessage = error.localizedDescription
+        }
+    }
+
+    private func arrangeWindows() {
+        do {
+            let count = try windowService.arrangeFocusedApplicationWindows()
+            errorMessage = L("window.arranged", count)
+        } catch {
+            errorMessage = error.localizedDescription
+        }
     }
 
     private func layoutRow(_ layout: WindowLayout) -> some View {

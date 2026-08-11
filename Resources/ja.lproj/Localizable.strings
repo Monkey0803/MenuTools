@@ -16,6 +16,8 @@
 "resource.memoryNormal" = "メモリ正常";
 "resource.memoryWarning" = "メモリ負荷";
 "resource.memoryCritical" = "メモリ負荷高";
+"resource.releaseMemory" = "メモリを解放";
+"resource.releasingMemory" = "解放中…";
 "resource.loading" = "システムリソースを読み込み中…";
 
 /* ネットワーク状態 */
@@ -121,6 +123,8 @@
 "status.openedIn" = "%@ で開きました：%@";
 "status.clipboardCleared" = "クリップボードを消去しました";
 "status.freed" = "%@ を解放しました";
+"status.memoryReleased" = "システムメモリキャッシュの解放を要求しました";
+"status.memoryReleaseFailed" = "メモリの解放を完了できませんでした。管理者権限が必要です";
 "status.newVersion" = "新バージョン v%@ があります%@";
 "status.upToDate" = "最新バージョンです (v%@)";
 "status.updateFailed" = "アップデート確認に失敗：%@";
@@ -353,6 +357,24 @@
 "window.error.readFrame" = "ウインドウの位置またはサイズを読み取れません";
 "window.error.writeFrame" = "ウインドウの位置またはサイズを設定できません";
 "window.error.fullscreen" = "現在のウインドウはフルスクリーン切替に対応していません";
+"window.error.excludedApplication" = "現在のアプリケーションはウインドウ管理から除外されています";
+"window.manager.section" = "ウインドウマネージャー";
+"window.manager.padding" = "画面の余白";
+"window.manager.gap" = "ウインドウ間隔";
+"window.manager.snapDistance" = "吸着距離";
+"window.manager.edgeSnapping" = "ドラッグ中に画面端へ吸着";
+"window.manager.autoRules" = "アプリ切替時にアプリルールを適用";
+"window.manager.presets" = "レイアウトプリセット";
+"window.manager.presetName" = "プリセット名";
+"window.manager.applicationRules" = "アプリケーションルール";
+"window.manager.currentApp" = "現在のアプリ：%@";
+"window.manager.noCurrentApp" = "外部アプリケーションを検出できません";
+"window.manager.bind" = "登録";
+"window.manager.exclusions" = "除外アプリケーション";
+"window.manager.excludeCurrent" = "現在のアプリを除外：%@";
+"window.apply" = "適用";
+"window.arrange" = "現在のアプリのウインドウを整列";
+"window.arranged" = "%@ 個のウインドウを整列しました";
 "focus.title" = "集中モード";
 "focus.enabled" = "オン";
 "focus.disabled" = "オフ";
@@ -374,5 +396,7 @@
 "shortcut.clear" = "ショートカットを消去";
 "shortcut.error.modifierRequired" = "Command、Option、Control、Shift のいずれかが必要です";
 "shortcut.error.conflict" = "ショートカットが %@ と競合しています";
+"shortcut.error.systemConflict" = "有効な macOS システムショートカットと競合しています";
+"shortcut.error.otherApplicationConflict" = "別のアプリケーションですでに登録されている可能性があります";
 "focus.doNotDisturb" = "おやすみモードを切り替え";
 "focus.doNotDisturbToggled" = "おやすみモードを切り替えました";

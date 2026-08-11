@@ -67,6 +67,8 @@ struct MenuToolsApp: App {
         GlobalShortcutService.shared.start()
         // 窗口布局快捷键必须独立于设置页面生命周期持续监听
         WindowShortcutService.shared.start()
+        // 窗口管理器的应用规则和边缘吸附必须独立于设置页面持续运行
+        WindowManagementService.shared.start()
     }
 
     var body: some Scene {

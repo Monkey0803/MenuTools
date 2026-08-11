@@ -78,11 +78,17 @@ enum GlobalShortcutCatalog {
 enum GlobalShortcutError: LocalizedError, Equatable {
     case modifierRequired
     case conflict(ScenePreset)
+    case systemConflict
+    case otherApplicationConflict
+    case windowConflict(WindowLayout)
 
     var errorDescription: String? {
         switch self {
         case .modifierRequired: return L("shortcut.error.modifierRequired")
         case let .conflict(scene): return L("shortcut.error.conflict", L(scene.titleKey))
+        case .systemConflict: return L("shortcut.error.systemConflict")
+        case .otherApplicationConflict: return L("shortcut.error.otherApplicationConflict")
+        case let .windowConflict(layout): return L("shortcut.error.conflict", L(layout.titleKey))
         }
     }
 }
@@ -98,11 +104,19 @@ final class GlobalShortcutService {
     private(set) var isRunning = false
     private(set) var isAccessibilityTrusted = AXIsProcessTrusted()
     private let defaults: UserDefaults
+    private let conflictChecker: any ShortcutConflictChecking
+    private let windowBindingsProvider: @MainActor () -> [WindowLayout: GlobalShortcut]
     private var globalMonitor: Any?
     private var localMonitor: Any?
 
-    init(defaults: UserDefaults = .standard) {
+    init(
+        defaults: UserDefaults = .standard,
+        conflictChecker: any ShortcutConflictChecking = DefaultShortcutConflictChecker(),
+        windowBindingsProvider: @escaping @MainActor () -> [WindowLayout: GlobalShortcut] = { WindowShortcutService.shared.bindings }
+    ) {
         self.defaults = defaults
+        self.conflictChecker = conflictChecker
+        self.windowBindingsProvider = windowBindingsProvider
         self.bindings = GlobalShortcutService.loadBindings(from: defaults)
     }
 
@@ -146,6 +160,24 @@ final class GlobalShortcutService {
         }
         if let conflict = GlobalShortcutCatalog.conflict(for: binding, excluding: scene, in: bindings) {
             throw GlobalShortcutError.conflict(conflict)
+        }
+        let context = ShortcutConflictContext(
+            sceneBindings: bindings,
+            windowBindings: windowBindingsProvider(),
+            excludingScene: scene,
+            excludingWindow: nil
+        )
+        switch conflictChecker.conflict(for: binding, context: context) {
+        case .system:
+            throw GlobalShortcutError.systemConflict
+        case .otherApplication:
+            throw GlobalShortcutError.otherApplicationConflict
+        case let .window(layout):
+            throw GlobalShortcutError.windowConflict(layout)
+        case let .scene(conflict):
+            throw GlobalShortcutError.conflict(conflict)
+        case nil:
+            break
         }
         bindings[scene] = binding
         saveBindings()

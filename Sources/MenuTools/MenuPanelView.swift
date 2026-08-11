@@ -274,6 +274,19 @@ struct MenuPanelView: View {
             }
             Spacer()
             Button {
+                NSApplication.shared.terminate(nil)
+            } label: {
+                Image(systemName: "power")
+                    .font(.callout)
+                    .frame(width: 28, height: 28)
+                    .contentShape(.circle)
+            }
+            .buttonStyle(.plain)
+            .focusEffectDisabled()
+            .foregroundStyle(.secondary)
+            .glassEffect(.regular, in: .circle)
+            .help(L("footer.quit"))
+            Button {
                 if let openSettingsAction {
                     openSettingsAction()
                 } else {
@@ -287,8 +300,9 @@ struct MenuPanelView: View {
                     .contentShape(.circle)
             }
             .buttonStyle(.plain)
+            .focusEffectDisabled()
             .foregroundStyle(.secondary)
-            .glassEffect(.regular.interactive(), in: .circle)
+            .glassEffect(.regular, in: .circle)
             .help(L("help.settings"))
         }
     }
@@ -417,9 +431,34 @@ struct MenuPanelView: View {
                     .font(.caption.weight(.semibold))
                 Spacer()
                 if let snapshot = systemResourceService.snapshot {
-                    Text(memoryPressureLabel(snapshot.memoryPressure))
-                        .font(.caption2)
-                        .foregroundStyle(memoryPressureColor(snapshot.memoryPressure))
+                    HStack(spacing: 8) {
+                        Text(memoryPressureLabel(snapshot.memoryPressure))
+                            .font(.caption2)
+                            .foregroundStyle(memoryPressureColor(snapshot.memoryPressure))
+                        if snapshot.memoryPressure.shouldOfferMemoryRelease {
+                            Button {
+                                guard let result = systemResourceService.releaseMemory() else { return }
+                                flashStatus(
+                                    result.systemCachePurged
+                                        ? L("status.memoryReleased")
+                                        : L("status.memoryReleaseFailed"),
+                                    isError: !result.systemCachePurged
+                                )
+                            } label: {
+                                Label(
+                                    systemResourceService.isReleasingMemory
+                                        ? L("resource.releasingMemory")
+                                        : L("resource.releaseMemory"),
+                                    systemImage: "arrow.down.circle"
+                                )
+                            }
+                            .buttonStyle(.borderedProminent)
+                            .controlSize(.mini)
+                            .tint(.red)
+                            .disabled(systemResourceService.isReleasingMemory)
+                            .help(L("resource.releaseMemory"))
+                        }
+                    }
                 } else {
                     ProgressView()
                         .controlSize(.mini)
@@ -1234,12 +1273,6 @@ struct MenuPanelView: View {
             }
 
             Spacer()
-            Button(L("footer.quit")) {
-                NSApplication.shared.terminate(nil)
-            }
-            .buttonStyle(.plain)
-            .font(.caption)
-            .foregroundStyle(.secondary)
         }
     }
 

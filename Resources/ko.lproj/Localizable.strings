@@ -16,6 +16,8 @@
 "resource.memoryNormal" = "메모리 정상";
 "resource.memoryWarning" = "메모리 압박";
 "resource.memoryCritical" = "메모리 압박 높음";
+"resource.releaseMemory" = "메모리 해제";
+"resource.releasingMemory" = "해제 중…";
 "resource.loading" = "시스템 리소스 읽는 중…";
 
 /* 네트워크 상태 */
@@ -121,6 +123,8 @@
 "status.openedIn" = "%@에서 열었습니다: %@";
 "status.clipboardCleared" = "클립보드를 지웠습니다";
 "status.freed" = "%@ 확보됨";
+"status.memoryReleased" = "시스템 메모리 캐시 해제를 요청했습니다";
+"status.memoryReleaseFailed" = "메모리 정리를 완료하지 못했습니다. 관리자 권한이 필요합니다";
 "status.newVersion" = "새 버전 v%@ 발견%@";
 "status.upToDate" = "최신 버전입니다 (v%@)";
 "status.updateFailed" = "업데이트 확인 실패: %@";
@@ -353,6 +357,24 @@
 "window.error.readFrame" = "윈도우 위치 또는 크기를 읽을 수 없습니다";
 "window.error.writeFrame" = "윈도우 위치 또는 크기를 설정할 수 없습니다";
 "window.error.fullscreen" = "현재 윈도우는 전체 화면 전환을 지원하지 않습니다";
+"window.error.excludedApplication" = "현재 앱은 윈도우 관리에서 제외되었습니다";
+"window.manager.section" = "윈도우 관리자";
+"window.manager.padding" = "화면 여백";
+"window.manager.gap" = "윈도우 간격";
+"window.manager.snapDistance" = "스냅 거리";
+"window.manager.edgeSnapping" = "드래그할 때 화면 가장자리에 스냅";
+"window.manager.autoRules" = "앱 전환 시 앱 규칙 자동 적용";
+"window.manager.presets" = "레이아웃 프리셋";
+"window.manager.presetName" = "프리셋 이름";
+"window.manager.applicationRules" = "앱 규칙";
+"window.manager.currentApp" = "현재 앱: %@";
+"window.manager.noCurrentApp" = "외부 앱을 확인할 수 없습니다";
+"window.manager.bind" = "바인딩";
+"window.manager.exclusions" = "제외된 앱";
+"window.manager.excludeCurrent" = "현재 앱 제외: %@";
+"window.apply" = "적용";
+"window.arrange" = "현재 앱 윈도우 정렬";
+"window.arranged" = "%@개 윈도우를 정렬했습니다";
 "focus.title" = "집중 모드";
 "focus.enabled" = "켜짐";
 "focus.disabled" = "꺼짐";
@@ -374,5 +396,7 @@
 "shortcut.clear" = "단축키 지우기";
 "shortcut.error.modifierRequired" = "Command, Option, Control 또는 Shift가 필요합니다";
 "shortcut.error.conflict" = "단축키가 %@와 충돌합니다";
+"shortcut.error.systemConflict" = "활성화된 macOS 시스템 단축키와 충돌합니다";
+"shortcut.error.otherApplicationConflict" = "다른 앱에 이미 등록된 단축키일 수 있습니다";
 "focus.doNotDisturb" = "방해 금지 모드 전환";
 "focus.doNotDisturbToggled" = "방해 금지 모드를 전환했습니다";

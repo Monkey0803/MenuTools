@@ -1,5 +1,14 @@
+import Foundation
 import Testing
 @testable import MenuTools
+
+private struct StubShortcutConflictChecker: ShortcutConflictChecking {
+    let source: ShortcutConflictSource?
+
+    func conflict(for shortcut: GlobalShortcut, context: ShortcutConflictContext) -> ShortcutConflictSource? {
+        source
+    }
+}
 
 @Test("全局快捷键能匹配对应场景")
 func globalShortcutMatchesScene() {
@@ -22,4 +31,48 @@ func globalShortcutDetectsConflict() {
 func globalShortcutDefaultsAreDistinct() {
     let values = Array(GlobalShortcutCatalog.defaults.values)
     #expect(Set(values).count == values.count)
+}
+
+@Test("场景快捷键可以发现窗口快捷键交叉冲突")
+func globalShortcutDetectsWindowConflict() {
+    let binding = GlobalShortcut(keyCode: 18, modifiers: GlobalShortcutModifier.controlOption)
+    let bindings = [WindowLayout.maxWidth: binding]
+
+    #expect(ShortcutBindingConflictCatalog.windowConflict(for: binding, in: bindings) == .maxWidth)
+}
+
+@Test("快捷键冲突检测可以识别系统快捷键")
+@MainActor
+func globalShortcutRejectsSystemConflict() throws {
+    let suiteName = "MenuToolsTests.GlobalShortcutConflict.\(UUID().uuidString)"
+    let defaults = try #require(UserDefaults(suiteName: suiteName))
+    defer { defaults.removePersistentDomain(forName: suiteName) }
+
+    let binding = GlobalShortcut(keyCode: 18, modifiers: GlobalShortcutModifier.controlOption)
+    let service = GlobalShortcutService(
+        defaults: defaults,
+        conflictChecker: StubShortcutConflictChecker(source: .system)
+    )
+
+    #expect(throws: GlobalShortcutError.systemConflict) {
+        try service.setBinding(binding, for: .work)
+    }
+}
+
+@Test("快捷键冲突检测可以识别其他应用占用")
+@MainActor
+func globalShortcutRejectsOtherApplicationConflict() throws {
+    let suiteName = "MenuToolsTests.GlobalShortcutExternalConflict.\(UUID().uuidString)"
+    let defaults = try #require(UserDefaults(suiteName: suiteName))
+    defer { defaults.removePersistentDomain(forName: suiteName) }
+
+    let binding = GlobalShortcut(keyCode: 19, modifiers: GlobalShortcutModifier.controlOption)
+    let service = GlobalShortcutService(
+        defaults: defaults,
+        conflictChecker: StubShortcutConflictChecker(source: .otherApplication)
+    )
+
+    #expect(throws: GlobalShortcutError.otherApplicationConflict) {
+        try service.setBinding(binding, for: .demo)
+    }
 }

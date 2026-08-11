@@ -2,6 +2,20 @@ import Foundation
 import Testing
 @testable import MenuTools
 
+private struct RecordingMemoryReleaser: SystemMemoryReleasing {
+    let releasedBytes: Int64
+    let recorder: ReleaseRecorder
+
+    func releaseMemory() -> MemoryReleaseResult {
+        recorder.callCount += 1
+        return MemoryReleaseResult(systemCachePurged: true, processReleasedBytes: releasedBytes)
+    }
+}
+
+private final class ReleaseRecorder: @unchecked Sendable {
+    var callCount = 0
+}
+
 private func reading(
     time: TimeInterval,
     ticks: SystemResourceCPUTicks,
@@ -104,4 +118,51 @@ func calculatorClassifiesMemoryPressure() {
     #expect(SystemResourceCalculator.snapshot(current: normal, previous: nil).memoryPressure == .normal)
     #expect(SystemResourceCalculator.snapshot(current: warning, previous: nil).memoryPressure == .warning)
     #expect(SystemResourceCalculator.snapshot(current: critical, previous: nil).memoryPressure == .critical)
+}
+
+@Test("只有高内存压力时提供释放内存操作")
+func memoryReleaseActionIsLimitedToCriticalPressure() {
+    #expect(!SystemMemoryPressure.normal.shouldOfferMemoryRelease)
+    #expect(!SystemMemoryPressure.warning.shouldOfferMemoryRelease)
+    #expect(SystemMemoryPressure.critical.shouldOfferMemoryRelease)
+}
+
+@Test("高内存压力点击释放后调用系统释放器并保存结果")
+@MainActor
+func memoryReleaseRunsReleaserAndStoresResult() {
+    let current = reading(
+        time: 2,
+        ticks: .init(user: 1, system: 1, idle: 1, nice: 0),
+        memoryUsed: 9_500,
+        memoryTotal: 10_000
+    )
+    let recorder = ReleaseRecorder()
+    let service = SystemResourceService(
+        provider: StubSystemResourceProvider(readings: [current, current]),
+        memoryReleaser: RecordingMemoryReleaser(releasedBytes: 12_345, recorder: recorder)
+    )
+
+    service.refresh()
+    service.releaseMemory()
+
+    #expect(recorder.callCount == 1)
+    #expect(service.lastMemoryReleaseResult == MemoryReleaseResult(
+        systemCachePurged: true,
+        processReleasedBytes: 12_345
+    ))
+    #expect(!service.isReleasingMemory)
+}
+
+private final class StubSystemResourceProvider: SystemResourceProviding, @unchecked Sendable {
+    let readings: [SystemResourceReading]
+    private var index = 0
+
+    init(readings: [SystemResourceReading]) {
+        self.readings = readings
+    }
+
+    func read() -> SystemResourceReading {
+        defer { index += 1 }
+        return readings[min(index, readings.count - 1)]
+    }
 }

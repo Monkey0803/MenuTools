@@ -16,6 +16,8 @@
 "resource.memoryNormal" = "内存正常";
 "resource.memoryWarning" = "内存有压力";
 "resource.memoryCritical" = "内存压力高";
+"resource.releaseMemory" = "释放内存";
+"resource.releasingMemory" = "释放中…";
 "resource.loading" = "正在读取系统资源…";
 
 /* 网络状态 */
@@ -121,6 +123,8 @@
 "status.openedIn" = "已在 %@ 打开：%@";
 "status.clipboardCleared" = "剪贴板已清空";
 "status.freed" = "已释放 %@";
+"status.memoryReleased" = "已请求系统清理内存缓存";
+"status.memoryReleaseFailed" = "系统内存清理未完成，请允许管理员权限";
 "status.newVersion" = "发现新版本 v%@%@";
 "status.upToDate" = "当前已是最新版本 (v%@)";
 "status.updateFailed" = "检查更新失败：%@";
@@ -353,6 +357,24 @@
 "window.error.readFrame" = "无法读取窗口位置或尺寸";
 "window.error.writeFrame" = "无法设置窗口位置或尺寸";
 "window.error.fullscreen" = "当前窗口不支持切换全屏";
+"window.error.excludedApplication" = "当前应用已被窗口管理器排除";
+"window.manager.section" = "窗口管理器";
+"window.manager.padding" = "屏幕边距";
+"window.manager.gap" = "窗口间距";
+"window.manager.snapDistance" = "吸附距离";
+"window.manager.edgeSnapping" = "拖动窗口到屏幕边缘时自动吸附";
+"window.manager.autoRules" = "切换应用时自动应用窗口规则";
+"window.manager.presets" = "布局预设";
+"window.manager.presetName" = "预设名称";
+"window.manager.applicationRules" = "应用窗口规则";
+"window.manager.currentApp" = "当前应用：%@";
+"window.manager.noCurrentApp" = "没有可识别的外部应用";
+"window.manager.bind" = "绑定";
+"window.manager.exclusions" = "排除应用";
+"window.manager.excludeCurrent" = "排除当前应用：%@";
+"window.apply" = "应用";
+"window.arrange" = "排列当前应用窗口";
+"window.arranged" = "已排列 %@ 个窗口";
 "focus.title" = "专注模式";
 "focus.enabled" = "已开启";
 "focus.disabled" = "已关闭";
@@ -374,5 +396,7 @@
 "shortcut.clear" = "清除快捷键";
 "shortcut.error.modifierRequired" = "快捷键至少需要一个 Command、Option、Control 或 Shift 修饰键";
 "shortcut.error.conflict" = "快捷键与“%@”冲突";
+"shortcut.error.systemConflict" = "快捷键与已启用的 macOS 系统快捷键冲突";
+"shortcut.error.otherApplicationConflict" = "快捷键可能已被其他应用注册";
 "focus.doNotDisturb" = "切换勿扰模式";
 "focus.doNotDisturbToggled" = "已切换勿扰模式";

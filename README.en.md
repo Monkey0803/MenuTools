@@ -34,7 +34,7 @@ A lightweight system toolkit that lives in the macOS menu bar. MenuTools uses th
 |---|---|
 | App Launcher | Search and launch installed apps, with favorites and recent-app ordering. |
 | Scenes | Apply Work, Presentation, or Night presets manually. |
-| Window Management | Use halves, quarters, centering, cross-display movement, and saved window sizes. |
+| Window Management | Use 58 layouts, edge snapping, layout presets, app rules, multi-window tiling, cross-display movement, and saved window sizes. |
 | Focus | Toggle the system Focus state and open Focus settings. |
 | Global scene shortcuts | Record global shortcuts for Work, Presentation, and Night scenes. |
 
@@ -157,7 +157,7 @@ If permission was denied, enable it again in **System Settings → Privacy & Sec
 | Storage Analysis | Background recursive measurement of selected directories; cleanup keeps directories and never touches Downloads |
 | App Launcher | NSWorkspace app discovery, search, favorites, and launching |
 | Scenes | Composes app launching, appearance, Focus, audio, desktop icons, and prevent-sleep actions |
-| Window Management | Accessibility API for window position, size, and display movement |
+| Window Management | Accessibility API for window position, size, and display movement; NSEvent edge snapping; persisted layout presets and app rules |
 | Focus | Control Center accessibility script with a System Settings fallback |
 | Global shortcuts | NSEvent global/local keyboard monitors, persistent bindings, and conflict detection |
 | Update checks | GitHub Releases API with a lightweight appcast JSON fallback |
@@ -215,6 +215,7 @@ defaults delete com.qoder.menutools updateFeedURL
 - Bluetooth devices that do not report battery levels cannot be displayed with a percentage.
 - AirPods case battery levels may only be reported when the case is open or the device has just connected.
 - Empty Trash and screenshot actions depend on macOS Automation and Screen Recording permissions; denied access is reported in the panel.
+- Shortcut conflict detection covers system hotkeys and exclusive Carbon hotkeys registered by other apps; apps using private event taps cannot be fully enumerated through public APIs.
 
 ## Acknowledgements
 

@@ -16,6 +16,8 @@
 "resource.memoryNormal" = "Memory normal";
 "resource.memoryWarning" = "Memory pressure";
 "resource.memoryCritical" = "High memory pressure";
+"resource.releaseMemory" = "Release Memory";
+"resource.releasingMemory" = "Releasing…";
 "resource.loading" = "Reading system resources…";
 
 /* Network Status */
@@ -121,6 +123,8 @@
 "status.openedIn" = "Opened in %@: %@";
 "status.clipboardCleared" = "Clipboard cleared";
 "status.freed" = "Freed %@";
+"status.memoryReleased" = "System memory caches were requested to be purged";
+"status.memoryReleaseFailed" = "Memory cleanup was not completed; administrator permission is required";
 "status.newVersion" = "New version v%@ available%@";
 "status.upToDate" = "You're up to date (v%@)";
 "status.updateFailed" = "Update check failed: %@";
@@ -353,6 +357,24 @@
 "window.error.readFrame" = "Unable to read the window frame";
 "window.error.writeFrame" = "Unable to set the window frame";
 "window.error.fullscreen" = "The current window does not support fullscreen toggling";
+"window.error.excludedApplication" = "The current application is excluded from window management";
+"window.manager.section" = "Window Manager";
+"window.manager.padding" = "Screen padding";
+"window.manager.gap" = "Window gap";
+"window.manager.snapDistance" = "Snap distance";
+"window.manager.edgeSnapping" = "Snap windows to screen edges while dragging";
+"window.manager.autoRules" = "Apply application rules when switching apps";
+"window.manager.presets" = "Layout presets";
+"window.manager.presetName" = "Preset name";
+"window.manager.applicationRules" = "Application rules";
+"window.manager.currentApp" = "Current app: %@";
+"window.manager.noCurrentApp" = "No external application was detected";
+"window.manager.bind" = "Bind";
+"window.manager.exclusions" = "Excluded applications";
+"window.manager.excludeCurrent" = "Exclude current app: %@";
+"window.apply" = "Apply";
+"window.arrange" = "Arrange current app windows";
+"window.arranged" = "%@ windows arranged";
 "focus.title" = "Focus";
 "focus.enabled" = "Enabled";
 "focus.disabled" = "Disabled";
@@ -374,5 +396,7 @@
 "shortcut.clear" = "Clear shortcut";
 "shortcut.error.modifierRequired" = "A shortcut needs Command, Option, Control, or Shift";
 "shortcut.error.conflict" = "Shortcut conflicts with %@";
+"shortcut.error.systemConflict" = "Shortcut conflicts with an enabled macOS system shortcut";
+"shortcut.error.otherApplicationConflict" = "Shortcut may already be registered by another application";
 "focus.doNotDisturb" = "Toggle Do Not Disturb";
 "focus.doNotDisturbToggled" = "Do Not Disturb toggled";

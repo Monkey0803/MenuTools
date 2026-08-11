@@ -26,6 +26,10 @@ enum SystemMemoryPressure: Equatable, Sendable {
     case normal
     case warning
     case critical
+
+    var shouldOfferMemoryRelease: Bool {
+        self == .critical
+    }
 }
 
 /// 展示层使用的系统资源快照。
@@ -208,12 +212,20 @@ struct DefaultSystemResourceProvider: SystemResourceProviding {
 @Observable
 final class SystemResourceService {
     private let provider: any SystemResourceProviding
+    private let memoryReleaser: any SystemMemoryReleasing
     private var previousReading: SystemResourceReading?
 
     private(set) var snapshot: SystemResourceSnapshot?
+    private(set) var isReleasingMemory = false
+    private(set) var lastReleasedMemoryBytes: Int64?
+    private(set) var lastMemoryReleaseResult: MemoryReleaseResult?
 
-    init(provider: any SystemResourceProviding = DefaultSystemResourceProvider()) {
+    init(
+        provider: any SystemResourceProviding = DefaultSystemResourceProvider(),
+        memoryReleaser: any SystemMemoryReleasing = DefaultSystemMemoryReleaser()
+    ) {
         self.provider = provider
+        self.memoryReleaser = memoryReleaser
     }
 
     func refresh() {
@@ -223,5 +235,18 @@ final class SystemResourceService {
             previous: previousReading
         )
         previousReading = current
+    }
+
+    @discardableResult
+    func releaseMemory() -> MemoryReleaseResult? {
+        guard !isReleasingMemory,
+              snapshot?.memoryPressure.shouldOfferMemoryRelease == true else { return nil }
+        isReleasingMemory = true
+        let result = memoryReleaser.releaseMemory()
+        lastMemoryReleaseResult = result
+        lastReleasedMemoryBytes = result.processReleasedBytes
+        refresh()
+        isReleasingMemory = false
+        return result
     }
 }
