@@ -33,6 +33,13 @@ func globalShortcutDefaultsAreDistinct() {
     #expect(Set(values).count == values.count)
 }
 
+@Test("快捷键显示包含字母名称")
+func globalShortcutDisplayIncludesLetterName() {
+    #expect(GlobalShortcut.keyName(for: 0) == "A")
+    #expect(GlobalShortcut(keyCode: 0, modifiers: GlobalShortcutModifier.controlOption).displayName == "⌃⌥A")
+    #expect(GlobalShortcut.keyName(for: 46) == "M")
+}
+
 @Test("场景快捷键可以发现窗口快捷键交叉冲突")
 func globalShortcutDetectsWindowConflict() {
     let binding = GlobalShortcut(keyCode: 18, modifiers: GlobalShortcutModifier.controlOption)
@@ -73,6 +80,24 @@ func globalShortcutRejectsOtherApplicationConflict() throws {
     )
 
     #expect(throws: GlobalShortcutError.otherApplicationConflict) {
+        try service.setBinding(binding, for: .demo)
+    }
+}
+
+@Test("全局快捷键能发现截图快捷键冲突")
+@MainActor
+func globalShortcutRejectsScreenshotConflict() throws {
+    let suiteName = "MenuToolsTests.ScreenshotShortcutConflict.\(UUID().uuidString)"
+    let defaults = try #require(UserDefaults(suiteName: suiteName))
+    defer { defaults.removePersistentDomain(forName: suiteName) }
+
+    let binding = GlobalShortcut(keyCode: 19, modifiers: GlobalShortcutModifier.controlOption)
+    let service = GlobalShortcutService(
+        defaults: defaults,
+        conflictChecker: StubShortcutConflictChecker(source: .screenshot)
+    )
+
+    #expect(throws: GlobalShortcutError.screenshotConflict) {
         try service.setBinding(binding, for: .demo)
     }
 }

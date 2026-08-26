@@ -10,6 +10,9 @@ OUT_DIR="$SCRIPT_DIR/dist"
 INFO_PLIST="$SCRIPT_DIR/Resources/Info.plist"
 SIGN_IDENTITY="${CODESIGN_IDENTITY:-}"
 NOTARY_PROFILE="${NOTARY_PROFILE:-}"
+SPARKLE_PUBLIC_ED_KEY="${SPARKLE_PUBLIC_ED_KEY:-}"
+SPARKLE_PRIVATE_ED_KEY_FILE="${SPARKLE_PRIVATE_ED_KEY_FILE:-}"
+SPARKLE_DOWNLOAD_URL_PREFIX="${SPARKLE_DOWNLOAD_URL_PREFIX:-}"
 
 if [[ -z "$SIGN_IDENTITY" ]]; then
     echo "错误：正式发布必须设置 CODESIGN_IDENTITY（Developer ID Application）。" >&2
@@ -18,6 +21,16 @@ fi
 
 if [[ -z "$NOTARY_PROFILE" ]]; then
     echo "错误：正式发布必须设置 NOTARY_PROFILE（notarytool Keychain profile）。" >&2
+    exit 1
+fi
+
+if [[ -z "$SPARKLE_PUBLIC_ED_KEY" ]]; then
+    echo "错误：正式发布必须设置 SPARKLE_PUBLIC_ED_KEY（Sparkle Ed25519 公钥）。" >&2
+    exit 1
+fi
+
+if [[ -z "$SPARKLE_PRIVATE_ED_KEY_FILE" || ! -f "$SPARKLE_PRIVATE_ED_KEY_FILE" ]]; then
+    echo "错误：正式发布必须设置 SPARKLE_PRIVATE_ED_KEY_FILE（Sparkle Ed25519 私钥文件）。" >&2
     exit 1
 fi
 
@@ -47,7 +60,8 @@ echo "==> 运行测试"
 swift test
 
 echo "==> 使用 Developer ID 构建并签名"
-CODESIGN_IDENTITY="$SIGN_IDENTITY" ./build.sh release
+SPARKLE_PUBLIC_ED_KEY="$SPARKLE_PUBLIC_ED_KEY" \
+    CODESIGN_IDENTITY="$SIGN_IDENTITY" ./build.sh release
 
 APP_BUNDLE="$OUT_DIR/$APP_NAME.app"
 ZIP_PATH="$OUT_DIR/$APP_NAME-$VERSION.zip"
@@ -74,6 +88,32 @@ echo "==> 用已 stapled 的 App 重新生成 ZIP"
 rm -f "$ZIP_PATH"
 ditto -c -k --sequesterRsrc --keepParent "$APP_BUNDLE" "$ZIP_PATH"
 spctl --assess --type execute --verbose=2 "$APP_BUNDLE"
+
+echo "==> 生成 Sparkle appcast"
+SPARKLE_BIN_DIR="$SCRIPT_DIR/.build/artifacts/sparkle/Sparkle/bin"
+GENERATE_APPCAST="$SPARKLE_BIN_DIR/generate_appcast"
+if [[ ! -x "$GENERATE_APPCAST" ]]; then
+    echo "错误：未找到 Sparkle generate_appcast：$GENERATE_APPCAST" >&2
+    exit 1
+fi
+
+APPCAST_ARCHIVES="$OUT_DIR/sparkle-archives-$VERSION"
+mkdir -p "$APPCAST_ARCHIVES"
+cp "$ZIP_PATH" "$APPCAST_ARCHIVES/"
+cp "$SCRIPT_DIR/appcast.xml" "$APPCAST_ARCHIVES/"
+
+if [[ -z "$SPARKLE_DOWNLOAD_URL_PREFIX" ]]; then
+    SPARKLE_DOWNLOAD_URL_PREFIX="https://github.com/Monkey0803/MenuTools/releases/download/v$VERSION/"
+fi
+
+"$GENERATE_APPCAST" \
+    --ed-key-file "$SPARKLE_PRIVATE_ED_KEY_FILE" \
+    --download-url-prefix "$SPARKLE_DOWNLOAD_URL_PREFIX" \
+    --link "https://github.com/Monkey0803/MenuTools/releases" \
+    -o "$OUT_DIR/appcast.xml" \
+    "$APPCAST_ARCHIVES"
+
+echo "    Sparkle appcast: $OUT_DIR/appcast.xml"
 
 echo "==> 发布资产已准备："
 echo "    $ZIP_PATH"

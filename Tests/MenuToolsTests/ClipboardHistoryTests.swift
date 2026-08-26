@@ -1,3 +1,4 @@
+import AppKit
 import Foundation
 import Testing
 @testable import MenuTools
@@ -67,6 +68,15 @@ func imageContentIsRetained() {
     #expect(item?.expiresAt == nil)
 }
 
+@Test("剪贴板历史可以读取 PNG 图片")
+func pasteboardReaderReadsPNGImage() {
+    let item = NSPasteboardItem()
+    let data = Data([0x89, 0x50, 0x4E, 0x47])
+    item.setData(data, forType: .png)
+
+    #expect(ClipboardHistoryPasteboardReader.content(from: item) == .image(data))
+}
+
 @Test("删除和清空操作只影响对应历史项目")
 func historyRemovesRequestedItems() {
     var history = ClipboardHistoryBuffer(limit: 5)
@@ -91,6 +101,24 @@ func historyClearRemovesAllItems() {
     history.clearAll()
 
     #expect(history.items.isEmpty)
+}
+
+@Test("剪贴板历史可以持久化恢复文本、图片和固定状态")
+func historyPersistenceRoundTrips() throws {
+    let url = FileManager.default.temporaryDirectory
+        .appendingPathComponent("MenuTools-ClipboardHistory-\(UUID().uuidString).json")
+    defer { try? FileManager.default.removeItem(at: url) }
+
+    var history = ClipboardHistoryBuffer(limit: 5)
+    let now = Date(timeIntervalSince1970: 100)
+    let text = history.insert(.text("持久化文本"), now: now)
+    history.insert(.image(Data([1, 2, 3, 4])), now: now.addingTimeInterval(1))
+    history.togglePinned(id: text!.id)
+
+    try ClipboardHistoryPersistence.save(history.items, to: url)
+    let restored = ClipboardHistoryPersistence.load(from: url)
+
+    #expect(restored == history.items)
 }
 
 @Test("剪贴板历史服务使用应用级共享实例")

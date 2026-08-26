@@ -27,15 +27,218 @@ private extension View {
     func entrance(_ index: Int, appeared: Bool) -> some View {
         modifier(Entrance(appeared: appeared, index: index))
     }
+
+    func controlCenterCircleSurface(
+        tint: Color = .blue,
+        selected: Bool = false,
+        interactive: Bool = false
+    ) -> some View {
+        modifier(
+            ControlCenterCircleSurface(
+                tint: tint,
+                selected: selected,
+                interactive: interactive
+            )
+        )
+    }
 }
 
-/// 菜单栏弹出的主面板：液态玻璃风格，自动适配深色 / 浅色
+extension View {
+    /// 仿控制中心的深色半透明表面：比系统默认 Liquid Glass 更克制，边缘更清晰。
+    func controlCenterSurface(
+        tint: Color? = nil,
+        selected: Bool = false,
+        interactive: Bool = false,
+        shape: AnyShape = AnyShape(.rect(cornerRadius: 16))
+    ) -> some View {
+        modifier(
+            ControlCenterSurface(
+                tint: tint,
+                selected: selected,
+                interactive: interactive,
+                shape: shape
+            )
+        )
+    }
+
+    /// 给没有完整卡片表面的图标按钮提供轻量悬停反馈。
+    func controlCenterHover(
+        shape: AnyShape = AnyShape(.rect(cornerRadius: 8))
+    ) -> some View {
+        modifier(ControlCenterHover(shape: shape))
+    }
+}
+
+struct ControlCenterSurface: ViewModifier {
+    let tint: Color?
+    let selected: Bool
+    let interactive: Bool
+    let shape: AnyShape
+    @State private var isHovered = false
+
+    func body(content: Content) -> some View {
+        let accent = tint ?? .blue
+        let base = Color(nsColor: .controlBackgroundColor)
+        let highlighted = interactive && isHovered
+        let style = ControlCenterSurfaceStyle.resolve(selected: selected, highlighted: highlighted)
+        let fill = selected
+            ? AnyShapeStyle(
+                LinearGradient(
+                    colors: [
+                        Color.white.opacity(0.38),
+                        accent.opacity(0.92),
+                        accent.opacity(0.64),
+                        base.opacity(0.84)
+                    ],
+                    startPoint: .top,
+                    endPoint: .bottom
+                )
+            )
+            : AnyShapeStyle(
+                LinearGradient(
+                    colors: [
+                        Color.white.opacity(highlighted ? 0.15 : 0.075),
+                        base.opacity(0.88),
+                        Color.black.opacity(0.10)
+                    ],
+                    startPoint: .topLeading,
+                    endPoint: .bottomTrailing
+                )
+            )
+
+        return content
+            .background {
+                ZStack {
+                    shape.fill(fill)
+                    if selected {
+                        // 顶部镜面反射和底部暗部必须分层绘制，单一 tint 渐变仍会显得像平面色块。
+                        shape.fill(
+                            RadialGradient(
+                                colors: [
+                                    Color.white.opacity(style.specularOpacity),
+                                    Color.white.opacity(style.specularOpacity * 0.16),
+                                    .clear
+                                ],
+                                center: UnitPoint(x: 0.32, y: 0.02),
+                                startRadius: 0,
+                                endRadius: 48
+                            )
+                        )
+                        .blendMode(.screen)
+                        shape.fill(
+                            LinearGradient(
+                                colors: [.clear, .clear, Color.black.opacity(style.lowerRimOpacity)],
+                                startPoint: .top,
+                                endPoint: .bottom
+                            )
+                        )
+                        .blendMode(.multiply)
+                    }
+                }
+            }
+            .clipShape(shape)
+            .overlay {
+                ZStack {
+                    shape.stroke(
+                        LinearGradient(
+                            colors: selected
+                                ? [Color.white.opacity(0.92), accent.opacity(0.86), Color.black.opacity(0.48)]
+                                : highlighted
+                                    ? [Color.white.opacity(0.58), Color.white.opacity(0.18)]
+                                    : [Color.white.opacity(0.28), Color.white.opacity(0.08)],
+                            startPoint: .top,
+                            endPoint: .bottom
+                        ),
+                        lineWidth: selected ? 1.35 : (highlighted ? 0.9 : 0.6)
+                    )
+                    if selected {
+                        shape.stroke(Color.white.opacity(0.72), lineWidth: 1)
+                            .mask(
+                                LinearGradient(
+                                    colors: [.white, .clear],
+                                    startPoint: .top,
+                                    endPoint: .center
+                                )
+                            )
+                    }
+                }
+            }
+            .shadow(
+                color: selected
+                    ? Color.black.opacity(0.48)
+                    : (highlighted ? Color.black.opacity(0.38) : Color.black.opacity(0.28)),
+                radius: style.shadowRadius,
+                y: style.shadowY
+            )
+            .shadow(color: selected ? accent.opacity(0.34) : .clear, radius: 5, y: 1)
+            .animation(.easeOut(duration: 0.16), value: highlighted)
+            .onHover { hovering in
+                guard interactive else { return }
+                isHovered = hovering
+            }
+    }
+}
+
+/// 可自动测试的表面层次参数；渲染层据此区分平面悬停与凸起选中态。
+struct ControlCenterSurfaceStyle: Equatable, Sendable {
+    let specularOpacity: Double
+    let lowerRimOpacity: Double
+    let shadowRadius: CGFloat
+    let shadowY: CGFloat
+
+    static func resolve(selected: Bool, highlighted: Bool) -> Self {
+        if selected {
+            return Self(specularOpacity: 0.58, lowerRimOpacity: 0.34, shadowRadius: 10, shadowY: 5)
+        }
+        if highlighted {
+            return Self(specularOpacity: 0.16, lowerRimOpacity: 0.14, shadowRadius: 7, shadowY: 3)
+        }
+        return Self(specularOpacity: 0.08, lowerRimOpacity: 0.08, shadowRadius: 5, shadowY: 2)
+    }
+}
+
+private struct ControlCenterCircleSurface: ViewModifier {
+    let tint: Color
+    let selected: Bool
+    let interactive: Bool
+
+    func body(content: Content) -> some View {
+        return content
+            .frame(width: 40, height: 40)
+            .modifier(
+                ControlCenterSurface(
+                    tint: tint,
+                    selected: selected,
+                    interactive: interactive,
+                    shape: AnyShape(Circle())
+                )
+            )
+    }
+}
+
+struct ControlCenterHover: ViewModifier {
+    let shape: AnyShape
+    @State private var isHovered = false
+
+    func body(content: Content) -> some View {
+        content
+            .background(shape.fill(Color.white.opacity(isHovered ? 0.11 : 0)))
+            .clipShape(shape)
+            .overlay {
+                shape.stroke(Color.white.opacity(isHovered ? 0.24 : 0), lineWidth: 0.6)
+            }
+            .shadow(color: Color.black.opacity(isHovered ? 0.2 : 0), radius: 4, y: 2)
+            .animation(.easeOut(duration: 0.14), value: isHovered)
+            .onHover { isHovered = $0 }
+    }
+}
+
+/// 菜单栏弹出的主面板：控制中心风格，自动适配深色 / 浅色
 struct MenuPanelView: View {
-    private let openSettingsAction: (() -> Void)?
+    private let openSettingsAction: ((SettingsTab) -> Void)?
     @AppStorage(SettingsKey.menuBarIcon) private var menuBarIcon = MenuBarIcon.default.rawValue
     @AppStorage(SettingsKey.togglesShowTitle) private var togglesShowTitle = false
     @AppStorage(SettingsKey.preferredTerminal) private var preferredTerminal = TerminalApp.systemDefault.rawValue
-    @AppStorage(SettingsKey.autoCheckUpdate) private var autoCheckUpdate = true
     @AppStorage(SettingsKey.appLanguage) private var appLanguage = AppLanguage.system.rawValue
     @Environment(\.openSettings) private var openSettings
 
@@ -55,26 +258,19 @@ struct MenuPanelView: View {
     @State private var storageAnalysisService = StorageAnalysisService()
     @State private var storageCategoryToConfirm: StorageCategory?
     @State private var quickActionService = QuickActionService()
+    @State private var screenshotService = ScreenshotService.shared
     @State private var activeQuickAction: QuickAction?
     @State private var appLauncherService = AppLauncherService.shared
     @State private var sceneService = SceneService.shared
     @State private var focusModeService = FocusModeService.shared
     @State private var globalShortcutService = GlobalShortcutService.shared
-    @State private var isCheckingUpdate = false
-    @State private var availableUpdate: UpdateInfo?
-    @State private var updateDownloadService = UpdateDownloadService(
-        downloader: URLSessionUpdatePackageDownloader(),
-        opener: NSWorkspaceUpdatePackageOpener()
-    )
-    @State private var updateDownloadState: UpdateDownloadState = .idle
-    @State private var isConfirmingPackageOpen = false
+    @State private var appVolumeService = AppVolumeService.shared
     @State private var statusMessage: String?
     @State private var statusIsError = false
     @State private var appeared = false
     @State private var tooltipWidth: CGFloat = 0
-    @Namespace private var glassNamespace
 
-    init(openSettingsAction: (() -> Void)? = nil) {
+    init(openSettingsAction: ((SettingsTab) -> Void)? = nil) {
         self.openSettingsAction = openSettingsAction
     }
 
@@ -88,8 +284,7 @@ struct MenuPanelView: View {
                 .entrance(0, appeared: appeared)
 
             ScrollView(.vertical, showsIndicators: false) {
-                GlassEffectContainer(spacing: 12) {
-                    VStack(spacing: 12) {
+                VStack(spacing: 10) {
                     heroTiles
                         .entrance(1, appeared: appeared)
                     quickActionsCard
@@ -119,21 +314,40 @@ struct MenuPanelView: View {
                         .entrance(10, appeared: appeared)
                     quickToggles
                         .entrance(11, appeared: appeared)
-                    bluetoothCard
-                        .entrance(12, appeared: appeared)
-                    cleanupTiles
-                        .entrance(13, appeared: appeared)
+                    AppVolumeCard(service: appVolumeService) {
+                        openSettingsAction?(.volume)
                     }
+                    .entrance(12, appeared: appeared)
+                    bluetoothCard
+                        .entrance(13, appeared: appeared)
+                    cleanupTiles
+                        .entrance(14, appeared: appeared)
                 }
             }
+            .scrollContentBackground(.hidden)
+            .background(.clear)
 
             footer
-                .entrance(14, appeared: appeared)
+                .entrance(15, appeared: appeared)
         }
         .padding(16)
         // 菜单栏窗口必须有明确高度，否则 ScrollView 会按全部卡片的理想高度展开，
         // 在菜单栏屏幕上无法正常显示弹出面板。
         .frame(width: 320, height: 640)
+        .background {
+            RoundedRectangle(cornerRadius: 22, style: .continuous)
+                .fill(Color(nsColor: .windowBackgroundColor).opacity(0.82))
+                .overlay {
+                    RoundedRectangle(cornerRadius: 22, style: .continuous)
+                        .fill(.ultraThinMaterial)
+                        .opacity(0.34)
+                }
+        }
+        .clipShape(RoundedRectangle(cornerRadius: 22, style: .continuous))
+        .overlay {
+            RoundedRectangle(cornerRadius: 22, style: .continuous)
+                .strokeBorder(Color.white.opacity(0.16), lineWidth: 0.7)
+        }
         .overlay(alignment: .bottom) {
             if let statusMessage {
                 statusBanner(statusMessage)
@@ -154,7 +368,7 @@ struct MenuPanelView: View {
                         .fixedSize()
                         .padding(.horizontal, 9)
                         .padding(.vertical, 5)
-                        .glassEffect(.regular, in: .capsule)
+                        .controlCenterSurface(shape: AnyShape(.capsule))
                         .background {
                             GeometryReader { g in
                                 Color.clear
@@ -187,7 +401,6 @@ struct MenuPanelView: View {
             globalShortcutService.start()
             // 不在面板打开瞬间读取 Focus：读取会点击 Control Center，可能抢走菜单弹层焦点。
             // 状态在用户执行切换后刷新；未读取前由卡片显示“状态由系统控制”。
-            autoCheckUpdateIfNeeded()
             // 面板展示期间每 30 秒刷新一次蓝牙设备电量
             while !Task.isCancelled {
                 bleMonitor.refresh()
@@ -216,18 +429,6 @@ struct MenuPanelView: View {
                 displayService.refresh()
                 storageAnalysisService.refresh()
             }
-        }
-        .task {
-            await observeUpdateDownload()
-        }
-        .alert(L("update.confirmOpen.title"), isPresented: $isConfirmingPackageOpen) {
-            Button(L("update.open")) {
-                _ = updateDownloadService.openCompletedPackage()
-                updateDownloadState = updateDownloadService.state
-            }
-            Button(L("update.cancel"), role: .cancel) {}
-        } message: {
-            Text(L("update.confirmOpen.message"))
         }
         .alert(L("storage.confirm.title"), isPresented: Binding(
             get: { storageCategoryToConfirm != nil },
@@ -282,11 +483,11 @@ struct MenuPanelView: View {
             .buttonStyle(.plain)
             .focusEffectDisabled()
             .foregroundStyle(.secondary)
-            .glassEffect(.regular, in: .circle)
+                        .controlCenterSurface(interactive: true, shape: AnyShape(Circle()))
             .help(L("footer.quit"))
             Button {
                 if let openSettingsAction {
-                    openSettingsAction()
+                    openSettingsAction(.general)
                 } else {
                     NSApp.activate(ignoringOtherApps: true)
                     openSettings()
@@ -300,7 +501,7 @@ struct MenuPanelView: View {
             .buttonStyle(.plain)
             .focusEffectDisabled()
             .foregroundStyle(.secondary)
-            .glassEffect(.regular, in: .circle)
+            .controlCenterSurface(interactive: true, shape: AnyShape(Circle()))
             .help(L("help.settings"))
         }
     }
@@ -317,8 +518,7 @@ struct MenuPanelView: View {
                 )
             }
             .buttonStyle(.plain)
-            .glassEffect(.regular.tint(.blue.opacity(0.28)).interactive(), in: .rect(cornerRadius: 18))
-            .glassEffectID("terminal", in: glassNamespace)
+            .controlCenterSurface(tint: .blue, interactive: true, shape: AnyShape(.rect(cornerRadius: 18)))
 
             Button {
                 setSystemAppearance(dark: !isDarkMode)
@@ -330,11 +530,11 @@ struct MenuPanelView: View {
                 )
             }
             .buttonStyle(.plain)
-            .glassEffect(
-                .regular.tint((isDarkMode ? Color.indigo : Color.orange).opacity(0.28)).interactive(),
-                in: .rect(cornerRadius: 18)
+            .controlCenterSurface(
+                tint: isDarkMode ? .indigo : .orange,
+                interactive: true,
+                shape: AnyShape(.rect(cornerRadius: 18))
             )
-            .glassEffectID("appearance", in: glassNamespace)
         }
     }
 
@@ -405,7 +605,7 @@ struct MenuPanelView: View {
                     }
                     .buttonStyle(.plain)
                     .foregroundStyle(.primary)
-                    .glassEffect(.regular.interactive(), in: .rect(cornerRadius: 12))
+                    .controlCenterSurface(interactive: true, shape: AnyShape(.rect(cornerRadius: 12)))
                     .disabled(activeQuickAction != nil)
                     .accessibilityLabel(L(action.titleKey))
                 }
@@ -413,8 +613,7 @@ struct MenuPanelView: View {
         }
         .padding(12)
         .frame(maxWidth: .infinity, alignment: .leading)
-        .glassEffect(.regular.tint(.blue.opacity(0.14)), in: .rect(cornerRadius: 16))
-        .glassEffectID("quickActions", in: glassNamespace)
+        .controlCenterSurface(tint: .blue)
     }
 
     // MARK: - 系统资源
@@ -496,7 +695,7 @@ struct MenuPanelView: View {
         }
         .padding(12)
         .frame(maxWidth: .infinity, alignment: .leading)
-        .glassEffect(.regular.tint(.purple.opacity(0.16)), in: .rect(cornerRadius: 16))
+        .controlCenterSurface(tint: .purple)
         .accessibilityElement(children: .combine)
         .accessibilityLabel(L("resource.title"))
     }
@@ -514,6 +713,7 @@ struct MenuPanelView: View {
                         .font(.caption)
                 }
                 .buttonStyle(.plain)
+                .controlCenterHover(shape: AnyShape(.circle))
                 .foregroundStyle(.secondary)
                 .accessibilityLabel(L("network.refresh"))
             }
@@ -554,7 +754,7 @@ struct MenuPanelView: View {
         }
         .padding(12)
         .frame(maxWidth: .infinity, alignment: .leading)
-        .glassEffect(.regular.tint(.cyan.opacity(0.14)), in: .rect(cornerRadius: 16))
+        .controlCenterSurface(tint: .cyan)
         .accessibilityElement(children: .contain)
         .accessibilityLabel(L("network.title"))
     }
@@ -585,6 +785,7 @@ struct MenuPanelView: View {
             .font(.caption2)
         }
         .buttonStyle(.plain)
+        .controlCenterHover()
         .foregroundStyle(.tint)
         .disabled(isLoading)
     }
@@ -601,6 +802,7 @@ struct MenuPanelView: View {
                         .font(.caption)
                 }
                 .buttonStyle(.plain)
+                .controlCenterHover(shape: AnyShape(.circle))
                 .foregroundStyle(.secondary)
                 .accessibilityLabel(L("batteryHealth.refresh"))
             }
@@ -638,7 +840,7 @@ struct MenuPanelView: View {
         }
         .padding(12)
         .frame(maxWidth: .infinity, alignment: .leading)
-        .glassEffect(.regular.tint(.green.opacity(0.12)), in: .rect(cornerRadius: 16))
+        .controlCenterSurface(tint: .green)
         .accessibilityElement(children: .combine)
         .accessibilityLabel(L("batteryHealth.title"))
     }
@@ -664,6 +866,7 @@ struct MenuPanelView: View {
                         .font(.caption)
                 }
                 .buttonStyle(.plain)
+                .controlCenterHover(shape: AnyShape(.circle))
                 .foregroundStyle(.secondary)
                 .accessibilityLabel(L("display.refresh"))
             }
@@ -711,6 +914,7 @@ struct MenuPanelView: View {
                                 .frame(width: 24, height: 24)
                         }
                         .menuStyle(.borderlessButton)
+                        .controlCenterHover(shape: AnyShape(.rect(cornerRadius: 7)))
                         .foregroundStyle(.secondary)
                         .accessibilityLabel(L("display.changeMode"))
                     }
@@ -719,7 +923,7 @@ struct MenuPanelView: View {
         }
         .padding(12)
         .frame(maxWidth: .infinity, alignment: .leading)
-        .glassEffect(.regular.tint(.orange.opacity(0.12)), in: .rect(cornerRadius: 16))
+        .controlCenterSurface(tint: .orange)
         .accessibilityElement(children: .contain)
         .accessibilityLabel(L("display.title"))
     }
@@ -736,6 +940,7 @@ struct MenuPanelView: View {
                         .font(.caption)
                 }
                 .buttonStyle(.plain)
+                .controlCenterHover(shape: AnyShape(.circle))
                 .foregroundStyle(.secondary)
                 .accessibilityLabel(L("storage.refresh"))
             }
@@ -766,6 +971,7 @@ struct MenuPanelView: View {
                                 }
                             }
                             .buttonStyle(.plain)
+                            .controlCenterHover(shape: AnyShape(.circle))
                             .foregroundStyle(.secondary)
                             .disabled(storageAnalysisService.cleaningCategory != nil)
                             .accessibilityLabel(L("storage.clean"))
@@ -787,7 +993,7 @@ struct MenuPanelView: View {
         }
         .padding(12)
         .frame(maxWidth: .infinity, alignment: .leading)
-        .glassEffect(.regular.tint(.indigo.opacity(0.12)), in: .rect(cornerRadius: 16))
+        .controlCenterSurface(tint: .indigo)
         .accessibilityElement(children: .contain)
         .accessibilityLabel(L("storage.title"))
     }
@@ -875,6 +1081,12 @@ struct MenuPanelView: View {
 
     // MARK: - 快捷开关带：防止锁屏 / 隐藏文件 / 静音 / 程序坞 / 菜单栏 / 夜览
 
+    private var isOutputMuted: Bool {
+        appVolumeService.output.deviceID == 0
+            ? toggles.muted
+            : appVolumeService.output.isMuted
+    }
+
     private var quickToggles: some View {
         Group {
             if togglesShowTitle {
@@ -887,7 +1099,6 @@ struct MenuPanelView: View {
                 }
             }
         }
-        .glassEffectID("toggles", in: glassNamespace)
     }
 
     @ViewBuilder private var toggleButtons: some View {
@@ -908,10 +1119,15 @@ struct MenuPanelView: View {
             toggles.hiddenFilesShown.toggle()
         }
         quickToggle(
-            symbol: toggles.muted ? "speaker.slash.fill" : "speaker.wave.2.fill",
+            symbol: isOutputMuted ? "speaker.slash.fill" : "speaker.wave.2.fill",
             help: L("toggle.mute"),
-            isOn: toggles.muted
+            isOn: isOutputMuted
         ) {
+            if appVolumeService.output.canSetMute {
+                appVolumeService.setMasterMuted(!isOutputMuted)
+                toggles.muted = !isOutputMuted
+                return
+            }
             do {
                 try SystemToggleService.setMuted(!toggles.muted)
                 toggles.muted.toggle()
@@ -1011,6 +1227,7 @@ struct MenuPanelView: View {
                             .contentShape(.circle)
                     }
                     .buttonStyle(.plain)
+                    .controlCenterHover(shape: AnyShape(.circle))
                     .foregroundStyle(.secondary)
                 }
             } else {
@@ -1022,8 +1239,7 @@ struct MenuPanelView: View {
         .padding(.horizontal, 14)
         .padding(.vertical, 12)
         .frame(maxWidth: .infinity, alignment: .leading)
-        .glassEffect(.regular, in: .rect(cornerRadius: 16))
-        .glassEffectID("bluetooth", in: glassNamespace)
+        .controlCenterSurface()
     }
 
     private func deviceRow(_ device: BluetoothDeviceBattery) -> some View {
@@ -1096,8 +1312,7 @@ struct MenuPanelView: View {
             }
             .buttonStyle(.plain)
             .disabled(isCleaningDerivedData || derivedDataSize == 0)
-            .glassEffect(.regular.interactive(), in: .rect(cornerRadius: 16))
-            .glassEffectID("derivedData", in: glassNamespace)
+            .controlCenterSurface(interactive: true, shape: AnyShape(.rect(cornerRadius: 16)))
 
             ZStack(alignment: .topTrailing) {
                 Button {
@@ -1125,8 +1340,7 @@ struct MenuPanelView: View {
                 .disabled(clipboardHistoryService.currentItemCount == 0)
             }
             .buttonStyle(.plain)
-            .glassEffect(.regular.interactive(), in: .rect(cornerRadius: 16))
-            .glassEffectID("clipboard", in: glassNamespace)
+            .controlCenterSurface(interactive: true, shape: AnyShape(.rect(cornerRadius: 16)))
             .popover(isPresented: $isShowingClipboardHistory, arrowEdge: .bottom) {
                 ClipboardHistoryPopover(
                     items: clipboardHistoryService.items,
@@ -1204,71 +1418,24 @@ struct MenuPanelView: View {
             Spacer(minLength: 0)
         }
         .padding(10)
-        .glassEffect(.regular, in: .rect(cornerRadius: 12))
+        .controlCenterSurface(shape: AnyShape(.rect(cornerRadius: 12)))
         .transition(.opacity.combined(with: .scale(scale: 0.96)))
     }
 
     private var footer: some View {
         HStack(spacing: 10) {
-            Text("v\(UpdateCheckerService.currentVersion)")
+            Text("v\(AppVersionService.current)")
                 .font(.caption2)
                 .foregroundStyle(.tertiary)
 
-            if case let .downloading(progress) = updateDownloadState {
-                HStack(spacing: 5) {
-                    ProgressView(value: progress)
-                        .frame(width: 42)
-                    VStack(alignment: .leading, spacing: 0) {
-                        Text(L("update.downloading"))
-                            .font(.caption2)
-                        Text(L("update.progress", Int(progress * 100)))
-                            .font(.caption2)
-                            .foregroundStyle(.secondary)
-                            .monospacedDigit()
-                    }
-                    Button(L("update.cancel")) {
-                        cancelUpdateDownload()
-                    }
-                    .buttonStyle(.plain)
-                    .font(.caption2)
-                    .foregroundStyle(.secondary)
-                    .disabled(!isDownloadingUpdate)
-                }
-            } else if case .completed = updateDownloadState {
-                Text(L("update.completed"))
-                    .font(.caption2)
-                    .foregroundStyle(.green)
-                Button(L("update.open")) {
-                    isConfirmingPackageOpen = true
-                }
-                .buttonStyle(.plain)
-                .font(.caption2)
-                .foregroundStyle(.tint)
-            } else if let update = availableUpdate {
-                Button {
-                    startUpdateDownload(update)
-                } label: {
-                    HStack(spacing: 3) {
-                        Image(systemName: "arrow.down.circle.fill")
-                            .symbolEffect(.bounce, value: update)
-                        Text(L("footer.newVersion", update.version))
-                    }
-                    .font(.caption)
-                }
-                .buttonStyle(.plain)
-                .foregroundStyle(.tint)
-                .disabled(isDownloadingUpdate)
-            } else if isCheckingUpdate {
-                ProgressView()
-                    .controlSize(.mini)
-            } else {
-                Button(L("footer.checkUpdate")) {
-                    checkForUpdate()
-                }
-                .buttonStyle(.plain)
-                .font(.caption2)
-                .foregroundStyle(.secondary)
+            Button(L("footer.checkUpdate")) {
+                checkForUpdate()
             }
+            .buttonStyle(.plain)
+            .controlCenterHover()
+            .font(.caption2)
+            .foregroundStyle(.secondary)
+            .disabled(!SparkleUpdateService.shared.canCheckForUpdates)
 
             Spacer()
         }
@@ -1304,6 +1471,20 @@ struct MenuPanelView: View {
     private func performQuickAction(_ action: QuickAction) {
         guard activeQuickAction == nil else { return }
         activeQuickAction = action
+
+        if action == .screenshot {
+            Task { @MainActor in
+                do {
+                    _ = try await screenshotService.captureConfigured()
+                    flashStatus(L("quickAction.success", L(action.titleKey)), isError: false)
+                } catch {
+                    flashStatus(error.localizedDescription, isError: true)
+                }
+                activeQuickAction = nil
+            }
+            return
+        }
+
         defer { activeQuickAction = nil }
 
         do {
@@ -1419,92 +1600,7 @@ struct MenuPanelView: View {
     }
 
     private func checkForUpdate() {
-        guard !isCheckingUpdate else { return }
-        isCheckingUpdate = true
-        Task {
-            do {
-                let update = try await UpdateCheckerService.check()
-                isCheckingUpdate = false
-                if let update {
-                    withAnimation(.smooth(duration: 0.3)) {
-                        availableUpdate = update
-                    }
-                    let notes = update.notes.map { " — \($0)" } ?? ""
-                    flashStatus(L("status.newVersion", update.version, notes), isError: false)
-                } else {
-                    flashStatus(L("status.upToDate", UpdateCheckerService.currentVersion), isError: false)
-                }
-            } catch {
-                isCheckingUpdate = false
-                flashStatus(L("status.updateFailed", error.localizedDescription), isError: true)
-            }
-        }
-    }
-
-    private var isDownloadingUpdate: Bool {
-        if case .downloading = updateDownloadState { return true }
-        return false
-    }
-
-    private func startUpdateDownload(_ update: UpdateInfo) {
-        guard !isDownloadingUpdate else { return }
-        _ = updateDownloadService.start(update: update)
-        updateDownloadState = updateDownloadService.state
-        handleUpdateDownloadState(updateDownloadState)
-    }
-
-    private func cancelUpdateDownload() {
-        guard updateDownloadService.cancel() else { return }
-        updateDownloadState = updateDownloadService.state
-        handleUpdateDownloadState(updateDownloadState)
-    }
-
-    /// 轮询服务状态，将非 ObservableObject 的下载服务状态同步到视图。
-    private func observeUpdateDownload() async {
-        while !Task.isCancelled {
-            let state = updateDownloadService.state
-            if state != updateDownloadState {
-                updateDownloadState = state
-                handleUpdateDownloadState(state)
-            }
-            try? await Task.sleep(for: .milliseconds(100))
-        }
-    }
-
-    private func handleUpdateDownloadState(_ state: UpdateDownloadState) {
-        switch state {
-        case .idle, .downloading:
-            break
-        case .completed:
-            flashStatus(L("update.completed"), isError: false)
-        case let .failed(error):
-            flashStatus(updateDownloadErrorMessage(error), isError: true)
-        }
-    }
-
-    private func updateDownloadErrorMessage(_ error: UpdateDownloadError) -> String {
-        switch error {
-        case .unsupportedFileType:
-            return L("update.unsupportedPackage")
-        case .openFailed:
-            return L("update.openFailed")
-        case .cancelled:
-            return L("update.cancelled")
-        case .invalidURL, .alreadyDownloading, .downloadFailed, .downloadFailedWithReason:
-            return L("update.downloadFailed")
-        }
-    }
-
-    /// 打开面板时的静默自动检查：可在设置中关闭；24 小时节流，只在发现新版本时提示
-    private func autoCheckUpdateIfNeeded() {
-        guard autoCheckUpdate, availableUpdate == nil, UpdateCheckerService.shouldAutoCheck() else { return }
-        Task {
-            guard let update = try? await UpdateCheckerService.check() else { return }
-            withAnimation(.smooth(duration: 0.3)) {
-                availableUpdate = update
-            }
-            flashStatus(L("status.newVersionHint", update.version), isError: false)
-        }
+        SparkleUpdateService.shared.checkForUpdates()
     }
 
     private func flashStatus(_ message: String, isError: Bool) {
@@ -1523,7 +1619,7 @@ struct MenuPanelView: View {
     }
 }
 
-/// 单个快捷开关按钮：自带悬停状态，以液态玻璃胶囊即时展示提示（替代延迟高的系统 .help 提示）
+/// 单个快捷开关按钮：自带悬停状态，以控制中心胶囊即时展示提示（替代延迟高的系统 .help 提示）
 private struct QuickToggleButton: View {
     let symbol: String
     let title: String
@@ -1534,15 +1630,15 @@ private struct QuickToggleButton: View {
     @State private var hovering = false
 
     var body: some View {
-        Button {
+        let icon = Image(systemName: symbol)
+            .font(.body.weight(.medium))
+            .symbolRenderingMode(.hierarchical)
+            .contentTransition(.symbolEffect(.replace))
+            .symbolEffect(.bounce, value: isOn)
+            .symbolEffect(.pulse, options: .repeating, isActive: pulse)
+        let button = Button {
             withAnimation(.spring(response: 0.35, dampingFraction: 0.7)) { action() }
         } label: {
-            let icon = Image(systemName: symbol)
-                .font(.body.weight(.medium))
-                .symbolRenderingMode(.hierarchical)
-                .contentTransition(.symbolEffect(.replace))
-                .symbolEffect(.bounce, value: isOn)
-                .symbolEffect(.pulse, options: .repeating, isActive: pulse)
             if showTitle {
                 VStack(spacing: 4) {
                     icon.frame(height: 22)
@@ -1555,17 +1651,27 @@ private struct QuickToggleButton: View {
                 .padding(.vertical, 8)
                 .contentShape(.rect(cornerRadius: 12))
             } else {
-                icon
-                    .frame(width: 40, height: 40)
-                    .contentShape(.circle)
+                icon.contentShape(Circle())
             }
         }
         .buttonStyle(.plain)
-        .foregroundStyle(isOn ? AnyShapeStyle(.tint) : AnyShapeStyle(.primary))
-        .glassEffect(
-            isOn ? .regular.tint(.accentColor.opacity(0.32)).interactive() : .regular.interactive(),
-            in: showTitle ? AnyShape(.rect(cornerRadius: 12)) : AnyShape(.circle)
-        )
+        .foregroundStyle(isOn ? AnyShapeStyle(.white) : AnyShapeStyle(.primary))
+        Group {
+            if showTitle {
+                button.controlCenterSurface(
+                    tint: .blue,
+                    selected: isOn,
+                    interactive: true,
+                    shape: AnyShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
+                )
+            } else {
+                button.controlCenterCircleSurface(
+                    tint: .blue,
+                    selected: isOn,
+                    interactive: true
+                )
+            }
+        }
         .onHover { h in
             withAnimation(.easeOut(duration: 0.12)) { hovering = h }
         }

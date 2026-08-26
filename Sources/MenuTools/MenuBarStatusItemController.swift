@@ -9,6 +9,7 @@ final class MenuBarStatusItemController: NSObject {
     private var statusItem: NSStatusItem?
     private var popover: NSPopover?
     private var settingsWindowController: NSWindowController?
+    private var settingsHostingController: NSHostingController<SettingsView>?
     private var defaultsObserver: NSObjectProtocol?
 
     override init() {
@@ -58,6 +59,7 @@ final class MenuBarStatusItemController: NSObject {
 
     @objc private func togglePanel() {
         guard let button = statusItem?.button else { return }
+        try? Data("toggle".utf8).write(to: URL(fileURLWithPath: "/tmp/menutools-status-toggle.marker"))
 
         WindowManagementService.shared.rememberFrontmostExternalApplication()
 
@@ -71,14 +73,28 @@ final class MenuBarStatusItemController: NSObject {
         popover.animates = true
         popover.contentSize = NSSize(width: 352, height: 672)
         popover.contentViewController = NSHostingController(
-            rootView: MenuPanelView(openSettingsAction: openSettings)
+            rootView: MenuPanelView { [weak self] tab in
+                self?.openSettings(tab)
+            }
         )
         self.popover = popover
 
         popover.show(relativeTo: button.bounds, of: button, preferredEdge: .minY)
+        if let window = popover.contentViewController?.view.window {
+            Self.configurePopoverWindow(window)
+        }
     }
 
-    private func openSettings() {
+    /// NSPopover 默认会绘制一层不透明的窗口灰底；控制中心风格卡片之间应直接
+    /// 透出桌面材质，避免滚动区域形成一整块灰色矩形。
+    static func configurePopoverWindow(_ window: NSWindow) {
+        window.isOpaque = false
+        window.backgroundColor = .clear
+        window.contentView?.wantsLayer = true
+        window.contentView?.layer?.backgroundColor = NSColor.clear.cgColor
+    }
+
+    private func openSettings(_ tab: SettingsTab = .general) {
         WindowManagementService.shared.rememberFrontmostExternalApplication()
         // transient popover 会在当前鼠标事件结束时自动关闭。先显式关闭，再把设置窗口
         // 延迟到下一个 run loop 展示，避免 popover 的关闭流程覆盖窗口的前置操作。
@@ -87,19 +103,21 @@ final class MenuBarStatusItemController: NSObject {
         }
 
         DispatchQueue.main.async { [weak self] in
-            self?.presentSettingsWindow()
+            self?.presentSettingsWindow(initialTab: tab)
         }
     }
 
-    private func presentSettingsWindow() {
+    private func presentSettingsWindow(initialTab: SettingsTab) {
         if let window = settingsWindowController?.window {
+            settingsHostingController?.rootView = SettingsView(initialTab: initialTab)
             window.orderFrontRegardless()
             NSApp.activate(ignoringOtherApps: true)
             window.makeKey()
             return
         }
 
-        let hostingController = NSHostingController(rootView: SettingsView())
+        let hostingController = NSHostingController(rootView: SettingsView(initialTab: initialTab))
+        settingsHostingController = hostingController
         let window = NSWindow(
             contentRect: NSRect(
                 origin: .zero,

@@ -24,6 +24,17 @@ func makeDocumentReadsOnlyAllowlistedSettings() throws {
     defaults.set(1 << 20, forKey: SettingsKey.scrollAccelKey)
     defaults.set(1 << 17, forKey: SettingsKey.scrollShiftKey)
     defaults.set(0, forKey: SettingsKey.scrollDisableKey)
+    let profile = AppVolumeProfile(
+        rootBundleID: "com.google.Chrome",
+        displayName: "Google Chrome",
+        volume: 0.37,
+        lastNonzeroVolume: 0.85,
+        audioBundleIDs: ["com.google.Chrome.helper"],
+        lastAdjustedAt: Date(timeIntervalSince1970: 90)
+    )
+    defaults.set(true, forKey: AppVolumeService.StorageKey.enabled)
+    defaults.set(try JSONEncoder().encode([profile.rootBundleID: profile]),
+                 forKey: AppVolumeService.StorageKey.profiles)
     defaults.set("https://example.invalid/test-feed", forKey: "updateFeedURL")
 
     let document = AppBackupService.makeDocument(
@@ -36,11 +47,68 @@ func makeDocumentReadsOnlyAllowlistedSettings() throws {
     #expect(document.settings.menuBarIcon == "terminal.fill")
     #expect(document.settings.preferredTerminal == "com.googlecode.iterm2")
     #expect(document.settings.scrollGain == 1.75)
+    #expect(document.settings.appVolumeEnabled == true)
+    #expect(document.settings.appVolumeProfiles?[profile.rootBundleID] == profile)
     #expect(document.rightClick == RightClickConfig(enabled: [RightClickItem.newFolder.rawValue: false]))
 
     let encoded = try AppBackupService.encode(document)
     let object = try #require(JSONSerialization.jsonObject(with: encoded) as? [String: Any])
     #expect(object["updateFeedURL"] == nil)
+}
+
+@Test("新备份会恢复音量启用状态和 Profile")
+func restoreWritesAppVolumeSettings() throws {
+    let defaults = try makeDefaults(named: "appVolumeRestore")
+    let profile = AppVolumeProfile(
+        rootBundleID: "com.apple.Music",
+        displayName: "音乐",
+        volume: 0.42,
+        lastNonzeroVolume: 0.75,
+        audioBundleIDs: ["com.apple.Music"],
+        lastAdjustedAt: Date(timeIntervalSince1970: 250)
+    )
+    var settings = AppBackupSettings.serviceFixture
+    settings.appVolumeEnabled = true
+    settings.appVolumeProfiles = [profile.rootBundleID: profile]
+    let document = AppBackupDocument.current(
+        settings: settings,
+        rightClick: .default,
+        appVersion: "1.0.1",
+        createdAt: Date()
+    )
+
+    try AppBackupService.restore(
+        document,
+        userDefaults: defaults,
+        rightClickStore: InMemoryRightClickStore(config: .default)
+    )
+
+    #expect(defaults.bool(forKey: AppVolumeService.StorageKey.enabled))
+    let data = try #require(defaults.data(forKey: AppVolumeService.StorageKey.profiles))
+    let restored = try JSONDecoder().decode([String: AppVolumeProfile].self, from: data)
+    #expect(restored == [profile.rootBundleID: profile])
+}
+
+@Test("旧备份恢复时保留已有音量配置")
+func legacyBackupPreservesExistingAppVolumeSettings() throws {
+    let defaults = try makeDefaults(named: "legacyAppVolume")
+    let existingData = Data("existing-profile-data".utf8)
+    defaults.set(true, forKey: AppVolumeService.StorageKey.enabled)
+    defaults.set(existingData, forKey: AppVolumeService.StorageKey.profiles)
+
+    try AppBackupService.restore(
+        AppBackupDocument.current(
+            settings: .serviceFixture,
+            rightClick: .default,
+            appVersion: "1.0.1",
+            createdAt: Date()
+        ),
+        userDefaults: defaults,
+        rightClickStore: InMemoryRightClickStore(config: .default)
+    )
+
+    #expect(defaults.bool(forKey: AppVolumeService.StorageKey.enabled))
+    #expect(defaults.data(forKey: AppVolumeService.StorageKey.profiles) == existingData)
 }
 
 @Test("备份文档可以通过服务编码和解码")
@@ -83,7 +151,7 @@ func restoreWritesAllAllowlistedSettings() throws {
 @Test("非法文档校验失败且不会修改现有配置")
 func invalidDocumentDoesNotMutateConfiguration() throws {
     let defaults = try makeDefaults(named: "invalid")
-    let beforeDefaults = defaults.dictionaryRepresentation()
+    let beforeDefaults = persistentDefaultsSnapshot(defaults, named: "invalid")
     let store = InMemoryRightClickStore(config: .default)
     let beforeRightClick = store.config
     var invalid = AppBackupDocument.current(
@@ -97,7 +165,7 @@ func invalidDocumentDoesNotMutateConfiguration() throws {
     #expect(throws: AppBackupValidationError.invalidGain(100)) {
         try AppBackupService.restore(invalid, userDefaults: defaults, rightClickStore: store)
     }
-    #expect((defaults.dictionaryRepresentation() as NSDictionary).isEqual(to: beforeDefaults))
+    #expect((persistentDefaultsSnapshot(defaults, named: "invalid") as NSDictionary).isEqual(to: beforeDefaults))
     #expect(store.config == beforeRightClick)
     #expect(store.replaceCallCount == 0)
 }
@@ -105,7 +173,7 @@ func invalidDocumentDoesNotMutateConfiguration() throws {
 @Test("非法枚举值校验失败且不会修改现有配置")
 func invalidAllowlistedValueDoesNotMutateConfiguration() throws {
     let defaults = try makeDefaults(named: "invalidAllowlistedValue")
-    let beforeDefaults = defaults.dictionaryRepresentation()
+    let beforeDefaults = persistentDefaultsSnapshot(defaults, named: "invalidAllowlistedValue")
     let store = InMemoryRightClickStore(config: .default)
     var invalid = AppBackupDocument.current(
         settings: .serviceFixture,
@@ -118,14 +186,14 @@ func invalidAllowlistedValueDoesNotMutateConfiguration() throws {
     #expect(throws: AppBackupValidationError.invalidPreferredTerminal("unknown.terminal")) {
         try AppBackupService.restore(invalid, userDefaults: defaults, rightClickStore: store)
     }
-    #expect((defaults.dictionaryRepresentation() as NSDictionary).isEqual(to: beforeDefaults))
+    #expect((persistentDefaultsSnapshot(defaults, named: "invalidAllowlistedValue") as NSDictionary).isEqual(to: beforeDefaults))
     #expect(store.replaceCallCount == 0)
 }
 
 @Test("未知右键配置项不会被恢复")
 func invalidRightClickKeyDoesNotRestoreConfiguration() throws {
     let defaults = try makeDefaults(named: "invalidRightClickKey")
-    let beforeDefaults = defaults.dictionaryRepresentation()
+    let beforeDefaults = persistentDefaultsSnapshot(defaults, named: "invalidRightClickKey")
     let store = InMemoryRightClickStore(config: .default)
     let invalid = AppBackupDocument.current(
         settings: .serviceFixture,
@@ -137,7 +205,7 @@ func invalidRightClickKeyDoesNotRestoreConfiguration() throws {
     #expect(throws: AppBackupValidationError.invalidRightClickKey("unknownAction")) {
         try AppBackupService.restore(invalid, userDefaults: defaults, rightClickStore: store)
     }
-    #expect((defaults.dictionaryRepresentation() as NSDictionary).isEqual(to: beforeDefaults))
+    #expect((persistentDefaultsSnapshot(defaults, named: "invalidRightClickKey") as NSDictionary).isEqual(to: beforeDefaults))
     #expect(store.config == .default)
     #expect(store.replaceCallCount == 0)
 }
@@ -145,12 +213,15 @@ func invalidRightClickKeyDoesNotRestoreConfiguration() throws {
 @Test("右键配置写入失败时回滚 UserDefaults 和右键配置")
 func rightClickWriteFailureRollsBackEverything() throws {
     let defaults = try makeDefaults(named: "rollback")
-    let beforeDefaults = defaults.dictionaryRepresentation()
+    let beforeDefaults = persistentDefaultsSnapshot(defaults, named: "rollback")
     let oldRightClick = RightClickConfig(enabled: [RightClickItem.newFile.rawValue: true])
     let store = InMemoryRightClickStore(config: oldRightClick)
     store.failures = [.writeFailed]
+    var settings = AppBackupSettings.serviceFixture
+    settings.appVolumeEnabled = true
+    settings.appVolumeProfiles = [:]
     let document = AppBackupDocument.current(
-        settings: .serviceFixture,
+        settings: settings,
         rightClick: RightClickConfig(enabled: [RightClickItem.newFile.rawValue: false]),
         appVersion: "1.0.1",
         createdAt: Date()
@@ -159,7 +230,7 @@ func rightClickWriteFailureRollsBackEverything() throws {
     #expect(throws: InMemoryRightClickStore.Error.writeFailed) {
         try AppBackupService.restore(document, userDefaults: defaults, rightClickStore: store)
     }
-    #expect((defaults.dictionaryRepresentation() as NSDictionary).isEqual(to: beforeDefaults))
+    #expect((persistentDefaultsSnapshot(defaults, named: "rollback") as NSDictionary).isEqual(to: beforeDefaults))
     #expect(store.config == oldRightClick)
     #expect(store.replaceCallCount == 2)
 }
@@ -194,13 +265,13 @@ func rightClickRollbackFailureIsReported() throws {
 @Test("损坏 JSON 只被解码拒绝，不会触发配置写入")
 func malformedDataIsRejectedBeforeRestore() throws {
     let defaults = try makeDefaults(named: "malformed")
-    let beforeDefaults = defaults.dictionaryRepresentation()
+    let beforeDefaults = persistentDefaultsSnapshot(defaults, named: "malformed")
     let store = InMemoryRightClickStore(config: .default)
 
     #expect(throws: DecodingError.self) {
         _ = try AppBackupService.decode(Data("not-json".utf8))
     }
-    #expect((defaults.dictionaryRepresentation() as NSDictionary).isEqual(to: beforeDefaults))
+    #expect((persistentDefaultsSnapshot(defaults, named: "malformed") as NSDictionary).isEqual(to: beforeDefaults))
     #expect(store.replaceCallCount == 0)
 }
 
@@ -257,7 +328,7 @@ func exportWriteFailureIsReported() throws {
 }
 
 private func makeDefaults(named name: String) throws -> UserDefaults {
-    let suiteName = "AppBackupServiceTests.\(name)"
+    let suiteName = defaultsSuiteName(named: name)
     let defaults = try #require(UserDefaults(suiteName: suiteName))
     defaults.removePersistentDomain(forName: suiteName)
     defaults.set("wrench.and.screwdriver.fill", forKey: SettingsKey.menuBarIcon)
@@ -279,6 +350,14 @@ private func makeDefaults(named name: String) throws -> UserDefaults {
     defaults.set(0, forKey: SettingsKey.scrollShiftKey)
     defaults.set(0, forKey: SettingsKey.scrollDisableKey)
     return defaults
+}
+
+private func persistentDefaultsSnapshot(_ defaults: UserDefaults, named name: String) -> [String: Any] {
+    defaults.persistentDomain(forName: defaultsSuiteName(named: name)) ?? [:]
+}
+
+private func defaultsSuiteName(named name: String) -> String {
+    "AppBackupServiceTests.\(name)"
 }
 
 private final class InMemoryRightClickStore: RightClickConfigPersisting, @unchecked Sendable {

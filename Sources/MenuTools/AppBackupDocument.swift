@@ -21,6 +21,10 @@ struct AppBackupSettings: Codable, Equatable, Sendable {
     var scrollAccelModifier: UInt
     var scrollShiftModifier: UInt
     var scrollDisableModifier: UInt
+
+    /// v1 后增补的可选字段；缺失时代表旧备份，不覆盖当前音量配置。
+    var appVolumeEnabled: Bool? = nil
+    var appVolumeProfiles: [String: AppVolumeProfile]? = nil
 }
 
 /// 备份文档校验失败的原因。
@@ -33,6 +37,7 @@ enum AppBackupValidationError: Error, Equatable, Sendable {
     case invalidDuration(Double)
     case invalidMinimumStep(Double)
     case invalidModifier(String, UInt)
+    case invalidAppVolume(String, Double)
     case invalidRightClickKey(String)
 }
 
@@ -94,6 +99,16 @@ struct AppBackupDocument: Codable, Equatable, Sendable {
             ("scrollDisableModifier", settings.scrollDisableModifier)
         ] where value & ~Self.allowedModifierMask != 0 {
             throw AppBackupValidationError.invalidModifier(name, value)
+        }
+
+        for (identifier, profile) in settings.appVolumeProfiles ?? [:] {
+            guard profile.volume.isFinite, (0...1).contains(profile.volume) else {
+                throw AppBackupValidationError.invalidAppVolume(identifier, profile.volume)
+            }
+            guard profile.lastNonzeroVolume.isFinite,
+                  (0...1).contains(profile.lastNonzeroVolume) else {
+                throw AppBackupValidationError.invalidAppVolume(identifier, profile.lastNonzeroVolume)
+            }
         }
 
         for key in rightClick.enabled.keys.sorted() where RightClickItem(rawValue: key) == nil {

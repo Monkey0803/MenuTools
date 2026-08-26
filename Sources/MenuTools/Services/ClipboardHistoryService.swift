@@ -3,13 +3,60 @@ import Foundation
 import Observation
 
 /// 剪贴板历史中的内容；图片使用 TIFF 数据保存，避免把 NSImage 带入并发边界。
-enum ClipboardHistoryContent: Equatable, Sendable {
+enum ClipboardHistoryContent: Codable, Equatable, Sendable {
     case text(String)
     case image(Data)
+
+    private enum CodingKeys: String, CodingKey {
+        case text
+        case image
+    }
+
+    init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        if let text = try container.decodeIfPresent(String.self, forKey: .text) {
+            self = .text(text)
+        } else if let image = try container.decodeIfPresent(Data.self, forKey: .image) {
+            self = .image(image)
+        } else {
+            throw DecodingError.dataCorruptedError(
+                forKey: .text,
+                in: container,
+                debugDescription: "剪贴板历史内容缺少有效的文本或图片数据"
+            )
+        }
+    }
+
+    func encode(to encoder: Encoder) throws {
+        var container = encoder.container(keyedBy: CodingKeys.self)
+        switch self {
+        case let .text(text):
+            try container.encode(text, forKey: .text)
+        case let .image(image):
+            try container.encode(image, forKey: .image)
+        }
+    }
+}
+
+/// 将系统剪贴板项目转换为历史记录内容。
+enum ClipboardHistoryPasteboardReader {
+    static func content(from item: NSPasteboardItem) -> ClipboardHistoryContent? {
+        if let text = item.string(forType: .string) {
+            return .text(text)
+        }
+        // screencapture -c 在不同 macOS 版本可能写入 PNG 或 TIFF。
+        if let data = item.data(forType: .png) {
+            return .image(data)
+        }
+        if let data = item.data(forType: .tiff) {
+            return .image(data)
+        }
+        return nil
+    }
 }
 
 /// 一条剪贴板历史记录。
-struct ClipboardHistoryItem: Identifiable, Equatable, Sendable {
+struct ClipboardHistoryItem: Codable, Identifiable, Equatable, Sendable {
     let id: UUID
     let content: ClipboardHistoryContent
     let capturedAt: Date
@@ -41,9 +88,15 @@ struct ClipboardHistoryBuffer {
     private let limit: Int
     private let sensitiveLifetime: TimeInterval
 
-    init(limit: Int = 50, sensitiveLifetime: TimeInterval = 60) {
+    init(
+        limit: Int = 50,
+        sensitiveLifetime: TimeInterval = 60,
+        items: [ClipboardHistoryItem] = []
+    ) {
+        self.items = items
         self.limit = max(1, limit)
         self.sensitiveLifetime = max(0, sensitiveLifetime)
+        trimToLimit()
     }
 
     @discardableResult
@@ -119,6 +172,46 @@ struct ClipboardHistoryBuffer {
     }
 }
 
+/// 将剪贴板历史写入 Application Support，避免重启或重新编译后丢失。
+enum ClipboardHistoryPersistence {
+    private static let directoryName = "MenuTools"
+    private static let fileName = "ClipboardHistory.json"
+
+    static func defaultURL(fileManager: FileManager = .default) -> URL? {
+        guard let applicationSupport = try? fileManager.url(
+            for: .applicationSupportDirectory,
+            in: .userDomainMask,
+            appropriateFor: nil,
+            create: true
+        ) else {
+            return nil
+        }
+        let directory = applicationSupport.appendingPathComponent(directoryName, isDirectory: true)
+        try? fileManager.createDirectory(
+            at: directory,
+            withIntermediateDirectories: true
+        )
+        return directory.appendingPathComponent(fileName)
+    }
+
+    static func load(from url: URL) -> [ClipboardHistoryItem] {
+        guard let data = try? Data(contentsOf: url) else {
+            return []
+        }
+        let decoder = JSONDecoder()
+        decoder.dateDecodingStrategy = .millisecondsSince1970
+        return (try? decoder.decode([ClipboardHistoryItem].self, from: data)) ?? []
+    }
+
+    static func save(_ items: [ClipboardHistoryItem], to url: URL) throws {
+        let encoder = JSONEncoder()
+        encoder.dateEncodingStrategy = .millisecondsSince1970
+        let data = try encoder.encode(items)
+        try data.write(to: url, options: .atomic)
+    }
+
+}
+
 /// 负责监听系统剪贴板并向界面提供可操作的历史记录。
 @MainActor
 @Observable
@@ -126,17 +219,26 @@ final class ClipboardHistoryService {
     static let shared = ClipboardHistoryService()
 
     private var buffer: ClipboardHistoryBuffer
+    private let persistenceURL: URL?
     private var lastChangeCount: Int = -1
     private var monitoringTask: Task<Void, Never>?
 
     private(set) var items: [ClipboardHistoryItem] = []
     private(set) var currentItemCount = 0
 
-    init(limit: Int = 50, sensitiveLifetime: TimeInterval = 60) {
+    init(
+        limit: Int = 50,
+        sensitiveLifetime: TimeInterval = 60,
+        persistenceURL: URL? = ClipboardHistoryPersistence.defaultURL()
+    ) {
+        self.persistenceURL = persistenceURL
         buffer = ClipboardHistoryBuffer(
             limit: limit,
-            sensitiveLifetime: sensitiveLifetime
+            sensitiveLifetime: sensitiveLifetime,
+            items: persistenceURL.map(ClipboardHistoryPersistence.load(from:)) ?? []
         )
+        buffer.pruneExpired(now: Date())
+        items = buffer.items
     }
 
     /// 在 App 生命周期内持续监听剪贴板，不依赖菜单栏面板是否打开。
@@ -162,6 +264,7 @@ final class ClipboardHistoryService {
         let pasteboard = NSPasteboard.general
         let now = Date()
         currentItemCount = pasteboard.pasteboardItems?.count ?? 0
+        let itemsBeforeRefresh = buffer.items
         buffer.pruneExpired(now: now)
 
         guard pasteboard.changeCount != lastChangeCount else {
@@ -170,10 +273,13 @@ final class ClipboardHistoryService {
         }
         lastChangeCount = pasteboard.changeCount
 
-        if let content = readContent(from: pasteboard) {
-            _ = buffer.insert(content, now: now)
+        var historyChanged = buffer.items != itemsBeforeRefresh
+        if let content = readContent(from: pasteboard),
+           buffer.insert(content, now: now) != nil {
+            historyChanged = true
         }
         synchronizeItems()
+        if historyChanged { persist() }
     }
 
     func copy(_ item: ClipboardHistoryItem) {
@@ -193,30 +299,32 @@ final class ClipboardHistoryService {
     func togglePinned(id: UUID) {
         buffer.togglePinned(id: id)
         synchronizeItems()
+        persist()
     }
 
     func remove(id: UUID) {
         buffer.remove(id: id)
         synchronizeItems()
+        persist()
     }
 
     func clearHistory() {
         buffer.clearAll()
         synchronizeItems()
+        persist()
     }
 
     private func readContent(from pasteboard: NSPasteboard) -> ClipboardHistoryContent? {
         guard let item = pasteboard.pasteboardItems?.first else { return nil }
-        if let text = item.string(forType: .string) {
-            return .text(text)
-        }
-        if let data = item.data(forType: .tiff) {
-            return .image(data)
-        }
-        return nil
+        return ClipboardHistoryPasteboardReader.content(from: item)
     }
 
     private func synchronizeItems() {
         items = buffer.items
+    }
+
+    private func persist() {
+        guard let persistenceURL else { return }
+        try? ClipboardHistoryPersistence.save(buffer.items, to: persistenceURL)
     }
 }

@@ -24,6 +24,23 @@ struct GlobalShortcut: Codable, Equatable, Hashable, Sendable {
 
     static func keyName(for keyCode: UInt16) -> String {
         switch keyCode {
+        case 0: return "A"
+        case 1: return "S"
+        case 2: return "D"
+        case 3: return "F"
+        case 4: return "H"
+        case 5: return "G"
+        case 6: return "Z"
+        case 7: return "X"
+        case 8: return "C"
+        case 9: return "V"
+        case 11: return "B"
+        case 12: return "Q"
+        case 13: return "W"
+        case 14: return "E"
+        case 15: return "R"
+        case 16: return "Y"
+        case 17: return "T"
         case 18: return "1"
         case 19: return "2"
         case 20: return "3"
@@ -34,6 +51,15 @@ struct GlobalShortcut: Codable, Equatable, Hashable, Sendable {
         case 28: return "8"
         case 25: return "9"
         case 29: return "0"
+        case 31: return "O"
+        case 32: return "U"
+        case 34: return "I"
+        case 35: return "P"
+        case 37: return "L"
+        case 38: return "J"
+        case 40: return "K"
+        case 45: return "N"
+        case 46: return "M"
         case 49: return "Space"
         case 36: return "↩"
         case 48: return "⇥"
@@ -82,6 +108,7 @@ enum GlobalShortcutError: LocalizedError, Equatable {
     case otherApplicationConflict
     case windowConflict(WindowLayout)
     case appConflict(String)
+    case screenshotConflict
 
     var errorDescription: String? {
         switch self {
@@ -95,6 +122,8 @@ enum GlobalShortcutError: LocalizedError, Equatable {
                 "shortcut.error.conflict",
                 URL(fileURLWithPath: path).deletingPathExtension().lastPathComponent
             )
+        case .screenshotConflict:
+            return L("shortcut.error.screenshotConflict")
         }
     }
 }
@@ -113,6 +142,7 @@ final class GlobalShortcutService {
     private let conflictChecker: any ShortcutConflictChecking
     private let windowBindingsProvider: @MainActor () -> [WindowLayout: GlobalShortcut]
     private let appBindingsProvider: @MainActor () -> [String: GlobalShortcut]
+    private let screenshotBindingsProvider: @MainActor () -> [ScreenshotCaptureMode: GlobalShortcut]
     private var globalMonitor: Any?
     private var localMonitor: Any?
 
@@ -120,12 +150,14 @@ final class GlobalShortcutService {
         defaults: UserDefaults = .standard,
         conflictChecker: any ShortcutConflictChecking = DefaultShortcutConflictChecker(),
         windowBindingsProvider: @escaping @MainActor () -> [WindowLayout: GlobalShortcut] = { WindowShortcutService.shared.bindings },
-        appBindingsProvider: @escaping @MainActor () -> [String: GlobalShortcut] = { AppShortcutService.shared.bindings }
+        appBindingsProvider: @escaping @MainActor () -> [String: GlobalShortcut] = { AppShortcutService.shared.bindings },
+        screenshotBindingsProvider: @escaping @MainActor () -> [ScreenshotCaptureMode: GlobalShortcut] = { ScreenshotShortcutService.shared.bindings }
     ) {
         self.defaults = defaults
         self.conflictChecker = conflictChecker
         self.windowBindingsProvider = windowBindingsProvider
         self.appBindingsProvider = appBindingsProvider
+        self.screenshotBindingsProvider = screenshotBindingsProvider
         self.bindings = GlobalShortcutService.loadBindings(from: defaults)
     }
 
@@ -174,9 +206,11 @@ final class GlobalShortcutService {
             sceneBindings: bindings,
             windowBindings: windowBindingsProvider(),
             appBindings: appBindingsProvider(),
+            screenshotBindings: screenshotBindingsProvider(),
             excludingScene: scene,
             excludingWindow: nil,
-            excludingAppPath: nil
+            excludingAppPath: nil,
+            excludingScreenshotMode: nil
         )
         switch conflictChecker.conflict(for: binding, context: context) {
         case .system:
@@ -189,6 +223,8 @@ final class GlobalShortcutService {
             throw GlobalShortcutError.conflict(conflict)
         case let .app(path):
             throw GlobalShortcutError.appConflict(path)
+        case .screenshot:
+            throw GlobalShortcutError.screenshotConflict
         case nil:
             break
         }

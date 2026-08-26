@@ -26,6 +26,21 @@
 | ⚙️ 系统设置 | 打开 macOS 系统设置 |
 | 📷 截屏到剪贴板 | 截取当前屏幕并直接复制到剪贴板 |
 
+### 截图工具
+| 功能 | 说明 |
+|---|---|
+| 🖼 全屏/窗口截图 | 支持全屏、当前前台窗口和自定义区域截图，可绑定独立全局快捷键 |
+| 🧭 重复上次区域 | 保存最近一次自定义选区，后续一键重复截取 |
+| 📜 长截图 | 手动滚动并实时采集稳定画面，按快捷键结束后自动拼接 |
+| ✏️ 截图标注 | 支持画笔、箭头、形状、高亮、马赛克和文字标注 |
+
+### App 音量管理
+| 功能 | 说明 |
+|---|---|
+| 🔊 系统主音量 | 调节当前默认输出设备音量，并与系统静音状态同步 |
+| 🎚 单 App 音量 | 对正在发声的 App 独立进行 0–100% 无极调节，互不影响 |
+| 💾 音量记忆 | 按主 App Bundle ID 保存音量，Helper 进程自动合并到主 App |
+
 ### 效率工具
 | 功能 | 说明 |
 |---|---|
@@ -72,11 +87,11 @@
 
 ### 下载
 
-当前目标版本：[MenuTools v1.0.3](https://github.com/Monkey0803/MenuTools/releases/tag/v1.0.3)
+当前目标版本：[MenuTools v1.0.4](https://github.com/Monkey0803/MenuTools/releases/tag/v1.0.4)
 
-下载 `MenuTools-1.0.3.zip`，解压后将 `MenuTools.app` 拖入「应用程序」文件夹。
+下载 `MenuTools-1.0.4.zip`，解压后将 `MenuTools.app` 拖入「应用程序」文件夹。
 
-> 正式 Release 使用 Developer ID 签名并经过 notarization；本地直接运行 `./build.sh` 生成的包仍使用自签名或 ad-hoc 签名。
+> GitHub Release 的实际签名类型以对应版本说明为准。没有 Developer ID 与 notarization 凭据时，发布包使用项目自签名证书或 ad-hoc 签名，不会宣称已经 notarize。
 
 ### 首次打开
 
@@ -125,6 +140,8 @@ open dist/MenuTools.app
 | 自动化 → 系统事件 | 外观/程序坞/菜单栏设置 | 深浅色、程序坞、菜单栏 |
 | 蓝牙 | 读取 BLE 设备电量 | 蓝牙设备电量 |
 | 屏幕录制 | 允许截取屏幕内容 | 截屏到剪贴板 |
+| 屏幕录制 | 允许截取当前窗口、自定义区域和长截图 | 截图工具 |
+| 系统音频录制 | 捕获正在发声 App 的音频并以独立增益重放 | 单 App 音量管理 |
 | 辅助功能 | 读取和设置前台窗口位置、尺寸 | 窗口管理 |
 | 辅助功能 | 接收全局键盘事件并触发场景 | 场景快捷键、专注模式 |
 
@@ -143,6 +160,8 @@ open dist/MenuTools.app
 | 蓝牙电量 | 三通道合并：IORegistry（AirPods）+ IOBluetooth 私有 getter（经典蓝牙耳机）+ CoreBluetooth GATT 180F/2A19（BLE 键鼠） |
 | DerivedData | FileManager 递归容量统计（后台线程）+ 清理 |
 | 快捷操作中心 | Process、Finder AppleScript、系统设置 URL 和 `screencapture` |
+| 截图工具 | ScreenCaptureKit 原生像素采集、冻结选区、窗口捕获、跨显示器合成、Vision 位移估计、PNG 拼接和 OCR/二维码识别；截图可复制到剪贴板或进入内置标注器 |
+| App 音量管理 | 公开 Core Audio Process Tap、私有 Aggregate Device 和 IOProc；只为低于 100% 的 App 建立路由，退出或失败时销毁 Tap 并恢复原音 |
 | 网络状态 | CoreWLAN、网络接口地址、VPN 状态和按需 URLSession 探针 |
 | 电池健康 | `system_profiler SPPowerDataType -json`，无内置电池时静默降级 |
 | 显示器工具 | `NSScreen` + CoreGraphics 显示模式枚举和切换 |
@@ -152,7 +171,7 @@ open dist/MenuTools.app
 | 窗口管理 | Accessibility API 调整窗口位置、尺寸和显示器；NSEvent 边缘吸附；布局预设和应用规则持久化 | 窗口管理 |
 | 专注模式 | Control Center 辅助功能脚本，失败时回退到系统设置 | 专注模式 |
 | 全局快捷键 | NSEvent 全局/本地键盘监听、快捷键持久化和冲突检测 | 场景快捷键 |
-| 检查更新 | 轻量 appcast JSON + 语义化版本比较 |
+| 检查更新 | Sparkle 标准更新器 + Ed25519 签名 appcast |
 
 项目结构：
 
@@ -161,7 +180,7 @@ MenuTools/
 ├── Package.swift               # SPM 工程
 ├── build.sh                    # 一键打包脚本
 ├── release.sh                  # 正式发布预检、notarization 和安装包生成
-├── appcast.json                # 更新源模板
+├── appcast.xml                 # Sparkle 更新源模板
 ├── Resources/                  # Info.plist / 图标
 ├── Scripts/                    # 图标生成与 API 验证脚本
 └── Sources/MenuTools/
@@ -172,7 +191,7 @@ MenuTools/
 
 ## 🔄 发布更新
 
-更新检查已对接 **GitHub Releases API**，正式发版流程：
+更新功能使用 **[Sparkle](https://github.com/sparkle-project/Sparkle)**，由 Sparkle 负责 appcast 检查、下载、Ed25519 签名校验、安装和重启：
 
 1. 修改 `Resources/Info.plist` 中的 `CFBundleShortVersionString` 和 `CFBundleVersion`。
 2. 配置 Developer ID 证书和 notarization profile：
@@ -180,15 +199,19 @@ MenuTools/
    export CODESIGN_IDENTITY="Developer ID Application: ..."
    export NOTARY_PROFILE="menutools-notary"
    ```
-3. 运行 `./release.sh`，脚本会执行测试、Release 构建、签名验证、ZIP/DMG 打包、notarization 和 stapling。
-4. 在 GitHub 上发布 Release：tag 使用 `v1.0.3` 或 `1.0.3`，描述即更新说明，附件上传脚本生成的 `.zip` 和 `.dmg`。
-5. 用户端自动生效：打开面板时静默自动检查（24 小时节流），或手动点击「检查更新」；发现新版本后底栏可直接下载 Release 附件。
+3. 生成 Sparkle Ed25519 密钥，并将公钥写入环境变量；私钥只保存在本机或 CI 密钥存储中：
+   ```bash
+   export SPARKLE_PUBLIC_ED_KEY="..."
+   export SPARKLE_PRIVATE_ED_KEY_FILE="/secure/path/sparkle_ed25519_private_key"
+   ```
+4. 运行 `./release.sh`，脚本会执行测试、Release 构建、Sparkle Framework 嵌入与签名、ZIP/DMG 打包、notarization、stapling 和 `generate_appcast`。
+5. 在 GitHub 上发布 Release：tag 使用 `v1.0.4` 或 `1.0.4`，附件上传脚本生成的 `.zip` 和 `.dmg`。
+6. 将 `dist/appcast.xml` 以 `appcast.xml` 文件名上传到 GitHub Release（当前 `SUFeedURL` 指向 `releases/latest/download/appcast.xml`）。
 
-也兼容简单 appcast JSON（`{"version","notes","url"}`，见 `appcast.json` 模板），便于私有部署。更新源可通过命令行覆盖（便于测试）：
+Sparkle 更新默认使用 `Resources/Info.plist` 中的 `SUFeedURL`。如果更新源不在 GitHub，可在发布时覆盖下载地址前缀：
 
 ```bash
-defaults write com.qoder.menutools updateFeedURL "https://your-server/appcast.json"
-defaults delete com.qoder.menutools updateFeedURL   # 恢复默认 GitHub 源
+export SPARKLE_DOWNLOAD_URL_PREFIX="https://your-server/releases/"
 ```
 
 ## ⚠️ 已知限制
@@ -196,6 +219,7 @@ defaults delete com.qoder.menutools updateFeedURL   # 恢复默认 GitHub 源
 - 夜览与经典蓝牙耳机电量依赖系统私有 API，系统大版本升级后可能失效（代码已做能力检查，失效时静默降级不会崩溃；`Scripts/` 内有验证脚本可快速回归）
 - 不上报电量的蓝牙设备（部分白牌耳机）无法显示电量
 - AirPods 充电盒电量仅在开盖/刚连接时由系统上报
+- 单 App 音量需要系统音频录制权限；DRM 或无法被公开 Process Tap 捕获的音源会保持系统原始音量
 - 清空废纸篓和截屏功能受 macOS 的自动化、屏幕录制权限控制；拒绝权限时会在面板显示失败原因
 - 快捷键冲突检测可识别系统快捷键和其他应用通过 Carbon 注册的独占热键；使用私有事件监听器的应用无法通过公开 API 完整枚举
 

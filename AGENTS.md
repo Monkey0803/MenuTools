@@ -60,7 +60,7 @@ macOS 26 移除了传统电量数据源（IORegistry 电量键全空、IOPowerSo
 `NightShiftService`：`dlopen` CoreBrightness → `NSClassFromString("CBBlueLightClient")` → `unsafeBitCast(method(for:))` 成 C 函数指针调用；结构体 `BlueLightStatus` 内存布局须与私有头一致。所有私有 API 都带能力检查、失效时静默降级；对应验证脚本在 `Scripts/`。
 
 ### 更新检查
-`UpdateCheckerService`：默认 GitHub Releases API（仓库无 Release 返回 404 视为已最新），兼容 appcast JSON 回退；`defaults write com.qoder.menutools updateFeedURL <url>` 可覆盖更新源（本地 file:// 也支持，测试后记得 delete）。自动检查受设置开关 + 24h 节流控制。
+`SparkleUpdateService`：基于 Sparkle 标准更新器和 Ed25519 签名 appcast，负责自动检查、下载、签名校验、安装和重启；`AppVersionService` 只提供当前版本显示。发布时由 `release.sh` 调用 Sparkle `generate_appcast`。
 
 ### Swift 6 严格并发踩过的坑
 - `@MainActor` 类型内的 `static let`（如 CBUUID）不能在 `nonisolated` delegate 回调中引用——放文件级 private 常量或就地构造。

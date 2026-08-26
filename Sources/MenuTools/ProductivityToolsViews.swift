@@ -38,10 +38,12 @@ struct ScenePresetsCard: View {
                         .contentShape(.rect(cornerRadius: 10))
                     }
                     .buttonStyle(.plain)
-                    .foregroundStyle(activeScene == scene ? AnyShapeStyle(.tint) : AnyShapeStyle(.primary))
-                    .glassEffect(
-                        activeScene == scene ? .regular.tint(.blue.opacity(0.25)).interactive() : .regular.interactive(),
-                        in: .rect(cornerRadius: 10)
+                    .foregroundStyle(activeScene == scene ? AnyShapeStyle(.white) : AnyShapeStyle(.primary))
+                    .controlCenterSurface(
+                        tint: .blue,
+                        selected: activeScene == scene,
+                        interactive: true,
+                        shape: AnyShape(.rect(cornerRadius: 10))
                     )
                     .accessibilityLabel(L(scene.titleKey))
                 }
@@ -49,7 +51,7 @@ struct ScenePresetsCard: View {
         }
         .padding(12)
         .frame(maxWidth: .infinity, alignment: .leading)
-        .glassEffect(.regular.tint(.blue.opacity(0.14)), in: .rect(cornerRadius: 16))
+        .controlCenterSurface(tint: .blue)
     }
 }
 
@@ -80,6 +82,7 @@ struct GlobalShortcutCard: View {
                         Image(systemName: "arrow.up.forward.app")
                     }
                     .buttonStyle(.plain)
+                    .controlCenterHover(shape: AnyShape(.circle))
                     .foregroundStyle(.orange)
                     .accessibilityLabel(L("shortcut.openPermission"))
                 }
@@ -106,6 +109,7 @@ struct GlobalShortcutCard: View {
                         Image(systemName: recordingScene == scene ? "xmark" : "record.circle")
                     }
                     .buttonStyle(.plain)
+                    .controlCenterHover(shape: AnyShape(.circle))
                     .foregroundStyle(.tint)
                     .accessibilityLabel(L("shortcut.record"))
                     if service.binding(for: scene) != nil {
@@ -115,13 +119,14 @@ struct GlobalShortcutCard: View {
                             Image(systemName: "trash")
                         }
                         .buttonStyle(.plain)
+                        .controlCenterHover(shape: AnyShape(.circle))
                         .foregroundStyle(.secondary)
                         .accessibilityLabel(L("shortcut.clear"))
                     }
                 }
                 .padding(.horizontal, 7)
                 .padding(.vertical, 5)
-                .glassEffect(.regular.interactive(), in: .rect(cornerRadius: 9))
+                .controlCenterSurface(interactive: true, shape: AnyShape(.rect(cornerRadius: 9)))
             }
 
             ShortcutCaptureView(isRecording: recordingScene != nil) { shortcut in
@@ -138,7 +143,7 @@ struct GlobalShortcutCard: View {
         }
         .padding(12)
         .frame(maxWidth: .infinity, alignment: .leading)
-        .glassEffect(.regular.tint(.pink.opacity(0.14)), in: .rect(cornerRadius: 16))
+        .controlCenterSurface(tint: .pink)
         .task { service.start() }
     }
 }
@@ -226,6 +231,7 @@ struct FocusModeCard: View {
                 Image(systemName: isDoNotDisturbEnabled == true ? "bell.slash.fill" : "bell.slash")
             }
             .buttonStyle(.plain)
+            .controlCenterHover(shape: AnyShape(.circle))
             .foregroundStyle(isDoNotDisturbEnabled == true ? .orange : .secondary)
             .disabled(isBusy)
             .help(L("focus.doNotDisturb"))
@@ -236,11 +242,12 @@ struct FocusModeCard: View {
                 Image(systemName: "gearshape")
             }
             .buttonStyle(.plain)
+            .controlCenterHover(shape: AnyShape(.circle))
             .foregroundStyle(.secondary)
             .accessibilityLabel(L("focus.openSettings"))
         }
         .padding(12)
         .frame(maxWidth: .infinity, alignment: .leading)
-        .glassEffect(.regular.tint(.indigo.opacity(0.14)), in: .rect(cornerRadius: 16))
+        .controlCenterSurface(tint: .indigo)
     }
 }

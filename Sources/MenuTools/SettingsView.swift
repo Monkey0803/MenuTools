@@ -10,32 +10,38 @@ enum SettingsLayout {
     static let windowHeight: CGFloat = height + tabBarHeight
 }
 
-private enum SettingsTab: String, CaseIterable, Hashable, Identifiable {
+enum SettingsTab: String, CaseIterable, Hashable, Identifiable {
     case general
+    case volume
     case rightClick
     case scroll
     case windowManagement
     case appLaunch
+    case screenshot
 
     var id: String { rawValue }
 
     var titleKey: String {
         switch self {
         case .general: return "settings.tab.general"
+        case .volume: return "settings.tab.volume"
         case .rightClick: return "settings.tab.rightClick"
         case .scroll: return "settings.tab.scroll"
         case .windowManagement: return "settings.tab.windowManagement"
         case .appLaunch: return "settings.tab.appLaunch"
+        case .screenshot: return "settings.tab.screenshot"
         }
     }
 
     var symbol: String {
         switch self {
         case .general: return "gearshape"
+        case .volume: return "speaker.wave.2.bubble"
         case .rightClick: return "contextualmenu.and.cursorarrow"
         case .scroll: return "computermouse"
         case .windowManagement: return "macwindow.on.rectangle"
         case .appLaunch: return "app.badge"
+        case .screenshot: return "camera.viewfinder"
         }
     }
 }
@@ -43,7 +49,11 @@ private enum SettingsTab: String, CaseIterable, Hashable, Identifiable {
 /// 设置窗口（⌘, / 面板齿轮按钮打开）：分标签容纳通用与右键工具
 struct SettingsView: View {
     @AppStorage(SettingsKey.appLanguage) private var appLanguage = AppLanguage.system.rawValue
-    @State private var selectedTab: SettingsTab = .general
+    @State private var selectedTab: SettingsTab
+
+    init(initialTab: SettingsTab = .general) {
+        _selectedTab = State(initialValue: initialTab)
+    }
 
     var body: some View {
         VStack(spacing: 0) {
@@ -65,6 +75,8 @@ struct SettingsView: View {
                 switch selectedTab {
                 case .general:
                     GeneralSettingsView()
+                case .volume:
+                    AppVolumeSettingsView()
                 case .rightClick:
                     RightClickToolsView()
                 case .scroll:
@@ -73,6 +85,8 @@ struct SettingsView: View {
                     WindowManagementSettingsView()
                 case .appLaunch:
                     AppLaunchSettingsView()
+                case .screenshot:
+                    ScreenshotSettingsView()
                 }
             }
             .frame(width: SettingsLayout.width, height: SettingsLayout.height)
@@ -91,15 +105,6 @@ struct GeneralSettingsView: View {
     @AppStorage(SettingsKey.autoCheckUpdate) private var autoCheckUpdate = true
     @AppStorage(SettingsKey.appLanguage) private var appLanguage = AppLanguage.system.rawValue
 
-    @State private var isCheckingUpdate = false
-    @State private var checkResult: String?
-    @State private var availableUpdate: UpdateInfo?
-    @State private var updateDownloadService = UpdateDownloadService(
-        downloader: URLSessionUpdatePackageDownloader(),
-        opener: NSWorkspaceUpdatePackageOpener()
-    )
-    @State private var updateDownloadState: UpdateDownloadState = .idle
-    @State private var isConfirmingPackageOpen = false
     @State private var launchAtLogin = LoginItemService.isEnabled
     @State private var backupStatus: BackupStatus?
     @State private var isBackupOperationInProgress = false
@@ -181,52 +186,17 @@ struct GeneralSettingsView: View {
                     Text(L("settings.autoCheck"))
                     Text(L("settings.autoCheck.desc"))
                 }
+                .onChange(of: autoCheckUpdate) { _, enabled in
+                    SparkleUpdateService.shared.setAutomaticChecksEnabled(enabled)
+                }
 
-                LabeledContent(L("settings.currentVersion"), value: "v\(UpdateCheckerService.currentVersion)")
+                LabeledContent(L("settings.currentVersion"), value: "v\(AppVersionService.current)")
 
                 LabeledContent {
-                    HStack(spacing: 10) {
-                        if let result = checkResult {
-                            Text(result)
-                                .font(.caption)
-                                .foregroundStyle(availableUpdate == nil ? .secondary : .primary)
-                        }
-                        if case let .downloading(progress) = updateDownloadState {
-                            VStack(alignment: .leading, spacing: 4) {
-                                Text(L("update.downloading"))
-                                    .font(.caption)
-                                ProgressView(value: progress)
-                                Text(L("update.progress", Int(progress * 100)))
-                                    .font(.caption2)
-                                    .foregroundStyle(.secondary)
-                                    .monospacedDigit()
-                            }
-                            Button(L("update.cancel")) {
-                                cancelUpdateDownload()
-                            }
-                            .disabled(!isDownloadingUpdate)
-                        } else if case .completed = updateDownloadState {
-                            Text(L("update.completed"))
-                                .font(.caption)
-                                .foregroundStyle(.green)
-                            Button(L("update.open")) {
-                                isConfirmingPackageOpen = true
-                            }
-                        } else if isCheckingUpdate {
-                            ProgressView()
-                                .controlSize(.small)
-                        } else if let update = availableUpdate {
-                            Button(L("settings.download", update.version)) {
-                                startUpdateDownload(update)
-                            }
-                            .disabled(isDownloadingUpdate)
-                        } else {
-                            Button(L("settings.checkNow")) {
-                                checkForUpdate()
-                            }
-                            .disabled(isDownloadingUpdate)
-                        }
+                    Button(L("settings.checkNow")) {
+                        checkForUpdate()
                     }
+                    .disabled(!SparkleUpdateService.shared.canCheckForUpdates)
                 } label: {
                     Text(L("settings.manualCheck"))
                 }
@@ -258,18 +228,6 @@ struct GeneralSettingsView: View {
         .formStyle(.grouped)
         .frame(width: SettingsLayout.width, height: SettingsLayout.height)
         .navigationTitle(L("settings.title"))
-        .task {
-            await observeUpdateDownload()
-        }
-        .alert(L("update.confirmOpen.title"), isPresented: $isConfirmingPackageOpen) {
-            Button(L("update.open")) {
-                _ = updateDownloadService.openCompletedPackage()
-                updateDownloadState = updateDownloadService.state
-            }
-            Button(L("update.cancel"), role: .cancel) {}
-        } message: {
-            Text(L("update.confirmOpen.message"))
-        }
     }
 
     private func iconOption(_ icon: MenuBarIcon) -> some View {
@@ -304,78 +262,7 @@ struct GeneralSettingsView: View {
     }
 
     private func checkForUpdate() {
-        guard !isCheckingUpdate else { return }
-        isCheckingUpdate = true
-        checkResult = nil
-        Task {
-            do {
-                let update = try await UpdateCheckerService.check()
-                isCheckingUpdate = false
-                if let update {
-                    availableUpdate = update
-                    checkResult = L("settings.found", update.version)
-                } else {
-                    checkResult = L("settings.latest")
-                }
-            } catch {
-                isCheckingUpdate = false
-                checkResult = L("settings.checkFailed", error.localizedDescription)
-            }
-        }
-    }
-
-    private var isDownloadingUpdate: Bool {
-        if case .downloading = updateDownloadState { return true }
-        return false
-    }
-
-    private func startUpdateDownload(_ update: UpdateInfo) {
-        guard !isDownloadingUpdate else { return }
-        _ = updateDownloadService.start(update: update)
-        updateDownloadState = updateDownloadService.state
-        handleUpdateDownloadState(updateDownloadState)
-    }
-
-    private func cancelUpdateDownload() {
-        guard updateDownloadService.cancel() else { return }
-        updateDownloadState = updateDownloadService.state
-        handleUpdateDownloadState(updateDownloadState)
-    }
-
-    /// 轮询服务状态，将非 ObservableObject 的下载服务状态同步到视图。
-    private func observeUpdateDownload() async {
-        while !Task.isCancelled {
-            let state = updateDownloadService.state
-            if state != updateDownloadState {
-                updateDownloadState = state
-                handleUpdateDownloadState(state)
-            }
-            try? await Task.sleep(for: .milliseconds(100))
-        }
-    }
-
-    private func handleUpdateDownloadState(_ state: UpdateDownloadState) {
-        switch state {
-        case .idle, .downloading:
-            break
-        case .completed:
-            checkResult = L("update.completed")
-        case let .failed(error):
-            checkResult = updateDownloadErrorMessage(error)
-        }
-    }
-
-    private func updateDownloadErrorMessage(_ error: UpdateDownloadError) -> String {
-        switch error {
-        case .unsupportedFileType:
-            return L("update.unsupportedPackage")
-        case .openFailed:
-            return L("update.openFailed")
-        case .cancelled:
-            return L("update.cancelled")
-        case .invalidURL, .alreadyDownloading, .downloadFailed, .downloadFailedWithReason:
-            return L("update.downloadFailed")
-        }
+        SparkleUpdateService.shared.checkForUpdates()
     }
 
     private func exportBackup() {
@@ -388,7 +275,7 @@ struct GeneralSettingsView: View {
         panel.allowedContentTypes = [backupContentType]
         panel.nameFieldStringValue = L(
             "settings.backup.defaultFilename",
-            UpdateCheckerService.currentVersion
+            AppVersionService.current
         )
 
         guard panel.runModal() == .OK, let url = panel.url else { return }
@@ -398,7 +285,7 @@ struct GeneralSettingsView: View {
                 to: url,
                 userDefaults: .standard,
                 rightClick: RightClickConfigStore.load(),
-                appVersion: UpdateCheckerService.currentVersion,
+                appVersion: AppVersionService.current,
                 createdAt: Date()
             )
             backupStatus = .success(L("settings.backup.exportSuccess"))

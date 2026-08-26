@@ -1,0 +1,15 @@
+<?xml version="1.0" encoding="utf-8"?>
+<rss version="2.0"
+     xmlns:sparkle="http://www.andymatuschak.org/xml-namespaces/sparkle"
+     xmlns:dc="http://purl.org/dc/elements/1.1/">
+    <channel>
+        <title>MenuTools</title>
+        <link>https://github.com/Monkey0803/MenuTools</link>
+        <description>MenuTools 更新</description>
+        <language>zh-CN</language>
+        <!--
+          发布时由 Sparkle 的 generate_appcast 写入 item，并使用 Ed25519 私钥签名。
+          空 feed 表示当前没有可供用户安装的更新。
+        -->
+    </channel>
+</rss>

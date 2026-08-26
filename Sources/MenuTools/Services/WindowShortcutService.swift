@@ -10,6 +10,7 @@ enum WindowShortcutError: LocalizedError, Equatable {
     case otherApplicationConflict
     case sceneConflict(ScenePreset)
     case appConflict(String)
+    case screenshotConflict
 
     var errorDescription: String? {
         switch self {
@@ -28,6 +29,8 @@ enum WindowShortcutError: LocalizedError, Equatable {
                 "shortcut.error.conflict",
                 URL(fileURLWithPath: path).deletingPathExtension().lastPathComponent
             )
+        case .screenshotConflict:
+            return L("shortcut.error.screenshotConflict")
         }
     }
 }
@@ -67,6 +70,7 @@ final class WindowShortcutService {
     private let conflictChecker: any ShortcutConflictChecking
     private let sceneBindingsProvider: @MainActor () -> [ScenePreset: GlobalShortcut]
     private let appBindingsProvider: @MainActor () -> [String: GlobalShortcut]
+    private let screenshotBindingsProvider: @MainActor () -> [ScreenshotCaptureMode: GlobalShortcut]
     private var globalMonitor: Any?
     private var localMonitor: Any?
 
@@ -74,13 +78,15 @@ final class WindowShortcutService {
         defaults: UserDefaults = .standard,
         conflictChecker: any ShortcutConflictChecking = DefaultShortcutConflictChecker(),
         sceneBindingsProvider: @escaping @MainActor () -> [ScenePreset: GlobalShortcut] = { GlobalShortcutService.shared.bindings },
-        appBindingsProvider: @escaping @MainActor () -> [String: GlobalShortcut] = { AppShortcutService.shared.bindings }
+        appBindingsProvider: @escaping @MainActor () -> [String: GlobalShortcut] = { AppShortcutService.shared.bindings },
+        screenshotBindingsProvider: @escaping @MainActor () -> [ScreenshotCaptureMode: GlobalShortcut] = { ScreenshotShortcutService.shared.bindings }
     ) {
         self.defaults = defaults
         self.bindings = Self.loadBindings(from: defaults)
         self.conflictChecker = conflictChecker
         self.sceneBindingsProvider = sceneBindingsProvider
         self.appBindingsProvider = appBindingsProvider
+        self.screenshotBindingsProvider = screenshotBindingsProvider
     }
 
     func start() {
@@ -128,9 +134,11 @@ final class WindowShortcutService {
             sceneBindings: sceneBindingsProvider(),
             windowBindings: bindings,
             appBindings: appBindingsProvider(),
+            screenshotBindings: screenshotBindingsProvider(),
             excludingScene: nil,
             excludingWindow: layout,
-            excludingAppPath: nil
+            excludingAppPath: nil,
+            excludingScreenshotMode: nil
         )
         switch conflictChecker.conflict(for: binding, context: context) {
         case .system:
@@ -143,6 +151,8 @@ final class WindowShortcutService {
             throw WindowShortcutError.conflict(conflict)
         case let .app(path):
             throw WindowShortcutError.appConflict(path)
+        case .screenshot:
+            throw WindowShortcutError.screenshotConflict
         case nil:
             break
         }

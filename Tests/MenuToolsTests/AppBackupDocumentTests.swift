@@ -4,6 +4,14 @@ import Testing
 
 @Test("完整备份文档可以通过 JSON 往返")
 func completeDocumentRoundTripsThroughJSON() throws {
+    let profile = AppVolumeProfile(
+        rootBundleID: "com.google.Chrome",
+        displayName: "Google Chrome",
+        volume: 0.37,
+        lastNonzeroVolume: 0.85,
+        audioBundleIDs: ["com.google.Chrome.helper"],
+        lastAdjustedAt: Date(timeIntervalSince1970: 1_754_534_300)
+    )
     let settings = AppBackupSettings(
         menuBarIcon: "terminal.fill",
         menuBarShowTitle: true,
@@ -22,7 +30,9 @@ func completeDocumentRoundTripsThroughJSON() throws {
         scrollTouchpadEmulation: false,
         scrollAccelModifier: 1 << 20,
         scrollShiftModifier: 1 << 17,
-        scrollDisableModifier: 0
+        scrollDisableModifier: 0,
+        appVolumeEnabled: true,
+        appVolumeProfiles: [profile.rootBundleID: profile]
     )
     let rightClick = RightClickConfig(enabled: [
         RightClickItem.newFolder.rawValue: true,
@@ -43,6 +53,54 @@ func completeDocumentRoundTripsThroughJSON() throws {
 
     let object = try #require(JSONSerialization.jsonObject(with: data) as? [String: Any])
     #expect(object["createdAt"] as? String == "2025-08-07T02:40:00Z")
+}
+
+@Test("旧版 v1 备份缺少音量字段时仍可解码")
+func legacyVersionOneBackupWithoutAppVolumeStillDecodes() throws {
+    let data = #"{"formatVersion":1,"createdAt":"2025-08-07T00:00:00Z","appVersion":"1.0.1","settings":{"menuBarIcon":"wrench.and.screwdriver.fill","menuBarShowTitle":false,"togglesShowTitle":false,"preferredTerminal":"com.apple.Terminal","autoCheckUpdate":true,"appLanguage":"system","scrollEnabled":false,"scrollSmoothVertical":true,"scrollSmoothHorizontal":true,"scrollInvertVertical":false,"scrollInvertHorizontal":false,"scrollGain":1,"scrollDuration":0.35,"scrollMinStep":8,"scrollTouchpadEmulation":true,"scrollAccelModifier":0,"scrollShiftModifier":0,"scrollDisableModifier":0},"rightClick":{"enabled":{}}}"#.data(using: .utf8)!
+
+    let document = try AppBackupService.decode(data)
+
+    #expect(document.settings.appVolumeEnabled == nil)
+    #expect(document.settings.appVolumeProfiles == nil)
+}
+
+@Test("单 App 音量备份值必须位于零到一")
+func appVolumeProfileOutsideUnitRangeIsRejected() {
+    var settings = AppBackupSettings.fixture
+    settings.appVolumeProfiles = [
+        "com.example.Player": AppVolumeProfile(
+            rootBundleID: "com.example.Player",
+            displayName: "Player",
+            volume: 1.01,
+            lastNonzeroVolume: 0.5,
+            audioBundleIDs: ["com.example.Player"],
+            lastAdjustedAt: Date()
+        )
+    ]
+
+    #expect(throws: AppBackupValidationError.invalidAppVolume("com.example.Player", 1.01)) {
+        try document(settings: settings).validated()
+    }
+}
+
+@Test("单 App 静音恢复音量也必须位于零到一")
+func appVolumeLastNonzeroOutsideUnitRangeIsRejected() {
+    var settings = AppBackupSettings.fixture
+    settings.appVolumeProfiles = [
+        "com.example.Player": AppVolumeProfile(
+            rootBundleID: "com.example.Player",
+            displayName: "Player",
+            volume: 0,
+            lastNonzeroVolume: -0.1,
+            audioBundleIDs: ["com.example.Player"],
+            lastAdjustedAt: Date()
+        )
+    ]
+
+    #expect(throws: AppBackupValidationError.invalidAppVolume("com.example.Player", -0.1)) {
+        try document(settings: settings).validated()
+    }
 }
 
 @Test("备份服务可以导入 ISO-8601 日期 fixture")

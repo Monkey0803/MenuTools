@@ -51,6 +51,9 @@ enum AppBackupService {
             UInt(bitPattern: userDefaults.integer(forKey: key))
         }
 
+        let appVolumeProfiles = userDefaults.data(forKey: AppVolumeService.StorageKey.profiles)
+            .flatMap { try? JSONDecoder().decode([String: AppVolumeProfile].self, from: $0) }
+
         let settings = AppBackupSettings(
             menuBarIcon: string(SettingsKey.menuBarIcon, MenuBarIcon.default.rawValue),
             menuBarShowTitle: bool(SettingsKey.menuBarShowTitle, false),
@@ -69,7 +72,9 @@ enum AppBackupService {
             scrollTouchpadEmulation: bool(SettingsKey.scrollTouchpad, true),
             scrollAccelModifier: modifier(SettingsKey.scrollAccelKey),
             scrollShiftModifier: modifier(SettingsKey.scrollShiftKey),
-            scrollDisableModifier: modifier(SettingsKey.scrollDisableKey)
+            scrollDisableModifier: modifier(SettingsKey.scrollDisableKey),
+            appVolumeEnabled: bool(AppVolumeService.StorageKey.enabled, false),
+            appVolumeProfiles: appVolumeProfiles
         )
 
         return AppBackupDocument.current(
@@ -169,7 +174,9 @@ enum AppBackupService {
         SettingsKey.scrollTouchpad,
         SettingsKey.scrollAccelKey,
         SettingsKey.scrollShiftKey,
-        SettingsKey.scrollDisableKey
+        SettingsKey.scrollDisableKey,
+        AppVolumeService.StorageKey.enabled,
+        AppVolumeService.StorageKey.profiles
     ]
 
     private static func apply(_ settings: AppBackupSettings, to userDefaults: UserDefaults) {
@@ -191,6 +198,13 @@ enum AppBackupService {
         userDefaults.set(Int(bitPattern: settings.scrollAccelModifier), forKey: SettingsKey.scrollAccelKey)
         userDefaults.set(Int(bitPattern: settings.scrollShiftModifier), forKey: SettingsKey.scrollShiftKey)
         userDefaults.set(Int(bitPattern: settings.scrollDisableModifier), forKey: SettingsKey.scrollDisableKey)
+        if let enabled = settings.appVolumeEnabled {
+            userDefaults.set(enabled, forKey: AppVolumeService.StorageKey.enabled)
+        }
+        if let profiles = settings.appVolumeProfiles,
+           let data = try? JSONEncoder().encode(profiles) {
+            userDefaults.set(data, forKey: AppVolumeService.StorageKey.profiles)
+        }
     }
 
     private static func restore(_ values: [(String, Any?)], to userDefaults: UserDefaults) {

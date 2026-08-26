@@ -29,6 +29,29 @@ mkdir -p "$APP_BUNDLE/Contents/MacOS" "$APP_BUNDLE/Contents/Resources"
 cp "$BUILD_DIR/$APP_NAME" "$APP_BUNDLE/Contents/MacOS/$APP_NAME"
 cp "Resources/Info.plist" "$APP_BUNDLE/Contents/Info.plist"
 
+# Sparkle 的 SPM 二进制包不会自动嵌入最终的手工组装 App，需要把完整
+# Sparkle.framework（包含 Autoupdate、Updater.app 和 XPCServices）放入
+# Frameworks，并为主程序补上 App Bundle 内的运行时搜索路径。
+SPARKLE_FRAMEWORK="$BUILD_DIR/Sparkle.framework"
+FRAMEWORKS_DIR="$APP_BUNDLE/Contents/Frameworks"
+if [[ ! -d "$SPARKLE_FRAMEWORK" ]]; then
+    echo "错误：未找到 Sparkle.framework：$SPARKLE_FRAMEWORK" >&2
+    exit 1
+fi
+mkdir -p "$FRAMEWORKS_DIR"
+cp -R "$SPARKLE_FRAMEWORK" "$FRAMEWORKS_DIR/"
+install_name_tool -add_rpath "@loader_path/../Frameworks" "$APP_BUNDLE/Contents/MacOS/$APP_NAME"
+
+# 默认使用 Info.plist 中已公开的 Ed25519 公钥；密钥轮换或正式构建时也可以
+# 通过 SPARKLE_PUBLIC_ED_KEY 覆盖，私钥始终只保存在钥匙串或本地 .cert/ 中。
+if [[ -n "${SPARKLE_PUBLIC_ED_KEY:-}" ]]; then
+    if /usr/libexec/PlistBuddy -c "Print :SUPublicEDKey" "$APP_BUNDLE/Contents/Info.plist" >/dev/null 2>&1; then
+        /usr/libexec/PlistBuddy -c "Set :SUPublicEDKey $SPARKLE_PUBLIC_ED_KEY" "$APP_BUNDLE/Contents/Info.plist"
+    else
+        /usr/libexec/PlistBuddy -c "Add :SUPublicEDKey string $SPARKLE_PUBLIC_ED_KEY" "$APP_BUNDLE/Contents/Info.plist"
+    fi
+fi
+
 # App 图标（若已生成）
 if [[ -f "Resources/AppIcon.icns" ]]; then
     cp "Resources/AppIcon.icns" "$APP_BUNDLE/Contents/Resources/AppIcon.icns"
@@ -38,6 +61,18 @@ fi
 for lproj in Resources/*.lproj; do
     [[ -d "$lproj" ]] && cp -R "$lproj" "$APP_BUNDLE/Contents/Resources/"
 done
+
+# 随二进制分发第三方许可声明。Sparkle LICENSE 来自固定版本的 SPM artifact，
+# 避免手工复制后与实际嵌入版本不一致。
+if [[ -f "THIRD_PARTY_NOTICES.md" ]]; then
+    cp "THIRD_PARTY_NOTICES.md" "$APP_BUNDLE/Contents/Resources/"
+fi
+SPARKLE_LICENSE=".build/artifacts/sparkle/Sparkle/LICENSE"
+if [[ ! -f "$SPARKLE_LICENSE" ]]; then
+    echo "错误：未找到 Sparkle LICENSE：$SPARKLE_LICENSE" >&2
+    exit 1
+fi
+cp "$SPARKLE_LICENSE" "$APP_BUNDLE/Contents/Resources/Sparkle-LICENSE.txt"
 
 # ===== 编译并嵌入 Finder 右键扩展（.appex）=====
 EXT_NAME="RightClickTools"
@@ -74,6 +109,7 @@ else
 fi
 # 必须先签内嵌扩展，再签外层 App（否则封装校验失败）
 # 扩展必须开启沙箱（pkd 硬性要求）+ App Group（与主 App 共享配置）
+codesign --force --deep "${SIGN_ARG[@]}" "$APP_BUNDLE/Contents/Frameworks/Sparkle.framework"
 codesign --force "${SIGN_ARG[@]}" --entitlements Extension/RightClickTools.entitlements "$APPEX"
 codesign --force "${SIGN_ARG[@]}" --entitlements Resources/MenuTools.entitlements "$APP_BUNDLE"
 

@@ -28,6 +28,23 @@ A lightweight system toolkit that lives in the macOS menu bar. MenuTools uses th
 | System Settings | Opens macOS System Settings. |
 | Screenshot to Clipboard | Captures the screen and copies it directly to the clipboard. |
 
+### Screenshot Tools
+
+| Feature | Description |
+|---|---|
+| Full-screen / window capture | Captures the full screen, frontmost window, or a custom area with independent global shortcuts. |
+| Repeat last area | Stores the latest custom region for one-click recapture. |
+| Scrolling screenshot | Samples stable frames while you scroll and stitches them when the shortcut finishes the session. |
+| Screenshot annotation | Includes pen, arrows, shapes, highlight, mosaic, and text tools. |
+
+### App Volume Management
+
+| Feature | Description |
+|---|---|
+| System output volume | Controls the current default output device and stays synchronized with system mute. |
+| Per-app volume | Independently adjusts active apps from 0–100% with continuous sliders. |
+| Volume profiles | Remembers levels by root app bundle ID and groups helper processes into their parent app. |
+
 ### Productivity Tools
 
 | Feature | Description |
@@ -79,11 +96,11 @@ A lightweight system toolkit that lives in the macOS menu bar. MenuTools uses th
 
 ### Download
 
-Current target release: [MenuTools v1.0.3](https://github.com/Monkey0803/MenuTools/releases/tag/v1.0.3)
+Current target release: [MenuTools v1.0.4](https://github.com/Monkey0803/MenuTools/releases/tag/v1.0.4)
 
-Download `MenuTools-1.0.3.zip`, extract it, and move `MenuTools.app` to the Applications folder.
+Download `MenuTools-1.0.4.zip`, extract it, and move `MenuTools.app` to the Applications folder.
 
-> The formal release uses Developer ID signing and notarization. Packages built locally with `./build.sh` still use self-signed or ad-hoc signing.
+> Check each GitHub Release for its actual signing type. Without Developer ID and notarization credentials, packages use the project's self-signed certificate or ad-hoc signing and are not described as notarized.
 
 ### First Launch
 
@@ -133,6 +150,8 @@ Some features request permissions the first time they are used:
 | Automation → System Events | Changes appearance, Dock, and menu bar settings. | Appearance, Dock, and menu bar toggles |
 | Bluetooth | Reads battery levels from connected Bluetooth devices. | Bluetooth battery levels |
 | Screen Recording | Allows screen capture. | Screenshot to Clipboard |
+| Screen Recording | Allows window, area, and scrolling capture. | Screenshot Tools |
+| System Audio Recording | Captures active app audio and replays it with an independent gain. | Per-app volume management |
 | Accessibility | Reads and sets the position and size of the frontmost window. | Window Management |
 | Accessibility | Receives global keyboard events and triggers scenes. | Global scene shortcuts, Focus |
 
@@ -151,6 +170,8 @@ If permission was denied, enable it again in **System Settings → Privacy & Sec
 | Bluetooth battery levels | IORegistry for AirPods, private IOBluetooth getters for classic Bluetooth devices, and CoreBluetooth GATT service `180F/2A19` for BLE devices |
 | DerivedData | Background file-system size calculation and cleanup |
 | Quick Action Center | Process commands, Finder AppleScript, System Settings URL, and `screencapture` |
+| Screenshot Tools | ScreenCaptureKit native-pixel capture, frozen selection, window capture, multi-display compositing, Vision motion estimation, PNG stitching, and OCR/QR recognition; captures can be copied to the clipboard or opened in the built-in annotator |
+| App Volume Management | Public Core Audio Process Tap, a private aggregate device, and IOProc routing; routes only apps below 100% and destroys taps to restore original audio on exit or failure |
 | Network Status | CoreWLAN, interface addresses, VPN state, and on-demand URLSession probes |
 | Battery Health | `system_profiler SPPowerDataType -json`, with silent fallback when unavailable |
 | Displays | `NSScreen` and CoreGraphics display mode enumeration and switching |
@@ -160,7 +181,7 @@ If permission was denied, enable it again in **System Settings → Privacy & Sec
 | Window Management | Accessibility API for window position, size, and display movement; NSEvent edge snapping; persisted layout presets and app rules |
 | Focus | Control Center accessibility script with a System Settings fallback |
 | Global shortcuts | NSEvent global/local keyboard monitors, persistent bindings, and conflict detection |
-| Update checks | GitHub Releases API with a lightweight appcast JSON fallback |
+| Update checks | Sparkle standard updater with Ed25519-signed appcast |
 
 Project structure:
 
@@ -170,6 +191,7 @@ MenuTools/
 ├── build.sh                    # Build, package, and sign script
 ├── release.sh                  # Release checks, notarization, and packages
 ├── Resources/                  # Info.plist, entitlements, and icon
+├── appcast.xml                 # Sparkle update feed template
 ├── Scripts/                    # Icon generation and API validation scripts
 └── Sources/MenuTools/
     ├── MenuToolsApp.swift      # App entry point and menu bar configuration
@@ -179,7 +201,7 @@ MenuTools/
 
 ## Releases and Updates
 
-The update checker uses the GitHub Releases API by default. To publish a release:
+Updates use [Sparkle](https://github.com/sparkle-project/Sparkle) for appcast checks, downloads, Ed25519 signature verification, installation, and relaunch. To publish a release:
 
 1. Update `CFBundleShortVersionString` and `CFBundleVersion` in `Resources/Info.plist`.
 2. Configure a Developer ID certificate and a `notarytool` Keychain profile:
@@ -187,26 +209,19 @@ The update checker uses the GitHub Releases API by default. To publish a release
    export CODESIGN_IDENTITY="Developer ID Application: ..."
    export NOTARY_PROFILE="menutools-notary"
    ```
-3. Run `./release.sh` to execute tests, build, sign, verify, package ZIP/DMG, notarize, and staple the release assets.
-4. Create a GitHub Release with a tag such as `v1.0.3` and attach the generated `.zip` and `.dmg` files.
+3. Generate Sparkle Ed25519 keys. Keep the private key in local or CI secret storage and export:
+   ```bash
+   export SPARKLE_PUBLIC_ED_KEY="..."
+   export SPARKLE_PRIVATE_ED_KEY_FILE="/secure/path/sparkle_ed25519_private_key"
+   ```
+4. Run `./release.sh` to execute tests, build, embed and sign Sparkle, package ZIP/DMG, notarize, staple, and generate the appcast.
+5. Create a GitHub Release with a tag such as `v1.0.4` and attach the generated `.zip` and `.dmg` files.
+6. Upload `dist/appcast.xml` to the GitHub Release as `appcast.xml` (the current `SUFeedURL` points to `releases/latest/download/appcast.xml`).
 
-The app checks for updates automatically with a 24-hour throttle. Users can also trigger a manual check from the settings window. When an update is available, MenuTools opens the direct release asset when possible, or the release page as a fallback.
-
-An appcast JSON source is also supported:
-
-```json
-{
-  "version": "1.1.0",
-  "notes": "Release notes",
-  "url": "https://example.com/MenuTools-1.1.0.zip"
-}
-```
-
-Override the update source for testing:
+The default feed is configured by `SUFeedURL` in `Resources/Info.plist`. Override the download URL prefix for another hosting service:
 
 ```bash
-defaults write com.qoder.menutools updateFeedURL "https://your-server/appcast.json"
-defaults delete com.qoder.menutools updateFeedURL
+export SPARKLE_DOWNLOAD_URL_PREFIX="https://your-server/releases/"
 ```
 
 ## Known Limitations
@@ -214,6 +229,7 @@ defaults delete com.qoder.menutools updateFeedURL
 - Night Shift and classic Bluetooth headset battery levels depend on private system APIs. They may stop working after a major macOS update; capability checks make the app fail gracefully when the APIs are unavailable. Validation scripts are included in `Scripts/`.
 - Bluetooth devices that do not report battery levels cannot be displayed with a percentage.
 - AirPods case battery levels may only be reported when the case is open or the device has just connected.
+- Per-app volume requires System Audio Recording permission. DRM-protected or otherwise untappable audio keeps its original system volume.
 - Empty Trash and screenshot actions depend on macOS Automation and Screen Recording permissions; denied access is reported in the panel.
 - Shortcut conflict detection covers system hotkeys and exclusive Carbon hotkeys registered by other apps; apps using private event taps cannot be fully enumerated through public APIs.
 

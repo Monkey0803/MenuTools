@@ -27,19 +27,34 @@
 	<key>CFBundlePackageType</key>
 	<string>APPL</string>
 	<key>CFBundleShortVersionString</key>
-	<string>1.0.3</string>
+	<string>1.0.4</string>
 	<key>CFBundleVersion</key>
-	<string>1.0.3</string>
+	<string>1.0.4</string>
 	<key>LSMinimumSystemVersion</key>
 	<string>26.0</string>
 	<key>LSUIElement</key>
 	<true/>
+	<!-- Sparkle appcast；正式发布时由 release.sh 生成并上传到该地址。 -->
+	<key>SUFeedURL</key>
+	<string>https://github.com/Monkey0803/MenuTools/releases/latest/download/appcast.xml</string>
+	<key>SUPublicEDKey</key>
+	<string>d695AUZT0z9S5o8zeQwiEwAOWbNTDPlSFziJvvlScuI=</string>
+	<key>SUEnableAutomaticChecks</key>
+	<true/>
+	<key>SUScheduledCheckInterval</key>
+	<integer>86400</integer>
+	<key>SUAutomaticallyUpdate</key>
+	<false/>
 	<key>NSAppleEventsUsageDescription</key>
 	<string>MenuTools 需要访问 Finder 以获取当前窗口路径，并通过“系统事件”切换深色/浅色外观。</string>
+	<key>NSAudioCaptureUsageDescription</key>
+	<string>MenuTools 需要捕获其他 App 的系统音频，以单独调节每个 App 的音量。</string>
 	<key>NSAccessibilityUsageDescription</key>
 	<string>MenuTools 需要辅助功能权限来调整窗口布局、移动窗口和保存窗口尺寸。</string>
 	<key>NSBluetoothAlwaysUsageDescription</key>
 	<string>MenuTools 需要访问蓝牙以读取已连接设备（键盘、鼠标、耳机）的电量。</string>
+	<key>NSScreenCaptureUsageDescription</key>
+	<string>MenuTools 需要录屏权限来截取屏幕、窗口、自定义区域和滚动截图。</string>
 	<key>NSHumanReadableCopyright</key>
 	<string>Copyright © 2026 MenuTools.</string>
 </dict>
