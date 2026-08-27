@@ -125,7 +125,7 @@ final class MenuBarStatusItemController: NSObject {
         let window = NSWindow(
             contentRect: NSRect(
                 origin: .zero,
-                size: NSSize(width: SettingsLayout.width, height: SettingsLayout.windowHeight)
+                size: NSSize(width: SettingsLayout.windowWidth, height: SettingsLayout.windowHeight)
             ),
             styleMask: [.titled, .closable, .miniaturizable],
             backing: .buffered,
@@ -133,7 +133,7 @@ final class MenuBarStatusItemController: NSObject {
         )
         window.contentViewController = hostingController
         window.title = L("settings.title")
-        window.setContentSize(NSSize(width: SettingsLayout.width, height: SettingsLayout.windowHeight))
+        window.setContentSize(NSSize(width: SettingsLayout.windowWidth, height: SettingsLayout.windowHeight))
         // 设置窗口只在打开时置前，使用普通层级，避免长期覆盖其他应用窗口。
         window.level = .normal
         window.isReleasedWhenClosed = false

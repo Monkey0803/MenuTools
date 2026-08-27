@@ -5,6 +5,7 @@ import Observation
 struct AppVolumeProfile: Codable, Equatable, Sendable {
     var rootBundleID: String
     var displayName: String
+    var bundleURL: URL? = nil
     var volume: Double
     var lastNonzeroVolume: Double
     var audioBundleIDs: Set<String>
@@ -78,7 +79,7 @@ struct AppAudioSession: Identifiable, Equatable, Sendable {
             return Self(
                 rootBundleID: identifier,
                 displayName: first?.displayName ?? profile?.displayName ?? identifier,
-                bundleURL: first?.bundleURL,
+                bundleURL: processes.lazy.compactMap(\.bundleURL).first ?? profile?.bundleURL,
                 processObjectIDs: processes.map(\.processObjectID).sorted(),
                 audioBundleIDs: audioBundleIDs,
                 isRunningOutput: processes.contains(where: \.isRunningOutput),
@@ -246,12 +247,14 @@ final class AppVolumeService {
         var profile = profiles[rootBundleID] ?? AppVolumeProfile(
             rootBundleID: rootBundleID,
             displayName: session.displayName,
+            bundleURL: session.bundleURL,
             volume: 1,
             lastNonzeroVolume: 1,
             audioBundleIDs: session.audioBundleIDs,
             lastAdjustedAt: .distantPast
         )
         profile.displayName = session.displayName
+        profile.bundleURL = session.bundleURL ?? profile.bundleURL
         profile.volume = volume
         if volume > 0 { profile.lastNonzeroVolume = volume }
         profile.audioBundleIDs.formUnion(session.audioBundleIDs)

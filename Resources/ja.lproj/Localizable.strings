@@ -556,11 +556,21 @@
 
 /* 内蔵機能センター */
 "settings.tab.plugins" = "機能";
+"settings.sidebar.settings" = "設定";
+"settings.sidebar.enabledFeatures" = "有効な機能";
 "plugin.center.title" = "機能センター";
 "plugin.center.description" = "必要な機能だけを有効にできます。無効にすると、関連するバックグラウンド監視、ショートカット、音声処理が停止します。";
 "plugin.enableAll" = "すべて有効";
 "plugin.disableAll" = "すべて無効";
 "plugin.enabledCount" = "%ld / %ld 有効";
+"plugin.filter.label" = "機能を絞り込む";
+"plugin.filter.all" = "すべて";
+"plugin.filter.enabled" = "有効";
+"plugin.filter.attention" = "要確認";
+"plugin.empty.attention" = "すべての機能が正常に動作しています";
+"plugin.empty.filtered" = "現在の条件に一致する機能はありません";
+"plugin.actions" = "機能の操作";
+"plugin.openSettings" = "機能設定を開く";
 "plugin.error.title" = "機能の状態を変更できません";
 "plugin.error.dismiss" = "OK";
 "plugin.state.running" = "実行中";

@@ -20,3 +20,21 @@ func unavailableSettingsTabFallsBackToPluginCenter() {
     #expect(SettingsTab.fallback(for: .volume, enabledPluginIDs: []) == .plugins)
     #expect(SettingsTab.fallback(for: .general, enabledPluginIDs: []) == .general)
 }
+
+@Test("侧边栏固定设置与已启用功能分组互不混合")
+func sidebarSeparatesPrimaryAndFeatureDestinations() {
+    #expect(SettingsTab.primaryTabs == [.general, .plugins])
+    #expect(SettingsTab.enabledFeatureTabs(enabledPluginIDs: [.appVolume, .windowManagement]) == [
+        .volume,
+        .windowManagement
+    ])
+}
+
+@Test("功能中心筛选器只展示符合状态的模块")
+func pluginCenterFilterMatchesRuntimeState() {
+    #expect(PluginCenterFilter.all.includes(isEnabled: false, state: .stopped))
+    #expect(PluginCenterFilter.enabled.includes(isEnabled: true, state: .running))
+    #expect(!PluginCenterFilter.enabled.includes(isEnabled: false, state: .stopped))
+    #expect(PluginCenterFilter.attention.includes(isEnabled: true, state: .failed("error")))
+    #expect(!PluginCenterFilter.attention.includes(isEnabled: true, state: .running))
+}

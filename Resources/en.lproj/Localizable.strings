@@ -556,11 +556,21 @@
 
 /* Built-in Feature Center */
 "settings.tab.plugins" = "Features";
+"settings.sidebar.settings" = "Settings";
+"settings.sidebar.enabledFeatures" = "Enabled Features";
 "plugin.center.title" = "Feature Center";
 "plugin.center.description" = "Enable only what you need. Disabling a feature stops its background monitors, shortcuts, and audio processing.";
 "plugin.enableAll" = "Enable All";
 "plugin.disableAll" = "Disable All";
 "plugin.enabledCount" = "%ld of %ld enabled";
+"plugin.filter.label" = "Filter features";
+"plugin.filter.all" = "All";
+"plugin.filter.enabled" = "Enabled";
+"plugin.filter.attention" = "Needs Attention";
+"plugin.empty.attention" = "All features are working normally";
+"plugin.empty.filtered" = "No features match the current filter";
+"plugin.actions" = "Feature actions";
+"plugin.openSettings" = "Open feature settings";
 "plugin.error.title" = "Couldn’t Change Feature";
 "plugin.error.dismiss" = "OK";
 "plugin.state.running" = "Running";

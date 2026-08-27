@@ -157,7 +157,7 @@ open dist/MenuTools.app
 | 深浅色 / 程序坞 / 菜单栏 | 系统事件 AppleScript |
 | 防止锁屏 | IOKit `IOPMAssertionCreateWithName` |
 | 夜览 | CoreBrightness 私有框架 `CBBlueLightClient`（运行时动态调用，带能力检查） |
-| 蓝牙电量 | 三通道合并：IORegistry（AirPods）+ IOBluetooth 私有 getter（经典蓝牙耳机）+ CoreBluetooth GATT 180F/2A19（BLE 键鼠） |
+| 蓝牙电量 | 四通道合并：IORegistry + IOBluetooth 私有 getter + system_profiler（补齐 AirPods 分量）+ CoreBluetooth GATT 180F/2A19（BLE 键鼠） |
 | DerivedData | FileManager 递归容量统计（后台线程）+ 清理 |
 | 快捷操作中心 | Process、Finder AppleScript、系统设置 URL 和 `screencapture` |
 | 截图工具 | ScreenCaptureKit 原生像素采集、冻结选区、窗口捕获、跨显示器合成、Vision 位移估计、PNG 拼接和 OCR/二维码识别；截图可复制到剪贴板或进入内置标注器 |

@@ -6,7 +6,8 @@ private let batteryServiceID = "180F"
 private let batteryLevelID = "2A19"
 
 /// 通过 CoreBluetooth 读取系统已连接 BLE 设备的标准 GATT 电池服务 (180F / 2A19)
-/// 覆盖罗技等第三方 BLE 键鼠；AirPods 类设备由 BluetoothBatteryService (IORegistry) 负责
+/// 覆盖罗技等第三方 BLE 键鼠；AirPods 类设备由 BluetoothBatteryService 的
+/// IORegistry、IOBluetooth 和 system_profiler 通道负责。
 @MainActor
 final class BLEBatteryMonitor: NSObject, ObservableObject {
     static let shared = BLEBatteryMonitor()

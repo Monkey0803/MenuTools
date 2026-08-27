@@ -4,10 +4,13 @@ import UniformTypeIdentifiers
 
 /// 设置窗口统一尺寸（各 Tab 一致，避免切换时窗口重置闪烁）
 enum SettingsLayout {
+    /// 右侧详情区宽度；各功能设置页继续复用此值。
     static let width: CGFloat = 600
-    static let height: CGFloat = 580
-    static let tabBarHeight: CGFloat = 44
-    static let windowHeight: CGFloat = height + tabBarHeight
+    static let height: CGFloat = 568
+    static let sidebarWidth: CGFloat = 190
+    static let headerHeight: CGFloat = 52
+    static let windowWidth: CGFloat = 820
+    static let windowHeight: CGFloat = 620
 }
 
 enum SettingsTab: String, CaseIterable, Hashable, Identifiable {
@@ -60,11 +63,19 @@ enum SettingsTab: String, CaseIterable, Hashable, Identifiable {
         }
     }
 
-    static func visibleTabs(enabledPluginIDs: Set<BuiltInPluginID>) -> [SettingsTab] {
+    static let primaryTabs: [SettingsTab] = [.general, .plugins]
+
+    static func enabledFeatureTabs(
+        enabledPluginIDs: Set<BuiltInPluginID>
+    ) -> [SettingsTab] {
         allCases.filter { tab in
-            guard let pluginID = tab.pluginID else { return true }
+            guard let pluginID = tab.pluginID else { return false }
             return enabledPluginIDs.contains(pluginID)
         }
+    }
+
+    static func visibleTabs(enabledPluginIDs: Set<BuiltInPluginID>) -> [SettingsTab] {
+        primaryTabs + enabledFeatureTabs(enabledPluginIDs: enabledPluginIDs)
     }
 
     static func fallback(
@@ -75,10 +86,10 @@ enum SettingsTab: String, CaseIterable, Hashable, Identifiable {
     }
 }
 
-/// 设置窗口（⌘, / 面板齿轮按钮打开）：分标签容纳通用与右键工具
+/// 设置窗口（⌘, / 面板齿轮按钮打开）：左侧导航，右侧显示当前功能详情。
 struct SettingsView: View {
     @AppStorage(SettingsKey.appLanguage) private var appLanguage = AppLanguage.system.rawValue
-    @State private var selectedTab: SettingsTab
+    @State private var selectedTab: SettingsTab?
     @State private var pluginManager = BuiltInPluginManager.shared
 
     init(initialTab: SettingsTab = .general) {
@@ -86,57 +97,98 @@ struct SettingsView: View {
     }
 
     var body: some View {
-        let visibleTabs = SettingsTab.visibleTabs(enabledPluginIDs: pluginManager.enabledPluginIDs)
-        VStack(spacing: 0) {
-            Picker("", selection: $selectedTab) {
-                ForEach(visibleTabs) { tab in
-                    Label(L(tab.titleKey), systemImage: tab.symbol)
-                        .tag(tab)
+        NavigationSplitView {
+            List(selection: $selectedTab) {
+                Section(L("settings.sidebar.settings")) {
+                    ForEach(SettingsTab.primaryTabs) { tab in
+                        navigationRow(tab)
+                    }
+                }
+
+                let featureTabs = SettingsTab.enabledFeatureTabs(
+                    enabledPluginIDs: pluginManager.enabledPluginIDs
+                )
+                if !featureTabs.isEmpty {
+                    Section(L("settings.sidebar.enabledFeatures")) {
+                        ForEach(featureTabs) { tab in
+                            navigationRow(tab)
+                        }
+                    }
                 }
             }
-            .pickerStyle(.segmented)
-            .labelsHidden()
-            .padding(.horizontal, 12)
-            .padding(.vertical, 8)
-            .accessibilityLabel(L("settings.title"))
-
-            Divider()
-
-            Group {
-                switch selectedTab {
-                case .general:
-                    GeneralSettingsView()
-                case .plugins:
-                    PluginCenterView(manager: pluginManager)
-                case .volume:
-                    AppVolumeSettingsView()
-                case .rightClick:
-                    RightClickToolsView()
-                case .scroll:
-                    ScrollSettingsView()
-                case .windowManagement:
-                    WindowManagementSettingsView()
-                case .appLaunch:
-                    AppLaunchSettingsView()
-                case .screenshot:
-                    ScreenshotSettingsView()
+            .listStyle(.sidebar)
+            .navigationSplitViewColumnWidth(
+                min: 170,
+                ideal: SettingsLayout.sidebarWidth,
+                max: 220
+            )
+        } detail: {
+            VStack(spacing: 0) {
+                HStack(spacing: 10) {
+                    Image(systemName: currentTab.symbol)
+                        .font(.title3)
+                        .foregroundStyle(.secondary)
+                        .frame(width: 24)
+                    Text(L(currentTab.titleKey))
+                        .font(.title3.weight(.semibold))
+                    Spacer()
                 }
+                .padding(.horizontal, 20)
+                .frame(height: SettingsLayout.headerHeight)
+
+                Divider()
+
+                selectedDetail
+                    .frame(width: SettingsLayout.width, height: SettingsLayout.height)
             }
-            .frame(width: SettingsLayout.width, height: SettingsLayout.height)
         }
-        .frame(width: SettingsLayout.width, height: SettingsLayout.windowHeight)
-        .id(appLanguage)   // 切换语言时整体重建，连 Tab 标签一起刷新
+        .navigationSplitViewStyle(.balanced)
+        .frame(width: SettingsLayout.windowWidth, height: SettingsLayout.windowHeight)
+        .id(appLanguage)   // 切换语言时整体重建，连侧边栏标签一起刷新
         .onAppear {
             selectedTab = SettingsTab.fallback(
-                for: selectedTab,
+                for: currentTab,
                 enabledPluginIDs: pluginManager.enabledPluginIDs
             )
         }
         .onChange(of: pluginManager.enabledPluginIDs) { _, enabledPluginIDs in
             selectedTab = SettingsTab.fallback(
-                for: selectedTab,
+                for: currentTab,
                 enabledPluginIDs: enabledPluginIDs
             )
+        }
+    }
+
+    private var currentTab: SettingsTab {
+        selectedTab ?? .general
+    }
+
+    private func navigationRow(_ tab: SettingsTab) -> some View {
+        Label(L(tab.titleKey), systemImage: tab.symbol)
+            .tag(tab)
+    }
+
+    @ViewBuilder
+    private var selectedDetail: some View {
+        switch currentTab {
+        case .general:
+            GeneralSettingsView()
+        case .plugins:
+            PluginCenterView(manager: pluginManager) { tab in
+                selectedTab = tab
+            }
+        case .volume:
+            AppVolumeSettingsView()
+        case .rightClick:
+            RightClickToolsView()
+        case .scroll:
+            ScrollSettingsView()
+        case .windowManagement:
+            WindowManagementSettingsView()
+        case .appLaunch:
+            AppLaunchSettingsView()
+        case .screenshot:
+            ScreenshotSettingsView()
         }
     }
 }

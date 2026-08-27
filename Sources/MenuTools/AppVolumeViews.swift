@@ -234,10 +234,12 @@ private struct AppVolumeRow: View {
             appIcon
                 .frame(width: compact ? 18 : 26, height: compact ? 18 : 26)
 
-            VStack(alignment: .leading, spacing: 3) {
+            if compact {
+                compactControls
+            } else {
                 HStack(spacing: 5) {
                     Text(session.displayName)
-                        .font(compact ? .caption2 : .caption)
+                        .font(.caption)
                         .lineLimit(1)
                     if session.isRunningOutput {
                         Circle()
@@ -251,6 +253,8 @@ private struct AppVolumeRow: View {
                             .foregroundStyle(.orange)
                     }
                 }
+                .frame(width: 180, alignment: .leading)
+
                 Slider(value: Binding(
                     get: { service.session(id: session.rootBundleID)?.volume ?? session.volume },
                     set: { service.setVolume($0, for: session.rootBundleID) }
@@ -289,9 +293,37 @@ private struct AppVolumeRow: View {
         }
     }
 
+    private var compactControls: some View {
+        VStack(alignment: .leading, spacing: 3) {
+            HStack(spacing: 5) {
+                Text(session.displayName)
+                    .font(.caption2)
+                    .lineLimit(1)
+                if session.isRunningOutput {
+                    Circle()
+                        .fill(.green)
+                        .frame(width: 5, height: 5)
+                        .accessibilityLabel(L("volume.active"))
+                }
+                if session.errorMessage != nil {
+                    Image(systemName: "exclamationmark.triangle.fill")
+                        .font(.caption2)
+                        .foregroundStyle(.orange)
+                }
+            }
+            Slider(value: Binding(
+                get: { service.session(id: session.rootBundleID)?.volume ?? session.volume },
+                set: { service.setVolume($0, for: session.rootBundleID) }
+            ), in: 0...1)
+            .disabled(!service.isEnabled || session.processObjectIDs.isEmpty)
+            .accessibilityLabel(L("volume.app", session.displayName))
+        }
+    }
+
     @ViewBuilder
     private var appIcon: some View {
-        if let bundleURL = session.bundleURL {
+        if let bundleURL = session.bundleURL
+            ?? NSWorkspace.shared.urlForApplication(withBundleIdentifier: session.rootBundleID) {
             Image(nsImage: NSWorkspace.shared.icon(forFile: bundleURL.path))
                 .resizable()
                 .scaledToFit()

@@ -443,8 +443,10 @@ struct MenuPanelView: View {
             // 面板展示期间每 30 秒刷新一次蓝牙设备电量
             while !Task.isCancelled {
                 bleMonitor.refresh()
+                let devices = await BluetoothBatteryService.fetch()
+                guard !Task.isCancelled else { return }
                 withAnimation(.smooth(duration: 0.3)) {
-                    btDevices = BluetoothBatteryService.fetch()
+                    btDevices = devices
                 }
                 try? await Task.sleep(for: .seconds(30))
             }
@@ -1262,8 +1264,12 @@ struct MenuPanelView: View {
                     Spacer()
                     Button {
                         bleMonitor.refresh()
-                        withAnimation(.smooth(duration: 0.3)) {
-                            btDevices = BluetoothBatteryService.fetch()
+                        Task {
+                            let devices = await BluetoothBatteryService.fetch()
+                            guard !Task.isCancelled else { return }
+                            withAnimation(.smooth(duration: 0.3)) {
+                                btDevices = devices
+                            }
                         }
                     } label: {
                         Image(systemName: "arrow.clockwise")

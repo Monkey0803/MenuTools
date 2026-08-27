@@ -150,6 +150,23 @@ func appVolumeProfilesPersist() throws {
     #expect(second.session(id: "com.apple.Music")?.volume == 0.63)
 }
 
+@Test("已记忆 App 会保留上次已知的应用图标路径")
+@MainActor
+func rememberedAppRetainsLastKnownBundleURL() throws {
+    let defaults = try makeVolumeDefaults("rememberedAppIcon")
+    let backend = FakeAppVolumeRoutingBackend()
+    let service = AppVolumeService(backend: backend, userDefaults: defaults)
+    backend.send(candidates: [.music])
+    service.setVolume(0.63, for: "com.apple.Music")
+
+    backend.send(candidates: [])
+
+    #expect(
+        service.session(id: "com.apple.Music")?.bundleURL
+            == URL(fileURLWithPath: "/System/Applications/Music.app")
+    )
+}
+
 @Test("成功创建路由后会记住授权状态")
 @MainActor
 func successfulRoutePersistsPermissionState() throws {

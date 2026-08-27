@@ -556,11 +556,21 @@
 
 /* 内置功能中心 */
 "settings.tab.plugins" = "功能";
+"settings.sidebar.settings" = "设置";
+"settings.sidebar.enabledFeatures" = "已启用功能";
 "plugin.center.title" = "功能中心";
 "plugin.center.description" = "只启用需要的功能；关闭后会停止对应的后台监听、快捷键和音频处理。";
 "plugin.enableAll" = "全部启用";
 "plugin.disableAll" = "全部停用";
 "plugin.enabledCount" = "已启用 %ld / %ld";
+"plugin.filter.label" = "筛选功能";
+"plugin.filter.all" = "全部";
+"plugin.filter.enabled" = "已启用";
+"plugin.filter.attention" = "需要处理";
+"plugin.empty.attention" = "所有功能运行正常";
+"plugin.empty.filtered" = "没有符合当前筛选条件的功能";
+"plugin.actions" = "功能操作";
+"plugin.openSettings" = "打开功能设置";
 "plugin.error.title" = "无法更改功能状态";
 "plugin.error.dismiss" = "好";
 "plugin.state.running" = "运行中";
