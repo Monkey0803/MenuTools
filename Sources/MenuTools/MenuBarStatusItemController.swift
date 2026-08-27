@@ -61,7 +61,9 @@ final class MenuBarStatusItemController: NSObject {
         guard let button = statusItem?.button else { return }
         try? Data("toggle".utf8).write(to: URL(fileURLWithPath: "/tmp/menutools-status-toggle.marker"))
 
-        WindowManagementService.shared.rememberFrontmostExternalApplication()
+        if BuiltInPluginManager.shared.isEnabled(.windowManagement) {
+            WindowManagementService.shared.rememberFrontmostExternalApplication()
+        }
 
         if let popover, popover.isShown {
             popover.performClose(button)
@@ -95,7 +97,9 @@ final class MenuBarStatusItemController: NSObject {
     }
 
     private func openSettings(_ tab: SettingsTab = .general) {
-        WindowManagementService.shared.rememberFrontmostExternalApplication()
+        if BuiltInPluginManager.shared.isEnabled(.windowManagement) {
+            WindowManagementService.shared.rememberFrontmostExternalApplication()
+        }
         // transient popover 会在当前鼠标事件结束时自动关闭。先显式关闭，再把设置窗口
         // 延迟到下一个 run loop 展示，避免 popover 的关闭流程覆盖窗口的前置操作。
         if let button = statusItem?.button, let popover, popover.isShown {

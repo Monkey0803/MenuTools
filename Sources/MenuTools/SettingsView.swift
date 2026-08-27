@@ -12,6 +12,7 @@ enum SettingsLayout {
 
 enum SettingsTab: String, CaseIterable, Hashable, Identifiable {
     case general
+    case plugins
     case volume
     case rightClick
     case scroll
@@ -24,6 +25,7 @@ enum SettingsTab: String, CaseIterable, Hashable, Identifiable {
     var titleKey: String {
         switch self {
         case .general: return "settings.tab.general"
+        case .plugins: return "settings.tab.plugins"
         case .volume: return "settings.tab.volume"
         case .rightClick: return "settings.tab.rightClick"
         case .scroll: return "settings.tab.scroll"
@@ -36,6 +38,7 @@ enum SettingsTab: String, CaseIterable, Hashable, Identifiable {
     var symbol: String {
         switch self {
         case .general: return "gearshape"
+        case .plugins: return "puzzlepiece.extension"
         case .volume: return "speaker.wave.2.bubble"
         case .rightClick: return "contextualmenu.and.cursorarrow"
         case .scroll: return "computermouse"
@@ -44,21 +47,49 @@ enum SettingsTab: String, CaseIterable, Hashable, Identifiable {
         case .screenshot: return "camera.viewfinder"
         }
     }
+
+    var pluginID: BuiltInPluginID? {
+        switch self {
+        case .general, .plugins: return nil
+        case .volume: return .appVolume
+        case .rightClick: return .finderTools
+        case .scroll: return .smoothScroll
+        case .windowManagement: return .windowManagement
+        case .appLaunch: return .appLauncher
+        case .screenshot: return .screenshot
+        }
+    }
+
+    static func visibleTabs(enabledPluginIDs: Set<BuiltInPluginID>) -> [SettingsTab] {
+        allCases.filter { tab in
+            guard let pluginID = tab.pluginID else { return true }
+            return enabledPluginIDs.contains(pluginID)
+        }
+    }
+
+    static func fallback(
+        for tab: SettingsTab,
+        enabledPluginIDs: Set<BuiltInPluginID>
+    ) -> SettingsTab {
+        visibleTabs(enabledPluginIDs: enabledPluginIDs).contains(tab) ? tab : .plugins
+    }
 }
 
 /// 设置窗口（⌘, / 面板齿轮按钮打开）：分标签容纳通用与右键工具
 struct SettingsView: View {
     @AppStorage(SettingsKey.appLanguage) private var appLanguage = AppLanguage.system.rawValue
     @State private var selectedTab: SettingsTab
+    @State private var pluginManager = BuiltInPluginManager.shared
 
     init(initialTab: SettingsTab = .general) {
         _selectedTab = State(initialValue: initialTab)
     }
 
     var body: some View {
+        let visibleTabs = SettingsTab.visibleTabs(enabledPluginIDs: pluginManager.enabledPluginIDs)
         VStack(spacing: 0) {
             Picker("", selection: $selectedTab) {
-                ForEach(SettingsTab.allCases) { tab in
+                ForEach(visibleTabs) { tab in
                     Label(L(tab.titleKey), systemImage: tab.symbol)
                         .tag(tab)
                 }
@@ -75,6 +106,8 @@ struct SettingsView: View {
                 switch selectedTab {
                 case .general:
                     GeneralSettingsView()
+                case .plugins:
+                    PluginCenterView(manager: pluginManager)
                 case .volume:
                     AppVolumeSettingsView()
                 case .rightClick:
@@ -93,6 +126,18 @@ struct SettingsView: View {
         }
         .frame(width: SettingsLayout.width, height: SettingsLayout.windowHeight)
         .id(appLanguage)   // 切换语言时整体重建，连 Tab 标签一起刷新
+        .onAppear {
+            selectedTab = SettingsTab.fallback(
+                for: selectedTab,
+                enabledPluginIDs: pluginManager.enabledPluginIDs
+            )
+        }
+        .onChange(of: pluginManager.enabledPluginIDs) { _, enabledPluginIDs in
+            selectedTab = SettingsTab.fallback(
+                for: selectedTab,
+                enabledPluginIDs: enabledPluginIDs
+            )
+        }
     }
 }
 

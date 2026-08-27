@@ -53,6 +53,10 @@ struct RightClickConfig: Codable, Equatable, Sendable {
         enabled: Dictionary(uniqueKeysWithValues: RightClickItem.allCases.map { ($0.rawValue, true) })
     )
 
+    static let disabled = RightClickConfig(
+        enabled: Dictionary(uniqueKeysWithValues: RightClickItem.allCases.map { ($0.rawValue, false) })
+    )
+
     func isEnabled(_ item: RightClickItem) -> Bool {
         enabled[item.rawValue] ?? true
     }

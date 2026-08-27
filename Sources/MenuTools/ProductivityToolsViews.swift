@@ -144,7 +144,6 @@ struct GlobalShortcutCard: View {
         .padding(12)
         .frame(maxWidth: .infinity, alignment: .leading)
         .controlCenterSurface(tint: .pink)
-        .task { service.start() }
     }
 }
 

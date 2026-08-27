@@ -16,10 +16,29 @@ final class BLEBatteryMonitor: NSObject, ObservableObject {
     private var central: CBCentralManager?
     private var retained: [UUID: CBPeripheral] = [:]   // 必须强引用，否则连接会被系统取消
     private var results: [UUID: BluetoothDeviceBattery] = [:]
+    private(set) var isRunning = false
 
     private override init() {
         super.init()
+    }
+
+    func start() {
+        guard central == nil else { return }
+        isRunning = true
         central = CBCentralManager(delegate: self, queue: .main)
+    }
+
+    func stop() {
+        guard let central else { return }
+        for peripheral in retained.values where peripheral.state != .disconnected {
+            central.cancelPeripheralConnection(peripheral)
+        }
+        central.delegate = nil
+        retained.removeAll()
+        results.removeAll()
+        devices = []
+        self.central = nil
+        isRunning = false
     }
 
     /// 重新枚举系统已连接的 BLE 设备并读取电量

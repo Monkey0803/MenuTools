@@ -1,5 +1,12 @@
 import SwiftUI
 
+@MainActor
+private final class MenuToolsApplicationDelegate: NSObject, NSApplicationDelegate {
+    func applicationWillTerminate(_ notification: Notification) {
+        BuiltInPluginManager.shared.stopAllPlugins()
+    }
+}
+
 /// 全局设置的存取 Key
 enum SettingsKey {
     static let menuBarIcon = "menuBarIcon"
@@ -67,32 +74,15 @@ enum MenuBarIcon: String, CaseIterable, Identifiable {
 
 @main
 struct MenuToolsApp: App {
+    @NSApplicationDelegateAdaptor(MenuToolsApplicationDelegate.self) private var appDelegate
+
     init() {
         // Sparkle 必须由主 App 持有并在应用启动时启动，自动检查和安装流程才能跨面板生命周期工作。
         _ = SparkleUpdateService.shared
         // 使用 AppKit 原生状态项接收鼠标点击，面板内容仍由 SwiftUI 渲染。
         MenuBarStatusItemController.shared.start()
-        // 根据配置启动平滑滚动引擎
-        SmoothScrollEngine.shared.activateIfEnabled()
-        // 监听 Finder 扩展转交的右键操作指令（沙箱扩展无法直接执行文件操作）
-        RightClickCommandHandler.activate()
-        // 剪贴板历史必须独立于菜单栏面板持续监听
-        ClipboardHistoryService.shared.startMonitoring()
-        // App 音量进程枚举和输出设备监听必须独立于面板生命周期持续运行。
-        AppVolumeService.shared.start()
-        // 截图历史只保留仍存在的文件，避免 Quick Access 显示已被 Finder 删除的条目。
-        ScreenshotHistoryStore.shared.pruneMissingFiles()
-        // 全局快捷键必须独立于面板生命周期持续监听
-        GlobalShortcutService.shared.start()
-        // 应用快捷键必须独立于设置页面生命周期持续监听
-        AppShortcutService.shared.start()
-        // 窗口布局快捷键必须独立于设置页面生命周期持续监听
-        WindowShortcutService.shared.start()
-        // 截图快捷键必须独立于设置页面生命周期持续监听
-        ScreenshotShortcutService.shared.start()
-        ScreenshotRegionOCRService.shared.start()
-        // 窗口管理器的应用规则和边缘吸附必须独立于设置页面持续运行
-        WindowManagementService.shared.start()
+        // 所有可选功能统一由插件管理器启动，禁用后不会创建对应后台监听。
+        BuiltInPluginManager.shared.startEnabledPlugins()
     }
 
     var body: some Scene {

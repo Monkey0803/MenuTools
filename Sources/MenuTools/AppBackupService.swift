@@ -53,6 +53,8 @@ enum AppBackupService {
 
         let appVolumeProfiles = userDefaults.data(forKey: AppVolumeService.StorageKey.profiles)
             .flatMap { try? JSONDecoder().decode([String: AppVolumeProfile].self, from: $0) }
+        let pluginConfiguration = BuiltInPluginManager.configuration(from: userDefaults)
+            ?? .defaultConfiguration
 
         let settings = AppBackupSettings(
             menuBarIcon: string(SettingsKey.menuBarIcon, MenuBarIcon.default.rawValue),
@@ -74,7 +76,9 @@ enum AppBackupService {
             scrollShiftModifier: modifier(SettingsKey.scrollShiftKey),
             scrollDisableModifier: modifier(SettingsKey.scrollDisableKey),
             appVolumeEnabled: bool(AppVolumeService.StorageKey.enabled, false),
-            appVolumeProfiles: appVolumeProfiles
+            appVolumeProfiles: appVolumeProfiles,
+            enabledPluginIDs: pluginConfiguration.enabledPluginIDs.map(\.rawValue),
+            pluginOrder: pluginConfiguration.orderedPluginIDs.map(\.rawValue)
         )
 
         return AppBackupDocument.current(
@@ -128,7 +132,7 @@ enum AppBackupService {
         let previousRightClick = rightClickStore.load()
 
         do {
-            apply(document.settings, to: userDefaults)
+            try apply(document.settings, to: userDefaults)
             try rightClickStore.replace(document.rightClick)
         } catch let originalError {
             restore(previousDefaults, to: userDefaults)
@@ -176,10 +180,11 @@ enum AppBackupService {
         SettingsKey.scrollShiftKey,
         SettingsKey.scrollDisableKey,
         AppVolumeService.StorageKey.enabled,
-        AppVolumeService.StorageKey.profiles
+        AppVolumeService.StorageKey.profiles,
+        BuiltInPluginManager.storageKey
     ]
 
-    private static func apply(_ settings: AppBackupSettings, to userDefaults: UserDefaults) {
+    private static func apply(_ settings: AppBackupSettings, to userDefaults: UserDefaults) throws {
         userDefaults.set(settings.menuBarIcon, forKey: SettingsKey.menuBarIcon)
         userDefaults.set(settings.menuBarShowTitle, forKey: SettingsKey.menuBarShowTitle)
         userDefaults.set(settings.togglesShowTitle, forKey: SettingsKey.togglesShowTitle)
@@ -204,6 +209,16 @@ enum AppBackupService {
         if let profiles = settings.appVolumeProfiles,
            let data = try? JSONEncoder().encode(profiles) {
             userDefaults.set(data, forKey: AppVolumeService.StorageKey.profiles)
+        }
+        if let enabled = settings.enabledPluginIDs,
+           let order = settings.pluginOrder {
+            try BuiltInPluginManager.persist(
+                BuiltInPluginConfiguration(
+                    enabledPluginIDs: enabled.compactMap(BuiltInPluginID.init(rawValue:)),
+                    orderedPluginIDs: order.compactMap(BuiltInPluginID.init(rawValue:))
+                ),
+                to: userDefaults
+            )
         }
     }
 

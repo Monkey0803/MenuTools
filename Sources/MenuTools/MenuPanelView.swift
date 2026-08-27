@@ -265,6 +265,7 @@ struct MenuPanelView: View {
     @State private var focusModeService = FocusModeService.shared
     @State private var globalShortcutService = GlobalShortcutService.shared
     @State private var appVolumeService = AppVolumeService.shared
+    @State private var pluginManager = BuiltInPluginManager.shared
     @State private var statusMessage: String?
     @State private var statusIsError = false
     @State private var appeared = false
@@ -278,6 +279,19 @@ struct MenuPanelView: View {
         for: Notification.Name("AppleInterfaceThemeChangedNotification")
     )
 
+    private var enabledQuickActions: [QuickAction] {
+        QuickAction.allCases.filter { action in
+            switch action {
+            case .screenshot:
+                return pluginManager.isEnabled(.screenshot)
+            case .emptyTrash, .restartFinder:
+                return pluginManager.isEnabled(.finderTools)
+            case .lockScreen, .flushDNS, .openSystemSettings:
+                return pluginManager.isEnabled(.systemControls)
+            }
+        }
+    }
+
     var body: some View {
         VStack(spacing: 12) {
             header
@@ -285,43 +299,61 @@ struct MenuPanelView: View {
 
             ScrollView(.vertical, showsIndicators: false) {
                 VStack(spacing: 10) {
-                    heroTiles
-                        .entrance(1, appeared: appeared)
-                    quickActionsCard
-                        .entrance(2, appeared: appeared)
-                    ScenePresetsCard(activeScene: sceneService.activeScene, apply: applyScene)
-                        .entrance(3, appeared: appeared)
-                    GlobalShortcutCard(service: globalShortcutService, report: flashStatus)
-                        .entrance(4, appeared: appeared)
-                    FocusModeCard(
-                        isEnabled: focusModeService.isEnabled,
-                        isDoNotDisturbEnabled: focusModeService.isDoNotDisturbEnabled,
-                        isBusy: focusModeService.isBusy,
-                        toggle: toggleFocusMode,
-                        toggleDoNotDisturb: toggleDoNotDisturb,
-                        openSettings: openFocusSettings
-                    )
-                    .entrance(5, appeared: appeared)
-                    systemResourceCard
-                        .entrance(6, appeared: appeared)
-                    networkCard
-                        .entrance(7, appeared: appeared)
-                    batteryHealthCard
-                        .entrance(8, appeared: appeared)
-                    displayCard
-                        .entrance(9, appeared: appeared)
-                    storageCard
-                        .entrance(10, appeared: appeared)
-                    quickToggles
-                        .entrance(11, appeared: appeared)
-                    AppVolumeCard(service: appVolumeService) {
-                        openSettingsAction?(.volume)
+                    if pluginManager.isEnabled(.systemControls)
+                        || pluginManager.isEnabled(.finderTools) {
+                        heroTiles
+                            .entrance(1, appeared: appeared)
                     }
-                    .entrance(12, appeared: appeared)
-                    bluetoothCard
-                        .entrance(13, appeared: appeared)
-                    cleanupTiles
-                        .entrance(14, appeared: appeared)
+                    if !enabledQuickActions.isEmpty {
+                        quickActionsCard
+                            .entrance(2, appeared: appeared)
+                    }
+                    if pluginManager.isEnabled(.automation) {
+                        ScenePresetsCard(activeScene: sceneService.activeScene, apply: applyScene)
+                            .entrance(3, appeared: appeared)
+                        GlobalShortcutCard(service: globalShortcutService, report: flashStatus)
+                            .entrance(4, appeared: appeared)
+                        FocusModeCard(
+                            isEnabled: focusModeService.isEnabled,
+                            isDoNotDisturbEnabled: focusModeService.isDoNotDisturbEnabled,
+                            isBusy: focusModeService.isBusy,
+                            toggle: toggleFocusMode,
+                            toggleDoNotDisturb: toggleDoNotDisturb,
+                            openSettings: openFocusSettings
+                        )
+                        .entrance(5, appeared: appeared)
+                    }
+                    if pluginManager.isEnabled(.systemInsights) {
+                        systemResourceCard
+                            .entrance(6, appeared: appeared)
+                        networkCard
+                            .entrance(7, appeared: appeared)
+                        batteryHealthCard
+                            .entrance(8, appeared: appeared)
+                        displayCard
+                            .entrance(9, appeared: appeared)
+                        storageCard
+                            .entrance(10, appeared: appeared)
+                    }
+                    if pluginManager.isEnabled(.systemControls) {
+                        quickToggles
+                            .entrance(11, appeared: appeared)
+                    }
+                    if pluginManager.isEnabled(.appVolume) {
+                        AppVolumeCard(service: appVolumeService) {
+                            openSettingsAction?(.volume)
+                        }
+                        .entrance(12, appeared: appeared)
+                    }
+                    if pluginManager.isEnabled(.systemInsights) {
+                        bluetoothCard
+                            .entrance(13, appeared: appeared)
+                    }
+                    if pluginManager.isEnabled(.systemInsights)
+                        || pluginManager.isEnabled(.clipboard) {
+                        cleanupTiles
+                            .entrance(14, appeared: appeared)
+                    }
                 }
             }
             .scrollContentBackground(.hidden)
@@ -395,10 +427,17 @@ struct MenuPanelView: View {
             }
         }
         .task {
-            refreshToggles()
-            refreshDerivedDataSize()
-            appLauncherService.refresh()
-            globalShortcutService.start()
+            if pluginManager.isEnabled(.systemControls) {
+                refreshToggles()
+            }
+            if pluginManager.isEnabled(.systemInsights) {
+                refreshDerivedDataSize()
+            }
+            if pluginManager.isEnabled(.appLauncher) || pluginManager.isEnabled(.automation) {
+                appLauncherService.refresh()
+            }
+            guard pluginManager.isEnabled(.systemInsights) else { return }
+            bleMonitor.start()
             // 不在面板打开瞬间读取 Focus：读取会点击 Control Center，可能抢走菜单弹层焦点。
             // 状态在用户执行切换后刷新；未读取前由卡片显示“状态由系统控制”。
             // 面板展示期间每 30 秒刷新一次蓝牙设备电量
@@ -411,12 +450,14 @@ struct MenuPanelView: View {
             }
         }
         .task {
+            guard pluginManager.isEnabled(.systemInsights) else { return }
             while !Task.isCancelled {
                 systemResourceService.refresh()
                 try? await Task.sleep(for: .seconds(2))
             }
         }
         .task {
+            guard pluginManager.isEnabled(.systemInsights) else { return }
             networkService.refresh()
             batteryHealthService.refresh()
             displayService.refresh()
@@ -510,31 +551,35 @@ struct MenuPanelView: View {
 
     private var heroTiles: some View {
         HStack(spacing: 12) {
-            Button(action: openFinderPathInTerminal) {
-                heroTileLabel(
-                    symbol: "terminal.fill",
-                    title: L("panel.tile.terminal"),
-                    subtitle: currentTerminal.shortName
-                )
+            if pluginManager.isEnabled(.finderTools) {
+                Button(action: openFinderPathInTerminal) {
+                    heroTileLabel(
+                        symbol: "terminal.fill",
+                        title: L("panel.tile.terminal"),
+                        subtitle: currentTerminal.shortName
+                    )
+                }
+                .buttonStyle(.plain)
+                .controlCenterSurface(tint: .blue, interactive: true, shape: AnyShape(.rect(cornerRadius: 18)))
             }
-            .buttonStyle(.plain)
-            .controlCenterSurface(tint: .blue, interactive: true, shape: AnyShape(.rect(cornerRadius: 18)))
 
-            Button {
-                setSystemAppearance(dark: !isDarkMode)
-            } label: {
-                heroTileLabel(
-                    symbol: isDarkMode ? "moon.stars.fill" : "sun.max.fill",
-                    title: isDarkMode ? L("panel.tile.dark") : L("panel.tile.light"),
-                    subtitle: L("panel.tile.tap")
+            if pluginManager.isEnabled(.systemControls) {
+                Button {
+                    setSystemAppearance(dark: !isDarkMode)
+                } label: {
+                    heroTileLabel(
+                        symbol: isDarkMode ? "moon.stars.fill" : "sun.max.fill",
+                        title: isDarkMode ? L("panel.tile.dark") : L("panel.tile.light"),
+                        subtitle: L("panel.tile.tap")
+                    )
+                }
+                .buttonStyle(.plain)
+                .controlCenterSurface(
+                    tint: isDarkMode ? .indigo : .orange,
+                    interactive: true,
+                    shape: AnyShape(.rect(cornerRadius: 18))
                 )
             }
-            .buttonStyle(.plain)
-            .controlCenterSurface(
-                tint: isDarkMode ? .indigo : .orange,
-                interactive: true,
-                shape: AnyShape(.rect(cornerRadius: 18))
-            )
         }
     }
 
@@ -579,7 +624,7 @@ struct MenuPanelView: View {
                 columns: Array(repeating: GridItem(.flexible(), spacing: 8), count: 2),
                 spacing: 8
             ) {
-                ForEach(QuickAction.allCases) { action in
+                ForEach(enabledQuickActions) { action in
                     Button {
                         performQuickAction(action)
                     } label: {
@@ -1302,65 +1347,69 @@ struct MenuPanelView: View {
 
     private var cleanupTiles: some View {
         HStack(spacing: 12) {
-            Button(action: cleanDerivedData) {
-                cleanupTileLabel(
-                    symbol: "hammer.fill",
-                    title: L("cleanup.derivedData"),
-                    subtitle: derivedDataSubtitle,
-                    showProgress: isCleaningDerivedData
-                )
-            }
-            .buttonStyle(.plain)
-            .disabled(isCleaningDerivedData || derivedDataSize == 0)
-            .controlCenterSurface(interactive: true, shape: AnyShape(.rect(cornerRadius: 16)))
-
-            ZStack(alignment: .topTrailing) {
-                Button {
-                    isShowingClipboardHistory = true
-                } label: {
+            if pluginManager.isEnabled(.systemInsights) {
+                Button(action: cleanDerivedData) {
                     cleanupTileLabel(
-                        symbol: "clock.arrow.circlepath",
-                        title: L("clipboard.history"),
-                        subtitle: clipboardSubtitle,
-                        showProgress: false
+                        symbol: "hammer.fill",
+                        title: L("cleanup.derivedData"),
+                        subtitle: derivedDataSubtitle,
+                        showProgress: isCleaningDerivedData
                     )
                 }
                 .buttonStyle(.plain)
+                .disabled(isCleaningDerivedData || derivedDataSize == 0)
+                .controlCenterSurface(interactive: true, shape: AnyShape(.rect(cornerRadius: 16)))
+            }
 
-                Button(action: clearClipboard) {
-                    Image(systemName: "trash")
-                        .font(.caption.weight(.semibold))
-                        .padding(7)
-                        .contentShape(.circle)
+            if pluginManager.isEnabled(.clipboard) {
+                ZStack(alignment: .topTrailing) {
+                    Button {
+                        isShowingClipboardHistory = true
+                    } label: {
+                        cleanupTileLabel(
+                            symbol: "clock.arrow.circlepath",
+                            title: L("clipboard.history"),
+                            subtitle: clipboardSubtitle,
+                            showProgress: false
+                        )
+                    }
+                    .buttonStyle(.plain)
+
+                    Button(action: clearClipboard) {
+                        Image(systemName: "trash")
+                            .font(.caption.weight(.semibold))
+                            .padding(7)
+                            .contentShape(.circle)
+                    }
+                    .buttonStyle(.plain)
+                    .foregroundStyle(.secondary)
+                    .help(L("cleanup.clipboard"))
+                    .accessibilityLabel(L("cleanup.clipboard"))
+                    .disabled(clipboardHistoryService.currentItemCount == 0)
                 }
                 .buttonStyle(.plain)
-                .foregroundStyle(.secondary)
-                .help(L("cleanup.clipboard"))
-                .accessibilityLabel(L("cleanup.clipboard"))
-                .disabled(clipboardHistoryService.currentItemCount == 0)
-            }
-            .buttonStyle(.plain)
-            .controlCenterSurface(interactive: true, shape: AnyShape(.rect(cornerRadius: 16)))
-            .popover(isPresented: $isShowingClipboardHistory, arrowEdge: .bottom) {
-                ClipboardHistoryPopover(
-                    items: clipboardHistoryService.items,
-                    onCopy: { item in
-                        clipboardHistoryService.copy(item)
-                        isShowingClipboardHistory = false
-                    },
-                    onTogglePinned: { id in
-                        clipboardHistoryService.togglePinned(id: id)
-                    },
-                    onRemove: { id in
-                        clipboardHistoryService.remove(id: id)
-                    },
-                    onClearHistory: {
-                        clipboardHistoryService.clearHistory()
-                    },
-                    onClearClipboard: {
-                        clearClipboard()
-                    }
-                )
+                .controlCenterSurface(interactive: true, shape: AnyShape(.rect(cornerRadius: 16)))
+                .popover(isPresented: $isShowingClipboardHistory, arrowEdge: .bottom) {
+                    ClipboardHistoryPopover(
+                        items: clipboardHistoryService.items,
+                        onCopy: { item in
+                            clipboardHistoryService.copy(item)
+                            isShowingClipboardHistory = false
+                        },
+                        onTogglePinned: { id in
+                            clipboardHistoryService.togglePinned(id: id)
+                        },
+                        onRemove: { id in
+                            clipboardHistoryService.remove(id: id)
+                        },
+                        onClearHistory: {
+                            clipboardHistoryService.clearHistory()
+                        },
+                        onClearClipboard: {
+                            clearClipboard()
+                        }
+                    )
+                }
             }
         }
     }

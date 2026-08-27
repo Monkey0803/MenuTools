@@ -327,6 +327,79 @@ func exportWriteFailureIsReported() throws {
     }
 }
 
+@Test("新备份会保存并恢复内置插件配置")
+@MainActor
+func backupRoundTripsBuiltInPluginConfiguration() throws {
+    let defaults = try makeDefaults(named: "pluginRoundTrip")
+    let configuration = BuiltInPluginConfiguration(
+        enabledPluginIDs: [.clipboard, .appVolume],
+        orderedPluginIDs: [.appVolume, .clipboard]
+    )
+    try BuiltInPluginManager.persist(configuration, to: defaults)
+
+    let document = AppBackupService.makeDocument(
+        userDefaults: defaults,
+        rightClick: .default,
+        appVersion: "1.1.0",
+        createdAt: Date(timeIntervalSince1970: 500)
+    )
+
+    #expect(document.settings.enabledPluginIDs == ["app-volume", "clipboard"])
+    #expect(document.settings.pluginOrder == ["app-volume", "clipboard"])
+
+    let restoredDefaults = try makeDefaults(named: "pluginRoundTripRestored")
+    try AppBackupService.restore(
+        document,
+        userDefaults: restoredDefaults,
+        rightClickStore: InMemoryRightClickStore(config: .default)
+    )
+    #expect(BuiltInPluginManager.configuration(from: restoredDefaults) == (try configuration.validated()))
+}
+
+@Test("旧备份缺少插件字段时不会覆盖现有插件配置")
+@MainActor
+func legacyBackupDoesNotOverwritePluginConfiguration() throws {
+    let defaults = try makeDefaults(named: "legacyPluginBackup")
+    let existing = BuiltInPluginConfiguration(
+        enabledPluginIDs: [.screenshot],
+        orderedPluginIDs: [.screenshot]
+    )
+    try BuiltInPluginManager.persist(existing, to: defaults)
+    var settings = AppBackupSettings.serviceFixture
+    settings.enabledPluginIDs = nil
+    settings.pluginOrder = nil
+
+    try AppBackupService.restore(
+        .current(
+            settings: settings,
+            rightClick: .default,
+            appVersion: "1.0.4",
+            createdAt: Date(timeIntervalSince1970: 400)
+        ),
+        userDefaults: defaults,
+        rightClickStore: InMemoryRightClickStore(config: .default)
+    )
+
+    #expect(BuiltInPluginManager.configuration(from: defaults) == existing)
+}
+
+@Test("备份拒绝重复的插件标识")
+func backupRejectsDuplicatePluginIdentifiers() {
+    var settings = AppBackupSettings.serviceFixture
+    settings.enabledPluginIDs = ["clipboard", "clipboard"]
+    settings.pluginOrder = ["clipboard"]
+    let document = AppBackupDocument.current(
+        settings: settings,
+        rightClick: .default,
+        appVersion: "1.1.0",
+        createdAt: Date()
+    )
+
+    #expect(throws: AppBackupValidationError.invalidPluginConfiguration) {
+        _ = try document.validated()
+    }
+}
+
 private func makeDefaults(named name: String) throws -> UserDefaults {
     let suiteName = defaultsSuiteName(named: name)
     let defaults = try #require(UserDefaults(suiteName: suiteName))

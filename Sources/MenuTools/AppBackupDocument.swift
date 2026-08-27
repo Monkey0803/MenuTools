@@ -25,6 +25,10 @@ struct AppBackupSettings: Codable, Equatable, Sendable {
     /// v1 后增补的可选字段；缺失时代表旧备份，不覆盖当前音量配置。
     var appVolumeEnabled: Bool? = nil
     var appVolumeProfiles: [String: AppVolumeProfile]? = nil
+
+    /// v1.1.0 增补的可选字段；旧备份缺失时不覆盖当前插件选择。
+    var enabledPluginIDs: [String]? = nil
+    var pluginOrder: [String]? = nil
 }
 
 /// 备份文档校验失败的原因。
@@ -39,6 +43,7 @@ enum AppBackupValidationError: Error, Equatable, Sendable {
     case invalidModifier(String, UInt)
     case invalidAppVolume(String, Double)
     case invalidRightClickKey(String)
+    case invalidPluginConfiguration
 }
 
 /// MenuTools 配置备份文档。
@@ -113,6 +118,25 @@ struct AppBackupDocument: Codable, Equatable, Sendable {
 
         for key in rightClick.enabled.keys.sorted() where RightClickItem(rawValue: key) == nil {
             throw AppBackupValidationError.invalidRightClickKey(key)
+        }
+
+
+        switch (settings.enabledPluginIDs, settings.pluginOrder) {
+        case (nil, nil):
+            break
+        case let (enabled?, order?):
+            let enabledIDs = enabled.compactMap(BuiltInPluginID.init(rawValue:))
+            let orderedIDs = order.compactMap(BuiltInPluginID.init(rawValue:))
+            guard enabledIDs.count == enabled.count,
+                  orderedIDs.count == order.count,
+                  (try? BuiltInPluginConfiguration(
+                    enabledPluginIDs: enabledIDs,
+                    orderedPluginIDs: orderedIDs
+                  ).validated()) != nil else {
+                throw AppBackupValidationError.invalidPluginConfiguration
+            }
+        default:
+            throw AppBackupValidationError.invalidPluginConfiguration
         }
 
         return self

@@ -103,7 +103,6 @@ struct WindowManagementSettingsView: View {
         }
         .frame(width: SettingsLayout.width, height: SettingsLayout.height)
         .navigationTitle(L("settings.title"))
-        .task { shortcutService.start() }
     }
 
     private var managerOptionsSection: some View {

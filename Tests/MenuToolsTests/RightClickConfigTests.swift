@@ -49,3 +49,9 @@ func invalidRightClickNotificationPreservesCurrentConfig() {
 
     #expect(RightClickConfigNotification.applying(notification, to: current) == current)
 }
+
+@Test("禁用 Finder 工具时右键扩展配置不暴露任何菜单项")
+func disabledRightClickConfigurationHidesEveryItem() {
+    #expect(RightClickConfig.disabled.enabledItems.isEmpty)
+    #expect(RightClickItem.allCases.allSatisfy { !RightClickConfig.disabled.isEnabled($0) })
+}

@@ -5,11 +5,15 @@ import Foundation
 /// 扩展是沙箱进程，新建文件/文件夹与"在终端打开"必须由非沙箱的主 App 代为完成。
 @MainActor
 enum RightClickCommandHandler {
+    private static var observerTokens: [NSObjectProtocol] = []
+
+    static var isActive: Bool { !observerTokens.isEmpty }
 
     static func activate() {
+        guard observerTokens.isEmpty else { return }
         let center = DistributedNotificationCenter.default()
         // 指令随通知 object 以 JSON 字符串送达，不落盘（避免跨容器文件访问触发 TCC 弹窗）
-        center.addObserver(
+        observerTokens.append(center.addObserver(
             forName: Notification.Name(RightClickCommandStore.commandNotification),
             object: nil, queue: .main
         ) { note in
@@ -18,18 +22,26 @@ enum RightClickCommandHandler {
                 guard let command = RightClickCommandStore.decode(json) else { return }
                 handle(command)
             }
-        }
+        })
         // 扩展冷启动时请求配置 → 广播当前配置
-        center.addObserver(
+        observerTokens.append(center.addObserver(
             forName: Notification.Name(RightClickConfigStore.requestNotification),
             object: nil, queue: .main
         ) { _ in
             MainActor.assumeIsolated {
                 RightClickConfigStore.broadcast(RightClickConfigStore.load())
             }
-        }
+        })
         // 主 App 启动时也广播一次，让已在跑的扩展同步
         RightClickConfigStore.broadcast(RightClickConfigStore.load())
+    }
+
+    static func deactivate() {
+        let center = DistributedNotificationCenter.default()
+        observerTokens.forEach(center.removeObserver)
+        observerTokens.removeAll()
+        // 扩展会缓存最后一次配置；停用插件时显式隐藏其全部 Finder 菜单项。
+        RightClickConfigStore.broadcast(.disabled)
     }
 
     private static func handle(_ command: RightClickCommand) {

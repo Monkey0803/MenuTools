@@ -72,7 +72,6 @@ struct AppLaunchSettingsView: View {
         .frame(width: SettingsLayout.width, height: SettingsLayout.height)
         .task {
             launcher.refresh()
-            shortcutService.start()
             refreshFrontmostApp()
         }
         .onReceive(activationNotifications) { _ in
