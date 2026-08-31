@@ -174,7 +174,7 @@
 "clipboard.historyItems" = "%d 件保存";
 "clipboard.search" = "クリップボードを検索";
 "clipboard.empty" = "クリップボード履歴なし";
-"clipboard.emptyDescription" = "コピーしたテキストと画像がここに表示されます。";
+"clipboard.emptyDescription" = "コピーしたテキスト、画像、リンク、ファイルがここに表示されます。";
 "clipboard.image" = "画像";
 "clipboard.copied" = "クリップボードにコピーしました";
 "clipboard.clearHistory" = "履歴を消去";
@@ -187,11 +187,32 @@
 "clipboard.category.all" = "すべて";
 "clipboard.category.text" = "テキスト";
 "clipboard.category.image" = "画像";
+"clipboard.category.url" = "リンク";
+"clipboard.category.file" = "ファイル";
 "clipboard.sort" = "並び順";
 "clipboard.sort.newest" = "新しい順";
 "clipboard.sort.oldest" = "古い順";
 "clipboard.limit" = "保存件数";
 "clipboard.limitValue" = "%d 件";
+"clipboard.files" = "ファイル";
+"clipboard.filesCount" = "%d 件のファイル: %@";
+"clipboard.privacy" = "プライバシー";
+"clipboard.pauseRecording" = "記録を一時停止";
+"clipboard.pauseRecording.description" = "一時停止中のクリップボード変更は履歴に保存されません。";
+"clipboard.excludedApps" = "次のアプリが前面にある間は記録を停止";
+"clipboard.excludedApps.description" = "macOS はコピー元を提供しないため、これらのアプリが前面にある間だけ保存をスキップします。";
+"clipboard.excludedApps.empty" = "除外するアプリはありません";
+"clipboard.excludeApp" = "アプリを追加";
+"clipboard.excludeApp.remove" = "削除";
+"clipboard.snippets" = "定型文";
+"clipboard.snippet.defaultGroup" = "よく使う項目";
+"clipboard.snippets.empty" = "このグループにはまだ定型文がありません。";
+"clipboard.snippetGroup.add" = "グループを作成";
+"clipboard.snippetGroup.delete" = "グループを削除";
+"clipboard.snippetGroup.placeholder" = "グループ名";
+"clipboard.snippetTitle" = "定型文のタイトル（任意）";
+"clipboard.snippetDescription" = "定型文をクリックするとコピーされ、履歴にも追加されます。";
+"clipboard.snippet.add" = "定型文を追加";
 
 /* フッター */
 "footer.checkUpdate" = "アップデートを確認";

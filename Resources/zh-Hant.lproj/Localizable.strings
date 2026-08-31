@@ -174,7 +174,7 @@
 "clipboard.historyItems" = "%d 筆記錄";
 "clipboard.search" = "搜尋剪貼板";
 "clipboard.empty" = "暫無剪貼板歷史";
-"clipboard.emptyDescription" = "複製的文字和圖片會顯示在這裡。";
+"clipboard.emptyDescription" = "複製的文字、圖片、連結和檔案會顯示在這裡。";
 "clipboard.image" = "圖片";
 "clipboard.copied" = "已複製到剪貼板";
 "clipboard.clearHistory" = "清空歷史";
@@ -187,11 +187,32 @@
 "clipboard.category.all" = "全部";
 "clipboard.category.text" = "文字";
 "clipboard.category.image" = "圖片";
+"clipboard.category.url" = "連結";
+"clipboard.category.file" = "檔案";
 "clipboard.sort" = "排序";
 "clipboard.sort.newest" = "最新優先";
 "clipboard.sort.oldest" = "最早優先";
 "clipboard.limit" = "儲存數量";
 "clipboard.limitValue" = "%d 筆";
+"clipboard.files" = "檔案";
+"clipboard.filesCount" = "%d 個檔案：%@";
+"clipboard.privacy" = "隱私";
+"clipboard.pauseRecording" = "暫停記錄";
+"clipboard.pauseRecording.description" = "暫停後，剪貼簿的變更不會儲存到歷史記錄。";
+"clipboard.excludedApps" = "以下 App 位於前台時暫停記錄";
+"clipboard.excludedApps.description" = "macOS 不提供複製來源；僅在這些 App 位於前台時略過儲存。";
+"clipboard.excludedApps.empty" = "未排除任何 App";
+"clipboard.excludeApp" = "加入 App";
+"clipboard.excludeApp.remove" = "移除";
+"clipboard.snippets" = "常用片段";
+"clipboard.snippet.defaultGroup" = "常用";
+"clipboard.snippets.empty" = "這個分組還沒有常用片段。";
+"clipboard.snippetGroup.add" = "新增分組";
+"clipboard.snippetGroup.delete" = "刪除分組";
+"clipboard.snippetGroup.placeholder" = "分組名稱";
+"clipboard.snippetTitle" = "片段標題（選填）";
+"clipboard.snippetDescription" = "點擊已有片段即可複製，並自動加入剪貼簿歷史。";
+"clipboard.snippet.add" = "加入片段";
 
 /* 底欄 */
 "footer.checkUpdate" = "檢查更新";

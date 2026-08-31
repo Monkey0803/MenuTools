@@ -174,7 +174,7 @@
 "clipboard.historyItems" = "%d 条记录";
 "clipboard.search" = "搜索剪贴板";
 "clipboard.empty" = "暂无剪贴板历史";
-"clipboard.emptyDescription" = "复制的文本和图片会显示在这里。";
+"clipboard.emptyDescription" = "复制的文本、图片、链接和文件会显示在这里。";
 "clipboard.image" = "图片";
 "clipboard.copied" = "已复制到剪贴板";
 "clipboard.clearHistory" = "清空历史";
@@ -187,11 +187,32 @@
 "clipboard.category.all" = "全部";
 "clipboard.category.text" = "文字";
 "clipboard.category.image" = "图片";
+"clipboard.category.url" = "链接";
+"clipboard.category.file" = "文件";
 "clipboard.sort" = "排序";
 "clipboard.sort.newest" = "最新优先";
 "clipboard.sort.oldest" = "最早优先";
 "clipboard.limit" = "保存数量";
 "clipboard.limitValue" = "%d 条";
+"clipboard.files" = "文件";
+"clipboard.filesCount" = "%d 个文件：%@";
+"clipboard.privacy" = "隐私";
+"clipboard.pauseRecording" = "暂停记录";
+"clipboard.pauseRecording.description" = "暂停后，剪贴板的变化不会保存到历史记录。";
+"clipboard.excludedApps" = "以下 App 前台时暂停记录";
+"clipboard.excludedApps.description" = "macOS 不提供复制来源；仅在这些 App 位于前台时跳过保存。";
+"clipboard.excludedApps.empty" = "未排除任何 App";
+"clipboard.excludeApp" = "添加 App";
+"clipboard.excludeApp.remove" = "移除";
+"clipboard.snippets" = "常用片段";
+"clipboard.snippet.defaultGroup" = "常用";
+"clipboard.snippets.empty" = "这个分组还没有常用片段。";
+"clipboard.snippetGroup.add" = "新建分组";
+"clipboard.snippetGroup.delete" = "删除分组";
+"clipboard.snippetGroup.placeholder" = "分组名称";
+"clipboard.snippetTitle" = "片段标题（可选）";
+"clipboard.snippetDescription" = "点击已有片段即可复制，并自动加入剪贴板历史。";
+"clipboard.snippet.add" = "添加片段";
 
 /* 底栏 */
 "footer.checkUpdate" = "检查更新";

@@ -272,6 +272,49 @@ func clipboardHistoryWritesSelectedImageItem() throws {
     #expect(pasteboard.data(forType: .tiff) != nil)
 }
 
+@Test("剪贴板历史可识别网页链接")
+func clipboardHistoryReadsURL() {
+    let item = NSPasteboardItem()
+    item.setString("https://example.com/articles/clipboard", forType: .URL)
+
+    #expect(ClipboardHistoryPasteboardReader.content(from: [item]) == .url(
+        "https://example.com/articles/clipboard"
+    ))
+}
+
+@Test("剪贴板历史可将多个文件合并为一条记录")
+func clipboardHistoryReadsMultipleFiles() {
+    let first = NSPasteboardItem()
+    first.setString(URL(fileURLWithPath: "/tmp/报告.pdf").absoluteString, forType: .fileURL)
+    let second = NSPasteboardItem()
+    second.setString(URL(fileURLWithPath: "/tmp/截图.png").absoluteString, forType: .fileURL)
+
+    #expect(ClipboardHistoryPasteboardReader.content(from: [first, second]) == .files([
+        ClipboardHistoryFile(path: "/tmp/报告.pdf"),
+        ClipboardHistoryFile(path: "/tmp/截图.png")
+    ]))
+}
+
+@Test("链接和多文件历史会实际写回目标剪贴板")
+func clipboardHistoryWritesURLAndFiles() {
+    let urlPasteboard = NSPasteboard(name: NSPasteboard.Name("MenuToolsTests.\(UUID().uuidString)"))
+    #expect(ClipboardHistoryPasteboardWriter.write(
+        .url("https://example.com/clipboard"),
+        to: urlPasteboard
+    ))
+    #expect(ClipboardHistoryPasteboardReader.content(from: urlPasteboard.pasteboardItems ?? []) == .url(
+        "https://example.com/clipboard"
+    ))
+
+    let filePasteboard = NSPasteboard(name: NSPasteboard.Name("MenuToolsTests.\(UUID().uuidString)"))
+    let files = [
+        ClipboardHistoryFile(path: "/tmp/报告.pdf"),
+        ClipboardHistoryFile(path: "/tmp/截图.png")
+    ]
+    #expect(ClipboardHistoryPasteboardWriter.write(.files(files), to: filePasteboard))
+    #expect(ClipboardHistoryPasteboardReader.content(from: filePasteboard.pasteboardItems ?? []) == .files(files))
+}
+
 @Test("无效图片历史复制失败时保留现有剪贴板内容")
 func clipboardHistoryDoesNotClearPasteboardForInvalidImage() {
     let pasteboard = NSPasteboard(name: NSPasteboard.Name("MenuToolsTests.\(UUID().uuidString)"))
@@ -424,6 +467,47 @@ func historyServiceUsesSharedInstance() {
     #expect(ClipboardHistoryService.shared === ClipboardHistoryService.shared)
 }
 
+@Test("暂停记录和排除应用会阻止新剪贴板内容写入历史")
+func clipboardRecordingPolicyRespectsPauseAndExcludedApplications() {
+    #expect(!ClipboardHistoryRecordingPolicy.shouldRecord(
+        isPaused: true,
+        sourceBundleID: "com.example.browser",
+        excludedBundleIDs: []
+    ))
+    #expect(!ClipboardHistoryRecordingPolicy.shouldRecord(
+        isPaused: false,
+        sourceBundleID: "com.example.browser",
+        excludedBundleIDs: ["com.example.browser"]
+    ))
+    #expect(ClipboardHistoryRecordingPolicy.shouldRecord(
+        isPaused: false,
+        sourceBundleID: "com.example.editor",
+        excludedBundleIDs: ["com.example.browser"]
+    ))
+}
+
+@Test("暂停记录和排除应用配置会持久化")
+@MainActor
+func clipboardRecordingPreferencesPersist() throws {
+    let suiteName = "MenuTools-ClipboardRecordingPreferences-\(UUID().uuidString)"
+    let defaults = try #require(UserDefaults(suiteName: suiteName))
+    defer { UserDefaults().removePersistentDomain(forName: suiteName) }
+
+    let service = ClipboardHistoryService(
+        persistenceURL: nil,
+        userDefaults: defaults
+    )
+    service.setRecordingPaused(true)
+    service.addExcludedBundleID("com.example.browser")
+
+    let restored = ClipboardHistoryService(
+        persistenceURL: nil,
+        userDefaults: defaults
+    )
+    #expect(restored.isRecordingPaused)
+    #expect(restored.excludedBundleIDs == ["com.example.browser"])
+}
+
 @Test("剪贴板历史服务初始化不在主线程同步读取持久化文件")
 @MainActor
 func historyServiceDefersPersistenceLoad() async throws {
@@ -534,6 +618,84 @@ func historyServiceKeepsClearHistoryDuringDelayedLoad() async {
     await loadTask.value
 
     #expect(service.items.isEmpty)
+}
+
+@Test("复制常用片段会写入剪贴板并进入历史")
+@MainActor
+func clipboardHistoryCopyContentAddsSnippetToHistory() async throws {
+    let pasteboard = NSPasteboard(name: NSPasteboard.Name("MenuToolsTests.\(UUID().uuidString)"))
+    let persistenceURL = FileManager.default.temporaryDirectory
+        .appendingPathComponent("MenuTools-ClipboardHistory-Snippet-\(UUID().uuidString).json")
+    defer { try? FileManager.default.removeItem(at: persistenceURL) }
+    let service = ClipboardHistoryService(
+        limit: 5,
+        persistenceURL: persistenceURL,
+        pasteboard: pasteboard
+    )
+    await service.loadPersistedHistory()
+
+    #expect(service.copy(.text("常用回复")))
+    #expect(pasteboard.string(forType: .string) == "常用回复")
+    #expect(service.items.map(\.content) == [.text("常用回复")])
+}
+
+@Test("暂停记录时手动复制只写入系统剪贴板")
+@MainActor
+func clipboardHistoryPausedCopyDoesNotAddHistory() async {
+    let pasteboard = NSPasteboard(name: NSPasteboard.Name("MenuToolsTests.\(UUID().uuidString)"))
+    let suiteName = "MenuToolsTests.\(UUID().uuidString)"
+    let preferences = UserDefaults(suiteName: suiteName)!
+    defer { preferences.removePersistentDomain(forName: suiteName) }
+    let service = ClipboardHistoryService(
+        persistenceURL: nil,
+        pasteboard: pasteboard,
+        userDefaults: preferences
+    )
+
+    service.setRecordingPaused(true)
+
+    #expect(service.copy(.text("暂停期间的片段")))
+    #expect(pasteboard.string(forType: .string) == "暂停期间的片段")
+    #expect(service.items.isEmpty)
+}
+
+@Test("排除应用失焦时会丢弃尚未采样的剪贴板变更")
+@MainActor
+func clipboardHistoryExcludedApplicationDeactivationDiscardsPendingContent() async {
+    let pasteboard = NSPasteboard(name: NSPasteboard.Name("MenuToolsTests.\(UUID().uuidString)"))
+    let service = ClipboardHistoryService(
+        persistenceURL: nil,
+        pasteboard: pasteboard,
+        frontmostApplicationBundleIdentifierProvider: { "com.example.normal" }
+    )
+    await service.loadPersistedHistory()
+    service.addExcludedBundleID("com.example.private")
+
+    pasteboard.clearContents()
+    pasteboard.setString("私密内容", forType: .string)
+    service.handleApplicationDeactivation(bundleIdentifier: "com.example.private")
+    service.refresh()
+
+    #expect(service.items.isEmpty)
+}
+
+@Test("普通应用失焦时会按离开前的上下文保存待采样变更")
+@MainActor
+func clipboardHistoryNormalApplicationDeactivationRecordsPendingContent() async {
+    let pasteboard = NSPasteboard(name: NSPasteboard.Name("MenuToolsTests.\(UUID().uuidString)"))
+    let service = ClipboardHistoryService(
+        persistenceURL: nil,
+        pasteboard: pasteboard,
+        frontmostApplicationBundleIdentifierProvider: { "com.example.private" }
+    )
+    await service.loadPersistedHistory()
+    service.addExcludedBundleID("com.example.private")
+
+    pasteboard.clearContents()
+    pasteboard.setString("普通内容", forType: .string)
+    service.handleApplicationDeactivation(bundleIdentifier: "com.example.normal")
+
+    #expect(service.items.map(\.content) == [.text("普通内容")])
 }
 
 private actor ClipboardHistoryLoadGate {

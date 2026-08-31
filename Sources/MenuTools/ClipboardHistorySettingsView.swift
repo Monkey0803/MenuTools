@@ -87,9 +87,11 @@ struct ClipboardHistorySettingsView: View {
             ScrollView {
                 VStack(alignment: .leading, spacing: 16) {
                     historyHeader
+                    ClipboardPrivacySettingsSection(historyService: historyService)
                     searchField
                     historyControls
                     historyContent
+                    ClipboardSnippetSettingsSection(historyService: historyService)
                 }
                 .padding(ClipboardHistorySettingsLayout.contentHorizontalPadding)
             }
@@ -426,6 +428,12 @@ private struct ClipboardHistorySettingsCard: View {
         switch item.content {
         case let .text(text): return text
         case .image: return L("clipboard.image")
+        case let .url(value): return value
+        case let .files(files):
+            guard let first = files.first else { return L("clipboard.files") }
+            return files.count == 1
+                ? first.displayName
+                : L("clipboard.filesCount", files.count, first.displayName)
         }
     }
 }
@@ -456,6 +464,14 @@ private struct ClipboardHistoryThumbnail: View {
                     Image(systemName: "photo")
                         .foregroundStyle(.secondary)
                 }
+            case .url:
+                Image(systemName: "link")
+                    .font(.title3.weight(.semibold))
+                    .foregroundStyle(.tint)
+            case let .files(files):
+                Image(systemName: files.count == 1 ? "doc.fill" : "doc.on.doc.fill")
+                    .font(.title3.weight(.semibold))
+                    .foregroundStyle(.tint)
             }
         }
         .frame(
@@ -522,6 +538,23 @@ private struct ClipboardHistoryHoverPreview: View {
                     systemImage: "photo"
                 )
             }
+        case let .url(value):
+            Text(value)
+                .font(.body)
+                .lineLimit(6)
+                .multilineTextAlignment(.leading)
+                .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
+                .padding(12)
+        case let .files(files):
+            VStack(alignment: .leading, spacing: 6) {
+                ForEach(files) { file in
+                    Label(file.displayName, systemImage: "doc")
+                        .font(.caption)
+                        .lineLimit(1)
+                }
+            }
+            .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
+            .padding(12)
         }
     }
 }

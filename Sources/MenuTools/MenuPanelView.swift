@@ -1945,6 +1945,27 @@ struct ClipboardHistoryRow: View {
                     .font(.caption)
                     .foregroundStyle(.secondary)
             }
+        case let .url(value):
+            Label(value, systemImage: "link")
+                .font(.caption)
+                .lineLimit(2)
+                .multilineTextAlignment(.leading)
+        case let .files(files):
+            HStack(spacing: 6) {
+                Image(systemName: files.count == 1 ? "doc.fill" : "doc.on.doc.fill")
+                    .foregroundStyle(.tint)
+                VStack(alignment: .leading, spacing: 2) {
+                    Text(files.first?.displayName ?? L("clipboard.files"))
+                        .font(.caption)
+                        .lineLimit(1)
+                    if files.count > 1 {
+                        Text(L("clipboard.filesCount", files.count, files.first?.displayName ?? ""))
+                            .font(.caption2)
+                            .foregroundStyle(.secondary)
+                            .lineLimit(1)
+                    }
+                }
+            }
         }
     }
 }

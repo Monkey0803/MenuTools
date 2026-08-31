@@ -174,7 +174,7 @@
 "clipboard.historyItems" = "%d saved item(s)";
 "clipboard.search" = "Search clipboard";
 "clipboard.empty" = "No clipboard history";
-"clipboard.emptyDescription" = "Copied text and images will appear here.";
+"clipboard.emptyDescription" = "Copied text, images, links, and files will appear here.";
 "clipboard.image" = "Image";
 "clipboard.copied" = "Copied to clipboard";
 "clipboard.clearHistory" = "Clear History";
@@ -187,11 +187,32 @@
 "clipboard.category.all" = "All";
 "clipboard.category.text" = "Text";
 "clipboard.category.image" = "Images";
+"clipboard.category.url" = "Links";
+"clipboard.category.file" = "Files";
 "clipboard.sort" = "Sort";
 "clipboard.sort.newest" = "Newest first";
 "clipboard.sort.oldest" = "Oldest first";
 "clipboard.limit" = "History limit";
 "clipboard.limitValue" = "%d items";
+"clipboard.files" = "Files";
+"clipboard.filesCount" = "%d files: %@";
+"clipboard.privacy" = "Privacy";
+"clipboard.pauseRecording" = "Pause Recording";
+"clipboard.pauseRecording.description" = "Clipboard changes are not saved while recording is paused.";
+"clipboard.excludedApps" = "Pause recording while these apps are active";
+"clipboard.excludedApps.description" = "macOS does not provide the copy source, so saving is skipped only while these apps are active.";
+"clipboard.excludedApps.empty" = "No excluded apps";
+"clipboard.excludeApp" = "Add App";
+"clipboard.excludeApp.remove" = "Remove";
+"clipboard.snippets" = "Snippets";
+"clipboard.snippet.defaultGroup" = "General";
+"clipboard.snippets.empty" = "There are no snippets in this group yet.";
+"clipboard.snippetGroup.add" = "New Group";
+"clipboard.snippetGroup.delete" = "Delete Group";
+"clipboard.snippetGroup.placeholder" = "Group name";
+"clipboard.snippetTitle" = "Snippet title (optional)";
+"clipboard.snippetDescription" = "Click a snippet to copy it and add it to clipboard history.";
+"clipboard.snippet.add" = "Add Snippet";
 
 /* Footer */
 "footer.checkUpdate" = "Check for Updates";
