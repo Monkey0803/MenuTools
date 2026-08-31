@@ -10,6 +10,13 @@ struct SystemToggleStates {
     var nightShift = false
 }
 
+/// 入场动画只用于建立层次，不应让底部内容等待接近一秒才出现。
+enum MenuPanelEntranceTiming {
+    static func delay(for index: Int) -> Double {
+        Double(min(max(index, 0), 5)) * 0.03
+    }
+}
+
 /// 卡片错峰入场动画
 private struct Entrance: ViewModifier {
     let appeared: Bool
@@ -19,7 +26,11 @@ private struct Entrance: ViewModifier {
         content
             .opacity(appeared ? 1 : 0)
             .offset(y: appeared ? 0 : 16)
-            .animation(.spring(response: 0.45, dampingFraction: 0.8).delay(Double(index) * 0.06), value: appeared)
+            .animation(
+                .spring(response: 0.38, dampingFraction: 0.82)
+                    .delay(MenuPanelEntranceTiming.delay(for: index)),
+                value: appeared
+            )
     }
 }
 
@@ -249,8 +260,6 @@ struct MenuPanelView: View {
     @State private var toggles = SystemToggleStates()
     @State private var derivedDataSize: Int64?
     @State private var isCleaningDerivedData = false
-    @State private var clipboardHistoryService = ClipboardHistoryService.shared
-    @State private var isShowingClipboardHistory = false
     @State private var systemResourceService = SystemResourceService()
     @State private var networkService = NetworkStatusService()
     @State private var batteryHealthService = BatteryHealthService()
@@ -298,7 +307,7 @@ struct MenuPanelView: View {
                 .entrance(0, appeared: appeared)
 
             ScrollView(.vertical, showsIndicators: false) {
-                VStack(spacing: 10) {
+                LazyVStack(spacing: 10) {
                     if pluginManager.isEnabled(.systemControls)
                         || pluginManager.isEnabled(.finderTools) {
                         heroTiles
@@ -349,8 +358,7 @@ struct MenuPanelView: View {
                         bluetoothCard
                             .entrance(13, appeared: appeared)
                     }
-                    if pluginManager.isEnabled(.systemInsights)
-                        || pluginManager.isEnabled(.clipboard) {
+                    if pluginManager.isEnabled(.systemInsights) {
                         cleanupTiles
                             .entrance(14, appeared: appeared)
                     }
@@ -1349,7 +1357,7 @@ struct MenuPanelView: View {
         }
     }
 
-    // MARK: - 清理磁贴：DerivedData / 剪贴板
+    // MARK: - 清理磁贴：DerivedData
 
     private var cleanupTiles: some View {
         HStack(spacing: 12) {
@@ -1365,57 +1373,6 @@ struct MenuPanelView: View {
                 .buttonStyle(.plain)
                 .disabled(isCleaningDerivedData || derivedDataSize == 0)
                 .controlCenterSurface(interactive: true, shape: AnyShape(.rect(cornerRadius: 16)))
-            }
-
-            if pluginManager.isEnabled(.clipboard) {
-                ZStack(alignment: .topTrailing) {
-                    Button {
-                        isShowingClipboardHistory = true
-                    } label: {
-                        cleanupTileLabel(
-                            symbol: "clock.arrow.circlepath",
-                            title: L("clipboard.history"),
-                            subtitle: clipboardSubtitle,
-                            showProgress: false
-                        )
-                    }
-                    .buttonStyle(.plain)
-
-                    Button(action: clearClipboard) {
-                        Image(systemName: "trash")
-                            .font(.caption.weight(.semibold))
-                            .padding(7)
-                            .contentShape(.circle)
-                    }
-                    .buttonStyle(.plain)
-                    .foregroundStyle(.secondary)
-                    .help(L("cleanup.clipboard"))
-                    .accessibilityLabel(L("cleanup.clipboard"))
-                    .disabled(clipboardHistoryService.currentItemCount == 0)
-                }
-                .buttonStyle(.plain)
-                .controlCenterSurface(interactive: true, shape: AnyShape(.rect(cornerRadius: 16)))
-                .popover(isPresented: $isShowingClipboardHistory, arrowEdge: .bottom) {
-                    ClipboardHistoryPopover(
-                        items: clipboardHistoryService.items,
-                        onCopy: { item in
-                            clipboardHistoryService.copy(item)
-                            isShowingClipboardHistory = false
-                        },
-                        onTogglePinned: { id in
-                            clipboardHistoryService.togglePinned(id: id)
-                        },
-                        onRemove: { id in
-                            clipboardHistoryService.remove(id: id)
-                        },
-                        onClearHistory: {
-                            clipboardHistoryService.clearHistory()
-                        },
-                        onClearClipboard: {
-                            clearClipboard()
-                        }
-                    )
-                }
             }
         }
     }
@@ -1452,12 +1409,6 @@ struct MenuPanelView: View {
         if isCleaningDerivedData { return L("cleanup.cleaning") }
         guard let size = derivedDataSize else { return L("cleanup.calculating") }
         return size == 0 ? L("cleanup.cleared") : XcodeCleanerService.formatted(size)
-    }
-
-    private var clipboardSubtitle: String {
-        clipboardHistoryService.items.isEmpty
-            ? L("clipboard.empty")
-            : L("clipboard.historyItems", clipboardHistoryService.items.count)
     }
 
     // MARK: - 状态提示 / 底部
@@ -1648,12 +1599,6 @@ struct MenuPanelView: View {
         }
     }
 
-    private func clearClipboard() {
-        ClipboardService.clear()
-        clipboardHistoryService.clearHistory()
-        clipboardHistoryService.refresh()
-    }
-
     private func checkForUpdate() {
         SparkleUpdateService.shared.checkForUpdates()
     }
@@ -1753,7 +1698,12 @@ private struct ToggleTooltipKey: PreferenceKey {
 }
 
 /// 剪贴板历史弹出面板。
-private struct ClipboardHistoryPopover: View {
+struct ClipboardHistoryPopover: View {
+    private enum FocusTarget: Hashable {
+        case search
+        case keyboard
+    }
+
     let items: [ClipboardHistoryItem]
     let onCopy: (ClipboardHistoryItem) -> Void
     let onTogglePinned: (UUID) -> Void
@@ -1762,14 +1712,16 @@ private struct ClipboardHistoryPopover: View {
     let onClearClipboard: () -> Void
 
     @State private var searchText = ""
+    @State private var selectedItemID: UUID?
+    @FocusState private var focusTarget: FocusTarget?
 
     private var filteredItems: [ClipboardHistoryItem] {
-        let query = searchText.trimmingCharacters(in: .whitespacesAndNewlines)
-        guard !query.isEmpty else { return items }
-        return items.filter { item in
-            guard case let .text(text) = item.content else { return false }
-            return text.localizedCaseInsensitiveContains(query)
-        }
+        ClipboardHistoryList.items(
+            from: items,
+            query: searchText,
+            category: .all,
+            sortOrder: .newestFirst
+        )
     }
 
     var body: some View {
@@ -1804,6 +1756,22 @@ private struct ClipboardHistoryPopover: View {
                     .foregroundStyle(.secondary)
                 TextField(L("clipboard.search"), text: $searchText)
                     .textFieldStyle(.plain)
+                    .focused($focusTarget, equals: .search)
+                    .onKeyPress(.escape) {
+                        focusTarget = .keyboard
+                        return .handled
+                    }
+                    .onKeyPress(.upArrow) {
+                        moveSelection(.up)
+                        return .handled
+                    }
+                    .onKeyPress(.downArrow) {
+                        moveSelection(.down)
+                        return .handled
+                    }
+                    .onKeyPress(.return) {
+                        copySelectedItem()
+                    }
             }
             .padding(.horizontal, 9)
             .padding(.vertical, 7)
@@ -1817,15 +1785,25 @@ private struct ClipboardHistoryPopover: View {
                 )
                 .frame(maxHeight: .infinity)
             } else {
-                ScrollView {
-                    LazyVStack(spacing: 6) {
-                        ForEach(filteredItems) { item in
-                            ClipboardHistoryRow(
-                                item: item,
-                                onCopy: { onCopy(item) },
-                                onTogglePinned: { onTogglePinned(item.id) },
-                                onRemove: { onRemove(item.id) }
-                            )
+                ScrollViewReader { proxy in
+                    ScrollView {
+                        LazyVStack(spacing: 6) {
+                            ForEach(filteredItems) { item in
+                                ClipboardHistoryRow(
+                                    item: item,
+                                    isSelected: selectedItemID == item.id,
+                                    onCopy: { onCopy(item) },
+                                    onTogglePinned: { onTogglePinned(item.id) },
+                                    onRemove: { onRemove(item.id) }
+                                )
+                                .id(item.id)
+                            }
+                        }
+                    }
+                    .onChange(of: selectedItemID) { _, selectedItemID in
+                        guard let selectedItemID else { return }
+                        withAnimation(.easeOut(duration: 0.16)) {
+                            proxy.scrollTo(selectedItemID, anchor: .center)
                         }
                     }
                 }
@@ -1834,11 +1812,59 @@ private struct ClipboardHistoryPopover: View {
         }
         .padding(14)
         .frame(width: 300, height: 360)
+        .focusable()
+        .focused($focusTarget, equals: .keyboard)
+        .focusEffectDisabled()
+        .onAppear {
+            // SwiftUI 需要在 TextField 真正加入窗口后再设置焦点。
+            DispatchQueue.main.async {
+                focusTarget = .search
+            }
+        }
+        .onChange(of: filteredItems.map(\.id)) { _, itemIDs in
+            guard let selectedItemID,
+                  !itemIDs.contains(selectedItemID) else { return }
+            self.selectedItemID = nil
+        }
+        .onKeyPress(.escape) {
+            focusTarget = .keyboard
+            return .handled
+        }
+        .onKeyPress(.upArrow) {
+            moveSelection(.up)
+            return .handled
+        }
+        .onKeyPress(.downArrow) {
+            moveSelection(.down)
+            return .handled
+        }
+        .onKeyPress(.return) {
+            copySelectedItem()
+        }
+    }
+
+    private func moveSelection(_ direction: ClipboardHistoryKeyboardNavigation.Direction) {
+        selectedItemID = ClipboardHistoryKeyboardNavigation.selection(
+            in: filteredItems,
+            from: selectedItemID,
+            moving: direction
+        )
+        focusTarget = .keyboard
+    }
+
+    private func copySelectedItem() -> KeyPress.Result {
+        guard let selectedItemID,
+              let item = filteredItems.first(where: { $0.id == selectedItemID }) else {
+            return .ignored
+        }
+        onCopy(item)
+        return .handled
     }
 }
 
-private struct ClipboardHistoryRow: View {
+struct ClipboardHistoryRow: View {
     let item: ClipboardHistoryItem
+    let isSelected: Bool
     let onCopy: () -> Void
     let onTogglePinned: () -> Void
     let onRemove: () -> Void
@@ -1872,6 +1898,17 @@ private struct ClipboardHistoryRow: View {
         }
         .padding(8)
         .background(.quaternary.opacity(0.25), in: .rect(cornerRadius: 10))
+        .overlay {
+            RoundedRectangle(cornerRadius: 10, style: .continuous)
+                .stroke(
+                    isSelected ? Color.accentColor.opacity(0.72) : .clear,
+                    lineWidth: 1
+                )
+        }
+        .background(
+            isSelected ? Color.accentColor.opacity(0.12) : .clear,
+            in: .rect(cornerRadius: 10)
+        )
     }
 
     @ViewBuilder

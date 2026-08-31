@@ -55,6 +55,144 @@ enum ClipboardHistoryPasteboardReader {
     }
 }
 
+/// 图片历史记录统一以 TIFF 写回系统剪贴板，避免内容字节与声明类型不一致。
+enum ClipboardHistoryImageData {
+    static func tiffData(from data: Data) -> Data? {
+        NSImage(data: data)?.tiffRepresentation
+    }
+}
+
+/// 可在设置中选择的剪贴板历史容量。
+enum ClipboardHistoryLimit: Int, CaseIterable, Identifiable {
+    case twenty = 20
+    case fifty = 50
+    case hundred = 100
+    case twoHundred = 200
+
+    static let defaultValue = ClipboardHistoryLimit.fifty.rawValue
+
+    var id: Int { rawValue }
+
+    static var storedValue: Int {
+        let stored = UserDefaults.standard.object(forKey: SettingsKey.clipboardHistoryLimit) as? Int
+        return ClipboardHistoryLimit(rawValue: stored ?? defaultValue)?.rawValue ?? defaultValue
+    }
+}
+
+/// 剪贴板历史内容分类。
+enum ClipboardHistoryCategory: String, CaseIterable, Identifiable {
+    case all
+    case text
+    case image
+
+    var id: String { rawValue }
+
+    var titleKey: String {
+        switch self {
+        case .all: return "clipboard.category.all"
+        case .text: return "clipboard.category.text"
+        case .image: return "clipboard.category.image"
+        }
+    }
+
+    fileprivate func contains(_ content: ClipboardHistoryContent) -> Bool {
+        switch (self, content) {
+        case (.all, _), (.text, .text), (.image, .image): return true
+        case (.text, .image), (.image, .text): return false
+        }
+    }
+}
+
+/// 剪贴板历史列表的展示排序。
+enum ClipboardHistorySortOrder: String, CaseIterable, Identifiable {
+    case newestFirst
+    case oldestFirst
+
+    var id: String { rawValue }
+
+    var titleKey: String {
+        switch self {
+        case .newestFirst: return "clipboard.sort.newest"
+        case .oldestFirst: return "clipboard.sort.oldest"
+        }
+    }
+}
+
+/// 设置页和快捷面板共用的历史筛选与排序规则。
+enum ClipboardHistoryList {
+    static func items(
+        from items: [ClipboardHistoryItem],
+        query: String,
+        category: ClipboardHistoryCategory,
+        sortOrder: ClipboardHistorySortOrder
+    ) -> [ClipboardHistoryItem] {
+        let normalizedQuery = query.trimmingCharacters(in: .whitespacesAndNewlines)
+        let filtered = items.filter { item in
+            guard category.contains(item.content) else { return false }
+            guard !normalizedQuery.isEmpty else { return true }
+            guard case let .text(text) = item.content else { return false }
+            return text.localizedCaseInsensitiveContains(normalizedQuery)
+        }
+
+        return filtered.sorted { lhs, rhs in
+            if lhs.isPinned != rhs.isPinned {
+                return lhs.isPinned
+            }
+
+            switch sortOrder {
+            case .newestFirst:
+                return lhs.capturedAt > rhs.capturedAt
+            case .oldestFirst:
+                return lhs.capturedAt < rhs.capturedAt
+            }
+        }
+    }
+}
+
+/// 剪贴板面板键盘选择规则，避免 UI 层直接处理索引边界。
+enum ClipboardHistoryKeyboardNavigation {
+    enum Direction {
+        case up
+        case down
+    }
+
+    static func selection(
+        in items: [ClipboardHistoryItem],
+        from selectedID: UUID?,
+        moving direction: Direction
+    ) -> UUID? {
+        guard !items.isEmpty else { return nil }
+        guard let selectedID,
+              let currentIndex = items.firstIndex(where: { $0.id == selectedID }) else {
+            return direction == .down ? items.first?.id : items.last?.id
+        }
+
+        switch direction {
+        case .up:
+            return items[max(0, currentIndex - 1)].id
+        case .down:
+            return items[min(items.count - 1, currentIndex + 1)].id
+        }
+    }
+}
+
+/// 将历史内容写入指定剪贴板，并返回系统是否接受写入。
+enum ClipboardHistoryPasteboardWriter {
+    static func write(_ content: ClipboardHistoryContent, to pasteboard: NSPasteboard) -> Bool {
+        switch content {
+        case let .text(text):
+            pasteboard.clearContents()
+            return pasteboard.setString(text, forType: .string)
+        case let .image(data):
+            guard let tiffData = ClipboardHistoryImageData.tiffData(from: data) else {
+                return false
+            }
+            pasteboard.clearContents()
+            return pasteboard.setData(tiffData, forType: .tiff)
+        }
+    }
+}
+
 /// 一条剪贴板历史记录。
 struct ClipboardHistoryItem: Codable, Identifiable, Equatable, Sendable {
     let id: UUID
@@ -85,7 +223,7 @@ enum ClipboardSensitivity {
 struct ClipboardHistoryBuffer {
     private(set) var items: [ClipboardHistoryItem] = []
 
-    private let limit: Int
+    private var limit: Int
     private let sensitiveLifetime: TimeInterval
 
     init(
@@ -154,6 +292,11 @@ struct ClipboardHistoryBuffer {
         items.removeAll()
     }
 
+    mutating func setLimit(_ limit: Int) {
+        self.limit = max(1, limit)
+        trimToLimit()
+    }
+
     mutating func pruneExpired(now: Date) {
         items.removeAll { item in
             guard let expiresAt = item.expiresAt else { return false }
@@ -220,36 +363,93 @@ final class ClipboardHistoryService {
 
     private var buffer: ClipboardHistoryBuffer
     private let persistenceURL: URL?
+    private let persistenceLoader: @Sendable (URL) async -> [ClipboardHistoryItem]
+    private let pasteboard: NSPasteboard
+    private(set) var limit: Int
+    private let sensitiveLifetime: TimeInterval
     private var lastChangeCount: Int = -1
+    private var historyMutationGeneration = 0
+    private var loadingTask: Task<Void, Never>?
     private var monitoringTask: Task<Void, Never>?
 
     private(set) var items: [ClipboardHistoryItem] = []
     private(set) var currentItemCount = 0
+    private(set) var hasLoadedPersistedHistory: Bool
 
     init(
-        limit: Int = 50,
+        limit: Int? = nil,
         sensitiveLifetime: TimeInterval = 60,
-        persistenceURL: URL? = ClipboardHistoryPersistence.defaultURL()
+        persistenceURL: URL? = ClipboardHistoryPersistence.defaultURL(),
+        pasteboard: NSPasteboard = .general,
+        persistenceLoader: @escaping @Sendable (URL) async -> [ClipboardHistoryItem] = { url in
+            await Task.detached(priority: .utility) {
+                ClipboardHistoryPersistence.load(from: url)
+            }.value
+        }
     ) {
+        let configuredLimit = limit ?? ClipboardHistoryLimit.storedValue
         self.persistenceURL = persistenceURL
+        self.persistenceLoader = persistenceLoader
+        self.pasteboard = pasteboard
+        self.limit = max(1, configuredLimit)
+        self.sensitiveLifetime = max(0, sensitiveLifetime)
+        self.hasLoadedPersistedHistory = persistenceURL == nil
         buffer = ClipboardHistoryBuffer(
-            limit: limit,
-            sensitiveLifetime: sensitiveLifetime,
-            items: persistenceURL.map(ClipboardHistoryPersistence.load(from:)) ?? []
+            limit: configuredLimit,
+            sensitiveLifetime: sensitiveLifetime
         )
-        buffer.pruneExpired(now: Date())
-        items = buffer.items
+    }
+
+    /// 历史文件可能包含体积很大的图片，必须在后台读取和解码，不能阻塞菜单栏首帧。
+    func loadPersistedHistory() async {
+        guard !hasLoadedPersistedHistory else { return }
+        if let loadingTask {
+            await loadingTask.value
+            return
+        }
+        guard let persistenceURL else {
+            hasLoadedPersistedHistory = true
+            return
+        }
+
+        let mutationGeneration = historyMutationGeneration
+        let persistenceLoader = self.persistenceLoader
+        let task = Task { @MainActor [weak self] in
+            let restored = await persistenceLoader(persistenceURL)
+            guard let self else { return }
+            defer {
+                hasLoadedPersistedHistory = true
+                loadingTask = nil
+            }
+            guard historyMutationGeneration == mutationGeneration else { return }
+
+            var restoredBuffer = ClipboardHistoryBuffer(
+                limit: limit,
+                sensitiveLifetime: sensitiveLifetime,
+                items: restored
+            )
+            restoredBuffer.pruneExpired(now: Date())
+            buffer = restoredBuffer
+            items = restoredBuffer.items
+            persist()
+        }
+        loadingTask = task
+        await task.value
     }
 
     /// 在 App 生命周期内持续监听剪贴板，不依赖菜单栏面板是否打开。
     func startMonitoring(interval: Duration = .seconds(1)) {
         guard monitoringTask == nil else { return }
-        refresh()
         monitoringTask = Task { @MainActor [weak self] in
+            guard let self else { return }
+            await self.loadPersistedHistory()
+            guard !Task.isCancelled else { return }
+            self.refreshLoadedHistory()
+
             while !Task.isCancelled {
-                guard let self else { return }
-                self.refresh()
                 try? await Task.sleep(for: interval)
+                guard !Task.isCancelled else { return }
+                self.refreshLoadedHistory()
             }
         }
     }
@@ -261,7 +461,19 @@ final class ClipboardHistoryService {
 
     /// 检查剪贴板变化；调用方负责按合适的间隔轮询。
     func refresh() {
-        let pasteboard = NSPasteboard.general
+        guard hasLoadedPersistedHistory else {
+            Task { @MainActor [weak self] in
+                guard let self else { return }
+                await self.loadPersistedHistory()
+                self.refreshLoadedHistory()
+            }
+            return
+        }
+        refreshLoadedHistory()
+    }
+
+    private func refreshLoadedHistory() {
+        let pasteboard = self.pasteboard
         let now = Date()
         currentItemCount = pasteboard.pasteboardItems?.count ?? 0
         let itemsBeforeRefresh = buffer.items
@@ -282,33 +494,50 @@ final class ClipboardHistoryService {
         if historyChanged { persist() }
     }
 
-    func copy(_ item: ClipboardHistoryItem) {
-        let pasteboard = NSPasteboard.general
-        pasteboard.clearContents()
-
-        switch item.content {
-        case let .text(text):
-            pasteboard.setString(text, forType: .string)
-        case let .image(data):
-            pasteboard.setData(data, forType: .tiff)
-        }
+    @discardableResult
+    func copy(_ item: ClipboardHistoryItem) -> Bool {
+        let pasteboard = self.pasteboard
+        guard ClipboardHistoryPasteboardWriter.write(item.content, to: pasteboard) else { return false }
+        historyMutationGeneration &+= 1
+        buffer.insert(item.content, now: Date())
+        synchronizeItems()
+        persist()
         lastChangeCount = pasteboard.changeCount
         currentItemCount = pasteboard.pasteboardItems?.count ?? 0
+        return true
+    }
+
+    func setLimit(_ limit: ClipboardHistoryLimit) {
+        let updatedLimit = limit.rawValue
+        guard self.limit != updatedLimit else { return }
+
+        self.limit = updatedLimit
+        buffer.setLimit(updatedLimit)
+        synchronizeItems()
+        UserDefaults.standard.set(updatedLimit, forKey: SettingsKey.clipboardHistoryLimit)
+        if hasLoadedPersistedHistory {
+            persist()
+        }
     }
 
     func togglePinned(id: UUID) {
+        guard buffer.items.contains(where: { $0.id == id }) else { return }
+        historyMutationGeneration &+= 1
         buffer.togglePinned(id: id)
         synchronizeItems()
         persist()
     }
 
     func remove(id: UUID) {
+        guard buffer.items.contains(where: { $0.id == id }) else { return }
+        historyMutationGeneration &+= 1
         buffer.remove(id: id)
         synchronizeItems()
         persist()
     }
 
     func clearHistory() {
+        historyMutationGeneration &+= 1
         buffer.clearAll()
         synchronizeItems()
         persist()

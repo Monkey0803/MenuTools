@@ -83,8 +83,100 @@ struct AppVolumeCard: View {
     }
 }
 
+enum AppVolumeQuickAccessLayout {
+    static func displayedSessions(from sessions: [AppAudioSession]) -> [AppAudioSession] {
+        sessions
+    }
+}
+
+enum AppVolumeRowInteractionPolicy {
+    static func canAdjust(isEnabled: Bool) -> Bool {
+        isEnabled
+    }
+}
+
+enum AppVolumeIconPolicy {
+    static func symbolName(volume: Double, isMuted: Bool) -> String {
+        guard !isMuted, volume.isFinite, volume > 0 else {
+            return "speaker.slash.fill"
+        }
+        if volume < 1.0 / 3.0 {
+            return "speaker.wave.1.fill"
+        }
+        if volume < 2.0 / 3.0 {
+            return "speaker.wave.2.fill"
+        }
+        return "speaker.wave.3.fill"
+    }
+}
+
+/// 可由全局快捷键直接唤起的紧凑音量管理面板。
+struct AppVolumeQuickAccessView: View {
+    @State private var service = AppVolumeService.shared
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 10) {
+            HStack(spacing: 7) {
+                Image(systemName: "speaker.wave.2.bubble")
+                    .font(.caption.weight(.semibold))
+                    .foregroundStyle(.tint)
+                Text(L("volume.title"))
+                    .font(.caption.weight(.semibold))
+                Spacer()
+                Toggle("", isOn: Binding(
+                    get: { service.isEnabled },
+                    set: { service.setEnabled($0) }
+                ))
+                .toggleStyle(.switch)
+                .controlSize(.mini)
+                .labelsHidden()
+                .accessibilityLabel(L("volume.enabled"))
+            }
+
+            SystemOutputVolumeRow(service: service, compact: true)
+
+            Divider()
+
+            if service.sessions.isEmpty {
+                HStack(spacing: 7) {
+                    Image(systemName: "waveform.slash")
+                        .foregroundStyle(.secondary)
+                    Text(L("volume.empty"))
+                        .font(.caption2)
+                        .foregroundStyle(.secondary)
+                }
+                .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
+                .padding(.top, 3)
+            } else {
+                ScrollView {
+                    LazyVStack(alignment: .leading, spacing: 10) {
+                        ForEach(AppVolumeQuickAccessLayout.displayedSessions(from: service.sessions)) { session in
+                            AppVolumeRow(service: service, session: session, compact: true)
+                        }
+                    }
+                    .padding(.vertical, 2)
+                }
+                .scrollIndicators(.automatic)
+            }
+
+            if let errorMessage = service.errorMessage {
+                Text(errorMessage)
+                    .font(.caption2)
+                    .foregroundStyle(.orange)
+                    .lineLimit(2)
+            }
+        }
+        .padding(14)
+        .frame(width: 300, height: 360, alignment: .top)
+    }
+}
+
 struct AppVolumeSettingsView: View {
     @State private var service = AppVolumeService.shared
+    @State private var shortcutService = AppVolumeShortcutService.shared
+    @State private var isRecordingShortcut = false
+    @State private var capturedShortcut: GlobalShortcut?
+    @State private var shortcutError: String?
 
     private var activeSessions: [AppAudioSession] {
         service.sessions.filter(\.isRunningOutput)
@@ -129,6 +221,18 @@ struct AppVolumeSettingsView: View {
                     service.resetAllProfiles()
                 }
                 .disabled(!service.hasProfiles)
+
+                if !shortcutService.isAccessibilityTrusted {
+                    LabeledContent(L("volume.shortcut")) {
+                        HStack(spacing: 8) {
+                            Label(L("shortcut.permission"), systemImage: "exclamationmark.triangle.fill")
+                                .foregroundStyle(.orange)
+                            Button(L("shortcut.openPermission"), action: openAccessibilitySettings)
+                        }
+                    }
+                }
+
+                volumeShortcutControl
             } header: {
                 Label(L("volume.section.control"), systemImage: "waveform.badge.magnifyingglass")
             }
@@ -170,6 +274,82 @@ struct AppVolumeSettingsView: View {
             }
         }
         .formStyle(.grouped)
+        .onAppear {
+            shortcutService.refreshAccessibilityTrust()
+        }
+        .overlay {
+            GlobalShortcutCaptureView(isRecording: isRecordingShortcut) { shortcut in
+                isRecordingShortcut = false
+                guard let shortcut else { return }
+                capturedShortcut = shortcut
+                shortcutError = nil
+            }
+            .frame(width: 1, height: 1)
+        }
+    }
+
+    private var volumeShortcutControl: some View {
+        LabeledContent(L("volume.shortcut")) {
+            HStack(spacing: 8) {
+                Text(
+                    isRecordingShortcut
+                        ? L("settings.recording")
+                        : capturedShortcut?.displayName ?? shortcutService.binding?.displayName ?? L("settings.unset")
+                )
+                .font(.callout.monospaced())
+                .foregroundStyle(isRecordingShortcut || capturedShortcut != nil || shortcutService.binding != nil ? .primary : .secondary)
+
+                if capturedShortcut != nil {
+                    Button(L("volume.shortcutSave"), action: saveShortcut)
+                }
+
+                Button {
+                    capturedShortcut = nil
+                    shortcutError = nil
+                    isRecordingShortcut.toggle()
+                } label: {
+                    Image(systemName: isRecordingShortcut ? "xmark" : "record.circle")
+                }
+                .help(isRecordingShortcut ? L("settings.recording") : L("shortcut.record"))
+
+                if shortcutService.binding != nil, !isRecordingShortcut {
+                    Button {
+                        shortcutService.clearBinding()
+                    } label: {
+                        Image(systemName: "trash")
+                    }
+                    .help(L("shortcut.clear"))
+                }
+            }
+        }
+        .help(L("volume.shortcutDescription"))
+        .overlay(alignment: .bottomLeading) {
+            if let shortcutError {
+                Text(shortcutError)
+                    .font(.caption2)
+                    .foregroundStyle(.red)
+                    .offset(y: 16)
+            }
+        }
+        .padding(.bottom, shortcutError == nil ? 0 : 14)
+    }
+
+    private func saveShortcut() {
+        guard let capturedShortcut else { return }
+        do {
+            try shortcutService.setBinding(capturedShortcut)
+            self.capturedShortcut = nil
+            shortcutError = nil
+        } catch {
+            shortcutError = error.localizedDescription
+        }
+    }
+
+    private func openAccessibilitySettings() {
+        guard let url = URL(
+            string: "x-apple.systempreferences:com.apple.preference.security?Privacy_Accessibility"
+        ) else { return }
+        NSWorkspace.shared.open(url)
     }
 
     private func openSystemSettings() {
@@ -189,7 +369,10 @@ private struct SystemOutputVolumeRow: View {
             Button {
                 service.setMasterMuted(!service.output.isMuted)
             } label: {
-                Image(systemName: service.output.isMuted ? "speaker.slash.fill" : "speaker.wave.2.fill")
+                Image(systemName: AppVolumeIconPolicy.symbolName(
+                    volume: service.output.volume,
+                    isMuted: service.output.isMuted
+                ))
                     .contentTransition(.symbolEffect(.replace))
                     .frame(width: compact ? 18 : 24)
             }
@@ -259,20 +442,23 @@ private struct AppVolumeRow: View {
                     get: { service.session(id: session.rootBundleID)?.volume ?? session.volume },
                     set: { service.setVolume($0, for: session.rootBundleID) }
                 ), in: 0...1)
-                .disabled(!service.isEnabled || session.processObjectIDs.isEmpty)
+                .disabled(!AppVolumeRowInteractionPolicy.canAdjust(isEnabled: service.isEnabled))
                 .accessibilityLabel(L("volume.app", session.displayName))
             }
 
             Button {
                 service.toggleMute(for: session.rootBundleID)
             } label: {
-                Image(systemName: session.volume == 0 ? "speaker.slash.fill" : "speaker.fill")
+                Image(systemName: AppVolumeIconPolicy.symbolName(
+                    volume: session.volume,
+                    isMuted: session.volume == 0
+                ))
                     .font(.caption)
                     .contentTransition(.symbolEffect(.replace))
             }
             .buttonStyle(.plain)
             .foregroundStyle(session.volume == 0 ? .orange : .secondary)
-            .disabled(!service.isEnabled || session.processObjectIDs.isEmpty)
+            .disabled(!AppVolumeRowInteractionPolicy.canAdjust(isEnabled: service.isEnabled))
             .accessibilityLabel(L("volume.muteApp", session.displayName))
 
             Text("\(Int((session.volume * 100).rounded()))%")
@@ -315,7 +501,7 @@ private struct AppVolumeRow: View {
                 get: { service.session(id: session.rootBundleID)?.volume ?? session.volume },
                 set: { service.setVolume($0, for: session.rootBundleID) }
             ), in: 0...1)
-            .disabled(!service.isEnabled || session.processObjectIDs.isEmpty)
+            .disabled(!AppVolumeRowInteractionPolicy.canAdjust(isEnabled: service.isEnabled))
             .accessibilityLabel(L("volume.app", session.displayName))
         }
     }

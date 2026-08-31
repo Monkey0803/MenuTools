@@ -10,6 +10,8 @@ enum ShortcutConflictSource: Equatable, Sendable {
     case window(WindowLayout)
     case app(String)
     case screenshot
+    case clipboard
+    case appVolume
 }
 
 struct ShortcutConflictContext: Sendable {
@@ -17,10 +19,14 @@ struct ShortcutConflictContext: Sendable {
     let windowBindings: [WindowLayout: GlobalShortcut]
     let appBindings: [String: GlobalShortcut]
     let screenshotBindings: [ScreenshotCaptureMode: GlobalShortcut]
+    let clipboardBinding: GlobalShortcut?
+    let appVolumeBinding: GlobalShortcut?
     let excludingScene: ScenePreset?
     let excludingWindow: WindowLayout?
     let excludingAppPath: String?
     let excludingScreenshotMode: ScreenshotCaptureMode?
+    let excludingClipboard: Bool
+    let excludingAppVolume: Bool
 }
 
 /// 快捷键冲突检测边界，便于测试时替换系统能力。
@@ -145,6 +151,12 @@ struct DefaultShortcutConflictChecker: ShortcutConflictChecking {
             $0.key != context.excludingScreenshotMode && $0.value == shortcut
         }) {
             return .screenshot
+        }
+        if !context.excludingClipboard, context.clipboardBinding == shortcut {
+            return .clipboard
+        }
+        if !context.excludingAppVolume, context.appVolumeBinding == shortcut {
+            return .appVolume
         }
         if systemProvider.contains(shortcut) { return .system }
         if externalProbe.contains(shortcut) { return .otherApplication }

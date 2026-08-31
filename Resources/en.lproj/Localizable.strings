@@ -179,9 +179,19 @@
 "clipboard.copied" = "Copied to clipboard";
 "clipboard.clearHistory" = "Clear History";
 "clipboard.actions" = "Clipboard actions";
-"clipboard.pin" = "Pin";
-"clipboard.unpin" = "Unpin";
+"clipboard.pin" = "Pin to Top";
+"clipboard.unpin" = "Unpin from Top";
 "clipboard.delete" = "Delete";
+"clipboard.copy" = "Copy";
+"clipboard.category" = "Category";
+"clipboard.category.all" = "All";
+"clipboard.category.text" = "Text";
+"clipboard.category.image" = "Images";
+"clipboard.sort" = "Sort";
+"clipboard.sort.newest" = "Newest first";
+"clipboard.sort.oldest" = "Oldest first";
+"clipboard.limit" = "History limit";
+"clipboard.limitValue" = "%d items";
 
 /* Footer */
 "footer.checkUpdate" = "Check for Updates";
@@ -200,6 +210,9 @@
 "status.newVersionHint" = "New version v%@ available, tap the footer to download";
 
 /* Update download */
+"update.developmentVersion.title" = "Development Version";
+"update.developmentVersion.message" = "You are running MenuTools %@, which is newer than the latest public release %@. No update is needed.";
+"update.developmentVersion.confirm" = "OK";
 "update.downloading" = "Downloading update…";
 "update.progress" = "%d%%";
 "update.cancel" = "Cancel";
@@ -309,6 +322,10 @@
 "settings.tab.windowManagement" = "Window Management";
 "settings.tab.appLaunch" = "App Launch";
 "settings.tab.screenshot" = "Screenshots";
+"settings.tab.clipboard" = "Clipboard";
+"clipboard.shortcut" = "Clipboard Shortcut";
+"clipboard.shortcutDescription" = "Open clipboard history from anywhere.";
+"clipboard.shortcutSave" = "Save Shortcut";
 "appShortcut.title" = "App Launch Shortcuts";
 "appShortcut.subtitle" = "Bind global shortcuts to launch an app directly.";
 "appShortcut.frontmost" = "Current Frontmost App";
@@ -553,6 +570,9 @@
 "volume.error.permission" = "System audio recording permission is missing. Allow MenuTools in System Settings.";
 "volume.error.format" = "The current audio device format does not support per-app volume.";
 "volume.error.operation" = "%@ failed (error %d)";
+"volume.shortcut" = "Volume Shortcut";
+"volume.shortcutDescription" = "Open the volume manager from anywhere.";
+"volume.shortcutSave" = "Save Shortcut";
 
 /* Built-in Feature Center */
 "settings.tab.plugins" = "Features";

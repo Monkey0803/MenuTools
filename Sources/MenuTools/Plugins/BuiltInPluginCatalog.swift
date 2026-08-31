@@ -48,16 +48,28 @@ enum BuiltInPluginCatalog {
                 id: .clipboard,
                 category: .productivity,
                 symbol: "clipboard",
-                start: { ClipboardHistoryService.shared.startMonitoring() },
-                stop: { ClipboardHistoryService.shared.stopMonitoring() }
+                start: {
+                    ClipboardHistoryService.shared.startMonitoring()
+                    ClipboardShortcutService.shared.start()
+                },
+                stop: {
+                    ClipboardShortcutService.shared.stop()
+                    ClipboardHistoryService.shared.stopMonitoring()
+                }
             ),
             registration(
                 id: .appVolume,
                 category: .media,
                 symbol: "speaker.wave.2.bubble",
-                permissions: [.systemAudioRecording],
-                start: { AppVolumeService.shared.start() },
-                stop: { AppVolumeService.shared.stop() }
+                permissions: [.systemAudioRecording, .accessibility],
+                start: {
+                    AppVolumeService.shared.start()
+                    AppVolumeShortcutService.shared.start()
+                },
+                stop: {
+                    AppVolumeShortcutService.shared.stop()
+                    AppVolumeService.shared.stop()
+                }
             ),
             registration(
                 id: .screenshot,

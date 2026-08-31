@@ -54,6 +54,8 @@ enum ScreenshotShortcutError: LocalizedError, Equatable {
     case windowConflict(WindowLayout)
     case appConflict(String)
     case screenshotConflict(ScreenshotCaptureMode)
+    case clipboardConflict
+    case appVolumeConflict
 
     var errorDescription: String? {
         switch self {
@@ -74,6 +76,10 @@ enum ScreenshotShortcutError: LocalizedError, Equatable {
             )
         case let .screenshotConflict(mode):
             return L("shortcut.error.conflict", L(mode.titleKey))
+        case .clipboardConflict:
+            return L("shortcut.error.conflict", L("settings.tab.clipboard"))
+        case .appVolumeConflict:
+            return L("shortcut.error.conflict", L("settings.tab.volume"))
         }
     }
 }
@@ -95,6 +101,8 @@ final class ScreenshotShortcutService {
     private let sceneBindingsProvider: @MainActor () -> [ScenePreset: GlobalShortcut]
     private let windowBindingsProvider: @MainActor () -> [WindowLayout: GlobalShortcut]
     private let appBindingsProvider: @MainActor () -> [String: GlobalShortcut]
+    private let clipboardBindingProvider: @MainActor () -> GlobalShortcut?
+    private let appVolumeBindingProvider: @MainActor () -> GlobalShortcut?
     private var globalMonitor: Any?
     private var localMonitor: Any?
     private var isRecordingShortcut = false
@@ -106,7 +114,9 @@ final class ScreenshotShortcutService {
         screenshotService: ScreenshotService = .shared,
         sceneBindingsProvider: @escaping @MainActor () -> [ScenePreset: GlobalShortcut] = { GlobalShortcutService.shared.bindings },
         windowBindingsProvider: @escaping @MainActor () -> [WindowLayout: GlobalShortcut] = { WindowShortcutService.shared.bindings },
-        appBindingsProvider: @escaping @MainActor () -> [String: GlobalShortcut] = { AppShortcutService.shared.bindings }
+        appBindingsProvider: @escaping @MainActor () -> [String: GlobalShortcut] = { AppShortcutService.shared.bindings },
+        clipboardBindingProvider: @escaping @MainActor () -> GlobalShortcut? = { ClipboardShortcutService.shared.binding },
+        appVolumeBindingProvider: @escaping @MainActor () -> GlobalShortcut? = { AppVolumeShortcutService.shared.binding }
     ) {
         self.defaults = defaults
         self.conflictChecker = conflictChecker
@@ -114,6 +124,8 @@ final class ScreenshotShortcutService {
         self.sceneBindingsProvider = sceneBindingsProvider
         self.windowBindingsProvider = windowBindingsProvider
         self.appBindingsProvider = appBindingsProvider
+        self.clipboardBindingProvider = clipboardBindingProvider
+        self.appVolumeBindingProvider = appVolumeBindingProvider
         self.bindings = Self.loadBindings(from: defaults)
     }
 
@@ -177,10 +189,14 @@ final class ScreenshotShortcutService {
             windowBindings: windowBindingsProvider(),
             appBindings: appBindingsProvider(),
             screenshotBindings: bindings,
+            clipboardBinding: clipboardBindingProvider(),
+            appVolumeBinding: appVolumeBindingProvider(),
             excludingScene: nil,
             excludingWindow: nil,
             excludingAppPath: nil,
-            excludingScreenshotMode: mode
+            excludingScreenshotMode: mode,
+            excludingClipboard: false,
+            excludingAppVolume: false
         )
         switch conflictChecker.conflict(for: newBinding, context: context) {
         case .system:
@@ -193,6 +209,10 @@ final class ScreenshotShortcutService {
             throw ScreenshotShortcutError.windowConflict(layout)
         case let .app(path):
             throw ScreenshotShortcutError.appConflict(path)
+        case .clipboard:
+            throw ScreenshotShortcutError.clipboardConflict
+        case .appVolume:
+            throw ScreenshotShortcutError.appVolumeConflict
         case .screenshot, nil:
             break
         }

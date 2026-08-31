@@ -1,6 +1,18 @@
 import AppKit
 import SwiftUI
 
+enum ClipboardQuickAccessPresentationPolicy {
+    static func shouldShow(isShown: Bool) -> Bool {
+        !isShown
+    }
+}
+
+enum AppVolumeQuickAccessPresentationPolicy {
+    static func shouldShow(isShown: Bool) -> Bool {
+        !isShown
+    }
+}
+
 /// 使用 AppKit 直接管理菜单栏入口，避免 SwiftUI MenuBarExtra 在部分 macOS 版本上丢失鼠标点击。
 @MainActor
 final class MenuBarStatusItemController: NSObject {
@@ -8,6 +20,8 @@ final class MenuBarStatusItemController: NSObject {
 
     private var statusItem: NSStatusItem?
     private var popover: NSPopover?
+    private var clipboardPopover: NSPopover?
+    private var appVolumePopover: NSPopover?
     private var settingsWindowController: NSWindowController?
     private var settingsHostingController: NSHostingController<SettingsView>?
     private var defaultsObserver: NSObjectProtocol?
@@ -70,21 +84,103 @@ final class MenuBarStatusItemController: NSObject {
             return
         }
 
-        let popover = NSPopover()
-        popover.behavior = .transient
-        popover.animates = true
-        popover.contentSize = NSSize(width: 352, height: 672)
-        popover.contentViewController = NSHostingController(
-            rootView: MenuPanelView { [weak self] tab in
-                self?.openSettings(tab)
-            }
-        )
+        let popover = Self.reusablePopover(existing: popover) { [weak self] in
+            let popover = NSPopover()
+            popover.behavior = .transient
+            popover.animates = true
+            popover.contentSize = NSSize(width: 352, height: 672)
+            popover.contentViewController = NSHostingController(
+                rootView: MenuPanelView { [weak self] tab in
+                    self?.openSettings(tab)
+                }
+            )
+            return popover
+        }
         self.popover = popover
 
         popover.show(relativeTo: button.bounds, of: button, preferredEdge: .minY)
         if let window = popover.contentViewController?.view.window {
             Self.configurePopoverWindow(window)
         }
+    }
+
+    /// 供剪贴板插件的全局快捷键直接调出历史记录。
+    func showClipboardHistory() {
+        guard BuiltInPluginManager.shared.isEnabled(.clipboard),
+              let button = statusItem?.button else {
+            return
+        }
+
+        guard ClipboardQuickAccessPresentationPolicy.shouldShow(
+            isShown: clipboardPopover?.isShown == true
+        ) else { return }
+        if let appVolumePopover, appVolumePopover.isShown {
+            appVolumePopover.performClose(button)
+        }
+        if let popover, popover.isShown {
+            popover.performClose(button)
+        }
+
+        let clipboardPopover = Self.reusablePopover(existing: clipboardPopover) { [weak self] in
+            let popover = NSPopover()
+            popover.behavior = .transient
+            popover.animates = true
+            popover.contentSize = NSSize(width: 328, height: 388)
+            popover.contentViewController = NSHostingController(
+                rootView: ClipboardHistoryQuickAccessView { [weak self] in
+                    guard let self, let button = self.statusItem?.button else { return }
+                    self.clipboardPopover?.performClose(button)
+                }
+            )
+            return popover
+        }
+        self.clipboardPopover = clipboardPopover
+        clipboardPopover.show(relativeTo: button.bounds, of: button, preferredEdge: .minY)
+        if let window = clipboardPopover.contentViewController?.view.window {
+            Self.configurePopoverWindow(window)
+        }
+    }
+
+    /// 供 App 音量插件的全局快捷键直接调出音量管理面板。
+    func showAppVolume() {
+        guard BuiltInPluginManager.shared.isEnabled(.appVolume),
+              let button = statusItem?.button else {
+            return
+        }
+
+        guard AppVolumeQuickAccessPresentationPolicy.shouldShow(
+            isShown: appVolumePopover?.isShown == true
+        ) else { return }
+        if let clipboardPopover, clipboardPopover.isShown {
+            clipboardPopover.performClose(button)
+        }
+        if let popover, popover.isShown {
+            popover.performClose(button)
+        }
+
+        let appVolumePopover = Self.reusablePopover(existing: appVolumePopover) {
+            let popover = NSPopover()
+            popover.behavior = .transient
+            popover.animates = true
+            popover.contentSize = NSSize(width: 328, height: 388)
+            popover.contentViewController = NSHostingController(
+                rootView: AppVolumeQuickAccessView()
+            )
+            return popover
+        }
+        self.appVolumePopover = appVolumePopover
+        appVolumePopover.show(relativeTo: button.bounds, of: button, preferredEdge: .minY)
+        if let window = appVolumePopover.contentViewController?.view.window {
+            Self.configurePopoverWindow(window)
+        }
+    }
+
+    /// 关闭 Popover 时保留 SwiftUI 视图树，后续打开不再重复初始化全部服务和玻璃层级。
+    static func reusablePopover(
+        existing: NSPopover?,
+        create: () -> NSPopover
+    ) -> NSPopover {
+        existing ?? create()
     }
 
     /// NSPopover 默认会绘制一层不透明的窗口灰底；控制中心风格卡片之间应直接

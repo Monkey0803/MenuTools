@@ -179,9 +179,19 @@
 "clipboard.copied" = "已複製到剪貼板";
 "clipboard.clearHistory" = "清空歷史";
 "clipboard.actions" = "剪貼板操作";
-"clipboard.pin" = "固定";
-"clipboard.unpin" = "取消固定";
+"clipboard.pin" = "置頂";
+"clipboard.unpin" = "取消置頂";
 "clipboard.delete" = "刪除";
+"clipboard.copy" = "複製";
+"clipboard.category" = "分類";
+"clipboard.category.all" = "全部";
+"clipboard.category.text" = "文字";
+"clipboard.category.image" = "圖片";
+"clipboard.sort" = "排序";
+"clipboard.sort.newest" = "最新優先";
+"clipboard.sort.oldest" = "最早優先";
+"clipboard.limit" = "儲存數量";
+"clipboard.limitValue" = "%d 筆";
 
 /* 底欄 */
 "footer.checkUpdate" = "檢查更新";
@@ -200,6 +210,9 @@
 "status.newVersionHint" = "發現新版本 v%@，點擊底欄下載";
 
 /* 更新下載 */
+"update.developmentVersion.title" = "目前為開發版本";
+"update.developmentVersion.message" = "您正在執行 MenuTools %@，版本高於最新正式版 %@，無需更新。";
+"update.developmentVersion.confirm" = "好";
 "update.downloading" = "正在下載更新…";
 "update.progress" = "%d%%";
 "update.cancel" = "取消";
@@ -309,6 +322,10 @@
 "settings.tab.windowManagement" = "視窗管理";
 "settings.tab.appLaunch" = "應用程式啟動";
 "settings.tab.screenshot" = "截圖";
+"settings.tab.clipboard" = "剪貼簿";
+"clipboard.shortcut" = "剪貼簿快速鍵";
+"clipboard.shortcutDescription" = "透過全域快速鍵隨時開啟剪貼簿歷史。";
+"clipboard.shortcutSave" = "儲存快速鍵";
 "appShortcut.title" = "應用程式啟動快捷鍵";
 "appShortcut.subtitle" = "為應用程式綁定全域快捷鍵，按下後直接啟動對應應用程式。";
 "appShortcut.frontmost" = "目前最前端應用程式";
@@ -553,6 +570,9 @@
 "volume.error.permission" = "沒有系統音訊錄製權限，請在系統設定中允許 MenuTools。";
 "volume.error.format" = "目前音訊裝置格式暫不支援單 App 音量。";
 "volume.error.operation" = "%@失敗（錯誤 %d）";
+"volume.shortcut" = "音量快速鍵";
+"volume.shortcutDescription" = "透過全域快速鍵隨時開啟音量管理面板。";
+"volume.shortcutSave" = "儲存快速鍵";
 
 /* 內建功能中心 */
 "settings.tab.plugins" = "功能";

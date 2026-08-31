@@ -179,9 +179,19 @@
 "clipboard.copied" = "クリップボードにコピーしました";
 "clipboard.clearHistory" = "履歴を消去";
 "clipboard.actions" = "クリップボード操作";
-"clipboard.pin" = "固定";
-"clipboard.unpin" = "固定を解除";
+"clipboard.pin" = "上部に固定";
+"clipboard.unpin" = "上部固定を解除";
 "clipboard.delete" = "削除";
+"clipboard.copy" = "コピー";
+"clipboard.category" = "分類";
+"clipboard.category.all" = "すべて";
+"clipboard.category.text" = "テキスト";
+"clipboard.category.image" = "画像";
+"clipboard.sort" = "並び順";
+"clipboard.sort.newest" = "新しい順";
+"clipboard.sort.oldest" = "古い順";
+"clipboard.limit" = "保存件数";
+"clipboard.limitValue" = "%d 件";
 
 /* フッター */
 "footer.checkUpdate" = "アップデートを確認";
@@ -200,6 +210,9 @@
 "status.newVersionHint" = "新バージョン v%@ があります。下部からダウンロード";
 
 /* アップデートのダウンロード */
+"update.developmentVersion.title" = "開発版を使用中";
+"update.developmentVersion.message" = "実行中の MenuTools %@ は、最新の正式版 %@ より新しいバージョンです。アップデートは不要です。";
+"update.developmentVersion.confirm" = "OK";
 "update.downloading" = "アップデートをダウンロード中…";
 "update.progress" = "%d%%";
 "update.cancel" = "キャンセル";
@@ -309,6 +322,10 @@
 "settings.tab.windowManagement" = "ウインドウ管理";
 "settings.tab.appLaunch" = "アプリ起動";
 "settings.tab.screenshot" = "スクリーンショット";
+"settings.tab.clipboard" = "クリップボード";
+"clipboard.shortcut" = "クリップボードのショートカット";
+"clipboard.shortcutDescription" = "グローバルショートカットでいつでも履歴を開きます。";
+"clipboard.shortcutSave" = "ショートカットを保存";
 "appShortcut.title" = "アプリ起動ショートカット";
 "appShortcut.subtitle" = "アプリを直接起動するグローバルショートカットを割り当てます。";
 "appShortcut.frontmost" = "現在の最前面アプリ";
@@ -553,6 +570,9 @@
 "volume.error.permission" = "システムオーディオ録音の許可がありません。システム設定で MenuTools を許可してください。";
 "volume.error.format" = "現在のオーディオデバイス形式では App ごとの音量を利用できません。";
 "volume.error.operation" = "%@に失敗しました（エラー %d）";
+"volume.shortcut" = "音量ショートカット";
+"volume.shortcutDescription" = "グローバルショートカットでいつでも音量管理を開きます。";
+"volume.shortcutSave" = "ショートカットを保存";
 
 /* 内蔵機能センター */
 "settings.tab.plugins" = "機能";

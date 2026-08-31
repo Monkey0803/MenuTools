@@ -41,6 +41,7 @@ enum SettingsKey {
     static let screenshotNamingTemplate = "screenshot.namingTemplate"
     static let screenshotHistory = "screenshot.history"
     static let screenshotOCRShortcut = "screenshot.ocrShortcut"
+    static let clipboardHistoryLimit = "clipboard.historyLimit"
 }
 
 /// 可选的菜单栏图标（SF Symbols）

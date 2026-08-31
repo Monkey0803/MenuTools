@@ -3,6 +3,303 @@ import Foundation
 import Testing
 @testable import MenuTools
 
+@Test("宽屏剪贴板设置页优先使用双列历史卡片")
+func clipboardSettingsUsesAdaptiveHistoryGrid() {
+    #expect(ClipboardHistorySettingsLayout.columnCount(for: 552) == 2)
+    #expect(ClipboardHistorySettingsLayout.columnCount(for: 390) == 1)
+}
+
+@Test("剪贴板卡片缩略图和悬停预览使用固定尺寸")
+func clipboardPreviewUsesConsistentFrames() {
+    #expect(ClipboardHistoryPreviewLayout.thumbnailSize == CGSize(width: 64, height: 64))
+    #expect(ClipboardHistoryPreviewLayout.hoverPreviewSize == CGSize(width: 272, height: 188))
+}
+
+@Test("剪贴板预览会根据卡片位置切换左右并跟随纵向位置")
+func clipboardHoverPreviewFollowsHoveredCard() {
+    let containerSize = CGSize(width: 552, height: 420)
+    let leftCard = CGRect(x: 12, y: 80, width: 246, height: 88)
+    let lowerLeftCard = CGRect(x: 12, y: 180, width: 246, height: 88)
+    let rightCard = CGRect(x: 294, y: 80, width: 246, height: 88)
+
+    let leftPosition = ClipboardHistoryPreviewPlacement.position(
+        for: leftCard,
+        in: containerSize
+    )
+    let lowerLeftPosition = ClipboardHistoryPreviewPlacement.position(
+        for: lowerLeftCard,
+        in: containerSize
+    )
+    let rightPosition = ClipboardHistoryPreviewPlacement.position(
+        for: rightCard,
+        in: containerSize
+    )
+
+    #expect(leftPosition.x > containerSize.width / 2)
+    #expect(rightPosition.x < containerSize.width / 2)
+    #expect(lowerLeftPosition.y > leftPosition.y)
+}
+
+@Test("剪贴板容量只提供四个可管理档位")
+func clipboardHistoryCapacityOptionsAreSupported() {
+    #expect(ClipboardHistoryLimit.allCases.map(\.rawValue) == [20, 50, 100, 200])
+}
+
+@Test("调整剪贴板容量会立即裁剪最旧的普通历史")
+func clipboardHistoryTrimsWhenCapacityChanges() {
+    var history = ClipboardHistoryBuffer(limit: 200)
+    let now = Date(timeIntervalSince1970: 100)
+
+    for index in 0 ..< 25 {
+        history.insert(.text("记录 \(index)"), now: now.addingTimeInterval(Double(index)))
+    }
+    history.setLimit(20)
+
+    #expect(history.items.count == 20)
+    #expect(history.items.first?.content == .text("记录 24"))
+    #expect(history.items.last?.content == .text("记录 5"))
+}
+
+@Test("剪贴板历史支持按分类、关键词和时间排序")
+func clipboardHistoryFiltersAndSortsItems() {
+    let oldestText = ClipboardHistoryItem(
+        id: UUID(),
+        content: .text("Apple 文本"),
+        capturedAt: Date(timeIntervalSince1970: 100),
+        expiresAt: nil,
+        isPinned: false
+    )
+    let image = ClipboardHistoryItem(
+        id: UUID(),
+        content: .image(Data([1, 2, 3])),
+        capturedAt: Date(timeIntervalSince1970: 200),
+        expiresAt: nil,
+        isPinned: false
+    )
+    let newestText = ClipboardHistoryItem(
+        id: UUID(),
+        content: .text("Apple 最新文本"),
+        capturedAt: Date(timeIntervalSince1970: 300),
+        expiresAt: nil,
+        isPinned: false
+    )
+
+    let result = ClipboardHistoryList.items(
+        from: [newestText, image, oldestText],
+        query: "apple",
+        category: .text,
+        sortOrder: .oldestFirst
+    )
+
+    #expect(result == [oldestText, newestText])
+    #expect(
+        ClipboardHistoryList.items(
+            from: [newestText, image, oldestText],
+            query: "",
+            category: .image,
+            sortOrder: .newestFirst
+        ) == [image]
+    )
+}
+
+@Test("置顶项目在所有时间排序下都优先显示")
+func clipboardHistoryPinnedItemsAlwaysAppearFirst() {
+    let pinnedOldest = ClipboardHistoryItem(
+        id: UUID(),
+        content: .text("置顶旧记录"),
+        capturedAt: Date(timeIntervalSince1970: 100),
+        expiresAt: nil,
+        isPinned: true
+    )
+    let pinnedNewest = ClipboardHistoryItem(
+        id: UUID(),
+        content: .text("置顶新记录"),
+        capturedAt: Date(timeIntervalSince1970: 300),
+        expiresAt: nil,
+        isPinned: true
+    )
+    let newest = ClipboardHistoryItem(
+        id: UUID(),
+        content: .text("普通新记录"),
+        capturedAt: Date(timeIntervalSince1970: 400),
+        expiresAt: nil,
+        isPinned: false
+    )
+
+    let newestFirst = ClipboardHistoryList.items(
+        from: [newest, pinnedOldest, pinnedNewest],
+        query: "",
+        category: .all,
+        sortOrder: .newestFirst
+    )
+    let oldestFirst = ClipboardHistoryList.items(
+        from: [newest, pinnedOldest, pinnedNewest],
+        query: "",
+        category: .all,
+        sortOrder: .oldestFirst
+    )
+
+    #expect(newestFirst == [pinnedNewest, pinnedOldest, newest])
+    #expect(oldestFirst == [pinnedOldest, pinnedNewest, newest])
+}
+
+@Test("剪贴板面板可用上下方向键移动选择")
+func clipboardHistoryKeyboardNavigationMovesSelection() {
+    let first = ClipboardHistoryItem(
+        id: UUID(),
+        content: .text("第一条"),
+        capturedAt: Date(timeIntervalSince1970: 300),
+        expiresAt: nil,
+        isPinned: false
+    )
+    let second = ClipboardHistoryItem(
+        id: UUID(),
+        content: .text("第二条"),
+        capturedAt: Date(timeIntervalSince1970: 200),
+        expiresAt: nil,
+        isPinned: false
+    )
+    let third = ClipboardHistoryItem(
+        id: UUID(),
+        content: .text("第三条"),
+        capturedAt: Date(timeIntervalSince1970: 100),
+        expiresAt: nil,
+        isPinned: false
+    )
+    let items = [first, second, third]
+
+    #expect(
+        ClipboardHistoryKeyboardNavigation.selection(
+            in: items,
+            from: nil,
+            moving: .down
+        ) == first.id
+    )
+    #expect(
+        ClipboardHistoryKeyboardNavigation.selection(
+            in: items,
+            from: first.id,
+            moving: .down
+        ) == second.id
+    )
+    #expect(
+        ClipboardHistoryKeyboardNavigation.selection(
+            in: items,
+            from: third.id,
+            moving: .down
+        ) == third.id
+    )
+    #expect(
+        ClipboardHistoryKeyboardNavigation.selection(
+            in: items,
+            from: first.id,
+            moving: .up
+        ) == first.id
+    )
+    #expect(
+        ClipboardHistoryKeyboardNavigation.selection(
+            in: items,
+            from: nil,
+            moving: .up
+        ) == third.id
+    )
+}
+
+@Test("复制历史条目会回到顶部并保留置顶状态")
+@MainActor
+func clipboardHistoryCopyReinsertsItemAtTop() async throws {
+    let pasteboard = NSPasteboard(name: NSPasteboard.Name("MenuToolsTests.\(UUID().uuidString)"))
+    let persistenceURL = FileManager.default.temporaryDirectory
+        .appendingPathComponent("MenuTools-ClipboardHistory-Copy-\(UUID().uuidString).json")
+    defer { try? FileManager.default.removeItem(at: persistenceURL) }
+    let service = ClipboardHistoryService(
+        limit: 5,
+        persistenceURL: persistenceURL,
+        pasteboard: pasteboard
+    )
+    await service.loadPersistedHistory()
+
+    pasteboard.clearContents()
+    pasteboard.setString("置顶记录", forType: .string)
+    service.refresh()
+    let pinnedID = try #require(service.items.first?.id)
+    service.togglePinned(id: pinnedID)
+
+    pasteboard.clearContents()
+    pasteboard.setString("普通记录", forType: .string)
+    service.refresh()
+
+    let pinnedItem = try #require(service.items.first(where: { $0.id == pinnedID }))
+    #expect(service.copy(pinnedItem))
+
+    #expect(service.items.map(\.content) == [.text("置顶记录"), .text("普通记录")])
+    #expect(service.items.first?.isPinned == true)
+    #expect(service.items.count == 2)
+
+    let copiedItem = try #require(service.items.first)
+    let persistedItems = ClipboardHistoryPersistence.load(from: persistenceURL)
+    #expect(persistedItems.map(\.id) == service.items.map(\.id))
+    #expect(persistedItems.map(\.content) == service.items.map(\.content))
+    #expect(persistedItems.map(\.isPinned) == service.items.map(\.isPinned))
+
+    service.refresh()
+
+    #expect(service.items.first?.id == copiedItem.id)
+    #expect(service.items.first?.capturedAt == copiedItem.capturedAt)
+    #expect(service.currentItemCount == (pasteboard.pasteboardItems?.count ?? 0))
+}
+
+@Test("复制文字历史会实际写入目标剪贴板")
+func clipboardHistoryWritesSelectedTextItem() {
+    let pasteboard = NSPasteboard(name: NSPasteboard.Name("MenuToolsTests.\(UUID().uuidString)"))
+
+    #expect(ClipboardHistoryPasteboardWriter.write(.text("可复制内容"), to: pasteboard))
+    #expect(pasteboard.string(forType: .string) == "可复制内容")
+}
+
+@Test("复制图片历史会实际写入目标剪贴板")
+func clipboardHistoryWritesSelectedImageItem() throws {
+    let image = NSImage(size: NSSize(width: 2, height: 2))
+    image.lockFocus()
+    NSColor.systemBlue.setFill()
+    NSRect(x: 0, y: 0, width: 2, height: 2).fill()
+    image.unlockFocus()
+
+    let imageData = try #require(image.tiffRepresentation)
+    let pasteboard = NSPasteboard(name: NSPasteboard.Name("MenuToolsTests.\(UUID().uuidString)"))
+
+    #expect(ClipboardHistoryPasteboardWriter.write(.image(imageData), to: pasteboard))
+    #expect(pasteboard.data(forType: .tiff) != nil)
+}
+
+@Test("无效图片历史复制失败时保留现有剪贴板内容")
+func clipboardHistoryDoesNotClearPasteboardForInvalidImage() {
+    let pasteboard = NSPasteboard(name: NSPasteboard.Name("MenuToolsTests.\(UUID().uuidString)"))
+    pasteboard.clearContents()
+    pasteboard.setString("保留内容", forType: .string)
+
+    #expect(!ClipboardHistoryPasteboardWriter.write(.image(Data([0, 1, 2])), to: pasteboard))
+    #expect(pasteboard.string(forType: .string) == "保留内容")
+}
+
+@Test("图片历史复制前会规范为 TIFF 数据")
+func clipboardHistoryImageNormalizesToTIFF() throws {
+    let image = NSImage(size: NSSize(width: 2, height: 2))
+    image.lockFocus()
+    NSColor.systemBlue.setFill()
+    NSRect(x: 0, y: 0, width: 2, height: 2).fill()
+    image.unlockFocus()
+
+    let tiff = try #require(image.tiffRepresentation)
+    let bitmap = try #require(NSBitmapImageRep(data: tiff))
+    let png = try #require(bitmap.representation(using: .png, properties: [:]))
+
+    let normalized = ClipboardHistoryImageData.tiffData(from: png)
+
+    #expect(normalized != nil)
+    #expect(NSImage(data: try #require(normalized)) != nil)
+}
+
 @Test("剪贴板历史按最新优先并限制容量")
 func historyKeepsNewestItemsWithinLimit() {
     var history = ClipboardHistoryBuffer(limit: 2)
@@ -125,4 +422,149 @@ func historyPersistenceRoundTrips() throws {
 @MainActor
 func historyServiceUsesSharedInstance() {
     #expect(ClipboardHistoryService.shared === ClipboardHistoryService.shared)
+}
+
+@Test("剪贴板历史服务初始化不在主线程同步读取持久化文件")
+@MainActor
+func historyServiceDefersPersistenceLoad() async throws {
+    let url = FileManager.default.temporaryDirectory
+        .appendingPathComponent("MenuTools-ClipboardHistory-Lazy-\(UUID().uuidString).json")
+    defer { try? FileManager.default.removeItem(at: url) }
+
+    let persisted = [
+        ClipboardHistoryItem(
+            id: UUID(),
+            content: .text("后台恢复"),
+            capturedAt: Date(timeIntervalSince1970: 100),
+            expiresAt: nil,
+            isPinned: false
+        )
+    ]
+    try ClipboardHistoryPersistence.save(persisted, to: url)
+
+    let service = ClipboardHistoryService(persistenceURL: url)
+
+    #expect(service.items.isEmpty)
+    #expect(!service.hasLoadedPersistedHistory)
+
+    await service.loadPersistedHistory()
+
+    #expect(service.hasLoadedPersistedHistory)
+    #expect(service.items == persisted)
+}
+
+@Test("设置历史容量会裁剪内容并保存用户选择")
+@MainActor
+func historyServicePersistsConfiguredLimit() throws {
+    let defaults = UserDefaults.standard
+    let previousLimit = defaults.object(forKey: SettingsKey.clipboardHistoryLimit)
+    defer {
+        if let previousLimit {
+            defaults.set(previousLimit, forKey: SettingsKey.clipboardHistoryLimit)
+        } else {
+            defaults.removeObject(forKey: SettingsKey.clipboardHistoryLimit)
+        }
+    }
+
+    let url = FileManager.default.temporaryDirectory
+        .appendingPathComponent("MenuTools-ClipboardHistory-Limit-\(UUID().uuidString).json")
+    defer { try? FileManager.default.removeItem(at: url) }
+
+    let service = ClipboardHistoryService(limit: 200, persistenceURL: url)
+    service.setLimit(.twenty)
+
+    #expect(service.limit == 20)
+    #expect(defaults.integer(forKey: SettingsKey.clipboardHistoryLimit) == 20)
+}
+
+@Test("异步恢复期间调整容量会按最新容量恢复历史")
+@MainActor
+func historyServiceUsesLatestLimitAfterDelayedLoad() async {
+    let persisted = (0 ..< 25).map { index in
+        ClipboardHistoryItem(
+            id: UUID(),
+            content: .text("记录 \(index)"),
+            capturedAt: Date(timeIntervalSince1970: Double(200 - index)),
+            expiresAt: nil,
+            isPinned: false
+        )
+    }
+    let gate = ClipboardHistoryLoadGate(items: persisted)
+    let service = ClipboardHistoryService(
+        limit: 200,
+        persistenceURL: URL(fileURLWithPath: "/tmp/MenuTools-ClipboardHistory-Delayed.json"),
+        persistenceLoader: { _ in await gate.load() }
+    )
+
+    let loadTask = Task { await service.loadPersistedHistory() }
+    await gate.waitUntilLoadStarts()
+    service.setLimit(.twenty)
+    await gate.finishLoading()
+    await loadTask.value
+
+    #expect(service.limit == 20)
+    #expect(service.items.count == 20)
+}
+
+@Test("异步恢复期间清空历史不会被旧文件覆盖")
+@MainActor
+func historyServiceKeepsClearHistoryDuringDelayedLoad() async {
+    let persisted = [
+        ClipboardHistoryItem(
+            id: UUID(),
+            content: .text("旧记录"),
+            capturedAt: Date(),
+            expiresAt: nil,
+            isPinned: false
+        )
+    ]
+    let gate = ClipboardHistoryLoadGate(items: persisted)
+    let url = FileManager.default.temporaryDirectory
+        .appendingPathComponent("MenuTools-ClipboardHistory-Clear-\(UUID().uuidString).json")
+    defer { try? FileManager.default.removeItem(at: url) }
+    let service = ClipboardHistoryService(
+        persistenceURL: url,
+        persistenceLoader: { _ in await gate.load() }
+    )
+
+    let loadTask = Task { await service.loadPersistedHistory() }
+    await gate.waitUntilLoadStarts()
+    service.clearHistory()
+    await gate.finishLoading()
+    await loadTask.value
+
+    #expect(service.items.isEmpty)
+}
+
+private actor ClipboardHistoryLoadGate {
+    private let items: [ClipboardHistoryItem]
+    private var started = false
+    private var startWaiter: CheckedContinuation<Void, Never>?
+    private var loadWaiter: CheckedContinuation<Void, Never>?
+
+    init(items: [ClipboardHistoryItem]) {
+        self.items = items
+    }
+
+    func waitUntilLoadStarts() async {
+        if started { return }
+        await withCheckedContinuation { continuation in
+            startWaiter = continuation
+        }
+    }
+
+    func load() async -> [ClipboardHistoryItem] {
+        started = true
+        startWaiter?.resume()
+        startWaiter = nil
+        await withCheckedContinuation { continuation in
+            loadWaiter = continuation
+        }
+        return items
+    }
+
+    func finishLoading() {
+        loadWaiter?.resume()
+        loadWaiter = nil
+    }
 }

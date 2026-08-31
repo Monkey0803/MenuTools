@@ -30,6 +30,11 @@ func sidebarSeparatesPrimaryAndFeatureDestinations() {
     ])
 }
 
+@Test("启用剪贴板后会显示在已启用功能中")
+func clipboardAppearsInEnabledFeatureSettings() {
+    #expect(SettingsTab.enabledFeatureTabs(enabledPluginIDs: [.clipboard]) == [.clipboard])
+}
+
 @Test("功能中心筛选器只展示符合状态的模块")
 func pluginCenterFilterMatchesRuntimeState() {
     #expect(PluginCenterFilter.all.includes(isEnabled: false, state: .stopped))
@@ -37,4 +42,34 @@ func pluginCenterFilterMatchesRuntimeState() {
     #expect(!PluginCenterFilter.enabled.includes(isEnabled: false, state: .stopped))
     #expect(PluginCenterFilter.attention.includes(isEnabled: true, state: .failed("error")))
     #expect(!PluginCenterFilter.attention.includes(isEnabled: true, state: .running))
+}
+
+@Test("设置窗口侧边栏始终保持可见")
+func settingsSidebarIsPersistent() {
+    #expect(!SettingsSidebarPolicy.allowsCollapsing)
+}
+
+@Test("设置侧边栏使用透明 Liquid Glass 导航层次")
+func settingsSidebarUsesTransparentLiquidGlassHierarchy() {
+    #expect(!SettingsSidebarVisualPolicy.usesSystemListBackground)
+    #expect(SettingsSidebarVisualPolicy.usesGlassSelection)
+    #expect(!SettingsSidebarVisualPolicy.showsSystemFocusRing)
+    #expect(SettingsSidebarVisualPolicy.selectionTintOpacity == 0.28)
+
+    let idle = SettingsSidebarVisualPolicy.itemStyle(isSelected: false, isHovered: false)
+    let hovered = SettingsSidebarVisualPolicy.itemStyle(isSelected: false, isHovered: true)
+    let selected = SettingsSidebarVisualPolicy.itemStyle(isSelected: true, isHovered: false)
+
+    #expect(!idle.showsGlass)
+    #expect(idle.backgroundOpacity == 0)
+    #expect(!hovered.showsGlass)
+    #expect(hovered.backgroundOpacity > idle.backgroundOpacity)
+    #expect(selected.showsGlass)
+    #expect(selected.tintOpacity == SettingsSidebarVisualPolicy.selectionTintOpacity)
+}
+
+@Test("菜单面板入场动画总延迟保持短促")
+func menuPanelEntranceDelayIsBounded() {
+    #expect(MenuPanelEntranceTiming.delay(for: 0) == 0)
+    #expect(MenuPanelEntranceTiming.delay(for: 15) <= 0.18)
 }

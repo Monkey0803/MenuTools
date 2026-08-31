@@ -1,0 +1,563 @@
+import AppKit
+import SwiftUI
+
+enum ClipboardHistorySettingsLayout {
+    static let contentHorizontalPadding: CGFloat = 24
+    static let historyGridSpacing: CGFloat = 12
+
+    static func columnCount(for availableWidth: CGFloat) -> Int {
+        availableWidth >= 500 ? 2 : 1
+    }
+}
+
+enum ClipboardShortcutControlPolicy {
+    static func shouldShowSave(hasCapturedShortcut: Bool) -> Bool {
+        hasCapturedShortcut
+    }
+
+    static func shouldShowClear(hasBinding: Bool, isRecording: Bool) -> Bool {
+        hasBinding && !isRecording
+    }
+}
+
+enum ClipboardHistoryPreviewLayout {
+    static let thumbnailSize = CGSize(width: 64, height: 64)
+    static let hoverPreviewSize = CGSize(width: 272, height: 188)
+}
+
+/// 悬停预览根据卡片锚点就近显示，避免固定在页面角落。
+enum ClipboardHistoryPreviewPlacement {
+    static let gap: CGFloat = 12
+    static let edgePadding: CGFloat = 12
+
+    static func position(for cardFrame: CGRect, in containerSize: CGSize) -> CGPoint {
+        let previewSize = ClipboardHistoryPreviewLayout.hoverPreviewSize
+        let minimumX = min(previewSize.width / 2 + edgePadding, containerSize.width / 2)
+        let maximumX = max(minimumX, containerSize.width - previewSize.width / 2 - edgePadding)
+        let minimumY = min(previewSize.height / 2 + edgePadding, containerSize.height / 2)
+        let maximumY = max(minimumY, containerSize.height - previewSize.height / 2 - edgePadding)
+        let prefersRightSide = cardFrame.midX <= containerSize.width / 2
+        let preferredX = prefersRightSide
+            ? cardFrame.maxX + gap + previewSize.width / 2
+            : cardFrame.minX - gap - previewSize.width / 2
+
+        return CGPoint(
+            x: min(max(preferredX, minimumX), maximumX),
+            y: min(max(cardFrame.midY, minimumY), maximumY)
+        )
+    }
+}
+
+private struct ClipboardHistoryHoverPreviewTarget {
+    let item: ClipboardHistoryItem
+    let anchor: Anchor<CGRect>
+}
+
+private struct ClipboardHistoryHoverPreviewPreferenceKey: PreferenceKey {
+    static let defaultValue: ClipboardHistoryHoverPreviewTarget? = nil
+
+    static func reduce(
+        value: inout ClipboardHistoryHoverPreviewTarget?,
+        nextValue: () -> ClipboardHistoryHoverPreviewTarget?
+    ) {
+        if let nextValue = nextValue() {
+            value = nextValue
+        }
+    }
+}
+
+/// 剪贴板功能设置页：管理历史记录，并配置随时呼出的全局快捷键。
+struct ClipboardHistorySettingsView: View {
+    @State private var historyService = ClipboardHistoryService.shared
+    @State private var shortcutService = ClipboardShortcutService.shared
+    @State private var isRecording = false
+    @State private var capturedShortcut: GlobalShortcut?
+    @State private var errorMessage: String?
+    @State private var searchText = ""
+    @State private var category: ClipboardHistoryCategory = .all
+    @State private var sortOrder: ClipboardHistorySortOrder = .newestFirst
+    @State private var isHistoryScrolling = false
+
+    private var displayedShortcut: GlobalShortcut? {
+        capturedShortcut ?? shortcutService.binding
+    }
+
+    var body: some View {
+        VStack(spacing: 0) {
+            ScrollView {
+                VStack(alignment: .leading, spacing: 16) {
+                    historyHeader
+                    searchField
+                    historyControls
+                    historyContent
+                }
+                .padding(ClipboardHistorySettingsLayout.contentHorizontalPadding)
+            }
+            .onScrollPhaseChange { _, phase in
+                isHistoryScrolling = phase.isScrolling
+            }
+            .overlayPreferenceValue(ClipboardHistoryHoverPreviewPreferenceKey.self) { target in
+                GeometryReader { proxy in
+                    if let target, !isHistoryScrolling {
+                        ClipboardHistoryHoverPreview(item: target.item)
+                            .position(
+                                ClipboardHistoryPreviewPlacement.position(
+                                    for: proxy[target.anchor],
+                                    in: proxy.size
+                                )
+                            )
+                            .allowsHitTesting(false)
+                            .transition(.opacity.combined(with: .scale(scale: 0.96)))
+                    }
+                }
+                .allowsHitTesting(false)
+            }
+
+            Divider()
+            shortcutSection
+        }
+        .task {
+            await historyService.loadPersistedHistory()
+            historyService.refresh()
+        }
+    }
+
+    private var historyHeader: some View {
+        HStack(spacing: 12) {
+            Image(systemName: "clock.arrow.circlepath")
+                .font(.title2)
+                .foregroundStyle(.tint)
+                .frame(width: 42, height: 42)
+                .background(Color.accentColor.opacity(0.12), in: .rect(cornerRadius: 12))
+
+            VStack(alignment: .leading, spacing: 3) {
+                Text(L("clipboard.history"))
+                    .font(.title3.weight(.semibold))
+                Text(L("clipboard.historyItems", historyService.items.count))
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+                    .contentTransition(.numericText())
+            }
+
+            Spacer()
+
+            Menu {
+                Button(L("clipboard.clearHistory"), role: .destructive) {
+                    historyService.clearHistory()
+                }
+                .disabled(historyService.items.isEmpty)
+
+                Button(L("cleanup.clipboard"), role: .destructive, action: clearClipboard)
+                    .disabled(historyService.items.isEmpty)
+            } label: {
+                Image(systemName: "ellipsis.circle")
+                    .font(.title3)
+                    .frame(width: 32, height: 32)
+                    .contentShape(.circle)
+            }
+            .menuStyle(.borderlessButton)
+            .accessibilityLabel(L("clipboard.actions"))
+        }
+    }
+
+    private var searchField: some View {
+        HStack(spacing: 8) {
+            Image(systemName: "magnifyingglass")
+                .foregroundStyle(.secondary)
+            TextField(L("clipboard.search"), text: $searchText)
+                .textFieldStyle(.plain)
+        }
+        .padding(.horizontal, 12)
+        .padding(.vertical, 10)
+        .background(.quaternary.opacity(0.5), in: .rect(cornerRadius: 11))
+    }
+
+    private var historyControls: some View {
+        HStack(spacing: 10) {
+            Picker(L("clipboard.category"), selection: $category) {
+                ForEach(ClipboardHistoryCategory.allCases) { category in
+                    Text(L(category.titleKey)).tag(category)
+                }
+            }
+            .labelsHidden()
+            .pickerStyle(.segmented)
+            .accessibilityLabel(L("clipboard.category"))
+
+            Menu {
+                Picker(L("clipboard.sort"), selection: $sortOrder) {
+                    ForEach(ClipboardHistorySortOrder.allCases) { sortOrder in
+                        Text(L(sortOrder.titleKey)).tag(sortOrder)
+                    }
+                }
+            } label: {
+                Label(L(sortOrder.titleKey), systemImage: "arrow.up.arrow.down")
+            }
+            .menuStyle(.borderlessButton)
+            .buttonStyle(.bordered)
+            .accessibilityLabel(L("clipboard.sort"))
+
+            Menu {
+                Picker(L("clipboard.limit"), selection: Binding<ClipboardHistoryLimit>(
+                    get: { ClipboardHistoryLimit(rawValue: historyService.limit) ?? .fifty },
+                    set: { limit in historyService.setLimit(limit) }
+                )) {
+                    ForEach(ClipboardHistoryLimit.allCases) { limit in
+                        Text(L("clipboard.limitValue", limit.rawValue)).tag(limit)
+                    }
+                }
+            } label: {
+                Label(L("clipboard.limitValue", historyService.limit), systemImage: "archivebox")
+            }
+            .menuStyle(.borderlessButton)
+            .buttonStyle(.bordered)
+            .accessibilityLabel(L("clipboard.limit"))
+        }
+    }
+
+    @ViewBuilder
+    private var historyContent: some View {
+        if filteredItems.isEmpty {
+            ContentUnavailableView(
+                L("clipboard.empty"),
+                systemImage: "doc.on.clipboard",
+                description: Text(L("clipboard.emptyDescription"))
+            )
+            .frame(maxWidth: .infinity, minHeight: 210)
+        } else {
+            LazyVGrid(
+                columns: Array(
+                    repeating: GridItem(.flexible(), spacing: ClipboardHistorySettingsLayout.historyGridSpacing),
+                    count: ClipboardHistorySettingsLayout.columnCount(
+                        for: SettingsLayout.width - ClipboardHistorySettingsLayout.contentHorizontalPadding * 2
+                    )
+                ),
+                spacing: ClipboardHistorySettingsLayout.historyGridSpacing
+            ) {
+                ForEach(filteredItems) { item in
+                    ClipboardHistorySettingsCard(
+                        item: item,
+                        onCopy: { historyService.copy(item) },
+                        onTogglePinned: { historyService.togglePinned(id: item.id) },
+                        onRemove: { historyService.remove(id: item.id) },
+                        isHistoryScrolling: isHistoryScrolling
+                    )
+                }
+            }
+        }
+    }
+
+    private var shortcutSection: some View {
+        HStack(spacing: 16) {
+            Text(L("clipboard.shortcut"))
+
+            Spacer(minLength: 24)
+
+            HStack(spacing: 10) {
+                Text(isRecording ? L("settings.recording") : displayedShortcut?.displayName ?? L("settings.unset"))
+                    .font(.callout.monospaced())
+                    .foregroundStyle(isRecording || displayedShortcut != nil ? .primary : .secondary)
+
+                if ClipboardShortcutControlPolicy.shouldShowSave(
+                    hasCapturedShortcut: capturedShortcut != nil
+                ) {
+                    Button(L("clipboard.shortcutSave"), action: saveShortcut)
+                }
+
+                Button {
+                    capturedShortcut = nil
+                    errorMessage = nil
+                    isRecording.toggle()
+                } label: {
+                    Image(systemName: isRecording ? "xmark" : "record.circle")
+                }
+                .help(isRecording ? L("settings.recording") : L("shortcut.record"))
+
+                if ClipboardShortcutControlPolicy.shouldShowClear(
+                    hasBinding: shortcutService.binding != nil,
+                    isRecording: isRecording
+                ) {
+                    Button {
+                        shortcutService.clearBinding()
+                    } label: {
+                        Image(systemName: "trash")
+                    }
+                    .help(L("shortcut.clear"))
+                }
+            }
+        }
+        .help(L("clipboard.shortcutDescription"))
+        .overlay(alignment: .bottomLeading) {
+            if let errorMessage {
+                Text(errorMessage)
+                    .font(.caption2)
+                    .foregroundStyle(.red)
+                    .offset(y: 16)
+            }
+        }
+        .padding(.horizontal, ClipboardHistorySettingsLayout.contentHorizontalPadding)
+        .padding(.vertical, 14)
+        .padding(.bottom, errorMessage == nil ? 0 : 14)
+        .overlay {
+            GlobalShortcutCaptureView(isRecording: isRecording) { shortcut in
+                isRecording = false
+                guard let shortcut else { return }
+                capturedShortcut = shortcut
+                errorMessage = nil
+            }
+            .frame(width: 1, height: 1)
+        }
+    }
+
+    private func saveShortcut() {
+        guard let capturedShortcut else { return }
+        do {
+            try shortcutService.setBinding(capturedShortcut)
+            self.capturedShortcut = nil
+            errorMessage = nil
+        } catch {
+            errorMessage = error.localizedDescription
+        }
+    }
+
+    private var filteredItems: [ClipboardHistoryItem] {
+        ClipboardHistoryList.items(
+            from: historyService.items,
+            query: searchText,
+            category: category,
+            sortOrder: sortOrder
+        )
+    }
+
+    private func clearClipboard() {
+        ClipboardService.clear()
+        historyService.clearHistory()
+        historyService.refresh()
+    }
+
+}
+
+private struct ClipboardHistorySettingsCard: View {
+    let item: ClipboardHistoryItem
+    let onCopy: () -> Bool
+    let onTogglePinned: () -> Void
+    let onRemove: () -> Void
+    let isHistoryScrolling: Bool
+
+    @State private var isHovered = false
+    @State private var didCopy = false
+
+    var body: some View {
+        HStack(alignment: .top, spacing: 10) {
+            Button(action: copyItem) {
+                HStack(alignment: .top, spacing: 10) {
+                    ClipboardHistoryThumbnail(content: item.content)
+
+                    VStack(alignment: .leading, spacing: 6) {
+                        Text(previewText)
+                            .font(.callout)
+                            .lineLimit(3)
+                            .multilineTextAlignment(.leading)
+                            .frame(maxWidth: .infinity, alignment: .leading)
+
+                        HStack(spacing: 5) {
+                            Image(systemName: item.isPinned ? "pin.fill" : "clock")
+                            Text(item.capturedAt, format: .dateTime.hour().minute())
+                        }
+                        .font(.caption2)
+                        .foregroundStyle(item.isPinned ? AnyShapeStyle(.tint) : AnyShapeStyle(.tertiary))
+                    }
+                }
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .contentShape(.rect(cornerRadius: 10))
+            }
+            .buttonStyle(.plain)
+            .help(L("clipboard.copy"))
+            .accessibilityLabel(L("clipboard.copy"))
+
+            Button(action: copyItem) {
+                Image(systemName: didCopy ? "checkmark" : "doc.on.doc")
+                    .font(.caption.weight(.semibold))
+                    .foregroundStyle(didCopy ? AnyShapeStyle(.tint) : AnyShapeStyle(.secondary))
+                    .frame(width: 24, height: 24)
+                    .contentShape(.circle)
+            }
+            .buttonStyle(.plain)
+            .help(didCopy ? L("clipboard.copied") : L("clipboard.copy"))
+            .accessibilityLabel(L("clipboard.copy"))
+
+            Menu {
+                Button(L("clipboard.pin"), action: onTogglePinned)
+                Button(L("clipboard.delete"), role: .destructive, action: onRemove)
+            } label: {
+                Image(systemName: "ellipsis")
+                    .font(.caption.weight(.semibold))
+                    .frame(width: 24, height: 24)
+                    .contentShape(.circle)
+            }
+            .menuStyle(.borderlessButton)
+            .accessibilityLabel(L("clipboard.actions"))
+        }
+        .padding(12)
+        .frame(maxWidth: .infinity, minHeight: 88, alignment: .leading)
+        .onHover { isHovered = $0 && !isHistoryScrolling }
+        .onChange(of: isHistoryScrolling) { _, isScrolling in
+            if isScrolling { isHovered = false }
+        }
+        .anchorPreference(key: ClipboardHistoryHoverPreviewPreferenceKey.self, value: .bounds) { anchor in
+            isHovered ? ClipboardHistoryHoverPreviewTarget(item: item, anchor: anchor) : nil
+        }
+        .controlCenterSurface(interactive: true, shape: AnyShape(.rect(cornerRadius: 14)))
+    }
+
+    private func copyItem() {
+        guard onCopy() else { return }
+        withAnimation(.easeOut(duration: 0.16)) {
+            didCopy = true
+        }
+        Task { @MainActor in
+            try? await Task.sleep(for: .seconds(1.2))
+            withAnimation(.easeOut(duration: 0.16)) {
+                didCopy = false
+            }
+        }
+    }
+
+    private var previewText: String {
+        switch item.content {
+        case let .text(text): return text
+        case .image: return L("clipboard.image")
+        }
+    }
+}
+
+private struct ClipboardHistoryThumbnail: View {
+    let content: ClipboardHistoryContent
+
+    var body: some View {
+        ZStack {
+            Color.primary.opacity(0.045)
+
+            switch content {
+            case let .text(text):
+                Text(text.prefix(2).uppercased())
+                    .font(.headline.weight(.semibold))
+                    .foregroundStyle(.secondary)
+                    .lineLimit(1)
+            case let .image(data):
+                if let image = NSImage(data: data) {
+                    Image(nsImage: image)
+                        .resizable()
+                        .scaledToFill()
+                        .frame(
+                            width: ClipboardHistoryPreviewLayout.thumbnailSize.width,
+                            height: ClipboardHistoryPreviewLayout.thumbnailSize.height
+                        )
+                } else {
+                    Image(systemName: "photo")
+                        .foregroundStyle(.secondary)
+                }
+            }
+        }
+        .frame(
+            width: ClipboardHistoryPreviewLayout.thumbnailSize.width,
+            height: ClipboardHistoryPreviewLayout.thumbnailSize.height
+        )
+        .clipped()
+        .clipShape(.rect(cornerRadius: 10))
+    }
+}
+
+private struct ClipboardHistoryHoverPreview: View {
+    let item: ClipboardHistoryItem
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 10) {
+            HStack(spacing: 6) {
+                Image(systemName: item.isPinned ? "pin.fill" : "doc.on.clipboard")
+                    .foregroundStyle(item.isPinned ? AnyShapeStyle(.tint) : AnyShapeStyle(.secondary))
+                Text(item.capturedAt, format: .dateTime.hour().minute())
+                    .font(.caption.weight(.medium))
+                    .foregroundStyle(.secondary)
+                Spacer()
+                Image(systemName: "eye")
+                    .foregroundStyle(.tertiary)
+            }
+
+            previewContent
+                .frame(maxWidth: .infinity, maxHeight: .infinity)
+                .background(.quaternary.opacity(0.35), in: .rect(cornerRadius: 12))
+        }
+        .padding(12)
+        .frame(
+            width: ClipboardHistoryPreviewLayout.hoverPreviewSize.width,
+            height: ClipboardHistoryPreviewLayout.hoverPreviewSize.height
+        )
+        .background(.regularMaterial, in: .rect(cornerRadius: 16))
+        .overlay {
+            RoundedRectangle(cornerRadius: 16, style: .continuous)
+                .strokeBorder(.white.opacity(0.22), lineWidth: 0.8)
+        }
+        .shadow(color: .black.opacity(0.16), radius: 18, y: 8)
+    }
+
+    @ViewBuilder
+    private var previewContent: some View {
+        switch item.content {
+        case let .text(text):
+            Text(text)
+                .font(.body)
+                .lineLimit(6)
+                .multilineTextAlignment(.leading)
+                .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
+                .padding(12)
+        case let .image(data):
+            if let image = NSImage(data: data) {
+                Image(nsImage: image)
+                    .resizable()
+                    .scaledToFit()
+                    .padding(6)
+            } else {
+                ContentUnavailableView(
+                    L("clipboard.image"),
+                    systemImage: "photo"
+                )
+            }
+        }
+    }
+}
+
+/// 可嵌入设置页或菜单栏 Popover 的剪贴板历史内容。
+struct ClipboardHistoryQuickAccessView: View {
+    let onCopy: () -> Void
+
+    @State private var historyService = ClipboardHistoryService.shared
+
+    init(onCopy: @escaping () -> Void = {}) {
+        self.onCopy = onCopy
+    }
+
+    var body: some View {
+        ClipboardHistoryPopover(
+            items: historyService.items,
+            onCopy: { item in
+                if historyService.copy(item) {
+                    onCopy()
+                }
+            },
+            onTogglePinned: historyService.togglePinned,
+            onRemove: historyService.remove,
+            onClearHistory: historyService.clearHistory,
+            onClearClipboard: clearClipboard
+        )
+        .task {
+            await historyService.loadPersistedHistory()
+            historyService.refresh()
+        }
+    }
+
+    private func clearClipboard() {
+        ClipboardService.clear()
+        historyService.clearHistory()
+        historyService.refresh()
+    }
+}
