@@ -5,6 +5,7 @@ import UniformTypeIdentifiers
 /// 剪贴板隐私设置：暂停记录与前台 App 排除规则。
 struct ClipboardPrivacySettingsSection: View {
     @Bindable var historyService: ClipboardHistoryService
+    @State private var keywordInput = ""
 
     var body: some View {
         VStack(alignment: .leading, spacing: 10) {
@@ -62,6 +63,43 @@ struct ClipboardPrivacySettingsSection: View {
                     }
                 }
             }
+
+            Divider()
+
+            Text(L("clipboard.sensitiveRules"))
+                .font(.subheadline.weight(.medium))
+            Toggle(L("clipboard.sensitive.passwordManagers"), isOn: ruleBinding(\.passwordManagersEnabled))
+            Toggle(L("clipboard.sensitive.verificationCodes"), isOn: ruleBinding(\.verificationCodesEnabled))
+            Toggle(L("clipboard.sensitive.bankCards"), isOn: ruleBinding(\.bankCardsEnabled))
+
+            HStack(spacing: 8) {
+                TextField(L("clipboard.sensitive.keywordPlaceholder"), text: $keywordInput)
+                    .textFieldStyle(.roundedBorder)
+                    .onSubmit(addKeyword)
+                Button(L("clipboard.sensitive.addKeyword"), action: addKeyword)
+                    .disabled(keywordInput.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
+            }
+
+            if !historyService.sensitiveRules.keywords.isEmpty {
+                LazyVGrid(columns: [GridItem(.adaptive(minimum: 92), spacing: 6)], spacing: 6) {
+                    ForEach(historyService.sensitiveRules.keywords, id: \.self) { keyword in
+                        Button {
+                            var rules = historyService.sensitiveRules
+                            rules.keywords.removeAll { $0 == keyword }
+                            historyService.setSensitiveRules(rules)
+                        } label: {
+                            Label(keyword, systemImage: "xmark")
+                                .font(.caption)
+                        }
+                        .buttonStyle(.bordered)
+                        .controlSize(.small)
+                    }
+                }
+            }
+
+            Text(L("clipboard.sensitiveRules.description"))
+                .font(.caption)
+                .foregroundStyle(.secondary)
         }
         .padding(14)
         .background(.quaternary.opacity(0.28), in: .rect(cornerRadius: 14))
@@ -82,6 +120,30 @@ struct ClipboardPrivacySettingsSection: View {
             }
             historyService.addExcludedBundleID(bundleID)
         }
+    }
+
+    private func ruleBinding(_ keyPath: WritableKeyPath<ClipboardSensitiveRules, Bool>) -> Binding<Bool> {
+        Binding(
+            get: { historyService.sensitiveRules[keyPath: keyPath] },
+            set: { enabled in
+                var rules = historyService.sensitiveRules
+                rules[keyPath: keyPath] = enabled
+                historyService.setSensitiveRules(rules)
+            }
+        )
+    }
+
+    private func addKeyword() {
+        let keyword = keywordInput.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !keyword.isEmpty else { return }
+        var rules = historyService.sensitiveRules
+        guard !rules.keywords.contains(where: { $0.caseInsensitiveCompare(keyword) == .orderedSame }) else {
+            keywordInput = ""
+            return
+        }
+        rules.keywords.append(keyword)
+        historyService.setSensitiveRules(rules)
+        keywordInput = ""
     }
 
     private func excludedApplicationName(for bundleID: String) -> String {

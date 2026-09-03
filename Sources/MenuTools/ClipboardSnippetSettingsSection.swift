@@ -1,3 +1,4 @@
+import AppKit
 import SwiftUI
 
 /// 剪贴板常用片段的分组、创建与复制入口。
@@ -158,7 +159,11 @@ struct ClipboardSnippetSettingsSection: View {
     }
 
     private func copy(_ snippet: ClipboardSnippet) {
-        guard historyService.copy(.text(snippet.content)) else { return }
+        let renderedContent = ClipboardSnippetTemplate.render(
+            snippet.content,
+            clipboardText: NSPasteboard.general.string(forType: .string)
+        )
+        guard historyService.copy(.text(renderedContent)) else { return }
         withAnimation(.easeOut(duration: 0.16)) {
             copiedSnippetID = snippet.id
         }

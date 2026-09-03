@@ -205,6 +205,28 @@ func clipboardHistoryKeyboardNavigationMovesSelection() {
     )
 }
 
+@Test("剪贴板面板按回车会复制选中项，未选择时复制首项")
+func clipboardHistoryKeyboardActivationUsesSelectedOrFirstItem() {
+    let first = ClipboardHistoryItem(
+        id: UUID(),
+        content: .text("第一条"),
+        capturedAt: Date(timeIntervalSince1970: 200),
+        expiresAt: nil,
+        isPinned: false
+    )
+    let second = ClipboardHistoryItem(
+        id: UUID(),
+        content: .text("第二条"),
+        capturedAt: Date(timeIntervalSince1970: 100),
+        expiresAt: nil,
+        isPinned: false
+    )
+
+    #expect(ClipboardHistoryKeyboardNavigation.itemToCopy(in: [first, second], selectedID: nil) == first)
+    #expect(ClipboardHistoryKeyboardNavigation.itemToCopy(in: [first, second], selectedID: second.id) == second)
+    #expect(ClipboardHistoryKeyboardNavigation.itemToCopy(in: [], selectedID: nil) == nil)
+}
+
 @Test("复制历史条目会回到顶部并保留置顶状态")
 @MainActor
 func clipboardHistoryCopyReinsertsItemAtTop() async throws {
@@ -302,6 +324,7 @@ func clipboardHistoryWritesURLAndFiles() {
         .url("https://example.com/clipboard"),
         to: urlPasteboard
     ))
+    #expect(urlPasteboard.string(forType: .string) == "https://example.com/clipboard")
     #expect(ClipboardHistoryPasteboardReader.content(from: urlPasteboard.pasteboardItems ?? []) == .url(
         "https://example.com/clipboard"
     ))
@@ -313,6 +336,21 @@ func clipboardHistoryWritesURLAndFiles() {
     ]
     #expect(ClipboardHistoryPasteboardWriter.write(.files(files), to: filePasteboard))
     #expect(ClipboardHistoryPasteboardReader.content(from: filePasteboard.pasteboardItems ?? []) == .files(files))
+}
+
+@Test("富文本历史会保留 HTML、RTF 与纯文本粘贴表示")
+func clipboardHistoryPreservesRichTextFormats() {
+    let pasteboard = NSPasteboard(name: NSPasteboard.Name("MenuToolsTests.\(UUID().uuidString)"))
+    let richText = ClipboardRichText(
+        plainText: "加粗内容",
+        html: Data("<strong>加粗内容</strong>".utf8),
+        rtf: Data("{\\rtf1\\b 加粗内容}".utf8)
+    )
+
+    #expect(ClipboardHistoryPasteboardWriter.write(.richText(richText), to: pasteboard))
+    #expect(pasteboard.string(forType: .string) == richText.plainText)
+    #expect(pasteboard.data(forType: .html) == richText.html)
+    #expect(pasteboard.data(forType: .rtf) == richText.rtf)
 }
 
 @Test("无效图片历史复制失败时保留现有剪贴板内容")
@@ -696,6 +734,139 @@ func clipboardHistoryNormalApplicationDeactivationRecordsPendingContent() async 
     service.handleApplicationDeactivation(bundleIdentifier: "com.example.normal")
 
     #expect(service.items.map(\.content) == [.text("普通内容")])
+}
+
+@Test("自动清理按保留天数、数量和占用空间移除非置顶历史")
+func clipboardHistoryCleanupPreservesPinnedItems() {
+    let now = Date(timeIntervalSince1970: 10 * 86_400)
+    var retentionHistory = ClipboardHistoryBuffer(
+        limit: 10,
+        retentionDuration: 86_400,
+        storageLimitBytes: 1_024
+    )
+    retentionHistory.insert(.text("旧记录"), now: now.addingTimeInterval(-2 * 86_400))
+    retentionHistory.insert(.text("新记录"), now: now)
+    #expect(retentionHistory.items.map(\.content) == [.text("新记录")])
+
+    var protectedHistory = ClipboardHistoryBuffer(
+        limit: 1,
+        retentionDuration: 86_400,
+        storageLimitBytes: 4
+    )
+    let pinned = protectedHistory.insert(.text("置顶"), now: now)!
+    protectedHistory.togglePinned(id: pinned.id)
+    protectedHistory.insert(.text("12345"), now: now)
+    #expect(protectedHistory.items.map(\.content) == [.text("置顶")])
+    #expect(protectedHistory.items.first?.isPinned == true)
+}
+
+@Test("敏感规则可独立拦截密码管理器、验证码、银行卡和关键词")
+func clipboardSensitiveRulesAreIndividuallyConfigurable() {
+    var rules = ClipboardSensitiveRules()
+
+    #expect(rules.shouldExclude(.text("123456"), sourceBundleID: nil))
+    #expect(rules.shouldExclude(.text("4242 4242 4242 4242"), sourceBundleID: nil))
+    #expect(rules.shouldExclude(.text("普通文本"), sourceBundleID: "com.1password.1password"))
+
+    rules.verificationCodesEnabled = false
+    rules.bankCardsEnabled = false
+    rules.passwordManagersEnabled = false
+    rules.keywords = ["仅此关键词"]
+
+    #expect(!rules.shouldExclude(.text("123456"), sourceBundleID: nil))
+    #expect(!rules.shouldExclude(.text("4242 4242 4242 4242"), sourceBundleID: nil))
+    #expect(!rules.shouldExclude(.text("普通文本"), sourceBundleID: "com.1password.1password"))
+    #expect(rules.shouldExclude(.text("包含仅此关键词的内容"), sourceBundleID: nil))
+}
+
+@Test("开启自动粘贴后复制历史会调用粘贴动作")
+@MainActor
+func clipboardHistoryAutoPasteCallsConfiguredAction() async {
+    let recorder = ClipboardAutoPasteRecorder()
+    let pasteboard = NSPasteboard(name: NSPasteboard.Name("MenuToolsTests.\(UUID().uuidString)"))
+    let service = ClipboardHistoryService(
+        persistenceURL: nil,
+        pasteboard: pasteboard,
+        autoPasteAction: { recorder.paste() }
+    )
+
+    service.setAutoPasteAfterCopy(true)
+    #expect(service.copy(.text("自动粘贴")))
+    #expect(recorder.callCount == 0)
+    await Task.yield()
+    #expect(recorder.callCount == 1)
+}
+
+@Test("自动粘贴结果会转换为用户可见的复制反馈")
+func clipboardAutoPasteResultsExposeClearFeedback() {
+    #expect(ClipboardCopyFeedback(autoPasteResult: .pasted) == .pasted)
+    #expect(ClipboardCopyFeedback(autoPasteResult: .accessibilityPermissionDenied) == .accessibilityPermissionDenied)
+    #expect(ClipboardCopyFeedback(autoPasteResult: .noEditableTarget) == .noEditableTarget)
+    #expect(ClipboardCopyFeedback(autoPasteResult: .failed) == .pasteFailed)
+}
+
+@Test("删除历史支持多选并在短暂窗口内撤销")
+@MainActor
+func clipboardHistoryMultipleRemovalCanBeUndone() async {
+    let pasteboard = NSPasteboard(name: NSPasteboard.Name("MenuToolsTests.\(UUID().uuidString)"))
+    let service = ClipboardHistoryService(persistenceURL: nil, pasteboard: pasteboard)
+    await service.loadPersistedHistory()
+    #expect(service.copy(.text("第一条")))
+    #expect(service.copy(.text("第二条")))
+    let removedIDs = Set(service.items.map(\.id))
+
+    service.remove(ids: removedIDs)
+    #expect(service.items.isEmpty)
+    #expect(service.canUndoLastRemoval)
+    #expect(service.undoLastRemoval())
+    #expect(service.items.map(\.content) == [.text("第二条"), .text("第一条")])
+}
+
+@Test("仅清空非置顶历史也可在撤销窗口内恢复")
+@MainActor
+func clipboardHistoryClearUnpinnedCanBeUndone() async {
+    let pasteboard = NSPasteboard(name: NSPasteboard.Name("MenuToolsTests.\(UUID().uuidString)"))
+    let service = ClipboardHistoryService(persistenceURL: nil, pasteboard: pasteboard)
+    await service.loadPersistedHistory()
+    #expect(service.copy(.text("置顶内容")))
+    let pinnedID = try! #require(service.items.first?.id)
+    service.togglePinned(id: pinnedID)
+    #expect(service.copy(.text("普通内容")))
+
+    service.clearUnpinnedHistory()
+
+    #expect(service.items.map(\.content) == [.text("置顶内容")])
+    #expect(service.canUndoLastRemoval)
+    #expect(service.undoLastRemoval())
+    #expect(service.items.map(\.content) == [.text("普通内容"), .text("置顶内容")])
+}
+
+@Test("历史项目按置顶、今天、昨天和更早日期分组")
+func clipboardHistoryDateSectionsGroupItems() {
+    let now = Date(timeIntervalSince1970: 10 * 86_400 + 12 * 3_600)
+    let items = [
+        ClipboardHistoryItem(id: UUID(), content: .text("置顶"), capturedAt: now, expiresAt: nil, isPinned: true),
+        ClipboardHistoryItem(id: UUID(), content: .text("今天"), capturedAt: now, expiresAt: nil, isPinned: false),
+        ClipboardHistoryItem(id: UUID(), content: .text("昨天"), capturedAt: now.addingTimeInterval(-86_400), expiresAt: nil, isPinned: false),
+        ClipboardHistoryItem(id: UUID(), content: .text("更早"), capturedAt: now.addingTimeInterval(-3 * 86_400), expiresAt: nil, isPinned: false)
+    ]
+
+    #expect(ClipboardHistoryDateSections.sections(from: items, now: now).map(\.kind) == [
+        .pinned,
+        .today,
+        .yesterday,
+        .date(Calendar.current.startOfDay(for: now.addingTimeInterval(-3 * 86_400)))
+    ])
+}
+
+@MainActor
+private final class ClipboardAutoPasteRecorder {
+    private(set) var callCount = 0
+
+    func paste() -> ClipboardAutoPasteResult {
+        callCount += 1
+        return .pasted
+    }
 }
 
 private actor ClipboardHistoryLoadGate {

@@ -1,6 +1,20 @@
 import Foundation
 import Observation
 
+enum ClipboardSnippetTemplate {
+    static func render(
+        _ template: String,
+        clipboardText: String?,
+        now: Date = Date(),
+        calendar: Calendar = .current
+    ) -> String {
+        let date = now.formatted(.dateTime.year().month().day())
+        return template
+            .replacingOccurrences(of: "{{date}}", with: date)
+            .replacingOccurrences(of: "{{clipboard}}", with: clipboardText ?? "")
+    }
+}
+
 struct ClipboardSnippetGroup: Codable, Identifiable, Equatable, Sendable {
     let id: UUID
     var name: String

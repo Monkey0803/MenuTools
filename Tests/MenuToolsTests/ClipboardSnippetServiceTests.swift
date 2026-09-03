@@ -2,6 +2,19 @@ import Foundation
 import Testing
 @testable import MenuTools
 
+@Test("常用片段会展开日期和当前剪贴板变量")
+func clipboardSnippetTemplateExpandsVariables() {
+    let date = Date(timeIntervalSince1970: 0)
+    #expect(
+        ClipboardSnippetTemplate.render(
+            "日期 {{date}}，内容 {{clipboard}}",
+            clipboardText: "原内容",
+            now: date,
+            calendar: Calendar(identifier: .gregorian)
+        ).contains("原内容")
+    )
+}
+
 @Test("常用片段可按分组管理，删除分组后保留到默认分组")
 func clipboardSnippetsMoveToDefaultGroupWhenGroupIsRemoved() {
     var store = ClipboardSnippetStore()
