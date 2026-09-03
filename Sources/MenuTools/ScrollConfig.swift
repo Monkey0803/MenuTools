@@ -1,7 +1,7 @@
 import Foundation
 
 /// 平滑滚动配置（从 UserDefaults 读取，UI 用 @AppStorage 写入同一批 Key）
-struct ScrollConfig {
+struct ScrollConfig: Sendable {
     var enabled: Bool
     var smoothVertical: Bool
     var smoothHorizontal: Bool
@@ -33,7 +33,8 @@ struct ScrollConfig {
             invertVertical: bool(SettingsKey.scrollInvertV, false),
             invertHorizontal: bool(SettingsKey.scrollInvertH, false),
             gain: dbl(SettingsKey.scrollGain, 1.0),
-            duration: dbl(SettingsKey.scrollDuration, 0.35),
+            // 与 OpenLogi 的有限动画一致：100 ms 有明显平滑感，同时不会让棘轮滚轮产生拖尾。
+            duration: dbl(SettingsKey.scrollDuration, 0.1),
             minStep: dbl(SettingsKey.scrollMinStep, 8),
             touchpadEmulation: bool(SettingsKey.scrollTouchpad, true),
             accelModifier: uint(SettingsKey.scrollAccelKey),

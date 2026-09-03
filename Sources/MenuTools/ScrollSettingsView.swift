@@ -10,7 +10,7 @@ struct ScrollSettingsView: View {
     @AppStorage(SettingsKey.scrollInvertV) private var invertV = false
     @AppStorage(SettingsKey.scrollInvertH) private var invertH = false
     @AppStorage(SettingsKey.scrollGain) private var gain = 1.0
-    @AppStorage(SettingsKey.scrollDuration) private var duration = 0.35
+    @AppStorage(SettingsKey.scrollDuration) private var duration = 0.1
     @AppStorage(SettingsKey.scrollMinStep) private var minStep = 8.0
     @AppStorage(SettingsKey.scrollTouchpad) private var touchpad = true
     @AppStorage(SettingsKey.scrollAccelKey) private var accelKey = 0
@@ -109,11 +109,15 @@ struct ScrollSettingsView: View {
         VStack(alignment: .leading, spacing: 8) {
             sectionLabel(icon: "slider.horizontal.3", title: L("scroll.section.smooth"))
             VStack(alignment: .leading, spacing: 14) {
-                sliderRow(title: L("scroll.gain"), value: $gain, range: 0.1...10.0, unit: "×")
+                Text(L("scroll.compatibility.note"))
+                    .font(.caption2)
+                    .foregroundStyle(.secondary)
+                    .fixedSize(horizontal: false, vertical: true)
+                sliderRow(title: L("scroll.gain"), description: L("scroll.gain.desc"), value: $gain, range: 0.1...10.0, unit: "×")
                 Divider()
-                sliderRow(title: L("scroll.duration"), value: $duration, range: 0.05...2.0, unit: "s")
+                sliderRow(title: L("scroll.duration"), description: L("scroll.duration.desc"), value: $duration, range: 0.05...2.0, unit: "s")
                 Divider()
-                sliderRow(title: L("scroll.minStep"), value: $minStep, range: 1...100, unit: "px")
+                sliderRow(title: L("scroll.minStep"), description: L("scroll.minStep.desc"), value: $minStep, range: 1...100, unit: "px")
                 Divider()
                 HStack(spacing: 12) {
                     VStack(alignment: .leading, spacing: 2) {
@@ -140,27 +144,40 @@ struct ScrollSettingsView: View {
         .opacity(enabled ? 1 : 0.5)
     }
 
-    private func sliderRow(title: String, value: Binding<Double>, range: ClosedRange<Double>, unit: String) -> some View {
-        HStack(spacing: 12) {
-            Text(title)
-                .font(.body)
-                .frame(width: 88, alignment: .leading)
-            Slider(value: value, in: range)
-                .onChange(of: value.wrappedValue) { _, _ in engine.reload() }
-            // 数值步进框（可直接微调）
-            TextField("", value: value, format: .number.precision(.fractionLength(2)))
-                .textFieldStyle(.roundedBorder)
-                .frame(width: 56)
-                .multilineTextAlignment(.trailing)
-                .onChange(of: value.wrappedValue) { _, _ in engine.reload() }
-            Stepper("", value: value, in: range, step: range.upperBound > 10 ? 1 : 0.05)
-                .labelsHidden()
-                .onChange(of: value.wrappedValue) { _, _ in engine.reload() }
-            Text(unit)
-                .font(.caption)
+    private func sliderRow(title: String, description: String, value: Binding<Double>, range: ClosedRange<Double>, unit: String, isAvailable: Bool = true) -> some View {
+        VStack(alignment: .leading, spacing: 4) {
+            HStack(spacing: 12) {
+                Text(title)
+                    .font(.body)
+                    .frame(width: 88, alignment: .leading)
+                Slider(value: value, in: range)
+                    .onChange(of: value.wrappedValue) { _, _ in engine.reload() }
+                    .accessibilityLabel(title)
+                    .accessibilityHint(description)
+                // 数值步进框（可直接微调）
+                TextField("", value: value, format: .number.precision(.fractionLength(2)))
+                    .textFieldStyle(.roundedBorder)
+                    .frame(width: 56)
+                    .multilineTextAlignment(.trailing)
+                    .onChange(of: value.wrappedValue) { _, _ in engine.reload() }
+                    .accessibilityLabel(title)
+                    .accessibilityHint(description)
+                Stepper("", value: value, in: range, step: range.upperBound > 10 ? 1 : 0.05)
+                    .labelsHidden()
+                    .onChange(of: value.wrappedValue) { _, _ in engine.reload() }
+                    .accessibilityLabel(title)
+                    .accessibilityHint(description)
+                Text(unit)
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+                    .frame(width: 18, alignment: .leading)
+            }
+            Text(description)
+                .font(.caption2)
                 .foregroundStyle(.secondary)
-                .frame(width: 18, alignment: .leading)
+                .fixedSize(horizontal: false, vertical: true)
         }
+        .disabled(!isAvailable)
     }
 
     // MARK: - 修饰键（加速/转换/禁用）
@@ -200,7 +217,7 @@ struct ScrollSettingsView: View {
 
     private var resetButton: some View {
         Button(L("scroll.reset")) {
-            gain = 1.0; duration = 0.35; minStep = 8
+            gain = 1.0; duration = 0.1; minStep = 8
             touchpad = true; invertV = false; invertH = false
             smoothV = true; smoothH = true
             accelKey = 0; shiftKey = 0; disableKey = 0

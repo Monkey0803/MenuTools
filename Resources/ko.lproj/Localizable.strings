@@ -370,9 +370,13 @@
 "scroll.needAccessibility" = "'손쉬운 사용' 권한이 없어 부드러운 스크롤이 작동하지 않습니다.";
 "scroll.openAccessibility" = "손쉬운 사용 열기";
 "scroll.section.smooth" = "부드러운 스크롤";
+"scroll.compatibility.note" = "마우스 휠 입력을 유한 시간의 연속 스크롤 이벤트로 출력합니다. 트랙패드 입력은 그대로 유지됩니다.";
 "scroll.gain" = "속도 게인";
+"scroll.gain.desc" = "휠 한 칸당 이동 거리입니다. 1×가 기본이며, 높이면 더 빠르게 스크롤됩니다.";
 "scroll.duration" = "지속 시간";
+"scroll.duration.desc" = "한 번의 휠 입력이 누적 목표에 도달하는 시간입니다. 짧을수록 즉각적이고 길수록 부드럽습니다.";
 "scroll.minStep" = "최소 단계";
+"scroll.minStep.desc" = "일반 휠 한 칸을 변환하는 픽셀 거리입니다. 고해상도 값을 함께 보고하는 마우스는 이 단계를 사용하고, 순수 연속 입력은 원래 이동 거리를 유지합니다.";
 "scroll.touchpad" = "트랙패드 시뮬레이션";
 "scroll.touchpad.desc" = "연속 픽셀 이벤트로 출력하여 앱의 기본 부드러운 스크롤을 유도합니다.";
 "scroll.section.axis" = "축별";

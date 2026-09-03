@@ -370,9 +370,13 @@
 "scroll.needAccessibility" = "「アクセシビリティ」未許可のため、スムーズスクロールは無効です。";
 "scroll.openAccessibility" = "アクセシビリティを開く";
 "scroll.section.smooth" = "スムーズスクロール";
+"scroll.compatibility.note" = "マウスホイール入力を有限時間の連続スクロールイベントとして出力します。トラックパッド入力はそのままです。";
 "scroll.gain" = "速度ゲイン";
+"scroll.gain.desc" = "ホイール1段あたりの移動量です。1×が標準で、上げると速くスクロールします。";
 "scroll.duration" = "継続時間";
+"scroll.duration.desc" = "1 回のホイール入力が累積目標に到達するまでの時間です。短いほど追従性が高く、長いほど滑らかです。";
 "scroll.minStep" = "最小ステップ";
+"scroll.minStep.desc" = "通常のホイール 1 ノッチを変換するピクセル距離です。高解像度値も同時に報告するマウスはこの値を使い、純粋な連続入力は元の移動量を維持します。";
 "scroll.touchpad" = "トラックパッドを模倣";
 "scroll.touchpad.desc" = "連続ピクセルイベントで出力し、App のネイティブな滑らかスクロールを促します。";
 "scroll.section.axis" = "軸ごと";

@@ -69,7 +69,7 @@ enum AppBackupService {
             scrollInvertVertical: bool(SettingsKey.scrollInvertV, false),
             scrollInvertHorizontal: bool(SettingsKey.scrollInvertH, false),
             scrollGain: double(SettingsKey.scrollGain, 1.0),
-            scrollDuration: double(SettingsKey.scrollDuration, 0.35),
+            scrollDuration: double(SettingsKey.scrollDuration, 0.1),
             scrollMinStep: double(SettingsKey.scrollMinStep, 8),
             scrollTouchpadEmulation: bool(SettingsKey.scrollTouchpad, true),
             scrollAccelModifier: modifier(SettingsKey.scrollAccelKey),

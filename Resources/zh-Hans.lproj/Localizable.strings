@@ -370,9 +370,13 @@
 "scroll.needAccessibility" = "尚未获得“辅助功能”权限，平滑滚动无法生效。";
 "scroll.openAccessibility" = "打开辅助功能";
 "scroll.section.smooth" = "平滑滚动";
+"scroll.compatibility.note" = "鼠标滚轮会拆分为有限时长的连续滚动事件；触控板输入保持原生。";
 "scroll.gain" = "速度增益";
+"scroll.gain.desc" = "每一格滚轮的移动距离。1× 为默认；调高滚得更快。";
 "scroll.duration" = "持续时间";
+"scroll.duration.desc" = "一次滚动输入平滑抵达累计目标的时长；较短更跟手，较长更柔和。";
 "scroll.minStep" = "最短步长";
+"scroll.minStep.desc" = "普通逐格滚轮每格转换的像素距离；同时上报高精度值的鼠标仍按此步长，纯连续滚动保留原始位移。";
 "scroll.touchpad" = "模拟触控板模式";
 "scroll.touchpad.desc" = "以连续像素事件输出，触发 App 的原生平滑滚动。";
 "scroll.section.axis" = "轴向独立";

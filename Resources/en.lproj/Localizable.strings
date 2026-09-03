@@ -370,9 +370,13 @@
 "scroll.needAccessibility" = "Accessibility permission not granted; smooth scrolling is inactive.";
 "scroll.openAccessibility" = "Open Accessibility";
 "scroll.section.smooth" = "Smooth Scrolling";
+"scroll.compatibility.note" = "Mouse wheel input is emitted as finite continuous scroll events; trackpad input remains native.";
 "scroll.gain" = "Speed Gain";
+"scroll.gain.desc" = "Distance moved for each wheel step. 1× is default; raise it to scroll faster.";
 "scroll.duration" = "Duration";
+"scroll.duration.desc" = "Time for one wheel input to reach its accumulated target. Shorter feels more immediate; longer feels softer.";
 "scroll.minStep" = "Min Step";
+"scroll.minStep.desc" = "Pixel distance represented by one ordinary wheel detent. Mice that also report a high-resolution value use this step; purely continuous input retains its original distance.";
 "scroll.touchpad" = "Emulate Trackpad";
 "scroll.touchpad.desc" = "Emit continuous pixel events to trigger apps' native smooth scrolling.";
 "scroll.section.axis" = "Per-Axis";

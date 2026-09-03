@@ -370,9 +370,13 @@
 "scroll.needAccessibility" = "尚未取得「輔助使用」權限，平滑捲動無法生效。";
 "scroll.openAccessibility" = "打開輔助使用";
 "scroll.section.smooth" = "平滑捲動";
+"scroll.compatibility.note" = "滑鼠滾輪會拆分為有限時長的連續捲動事件；觸控板輸入保持原生。";
 "scroll.gain" = "速度增益";
+"scroll.gain.desc" = "每一格滾輪的移動距離。1× 為預設；調高會捲得更快。";
 "scroll.duration" = "持續時間";
+"scroll.duration.desc" = "一次捲動輸入平滑抵達累計目標的時長；較短更跟手，較長更柔和。";
 "scroll.minStep" = "最短步長";
+"scroll.minStep.desc" = "一般逐格滾輪每格轉換的像素距離；同時回報高解析度值的滑鼠仍依此步長，純連續捲動保留原始位移。";
 "scroll.touchpad" = "模擬觸控板模式";
 "scroll.touchpad.desc" = "以連續像素事件輸出，觸發 App 的原生平滑捲動。";
 "scroll.section.axis" = "軸向獨立";
