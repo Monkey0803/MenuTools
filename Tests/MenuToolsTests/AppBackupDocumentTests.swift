@@ -257,6 +257,26 @@ func invalidRightClickKeyThrows() {
     }
 }
 
+@Test("未知网络流量范围会被拒绝")
+func invalidNetworkTrafficQueryThrows() {
+    var settings = AppBackupSettings.fixture
+    settings.networkTrafficQuery = "satellite:icmp"
+
+    #expect(throws: AppBackupValidationError.invalidNetworkTrafficQuery("satellite:icmp")) {
+        try document(settings: settings).validated()
+    }
+}
+
+@Test("超出范围的网络流量提醒阈值会被拒绝")
+func invalidNetworkTrafficThresholdThrows() {
+    var settings = AppBackupSettings.fixture
+    settings.networkTrafficAlertThreshold = 1_000_000_001
+
+    #expect(throws: AppBackupValidationError.invalidNetworkTrafficThreshold(1_000_000_001)) {
+        try document(settings: settings).validated()
+    }
+}
+
 @Test("未知 JSON 字段会被忽略")
 func unknownJSONFieldsAreIgnored() throws {
     let data = #"{"formatVersion":1,"createdAt":"2025-08-07T00:00:00Z","appVersion":"1.0.1","settings":{"menuBarIcon":"wrench.and.screwdriver.fill","menuBarShowTitle":false,"togglesShowTitle":false,"preferredTerminal":"com.apple.Terminal","autoCheckUpdate":true,"appLanguage":"system","scrollEnabled":false,"scrollSmoothVertical":true,"scrollSmoothHorizontal":true,"scrollInvertVertical":false,"scrollInvertHorizontal":false,"scrollGain":1,"scrollDuration":0.35,"scrollMinStep":8,"scrollTouchpadEmulation":true,"scrollAccelModifier":0,"scrollShiftModifier":0,"scrollDisableModifier":0,"unexpectedSetting":"do not execute"},"rightClick":{"enabled":{},"unexpectedAction":"do not execute"},"unexpectedTopLevel":"do not execute"}"#.data(using: .utf8)!

@@ -24,6 +24,10 @@ func makeDocumentReadsOnlyAllowlistedSettings() throws {
     defaults.set(1 << 20, forKey: SettingsKey.scrollAccelKey)
     defaults.set(1 << 17, forKey: SettingsKey.scrollShiftKey)
     defaults.set(0, forKey: SettingsKey.scrollDisableKey)
+    defaults.set("wifi:tcp", forKey: NetworkTrafficSettingsKey.query)
+    defaults.set(5_000_000, forKey: NetworkTrafficSettingsKey.alertThreshold)
+    defaults.set(NetworkTrafficMenuBarDisplayMode.upDown.rawValue, forKey: NetworkTrafficSettingsKey.menuBarDisplayMode)
+    defaults.set(100_000_000_000, forKey: NetworkTrafficSettingsKey.monthlyQuota)
     let profile = AppVolumeProfile(
         rootBundleID: "com.google.Chrome",
         displayName: "Google Chrome",
@@ -49,6 +53,10 @@ func makeDocumentReadsOnlyAllowlistedSettings() throws {
     #expect(document.settings.scrollGain == 1.75)
     #expect(document.settings.appVolumeEnabled == true)
     #expect(document.settings.appVolumeProfiles?[profile.rootBundleID] == profile)
+    #expect(document.settings.networkTrafficQuery == "wifi:tcp")
+    #expect(document.settings.networkTrafficAlertThreshold == 5_000_000)
+    #expect(document.settings.networkTrafficMenuBarDisplayMode == NetworkTrafficMenuBarDisplayMode.upDown.rawValue)
+    #expect(document.settings.networkTrafficMonthlyQuota == 100_000_000_000)
     #expect(document.rightClick == RightClickConfig(enabled: [RightClickItem.newFolder.rawValue: false]))
 
     let encoded = try AppBackupService.encode(document)
@@ -87,6 +95,58 @@ func restoreWritesAppVolumeSettings() throws {
     let data = try #require(defaults.data(forKey: AppVolumeService.StorageKey.profiles))
     let restored = try JSONDecoder().decode([String: AppVolumeProfile].self, from: data)
     #expect(restored == [profile.rootBundleID: profile])
+}
+
+@Test("新备份会恢复网络流量范围和提醒阈值")
+func restoreWritesNetworkTrafficSettings() throws {
+    let defaults = try makeDefaults(named: "networkTrafficRestore")
+    var settings = AppBackupSettings.serviceFixture
+    settings.networkTrafficQuery = "wired:udp"
+    settings.networkTrafficAlertThreshold = 10_000_000
+    settings.networkTrafficMenuBarDisplayMode = NetworkTrafficMenuBarDisplayMode.total.rawValue
+    settings.networkTrafficMonthlyQuota = 50_000_000_000
+    let document = AppBackupDocument.current(
+        settings: settings,
+        rightClick: .default,
+        appVersion: "1.1.0",
+        createdAt: Date()
+    )
+
+    try AppBackupService.restore(
+        document,
+        userDefaults: defaults,
+        rightClickStore: InMemoryRightClickStore(config: .default)
+    )
+
+    #expect(defaults.string(forKey: NetworkTrafficSettingsKey.query) == "wired:udp")
+    #expect(defaults.integer(forKey: NetworkTrafficSettingsKey.alertThreshold) == 10_000_000)
+    #expect(defaults.string(forKey: NetworkTrafficSettingsKey.menuBarDisplayMode) == NetworkTrafficMenuBarDisplayMode.total.rawValue)
+    #expect(Int64(defaults.integer(forKey: NetworkTrafficSettingsKey.monthlyQuota)) == 50_000_000_000)
+}
+
+@Test("旧备份恢复时保留已有网络流量设置")
+func legacyBackupPreservesExistingNetworkTrafficSettings() throws {
+    let defaults = try makeDefaults(named: "legacyNetworkTraffic")
+    defaults.set("wifi:tcp", forKey: NetworkTrafficSettingsKey.query)
+    defaults.set(5_000_000, forKey: NetworkTrafficSettingsKey.alertThreshold)
+    defaults.set(NetworkTrafficMenuBarDisplayMode.upDown.rawValue, forKey: NetworkTrafficSettingsKey.menuBarDisplayMode)
+    defaults.set(100_000_000_000, forKey: NetworkTrafficSettingsKey.monthlyQuota)
+
+    try AppBackupService.restore(
+        AppBackupDocument.current(
+            settings: .serviceFixture,
+            rightClick: .default,
+            appVersion: "1.1.0",
+            createdAt: Date()
+        ),
+        userDefaults: defaults,
+        rightClickStore: InMemoryRightClickStore(config: .default)
+    )
+
+    #expect(defaults.string(forKey: NetworkTrafficSettingsKey.query) == "wifi:tcp")
+    #expect(defaults.integer(forKey: NetworkTrafficSettingsKey.alertThreshold) == 5_000_000)
+    #expect(defaults.string(forKey: NetworkTrafficSettingsKey.menuBarDisplayMode) == NetworkTrafficMenuBarDisplayMode.upDown.rawValue)
+    #expect(Int64(defaults.integer(forKey: NetworkTrafficSettingsKey.monthlyQuota)) == 100_000_000_000)
 }
 
 @Test("旧备份恢复时保留已有音量配置")

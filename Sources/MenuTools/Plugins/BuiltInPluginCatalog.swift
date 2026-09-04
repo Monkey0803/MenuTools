@@ -45,6 +45,19 @@ enum BuiltInPluginCatalog {
                 stop: { BLEBatteryMonitor.shared.stop() }
             ),
             registration(
+                id: .networkTraffic,
+                category: .system,
+                symbol: "arrow.up.arrow.down.circle",
+                start: {
+                    NetworkStatusService.shared.startMonitoring()
+                    NetworkTrafficService.shared.start()
+                },
+                stop: {
+                    NetworkTrafficService.shared.stop()
+                    NetworkStatusService.shared.stopMonitoring()
+                }
+            ),
+            registration(
                 id: .clipboard,
                 category: .productivity,
                 symbol: "clipboard",

@@ -261,7 +261,7 @@ struct MenuPanelView: View {
     @State private var derivedDataSize: Int64?
     @State private var isCleaningDerivedData = false
     @State private var systemResourceService = SystemResourceService()
-    @State private var networkService = NetworkStatusService()
+    @State private var networkService = NetworkStatusService.shared
     @State private var batteryHealthService = BatteryHealthService()
     @State private var displayService = DisplayService()
     @State private var storageAnalysisService = StorageAnalysisService()
@@ -274,6 +274,7 @@ struct MenuPanelView: View {
     @State private var focusModeService = FocusModeService.shared
     @State private var globalShortcutService = GlobalShortcutService.shared
     @State private var appVolumeService = AppVolumeService.shared
+    @State private var networkTrafficService = NetworkTrafficService.shared
     @State private var pluginManager = BuiltInPluginManager.shared
     @State private var statusMessage: String?
     @State private var statusIsError = false
@@ -343,6 +344,10 @@ struct MenuPanelView: View {
                             .entrance(9, appeared: appeared)
                         storageCard
                             .entrance(10, appeared: appeared)
+                    }
+                    if pluginManager.isEnabled(.networkTraffic) {
+                        networkTrafficCard
+                            .entrance(11, appeared: appeared)
                     }
                     if pluginManager.isEnabled(.systemControls) {
                         quickToggles
@@ -479,6 +484,14 @@ struct MenuPanelView: View {
                 batteryHealthService.refresh()
                 displayService.refresh()
                 storageAnalysisService.refresh()
+            }
+        }
+        .task {
+            guard pluginManager.isEnabled(.networkTraffic) else { return }
+            networkTrafficService.beginLiveView()
+            defer { networkTrafficService.endLiveView() }
+            while !Task.isCancelled {
+                try? await Task.sleep(for: .seconds(30))
             }
         }
         .alert(L("storage.confirm.title"), isPresented: Binding(
@@ -812,6 +825,65 @@ struct MenuPanelView: View {
         .controlCenterSurface(tint: .cyan)
         .accessibilityElement(children: .contain)
         .accessibilityLabel(L("network.title"))
+    }
+
+    private var networkTrafficCard: some View {
+        let snapshot = networkTrafficService.snapshot
+        let apps = Array(snapshot.apps.filter { !$0.isHistoricalOnly }.prefix(3))
+        return VStack(alignment: .leading, spacing: 9) {
+            infoCardHeader(symbol: "arrow.up.arrow.down.circle", title: L("traffic.title")) {
+                Button {
+                    openNetworkTrafficSettings()
+                } label: {
+                    Image(systemName: "arrow.up.right.square")
+                        .font(.caption)
+                }
+                .buttonStyle(.plain)
+                .controlCenterHover(shape: AnyShape(.circle))
+                .foregroundStyle(.secondary)
+                .accessibilityLabel(L("traffic.viewAll"))
+            }
+
+            if apps.isEmpty {
+                Text(snapshot.isAvailable ? L("traffic.noApps") : L("traffic.unavailable"))
+                    .font(.caption2)
+                    .foregroundStyle(.secondary)
+            } else {
+                ForEach(apps) { app in
+                    HStack(spacing: 8) {
+                        Text(app.appName)
+                            .font(.caption.weight(.medium))
+                            .lineLimit(1)
+                        Spacer(minLength: 4)
+                        Text("↓ \(resourceRate(app.downloadBytesPerSecond))  ↑ \(resourceRate(app.uploadBytesPerSecond))")
+                            .font(.caption2)
+                            .foregroundStyle(.secondary)
+                            .monospacedDigit()
+                            .lineLimit(1)
+                    }
+                }
+                Button(L("traffic.viewAll")) {
+                    openNetworkTrafficSettings()
+                }
+                .font(.caption2.weight(.medium))
+                .buttonStyle(.plain)
+                .foregroundStyle(.tint)
+            }
+        }
+        .padding(12)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .controlCenterSurface(tint: .teal)
+        .accessibilityElement(children: .contain)
+        .accessibilityLabel(L("traffic.title"))
+    }
+
+    private func openNetworkTrafficSettings() {
+        if let openSettingsAction {
+            openSettingsAction(.networkTraffic)
+        } else {
+            NSApp.activate(ignoringOtherApps: true)
+            openSettings()
+        }
     }
 
     private func networkConnectionName(_ snapshot: NetworkStatusSnapshot) -> String {

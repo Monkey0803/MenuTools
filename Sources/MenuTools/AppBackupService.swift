@@ -78,7 +78,13 @@ enum AppBackupService {
             appVolumeEnabled: bool(AppVolumeService.StorageKey.enabled, false),
             appVolumeProfiles: appVolumeProfiles,
             enabledPluginIDs: pluginConfiguration.enabledPluginIDs.map(\.rawValue),
-            pluginOrder: pluginConfiguration.orderedPluginIDs.map(\.rawValue)
+            pluginOrder: pluginConfiguration.orderedPluginIDs.map(\.rawValue),
+            networkTrafficQuery: userDefaults.string(forKey: NetworkTrafficSettingsKey.query),
+            networkTrafficAlertThreshold: userDefaults.object(forKey: NetworkTrafficSettingsKey.alertThreshold)
+                == nil ? nil : Int64(userDefaults.integer(forKey: NetworkTrafficSettingsKey.alertThreshold)),
+            networkTrafficMenuBarDisplayMode: userDefaults.string(forKey: NetworkTrafficSettingsKey.menuBarDisplayMode),
+            networkTrafficMonthlyQuota: userDefaults.object(forKey: NetworkTrafficSettingsKey.monthlyQuota)
+                == nil ? nil : Int64(userDefaults.integer(forKey: NetworkTrafficSettingsKey.monthlyQuota))
         )
 
         return AppBackupDocument.current(
@@ -181,6 +187,10 @@ enum AppBackupService {
         SettingsKey.scrollDisableKey,
         AppVolumeService.StorageKey.enabled,
         AppVolumeService.StorageKey.profiles,
+        NetworkTrafficSettingsKey.query,
+        NetworkTrafficSettingsKey.alertThreshold,
+        NetworkTrafficSettingsKey.menuBarDisplayMode,
+        NetworkTrafficSettingsKey.monthlyQuota,
         BuiltInPluginManager.storageKey
     ]
 
@@ -209,6 +219,18 @@ enum AppBackupService {
         if let profiles = settings.appVolumeProfiles,
            let data = try? JSONEncoder().encode(profiles) {
             userDefaults.set(data, forKey: AppVolumeService.StorageKey.profiles)
+        }
+        if let query = settings.networkTrafficQuery {
+            userDefaults.set(query, forKey: NetworkTrafficSettingsKey.query)
+        }
+        if let threshold = settings.networkTrafficAlertThreshold {
+            userDefaults.set(threshold, forKey: NetworkTrafficSettingsKey.alertThreshold)
+        }
+        if let mode = settings.networkTrafficMenuBarDisplayMode {
+            userDefaults.set(mode, forKey: NetworkTrafficSettingsKey.menuBarDisplayMode)
+        }
+        if let quota = settings.networkTrafficMonthlyQuota {
+            userDefaults.set(quota, forKey: NetworkTrafficSettingsKey.monthlyQuota)
         }
         if let enabled = settings.enabledPluginIDs,
            let order = settings.pluginOrder {

@@ -53,6 +53,7 @@ struct SettingsSidebarItemStyle: Equatable, Sendable {
 enum SettingsTab: String, CaseIterable, Hashable, Identifiable {
     case general
     case plugins
+    case networkTraffic
     case volume
     case rightClick
     case scroll
@@ -67,6 +68,7 @@ enum SettingsTab: String, CaseIterable, Hashable, Identifiable {
         switch self {
         case .general: return "settings.tab.general"
         case .plugins: return "settings.tab.plugins"
+        case .networkTraffic: return "traffic.title"
         case .volume: return "settings.tab.volume"
         case .rightClick: return "settings.tab.rightClick"
         case .scroll: return "settings.tab.scroll"
@@ -81,6 +83,7 @@ enum SettingsTab: String, CaseIterable, Hashable, Identifiable {
         switch self {
         case .general: return "gearshape"
         case .plugins: return "puzzlepiece.extension"
+        case .networkTraffic: return "arrow.up.arrow.down.circle"
         case .volume: return "speaker.wave.2.bubble"
         case .rightClick: return "contextualmenu.and.cursorarrow"
         case .scroll: return "computermouse"
@@ -94,6 +97,7 @@ enum SettingsTab: String, CaseIterable, Hashable, Identifiable {
     var pluginID: BuiltInPluginID? {
         switch self {
         case .general, .plugins: return nil
+        case .networkTraffic: return .networkTraffic
         case .volume: return .appVolume
         case .rightClick: return .finderTools
         case .scroll: return .smoothScroll
@@ -248,6 +252,8 @@ struct SettingsView: View {
             PluginCenterView(manager: pluginManager) { tab in
                 selectedTab = tab
             }
+        case .networkTraffic:
+            NetworkTrafficSettingsView()
         case .volume:
             AppVolumeSettingsView()
         case .rightClick:

@@ -25,12 +25,22 @@ final class MenuBarStatusItemController: NSObject {
     private var settingsWindowController: NSWindowController?
     private var settingsHostingController: NSHostingController<SettingsView>?
     private var defaultsObserver: NSObjectProtocol?
+    private var networkTrafficObserver: NSObjectProtocol?
 
     override init() {
         super.init()
         defaultsObserver = NotificationCenter.default.addObserver(
             forName: UserDefaults.didChangeNotification,
             object: UserDefaults.standard,
+            queue: .main
+        ) { [weak self] _ in
+            Task { @MainActor [weak self] in
+                self?.updateButton()
+            }
+        }
+        networkTrafficObserver = NotificationCenter.default.addObserver(
+            forName: .networkTrafficSnapshotDidChange,
+            object: nil,
             queue: .main
         ) { [weak self] _ in
             Task { @MainActor [weak self] in
@@ -59,16 +69,24 @@ final class MenuBarStatusItemController: NSObject {
         let iconName = UserDefaults.standard.string(forKey: SettingsKey.menuBarIcon)
             ?? MenuBarIcon.default.rawValue
         let showTitle = UserDefaults.standard.bool(forKey: SettingsKey.menuBarShowTitle)
+        let trafficMode = UserDefaults.standard.string(forKey: NetworkTrafficSettingsKey.menuBarDisplayMode)
+            .flatMap(NetworkTrafficMenuBarDisplayMode.init(rawValue:)) ?? .off
+        let trafficTitle = BuiltInPluginManager.shared.isEnabled(.networkTraffic)
+            ? NetworkTrafficMenuBarPresenter.title(
+                snapshot: NetworkTrafficService.shared.snapshot,
+                mode: trafficMode
+            )
+            : nil
 
         button.image = NSImage(
             systemSymbolName: iconName,
             accessibilityDescription: "MenuTools"
         )
         button.image?.isTemplate = true
-        button.title = showTitle ? "MenuTools" : ""
-        button.imagePosition = showTitle ? .imageLeft : .imageOnly
-        button.toolTip = "MenuTools"
-        button.setAccessibilityLabel("MenuTools")
+        button.title = trafficTitle ?? (showTitle ? "MenuTools" : "")
+        button.imagePosition = button.title.isEmpty ? .imageOnly : .imageLeft
+        button.toolTip = trafficTitle.map { "MenuTools · \($0)" } ?? "MenuTools"
+        button.setAccessibilityLabel(button.toolTip ?? "MenuTools")
     }
 
     @objc private func togglePanel() {

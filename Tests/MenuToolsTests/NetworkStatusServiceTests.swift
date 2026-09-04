@@ -55,3 +55,43 @@ func networkParserRefreshPreservesProbes() {
     #expect(refreshed.publicIPv4 == "203.0.113.8")
     #expect(refreshed.latencyMilliseconds == 24)
 }
+
+@Test("网络质量会计算平均延迟、抖动、丢包和 DNS")
+func networkQualityCalculatorSummarizesSamples() {
+    let quality = NetworkQualityCalculator.make(
+        latencySamples: [20, nil, 30],
+        dnsMilliseconds: 5
+    )
+
+    #expect(quality.latencyMilliseconds == 25)
+    #expect(quality.jitterMilliseconds == 10)
+    #expect(abs(quality.packetLossPercent - 33.333) < 0.01)
+    #expect(quality.dnsMilliseconds == 5)
+}
+
+@Test("网络接口、WiFi 或 VPN 变化会生成切换记录")
+func networkTransitionDetectorRecordsMeaningfulChanges() {
+    let previous = NetworkEnvironmentSignature(
+        isConnected: true,
+        interfaceName: "en0",
+        wifiName: "Office",
+        vpnConnected: false
+    )
+    let current = NetworkEnvironmentSignature(
+        isConnected: true,
+        interfaceName: "en0",
+        wifiName: "Home",
+        vpnConnected: true
+    )
+
+    let event = NetworkStatusTransitionDetector.transition(
+        from: previous,
+        to: current,
+        at: Date(timeIntervalSince1970: 100)
+    )
+
+    #expect(event?.previous == previous)
+    #expect(event?.current == current)
+    #expect(event?.timestamp == Date(timeIntervalSince1970: 100))
+    #expect(NetworkStatusTransitionDetector.transition(from: current, to: current, at: Date()) == nil)
+}

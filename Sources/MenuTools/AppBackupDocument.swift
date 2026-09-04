@@ -29,6 +29,12 @@ struct AppBackupSettings: Codable, Equatable, Sendable {
     /// v1.1.0 增补的可选字段；旧备份缺失时不覆盖当前插件选择。
     var enabledPluginIDs: [String]? = nil
     var pluginOrder: [String]? = nil
+
+    /// 网络流量设置；旧备份缺失时保留当前配置。
+    var networkTrafficQuery: String? = nil
+    var networkTrafficAlertThreshold: Int64? = nil
+    var networkTrafficMenuBarDisplayMode: String? = nil
+    var networkTrafficMonthlyQuota: Int64? = nil
 }
 
 /// 备份文档校验失败的原因。
@@ -44,6 +50,10 @@ enum AppBackupValidationError: Error, Equatable, Sendable {
     case invalidAppVolume(String, Double)
     case invalidRightClickKey(String)
     case invalidPluginConfiguration
+    case invalidNetworkTrafficQuery(String)
+    case invalidNetworkTrafficThreshold(Int64)
+    case invalidNetworkTrafficMenuBarDisplayMode(String)
+    case invalidNetworkTrafficMonthlyQuota(Int64)
 }
 
 /// MenuTools 配置备份文档。
@@ -137,6 +147,23 @@ struct AppBackupDocument: Codable, Equatable, Sendable {
             }
         default:
             throw AppBackupValidationError.invalidPluginConfiguration
+        }
+
+        if let query = settings.networkTrafficQuery,
+           NetworkTrafficQuery(storageKey: query) == nil {
+            throw AppBackupValidationError.invalidNetworkTrafficQuery(query)
+        }
+        if let threshold = settings.networkTrafficAlertThreshold,
+           !(0...1_000_000_000).contains(threshold) {
+            throw AppBackupValidationError.invalidNetworkTrafficThreshold(threshold)
+        }
+        if let mode = settings.networkTrafficMenuBarDisplayMode,
+           NetworkTrafficMenuBarDisplayMode(rawValue: mode) == nil {
+            throw AppBackupValidationError.invalidNetworkTrafficMenuBarDisplayMode(mode)
+        }
+        if let quota = settings.networkTrafficMonthlyQuota,
+           !(0...10_000_000_000_000_000).contains(quota) {
+            throw AppBackupValidationError.invalidNetworkTrafficMonthlyQuota(quota)
         }
 
         return self

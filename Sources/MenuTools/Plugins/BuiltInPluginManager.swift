@@ -4,6 +4,7 @@ import Observation
 enum BuiltInPluginID: String, CaseIterable, Codable, Hashable, Identifiable, Sendable {
     case systemControls = "system-controls"
     case systemInsights = "system-insights"
+    case networkTraffic = "network-traffic"
     case clipboard
     case appVolume = "app-volume"
     case screenshot

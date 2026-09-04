@@ -17,6 +17,9 @@ struct NetworkStatusSnapshot: Equatable, Sendable {
     let vpnConnected: Bool
     var publicIPv4: String?
     var latencyMilliseconds: Int?
+    var jitterMilliseconds: Int? = nil
+    var packetLossPercent: Double? = nil
+    var dnsMilliseconds: Int? = nil
 
     static let empty = NetworkStatusSnapshot(
         isConnected: false,
@@ -27,6 +30,89 @@ struct NetworkStatusSnapshot: Equatable, Sendable {
         publicIPv4: nil,
         latencyMilliseconds: nil
     )
+}
+
+struct NetworkQualityMetrics: Equatable, Sendable {
+    let latencyMilliseconds: Int
+    let jitterMilliseconds: Int
+    let packetLossPercent: Double
+    let dnsMilliseconds: Int
+}
+
+enum NetworkQualityCalculator {
+    static func make(latencySamples: [Int?], dnsMilliseconds: Int) -> NetworkQualityMetrics {
+        let successful = latencySamples.compactMap { $0 }
+        let latency = successful.isEmpty ? 0 : successful.reduce(0, +) / successful.count
+        let jitter: Int
+        if successful.count < 2 {
+            jitter = 0
+        } else {
+            let differences = zip(successful, successful.dropFirst()).map { abs($1 - $0) }
+            jitter = differences.reduce(0, +) / differences.count
+        }
+        let loss = latencySamples.isEmpty
+            ? 100
+            : Double(latencySamples.count - successful.count) / Double(latencySamples.count) * 100
+        return NetworkQualityMetrics(
+            latencyMilliseconds: latency,
+            jitterMilliseconds: jitter,
+            packetLossPercent: loss,
+            dnsMilliseconds: dnsMilliseconds
+        )
+    }
+}
+
+struct NetworkEnvironmentSignature: Equatable, Sendable {
+    let isConnected: Bool
+    let interfaceName: String?
+    let wifiName: String?
+    let vpnConnected: Bool
+
+    init(snapshot: NetworkStatusSnapshot) {
+        self.init(
+            isConnected: snapshot.isConnected,
+            interfaceName: snapshot.interfaceName,
+            wifiName: snapshot.wifiName,
+            vpnConnected: snapshot.vpnConnected
+        )
+    }
+
+    init(isConnected: Bool, interfaceName: String?, wifiName: String?, vpnConnected: Bool) {
+        self.isConnected = isConnected
+        self.interfaceName = interfaceName
+        self.wifiName = wifiName
+        self.vpnConnected = vpnConnected
+    }
+}
+
+struct NetworkStatusTransition: Equatable, Identifiable, Sendable {
+    let id: UUID
+    let timestamp: Date
+    let previous: NetworkEnvironmentSignature
+    let current: NetworkEnvironmentSignature
+
+    init(
+        id: UUID = UUID(),
+        timestamp: Date,
+        previous: NetworkEnvironmentSignature,
+        current: NetworkEnvironmentSignature
+    ) {
+        self.id = id
+        self.timestamp = timestamp
+        self.previous = previous
+        self.current = current
+    }
+}
+
+enum NetworkStatusTransitionDetector {
+    static func transition(
+        from previous: NetworkEnvironmentSignature,
+        to current: NetworkEnvironmentSignature,
+        at timestamp: Date
+    ) -> NetworkStatusTransition? {
+        guard previous != current else { return nil }
+        return NetworkStatusTransition(timestamp: timestamp, previous: previous, current: current)
+    }
 }
 
 struct NetworkStatusReading: Equatable, Sendable {
@@ -80,6 +166,9 @@ enum NetworkStatusParser {
         var refreshed = snapshot(from: reading)
         refreshed.publicIPv4 = previous.publicIPv4
         refreshed.latencyMilliseconds = previous.latencyMilliseconds
+        refreshed.jitterMilliseconds = previous.jitterMilliseconds
+        refreshed.packetLossPercent = previous.packetLossPercent
+        refreshed.dnsMilliseconds = previous.dnsMilliseconds
         return refreshed
     }
 }
@@ -158,6 +247,7 @@ struct DefaultNetworkStatusProvider: NetworkStatusProviding {
 protocol NetworkProbe: Sendable {
     func publicIPv4() async throws -> String
     func latencyMilliseconds() async throws -> Int
+    func networkQuality() async -> NetworkQualityMetrics
 }
 
 struct URLSessionNetworkProbe: NetworkProbe {
@@ -189,31 +279,89 @@ struct URLSessionNetworkProbe: NetworkProbe {
         }
         return max(Int((Date().timeIntervalSince(start) * 1_000).rounded()), 0)
     }
+
+    func networkQuality() async -> NetworkQualityMetrics {
+        async let dns = Self.dnsResolutionMilliseconds()
+        var samples: [Int?] = []
+        for _ in 0..<3 {
+            samples.append(try? await latencyMilliseconds())
+        }
+        return await NetworkQualityCalculator.make(
+            latencySamples: samples,
+            dnsMilliseconds: dns
+        )
+    }
+
+    private static func dnsResolutionMilliseconds() async -> Int {
+        await Task.detached {
+            let start = ProcessInfo.processInfo.systemUptime
+            var result: UnsafeMutablePointer<addrinfo>?
+            let status = getaddrinfo("www.apple.com", nil, nil, &result)
+            if let result { freeaddrinfo(result) }
+            guard status == 0 else { return 0 }
+            return max(Int(((ProcessInfo.processInfo.systemUptime - start) * 1_000).rounded()), 0)
+        }.value
+    }
 }
 
 @MainActor
 @Observable
 final class NetworkStatusService {
+    static let shared = NetworkStatusService()
+
     private let provider: any NetworkStatusProviding
     private let probe: any NetworkProbe
+    private let now: () -> Date
+    private var previousEnvironment: NetworkEnvironmentSignature?
+    private var monitorTimer: Timer?
 
     private(set) var snapshot = NetworkStatusSnapshot.empty
     private(set) var isPublicIPLoading = false
     private(set) var isLatencyTesting = false
+    private(set) var recentTransitions: [NetworkStatusTransition] = []
 
     init(
         provider: any NetworkStatusProviding = DefaultNetworkStatusProvider(),
-        probe: any NetworkProbe = URLSessionNetworkProbe()
+        probe: any NetworkProbe = URLSessionNetworkProbe(),
+        now: @escaping () -> Date = Date.init
     ) {
         self.provider = provider
         self.probe = probe
+        self.now = now
     }
 
     func refresh() {
-        snapshot = NetworkStatusParser.refreshedSnapshot(
+        let refreshed = NetworkStatusParser.refreshedSnapshot(
             from: provider.read(),
             preserving: snapshot
         )
+        let currentEnvironment = NetworkEnvironmentSignature(snapshot: refreshed)
+        if let previousEnvironment,
+           let transition = NetworkStatusTransitionDetector.transition(
+            from: previousEnvironment,
+            to: currentEnvironment,
+            at: now()
+           ) {
+            recentTransitions.append(transition)
+            recentTransitions = Array(recentTransitions.suffix(20))
+        }
+        previousEnvironment = currentEnvironment
+        snapshot = refreshed
+    }
+
+    func startMonitoring() {
+        guard monitorTimer == nil else { return }
+        refresh()
+        monitorTimer = Timer.scheduledTimer(withTimeInterval: 30, repeats: true) { [weak self] _ in
+            Task { @MainActor [weak self] in
+                self?.refresh()
+            }
+        }
+    }
+
+    func stopMonitoring() {
+        monitorTimer?.invalidate()
+        monitorTimer = nil
     }
 
     func fetchPublicIP() {
@@ -233,8 +381,11 @@ final class NetworkStatusService {
         let probe = self.probe
         Task {
             defer { isLatencyTesting = false }
-            guard let latency = try? await probe.latencyMilliseconds() else { return }
-            snapshot.latencyMilliseconds = latency
+            let quality = await probe.networkQuality()
+            snapshot.latencyMilliseconds = quality.latencyMilliseconds
+            snapshot.jitterMilliseconds = quality.jitterMilliseconds
+            snapshot.packetLossPercent = quality.packetLossPercent
+            snapshot.dnsMilliseconds = quality.dnsMilliseconds
         }
     }
 }
