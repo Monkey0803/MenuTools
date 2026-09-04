@@ -16,6 +16,14 @@ private struct AppShortcutStubConflictChecker: ShortcutConflictChecking {
     }
 }
 
+@Test("当前应用已有绑定时显示已设置的快捷键")
+func appShortcutDisplayUsesExistingBinding() {
+    let binding = GlobalShortcut(keyCode: 18, modifiers: GlobalShortcutModifier.controlOption)
+
+    #expect(AppLaunchShortcutDisplay.title(for: binding) == binding.displayName)
+    #expect(AppLaunchShortcutDisplay.title(for: nil) == L("appShortcut.bindCurrent"))
+}
+
 @Test("应用快捷键能匹配绑定的应用路径")
 func appShortcutMatchesApplicationPath() {
     let binding = GlobalShortcut(keyCode: 18, modifiers: GlobalShortcutModifier.controlOption)

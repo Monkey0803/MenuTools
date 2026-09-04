@@ -1,6 +1,13 @@
 import AppKit
 import SwiftUI
 
+/// 当前前台应用的快捷键操作文案：已有绑定时优先展示实际组合键。
+enum AppLaunchShortcutDisplay {
+    static func title(for binding: GlobalShortcut?) -> String {
+        binding?.displayName ?? L("appShortcut.bindCurrent")
+    }
+}
+
 /// 应用启动快捷键设置：选择应用并为它绑定一个全局快捷键。
 struct AppLaunchSettingsView: View {
     @Bindable private var shortcutService: AppShortcutService
@@ -116,6 +123,7 @@ struct AppLaunchSettingsView: View {
             }
 
             if let frontmostApp {
+                let binding = shortcutService.binding(for: frontmostApp)
                 HStack(spacing: 10) {
                     appIcon(frontmostApp, size: 32)
                     VStack(alignment: .leading, spacing: 2) {
@@ -131,12 +139,15 @@ struct AppLaunchSettingsView: View {
                         presentBindingSheet(for: frontmostApp)
                     } label: {
                         Label(
-                            L("appShortcut.bindCurrent"),
+                            AppLaunchShortcutDisplay.title(for: binding),
                             systemImage: "keyboard"
                         )
+                        .font(binding == nil ? .caption : .caption.monospaced())
+                        .contentTransition(.symbolEffect(.replace))
                     }
                     .buttonStyle(.borderedProminent)
                     .controlSize(.small)
+                    .help(binding == nil ? L("appShortcut.bindCurrent") : L("appShortcut.currentBinding"))
                 }
             } else {
                 Text(L("appShortcut.noFrontmost"))
