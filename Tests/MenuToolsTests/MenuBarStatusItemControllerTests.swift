@@ -15,6 +15,12 @@ func appVolumeQuickAccessDoesNotToggleVisiblePopover() {
     #expect(!AppVolumeQuickAccessPresentationPolicy.shouldShow(isShown: true))
 }
 
+@Test("窗口管理快捷键只确保布局面板显示，不反向关闭")
+func windowManagementQuickAccessDoesNotToggleVisiblePopover() {
+    #expect(WindowManagementQuickAccessPresentationPolicy.shouldShow(isShown: false))
+    #expect(!WindowManagementQuickAccessPresentationPolicy.shouldShow(isShown: true))
+}
+
 @Test("菜单栏弹层窗口使用透明底板")
 @MainActor
 func menuBarPopoverWindowUsesTransparentBacking() {

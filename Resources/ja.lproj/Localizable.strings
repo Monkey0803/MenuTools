@@ -684,6 +684,9 @@
 "window.apply" = "適用";
 "window.arrange" = "現在のアプリのウインドウを整列";
 "window.arranged" = "%ld 個のウインドウを整列しました";
+"window.quickAccess.shortcut" = "クイックアクセス";
+"window.quickAccess.shortcutDescription" = "グローバルショートカットでウインドウレイアウトパネルをいつでも開けます。";
+"window.quickAccess.targetHint" = "レイアウトはショートカット実行時に前面だったアプリへ適用されます。";
 "focus.title" = "集中モード";
 "focus.enabled" = "オン";
 "focus.disabled" = "オフ";

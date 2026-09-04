@@ -684,6 +684,9 @@
 "window.apply" = "적용";
 "window.arrange" = "현재 앱 윈도우 정렬";
 "window.arranged" = "%ld개 윈도우를 정렬했습니다";
+"window.quickAccess.shortcut" = "빠른 접근";
+"window.quickAccess.shortcutDescription" = "전역 단축키로 언제든지 윈도우 레이아웃 패널을 엽니다.";
+"window.quickAccess.targetHint" = "레이아웃은 단축키를 누를 때 전면에 있던 앱에 적용됩니다.";
 "focus.title" = "집중 모드";
 "focus.enabled" = "켜짐";
 "focus.disabled" = "꺼짐";

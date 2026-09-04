@@ -684,6 +684,9 @@
 "window.apply" = "Apply";
 "window.arrange" = "Arrange current app windows";
 "window.arranged" = "%ld windows arranged";
+"window.quickAccess.shortcut" = "Quick access";
+"window.quickAccess.shortcutDescription" = "Set a global shortcut to open the window layout panel at any time.";
+"window.quickAccess.targetHint" = "Layouts apply to the app that was frontmost when the shortcut was pressed.";
 "focus.title" = "Focus";
 "focus.enabled" = "Enabled";
 "focus.disabled" = "Disabled";

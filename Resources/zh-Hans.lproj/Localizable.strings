@@ -698,6 +698,9 @@
 "window.apply" = "应用";
 "window.arrange" = "排列当前应用窗口";
 "window.arranged" = "已排列 %ld 个窗口";
+"window.quickAccess.shortcut" = "快速打开";
+"window.quickAccess.shortcutDescription" = "设置全局快捷键，随时打开窗口布局面板。";
+"window.quickAccess.targetHint" = "点选布局将应用到快捷键触发前的前台应用。";
 "focus.title" = "专注模式";
 "focus.enabled" = "已开启";
 "focus.disabled" = "已关闭";

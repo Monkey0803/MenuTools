@@ -13,6 +13,12 @@ enum AppVolumeQuickAccessPresentationPolicy {
     }
 }
 
+enum WindowManagementQuickAccessPresentationPolicy {
+    static func shouldShow(isShown: Bool) -> Bool {
+        !isShown
+    }
+}
+
 /// 使用 AppKit 直接管理菜单栏入口，避免 SwiftUI MenuBarExtra 在部分 macOS 版本上丢失鼠标点击。
 @MainActor
 final class MenuBarStatusItemController: NSObject {
@@ -22,6 +28,7 @@ final class MenuBarStatusItemController: NSObject {
     private var popover: NSPopover?
     private var clipboardPopover: NSPopover?
     private var appVolumePopover: NSPopover?
+    private var windowManagementPopover: NSPopover?
     private var settingsWindowController: NSWindowController?
     private var settingsHostingController: NSHostingController<SettingsView>?
     private var defaultsObserver: NSObjectProtocol?
@@ -196,6 +203,48 @@ final class MenuBarStatusItemController: NSObject {
         self.appVolumePopover = appVolumePopover
         appVolumePopover.show(relativeTo: button.bounds, of: button, preferredEdge: .minY)
         if let window = appVolumePopover.contentViewController?.view.window {
+            Self.configurePopoverWindow(window)
+        }
+    }
+
+    /// 供窗口管理插件的全局快捷键直接调出布局选择面板。
+    func showWindowManagement() {
+        guard BuiltInPluginManager.shared.isEnabled(.windowManagement),
+              let button = statusItem?.button else {
+            return
+        }
+
+        // 全局快捷键到达时仍是外部应用处于前台；在展示本面板之前保留它。
+        WindowManagementService.shared.rememberFrontmostExternalApplication()
+        guard WindowManagementQuickAccessPresentationPolicy.shouldShow(
+            isShown: windowManagementPopover?.isShown == true
+        ) else { return }
+        if let clipboardPopover, clipboardPopover.isShown {
+            clipboardPopover.performClose(button)
+        }
+        if let appVolumePopover, appVolumePopover.isShown {
+            appVolumePopover.performClose(button)
+        }
+        if let popover, popover.isShown {
+            popover.performClose(button)
+        }
+
+        let windowManagementPopover = Self.reusablePopover(existing: windowManagementPopover) { [weak self] in
+            let popover = NSPopover()
+            popover.behavior = .transient
+            popover.animates = true
+            popover.contentSize = NSSize(width: 340, height: 430)
+            popover.contentViewController = NSHostingController(
+                rootView: WindowManagementQuickAccessView {
+                    guard let self, let button = self.statusItem?.button else { return }
+                    self.windowManagementPopover?.performClose(button)
+                }
+            )
+            return popover
+        }
+        self.windowManagementPopover = windowManagementPopover
+        windowManagementPopover.show(relativeTo: button.bounds, of: button, preferredEdge: .minY)
+        if let window = windowManagementPopover.contentViewController?.view.window {
             Self.configurePopoverWindow(window)
         }
     }

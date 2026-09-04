@@ -684,6 +684,9 @@
 "window.apply" = "套用";
 "window.arrange" = "排列目前應用程式視窗";
 "window.arranged" = "已排列 %ld 個視窗";
+"window.quickAccess.shortcut" = "快速開啟";
+"window.quickAccess.shortcutDescription" = "設定全域快速鍵，隨時開啟視窗版面配置面板。";
+"window.quickAccess.targetHint" = "點選版面配置會套用到觸發快速鍵前的前景應用程式。";
 "focus.title" = "專注模式";
 "focus.enabled" = "已開啟";
 "focus.disabled" = "已關閉";

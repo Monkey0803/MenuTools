@@ -6,6 +6,7 @@ struct WindowManagementSettingsView: View {
     @Bindable private var shortcutService: WindowShortcutService
     @Bindable private var windowService: WindowManagementService
     @State private var recordingLayout: WindowLayout?
+    @State private var isRecordingQuickAccessShortcut = false
     @State private var errorMessage: String?
     @State private var newPresetName = ""
     @State private var presetLayout: WindowLayout = .leftHalf
@@ -32,13 +33,26 @@ struct WindowManagementSettingsView: View {
                         .foregroundStyle(.orange)
                 }
 
+                quickAccessShortcutSection
+
                 managerOptionsSection
                 presetSection
                 applicationRulesSection
                 exclusionSection
 
                 // 必须放在滚动内容顶部，确保窗口打开时就已创建并可成为第一响应者。
-                WindowShortcutCaptureView(isRecording: recordingLayout != nil) { shortcut in
+                WindowShortcutCaptureView(isRecording: recordingLayout != nil || isRecordingQuickAccessShortcut) { shortcut in
+                    if isRecordingQuickAccessShortcut {
+                        isRecordingQuickAccessShortcut = false
+                        guard let shortcut else { return }
+                        do {
+                            try shortcutService.setQuickAccessBinding(shortcut)
+                            errorMessage = nil
+                        } catch {
+                            errorMessage = error.localizedDescription
+                        }
+                        return
+                    }
                     guard let layout = recordingLayout else { return }
                     recordingLayout = nil
                     guard let shortcut else { return }
@@ -105,6 +119,40 @@ struct WindowManagementSettingsView: View {
         .navigationTitle(L("settings.title"))
     }
 
+    private var quickAccessShortcutSection: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            Text(L("window.quickAccess.shortcut"))
+                .font(.headline)
+            Text(L("window.quickAccess.shortcutDescription"))
+                .font(.caption)
+                .foregroundStyle(.secondary)
+            HStack {
+                Text(shortcutService.quickAccessBinding?.displayName ?? L("settings.unset"))
+                    .font(.callout.monospaced())
+                    .foregroundStyle(shortcutService.quickAccessBinding == nil ? .secondary : .primary)
+                Spacer()
+                Button {
+                    recordingLayout = nil
+                    errorMessage = nil
+                    isRecordingQuickAccessShortcut.toggle()
+                } label: {
+                    Image(systemName: isRecordingQuickAccessShortcut ? "xmark" : "record.circle")
+                }
+                .help(L("shortcut.record"))
+                if shortcutService.quickAccessBinding != nil {
+                    Button {
+                        shortcutService.clearQuickAccessBinding()
+                    } label: {
+                        Image(systemName: "trash")
+                    }
+                    .help(L("shortcut.clear"))
+                }
+            }
+        }
+        .padding(12)
+        .glassEffect(.regular, in: .rect(cornerRadius: 12))
+    }
+
     private var managerOptionsSection: some View {
         VStack(alignment: .leading, spacing: 8) {
             Text(L("window.manager.section"))
@@ -162,7 +210,8 @@ struct WindowManagementSettingsView: View {
             }
             ForEach(windowService.configuration.presets) { preset in
                 HStack {
-                    Image(systemName: preset.layout.symbol)
+                    WindowLayoutIcon(layout: preset.layout)
+                        .frame(width: 18, height: 14)
                     Text(preset.name)
                     Spacer()
                     Button(L("window.apply")) { apply(preset) }
@@ -302,8 +351,8 @@ struct WindowManagementSettingsView: View {
                 apply(layout)
             } label: {
                 HStack(spacing: 7) {
-                    Image(systemName: layout.symbol)
-                        .frame(width: 18)
+                    WindowLayoutIcon(layout: layout)
+                        .frame(width: 18, height: 14)
                     Text(L(layout.titleKey))
                         .font(.callout)
                         .lineLimit(1)
@@ -320,6 +369,7 @@ struct WindowManagementSettingsView: View {
             .help(L("window.applied", L(layout.titleKey)))
 
             Button {
+                isRecordingQuickAccessShortcut = false
                 recordingLayout = recordingLayout == layout ? nil : layout
             } label: {
                 Image(systemName: recordingLayout == layout ? "xmark" : "record.circle")

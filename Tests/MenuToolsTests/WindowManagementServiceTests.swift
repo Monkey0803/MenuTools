@@ -135,6 +135,21 @@ func maximizeLayoutsUseDistinctSymbols() {
     #expect(Set(symbols).count == symbols.count)
 }
 
+@Test("窗口布局预览图标与所有布局名称一一对应")
+func windowLayoutPreviewIconsMatchTheirDescriptions() {
+    #expect(WindowLayout.allCases.allSatisfy {
+        $0.iconDescriptor.isWindowPreview || $0.iconDescriptor.systemSymbol != nil
+    })
+    #expect(WindowLayout.allCases.filter { $0.iconDescriptor.isWindowPreview }.count == 46)
+
+    #expect(WindowLayout.secondFourth.iconDescriptor.windowFrame == CGRect(x: 0.25, y: 0, width: 0.25, height: 1))
+    #expect(WindowLayout.thirdFourth.iconDescriptor.windowFrame == CGRect(x: 0.5, y: 0, width: 0.25, height: 1))
+    #expect(WindowLayout.topSecondFourth.iconDescriptor.windowFrame == CGRect(x: 0.25, y: 0, width: 0.25, height: 0.5))
+    #expect(WindowLayout.topThirdFourth.iconDescriptor.windowFrame == CGRect(x: 0.5, y: 0, width: 0.25, height: 0.5))
+    #expect(WindowLayout.centerTwoThirds.iconDescriptor.windowFrame == CGRect(x: 1.0 / 6.0, y: 0, width: 2.0 / 3.0, height: 1))
+    #expect(WindowLayout.bottomCenterTwoThirds.iconDescriptor.windowFrame == CGRect(x: 1.0 / 6.0, y: 0.5, width: 2.0 / 3.0, height: 0.5))
+}
+
 @Test("窗口管理参数控制屏幕边距和窗口间距")
 func windowLayoutUsesConfigurableMetrics() {
     let screen = CGRect(x: 0, y: 0, width: 1200, height: 800)
