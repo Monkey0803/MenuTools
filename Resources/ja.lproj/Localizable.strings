@@ -303,6 +303,9 @@
 "clipboard.history" = "クリップボード履歴";
 "clipboard.historyItems" = "%d 件保存";
 "clipboard.search" = "クリップボードを検索";
+"clipboard.filters" = "絞り込み";
+"clipboard.filtersCount" = "絞り込み（%d）";
+"clipboard.tab.settings" = "設定";
 "clipboard.empty" = "クリップボード履歴なし";
 "clipboard.emptyDescription" = "コピーしたテキスト、画像、リンク、ファイルがここに表示されます。";
 "clipboard.image" = "画像";

@@ -11,6 +11,16 @@ func clipboardSettingsUsesAdaptiveHistoryGrid() {
     #expect(ClipboardHistorySettingsLayout.columnCount(for: 390) == 1)
 }
 
+@Test("剪贴板设置页拆分为三个低密度工作区")
+func clipboardSettingsUsesFocusedWorkspaces() {
+    #expect(ClipboardHistorySettingsTab.allCases.map(\.id) == ["history", "snippets", "settings"])
+    #expect(ClipboardHistorySettingsTab.allCases.map(\.titleKey) == [
+        "clipboard.history",
+        "clipboard.snippets",
+        "clipboard.tab.settings"
+    ])
+}
+
 @Test("剪贴板卡片缩略图和悬停预览使用固定尺寸")
 func clipboardPreviewUsesConsistentFrames() {
     #expect(ClipboardHistoryPreviewLayout.thumbnailSize == CGSize(width: 64, height: 64))

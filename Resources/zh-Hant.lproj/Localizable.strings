@@ -303,6 +303,9 @@
 "clipboard.history" = "剪貼板歷史";
 "clipboard.historyItems" = "%d 筆記錄";
 "clipboard.search" = "搜尋剪貼板";
+"clipboard.filters" = "篩選";
+"clipboard.filtersCount" = "篩選（%d）";
+"clipboard.tab.settings" = "設定";
 "clipboard.empty" = "暫無剪貼板歷史";
 "clipboard.emptyDescription" = "複製的文字、圖片、連結和檔案會顯示在這裡。";
 "clipboard.image" = "圖片";

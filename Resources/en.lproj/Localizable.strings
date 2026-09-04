@@ -303,6 +303,9 @@
 "clipboard.history" = "Clipboard History";
 "clipboard.historyItems" = "%d saved item(s)";
 "clipboard.search" = "Search clipboard";
+"clipboard.filters" = "Filters";
+"clipboard.filtersCount" = "Filters (%d)";
+"clipboard.tab.settings" = "Settings";
 "clipboard.empty" = "No clipboard history";
 "clipboard.emptyDescription" = "Copied text, images, links, and files will appear here.";
 "clipboard.image" = "Image";

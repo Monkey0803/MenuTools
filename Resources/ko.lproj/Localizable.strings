@@ -303,6 +303,9 @@
 "clipboard.history" = "클립보드 기록";
 "clipboard.historyItems" = "%d개 저장됨";
 "clipboard.search" = "클립보드 검색";
+"clipboard.filters" = "필터";
+"clipboard.filtersCount" = "필터 (%d)";
+"clipboard.tab.settings" = "설정";
 "clipboard.empty" = "클립보드 기록 없음";
 "clipboard.emptyDescription" = "복사한 텍스트, 이미지, 링크 및 파일이 여기에 표시됩니다.";
 "clipboard.image" = "이미지";

@@ -303,6 +303,9 @@
 "clipboard.history" = "剪贴板历史";
 "clipboard.historyItems" = "%d 条记录";
 "clipboard.search" = "搜索剪贴板";
+"clipboard.filters" = "筛选";
+"clipboard.filtersCount" = "筛选（%d）";
+"clipboard.tab.settings" = "设置";
 "clipboard.empty" = "暂无剪贴板历史";
 "clipboard.emptyDescription" = "复制的文本、图片、链接和文件会显示在这里。";
 "clipboard.image" = "图片";

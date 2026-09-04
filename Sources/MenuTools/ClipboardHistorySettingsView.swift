@@ -10,6 +10,30 @@ enum ClipboardHistorySettingsLayout {
     }
 }
 
+enum ClipboardHistorySettingsTab: String, CaseIterable, Identifiable, Sendable {
+    case history
+    case snippets
+    case settings
+
+    var id: String { rawValue }
+
+    var titleKey: String {
+        switch self {
+        case .history: "clipboard.history"
+        case .snippets: "clipboard.snippets"
+        case .settings: "clipboard.tab.settings"
+        }
+    }
+
+    var symbol: String {
+        switch self {
+        case .history: "clock.arrow.circlepath"
+        case .snippets: "text.quote"
+        case .settings: "slider.horizontal.3"
+        }
+    }
+}
+
 enum ClipboardShortcutControlPolicy {
     static func shouldShowSave(hasCapturedShortcut: Bool) -> Bool {
         hasCapturedShortcut
@@ -81,6 +105,7 @@ struct ClipboardHistorySettingsView: View {
     @State private var isHistoryScrolling = false
     @State private var selectedItemIDs = Set<UUID>()
     @State private var isSelectingItems = false
+    @State private var selectedTab: ClipboardHistorySettingsTab = .history
 
     private var displayedShortcut: GlobalShortcut? {
         capturedShortcut ?? shortcutService.binding
@@ -88,16 +113,12 @@ struct ClipboardHistorySettingsView: View {
 
     var body: some View {
         VStack(spacing: 0) {
+            historyHeader
+            workspacePicker
+            Divider()
+
             ScrollView {
-                VStack(alignment: .leading, spacing: 16) {
-                    historyHeader
-                    ClipboardPrivacySettingsSection(historyService: historyService)
-                    ClipboardHistoryManagementSettingsSection(historyService: historyService)
-                    searchField
-                    historyControls
-                    historyContent
-                    ClipboardSnippetSettingsSection(historyService: historyService)
-                }
+                workspaceContent
                 .padding(ClipboardHistorySettingsLayout.contentHorizontalPadding)
             }
             .onScrollPhaseChange { _, phase in
@@ -119,13 +140,58 @@ struct ClipboardHistorySettingsView: View {
                 }
                 .allowsHitTesting(false)
             }
-
-            Divider()
-            shortcutSection
         }
         .task {
             await historyService.loadPersistedHistory()
             historyService.refresh()
+        }
+        .onChange(of: selectedTab) { _, tab in
+            guard tab != .settings, isRecording else { return }
+            isRecording = false
+            capturedShortcut = nil
+            errorMessage = nil
+        }
+    }
+
+    private var workspacePicker: some View {
+        Picker("", selection: $selectedTab) {
+            ForEach(ClipboardHistorySettingsTab.allCases) { tab in
+                Label(L(tab.titleKey), systemImage: tab.symbol)
+                    .tag(tab)
+            }
+        }
+        .labelsHidden()
+        .pickerStyle(.segmented)
+        .controlSize(.small)
+        .padding(.horizontal, ClipboardHistorySettingsLayout.contentHorizontalPadding)
+        .padding(.vertical, 10)
+    }
+
+    @ViewBuilder
+    private var workspaceContent: some View {
+        switch selectedTab {
+        case .history:
+            historyWorkspace
+        case .snippets:
+            ClipboardSnippetSettingsSection(historyService: historyService)
+        case .settings:
+            settingsWorkspace
+        }
+    }
+
+    private var historyWorkspace: some View {
+        VStack(alignment: .leading, spacing: 14) {
+            searchField
+            historyControls
+            historyContent
+        }
+    }
+
+    private var settingsWorkspace: some View {
+        VStack(alignment: .leading, spacing: 14) {
+            ClipboardHistoryManagementSettingsSection(historyService: historyService)
+            ClipboardPrivacySettingsSection(historyService: historyService)
+            shortcutSection
         }
     }
 
@@ -177,6 +243,9 @@ struct ClipboardHistorySettingsView: View {
             .menuStyle(.borderlessButton)
             .accessibilityLabel(L("clipboard.actions"))
         }
+        .padding(.horizontal, ClipboardHistorySettingsLayout.contentHorizontalPadding)
+        .padding(.top, 16)
+        .padding(.bottom, 4)
     }
 
     private var searchField: some View {
@@ -193,50 +262,27 @@ struct ClipboardHistorySettingsView: View {
 
     private var historyControls: some View {
         HStack(spacing: 10) {
-            Picker(L("clipboard.category"), selection: $category) {
-                ForEach(ClipboardHistoryCategory.allCases) { category in
-                    Text(L(category.titleKey)).tag(category)
-                }
-            }
-            .labelsHidden()
-            .pickerStyle(.segmented)
-            .accessibilityLabel(L("clipboard.category"))
-
             Menu {
+                Picker(L("clipboard.category"), selection: $category) {
+                    ForEach(ClipboardHistoryCategory.allCases) { category in
+                        Text(L(category.titleKey)).tag(category)
+                    }
+                }
                 Picker(L("clipboard.sort"), selection: $sortOrder) {
                     ForEach(ClipboardHistorySortOrder.allCases) { sortOrder in
                         Text(L(sortOrder.titleKey)).tag(sortOrder)
                     }
                 }
-            } label: {
-                Label(L(sortOrder.titleKey), systemImage: "arrow.up.arrow.down")
-            }
-            .menuStyle(.borderlessButton)
-            .buttonStyle(.bordered)
-            .accessibilityLabel(L("clipboard.sort"))
 
-            Menu {
                 Button(L("clipboard.source.all")) { sourceBundleID = nil }
                 ForEach(sourceBundleIDs, id: \.self) { bundleID in
                     Button(sourceApplicationName(for: bundleID)) { sourceBundleID = bundleID }
                 }
-            } label: {
-                Label(sourceBundleID.map(sourceApplicationName) ?? L("clipboard.source.all"), systemImage: "app")
-            }
-            .menuStyle(.borderlessButton)
-            .buttonStyle(.bordered)
 
-            Menu {
                 ForEach(ClipboardHistoryDateFilter.allCases) { filter in
                     Button(L(filter.titleKey)) { dateFilter = filter }
                 }
-            } label: {
-                Label(L(dateFilter.titleKey), systemImage: "calendar")
-            }
-            .menuStyle(.borderlessButton)
-            .buttonStyle(.bordered)
 
-            Menu {
                 Picker(L("clipboard.limit"), selection: Binding<ClipboardHistoryLimit>(
                     get: { ClipboardHistoryLimit(rawValue: historyService.limit) ?? .fifty },
                     set: { limit in historyService.setLimit(limit) }
@@ -246,11 +292,11 @@ struct ClipboardHistorySettingsView: View {
                     }
                 }
             } label: {
-                Label(L("clipboard.limitValue", historyService.limit), systemImage: "archivebox")
+                Label(filterMenuTitle, systemImage: "line.3.horizontal.decrease.circle")
             }
             .menuStyle(.borderlessButton)
             .buttonStyle(.bordered)
-            .accessibilityLabel(L("clipboard.limit"))
+            .accessibilityLabel(L("clipboard.filters"))
 
             Spacer()
 
@@ -431,7 +477,6 @@ struct ClipboardHistorySettingsView: View {
                     .offset(y: 16)
             }
         }
-        .padding(.horizontal, ClipboardHistorySettingsLayout.contentHorizontalPadding)
         .padding(.vertical, 14)
         .padding(.bottom, errorMessage == nil ? 0 : 14)
         .overlay {
@@ -469,6 +514,17 @@ struct ClipboardHistorySettingsView: View {
 
     private var sourceBundleIDs: [String] {
         Array(Set(historyService.items.compactMap(\.sourceBundleID))).sorted()
+    }
+
+    private var filterMenuTitle: String {
+        let count = [
+            category != .all,
+            sortOrder != .newestFirst,
+            sourceBundleID != nil,
+            dateFilter != .all,
+            historyService.limit != ClipboardHistoryLimit.fifty.rawValue
+        ].filter { $0 }.count
+        return count == 0 ? L("clipboard.filters") : L("clipboard.filtersCount", count)
     }
 
     private func sourceApplicationName(for bundleID: String) -> String {
