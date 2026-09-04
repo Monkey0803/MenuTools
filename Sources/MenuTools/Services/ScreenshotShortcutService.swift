@@ -52,10 +52,12 @@ enum ScreenshotShortcutError: LocalizedError, Equatable {
     case otherApplicationConflict
     case sceneConflict(ScenePreset)
     case windowConflict(WindowLayout)
+    case windowManagementConflict
     case appConflict(String)
     case screenshotConflict(ScreenshotCaptureMode)
     case clipboardConflict
     case appVolumeConflict
+    case translationConflict
 
     var errorDescription: String? {
         switch self {
@@ -69,6 +71,8 @@ enum ScreenshotShortcutError: LocalizedError, Equatable {
             return L("shortcut.error.conflict", L(scene.titleKey))
         case let .windowConflict(layout):
             return L("shortcut.error.conflict", L(layout.titleKey))
+        case .windowManagementConflict:
+            return L("shortcut.error.conflict", L("window.title"))
         case let .appConflict(path):
             return L(
                 "shortcut.error.conflict",
@@ -80,6 +84,8 @@ enum ScreenshotShortcutError: LocalizedError, Equatable {
             return L("shortcut.error.conflict", L("settings.tab.clipboard"))
         case .appVolumeConflict:
             return L("shortcut.error.conflict", L("settings.tab.volume"))
+        case .translationConflict:
+            return L("shortcut.error.conflict", L("settings.tab.translation"))
         }
     }
 }
@@ -207,12 +213,16 @@ final class ScreenshotShortcutService {
             throw ScreenshotShortcutError.sceneConflict(scene)
         case let .window(layout):
             throw ScreenshotShortcutError.windowConflict(layout)
+        case .windowManagement:
+            throw ScreenshotShortcutError.windowManagementConflict
         case let .app(path):
             throw ScreenshotShortcutError.appConflict(path)
         case .clipboard:
             throw ScreenshotShortcutError.clipboardConflict
         case .appVolume:
             throw ScreenshotShortcutError.appVolumeConflict
+        case .translation:
+            throw ScreenshotShortcutError.translationConflict
         case .screenshot, nil:
             break
         }

@@ -30,9 +30,11 @@ enum AppShortcutError: LocalizedError, Equatable {
     case otherApplicationConflict
     case sceneConflict(ScenePreset)
     case windowConflict(WindowLayout)
+    case windowManagementConflict
     case screenshotConflict
     case clipboardConflict
     case appVolumeConflict
+    case translationConflict
     case launchFailed(String)
 
     var errorDescription: String? {
@@ -52,12 +54,16 @@ enum AppShortcutError: LocalizedError, Equatable {
             return L("shortcut.error.conflict", L(scene.titleKey))
         case let .windowConflict(layout):
             return L("shortcut.error.conflict", L(layout.titleKey))
+        case .windowManagementConflict:
+            return L("shortcut.error.conflict", L("window.title"))
         case .screenshotConflict:
             return L("shortcut.error.screenshotConflict")
         case .clipboardConflict:
             return L("shortcut.error.conflict", L("settings.tab.clipboard"))
         case .appVolumeConflict:
             return L("shortcut.error.conflict", L("settings.tab.volume"))
+        case .translationConflict:
+            return L("shortcut.error.conflict", L("settings.tab.translation"))
         case let .launchFailed(name):
             return L("appShortcut.launchFailed", name)
         }
@@ -177,12 +183,16 @@ final class AppShortcutService {
             throw AppShortcutError.sceneConflict(scene)
         case let .window(layout):
             throw AppShortcutError.windowConflict(layout)
+        case .windowManagement:
+            throw AppShortcutError.windowManagementConflict
         case .screenshot:
             throw AppShortcutError.screenshotConflict
         case .clipboard:
             throw AppShortcutError.clipboardConflict
         case .appVolume:
             throw AppShortcutError.appVolumeConflict
+        case .translation:
+            throw AppShortcutError.translationConflict
         case let .app(path):
             throw AppShortcutError.conflict(path)
         case nil:
