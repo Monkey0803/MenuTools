@@ -2,6 +2,17 @@ import Foundation
 import Testing
 @testable import MenuTools
 
+@Test("实时电平采样会返回各声道样本的最大绝对值")
+func inputLevelSamplingFindsPeakAmplitude() {
+    let samples: [Float] = [-0.12, 0.71, -0.93, 0.45]
+
+    let peakLevel = samples.withUnsafeBufferPointer {
+        InputLevelSampling.peakLevel(in: $0)
+    }
+
+    #expect(peakLevel == 0.93)
+}
+
 @Test("App 音量会限制在 0 到 100% 并保留上次非零值")
 func appVolumeProfileNormalizesValues() {
     let profile = AppVolumeProfile(
@@ -281,15 +292,37 @@ func processExitRemovesAppRoute() throws {
     #expect(backend.removed.last == "com.apple.Music")
 }
 
+@Test("麦克风电平采集仅在音量设置页明确请求时开启")
+@MainActor
+func inputLevelMonitoringRequiresExplicitRequest() throws {
+    let defaults = try makeVolumeDefaults("inputLevelMonitoring")
+    let backend = FakeAppVolumeRoutingBackend()
+    let service = AppVolumeService(backend: backend, userDefaults: defaults)
+
+    service.start()
+
+    #expect(backend.inputLevelMonitorStartCount == 0)
+
+    service.startInputLevelMonitoring()
+    #expect(backend.inputLevelMonitorStartCount == 1)
+
+    service.stopInputLevelMonitoring()
+    #expect(backend.inputLevelMonitorStopCount == 1)
+}
+
 @MainActor
 private final class FakeAppVolumeRoutingBackend: AppVolumeRoutingBackend {
     var onSnapshot: ((AppVolumeBackendSnapshot) -> Void)?
     var applied: [(id: String, volume: Double)] = []
     var removed: [String] = []
     var applyError: AppVolumeRoutingError?
+    var inputLevelMonitorStartCount = 0
+    var inputLevelMonitorStopCount = 0
 
     func start() {}
     func stop() {}
+    func startInputLevelMonitoring() { inputLevelMonitorStartCount += 1 }
+    func stopInputLevelMonitoring() { inputLevelMonitorStopCount += 1 }
 
     func apply(volume: Double, to target: AppVolumeTarget) throws {
         if let applyError { throw applyError }

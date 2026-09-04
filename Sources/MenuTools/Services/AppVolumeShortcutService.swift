@@ -13,6 +13,24 @@ enum AppVolumeShortcutCatalog {
     }
 }
 
+enum AppVolumeShortcutAction: String, CaseIterable, Codable, Identifiable, Sendable {
+    case showPanel
+    case increase
+    case decrease
+    case toggleMute
+
+    var id: String { rawValue }
+
+    var titleKey: String {
+        switch self {
+        case .showPanel: "volume.shortcut.showPanel"
+        case .increase: "volume.shortcut.increase"
+        case .decrease: "volume.shortcut.decrease"
+        case .toggleMute: "volume.shortcut.toggleMute"
+        }
+    }
+}
+
 @MainActor
 protocol AppVolumeShortcutEventMonitoring: AnyObject {
     func addGlobalKeyDownMonitor(_ handler: @escaping (NSEvent) -> Void) -> Any?
@@ -42,16 +60,22 @@ struct AppVolumeShortcutEventGate {
         keyCode: UInt16,
         modifiers: UInt,
         timestamp: TimeInterval,
-        isARepeat: Bool
+        isARepeat: Bool,
+        allowsRepeat: Bool = false
     ) -> Bool {
-        guard !isARepeat else { return false }
-        defer { lastEvent = (keyCode, modifiers, timestamp) }
-        guard let lastEvent else { return true }
-        guard lastEvent.keyCode == keyCode,
-              lastEvent.modifiers == modifiers else {
+        guard !isARepeat || allowsRepeat else { return false }
+        guard let lastEvent else {
+            self.lastEvent = (keyCode, modifiers, timestamp)
             return true
         }
-        return timestamp - lastEvent.timestamp > 0.35
+        guard lastEvent.keyCode == keyCode,
+              lastEvent.modifiers == modifiers else {
+            self.lastEvent = (keyCode, modifiers, timestamp)
+            return true
+        }
+        guard timestamp - lastEvent.timestamp > (allowsRepeat ? 0.05 : 0.35) else { return false }
+        self.lastEvent = (keyCode, modifiers, timestamp)
+        return true
     }
 
     mutating func reset() {
@@ -65,9 +89,13 @@ enum AppVolumeShortcutError: LocalizedError, Equatable {
     case otherApplicationConflict
     case sceneConflict(ScenePreset)
     case windowConflict(WindowLayout)
+    case windowManagementConflict
     case appConflict(String)
     case screenshotConflict
     case clipboardConflict
+    case translationConflict
+    case appVolumeConflict
+    case duplicateBinding
 
     var errorDescription: String? {
         switch self {
@@ -81,6 +109,8 @@ enum AppVolumeShortcutError: LocalizedError, Equatable {
             return L("shortcut.error.conflict", L(scene.titleKey))
         case let .windowConflict(layout):
             return L("shortcut.error.conflict", L(layout.titleKey))
+        case .windowManagementConflict:
+            return L("shortcut.error.conflict", L("window.title"))
         case let .appConflict(path):
             return L(
                 "shortcut.error.conflict",
@@ -90,6 +120,12 @@ enum AppVolumeShortcutError: LocalizedError, Equatable {
             return L("shortcut.error.screenshotConflict")
         case .clipboardConflict:
             return L("shortcut.error.conflict", L("settings.tab.clipboard"))
+        case .translationConflict:
+            return L("shortcut.error.conflict", L("settings.tab.translation"))
+        case .appVolumeConflict:
+            return L("shortcut.error.conflict", L("settings.tab.volume"))
+        case .duplicateBinding:
+            return L("shortcut.error.conflict", L("volume.title"))
         }
     }
 }
@@ -101,8 +137,10 @@ final class AppVolumeShortcutService {
     static let shared = AppVolumeShortcutService()
 
     private static let bindingKey = "appVolumeShortcut.binding"
+    private static let bindingsKey = "appVolumeShortcut.bindings.v2"
 
-    private(set) var binding: GlobalShortcut?
+    private(set) var bindings: [AppVolumeShortcutAction: GlobalShortcut]
+    var binding: GlobalShortcut? { bindings[.showPanel] }
     private(set) var lastError: String?
     private(set) var isRunning = false
     private(set) var isAccessibilityTrusted = AXIsProcessTrusted()
@@ -116,6 +154,7 @@ final class AppVolumeShortcutService {
     private let clipboardBindingProvider: @MainActor () -> GlobalShortcut?
     private let eventMonitor: any AppVolumeShortcutEventMonitoring
     private let onTrigger: @MainActor () -> Void
+    private let onAction: (@MainActor (AppVolumeShortcutAction) -> Void)?
     private var globalMonitor: Any?
     private var localMonitor: Any?
     private var eventGate = AppVolumeShortcutEventGate()
@@ -129,7 +168,8 @@ final class AppVolumeShortcutService {
         screenshotBindingsProvider: @escaping @MainActor () -> [ScreenshotCaptureMode: GlobalShortcut] = { ScreenshotShortcutService.shared.bindings },
         clipboardBindingProvider: @escaping @MainActor () -> GlobalShortcut? = { ClipboardShortcutService.shared.binding },
         eventMonitor: any AppVolumeShortcutEventMonitoring = DefaultAppVolumeShortcutEventMonitor(),
-        onTrigger: @escaping @MainActor () -> Void = { MenuBarStatusItemController.shared.showAppVolume() }
+        onTrigger: @escaping @MainActor () -> Void = { MenuBarStatusItemController.shared.showAppVolume() },
+        onAction: (@MainActor (AppVolumeShortcutAction) -> Void)? = nil
     ) {
         self.defaults = defaults
         self.conflictChecker = conflictChecker
@@ -140,7 +180,8 @@ final class AppVolumeShortcutService {
         self.clipboardBindingProvider = clipboardBindingProvider
         self.eventMonitor = eventMonitor
         self.onTrigger = onTrigger
-        binding = Self.loadBinding(from: defaults)
+        self.onAction = onAction
+        bindings = Self.loadBindings(from: defaults)
     }
 
     func start() {
@@ -193,8 +234,15 @@ final class AppVolumeShortcutService {
     }
 
     func setBinding(_ newBinding: GlobalShortcut) throws {
+        try setBinding(newBinding, for: .showPanel)
+    }
+
+    func setBinding(_ newBinding: GlobalShortcut, for action: AppVolumeShortcutAction) throws {
         guard newBinding.modifiers & GlobalShortcutModifier.relevantMask != 0 else {
             throw AppVolumeShortcutError.modifierRequired
+        }
+        guard !bindings.contains(where: { $0.key != action && $0.value == newBinding }) else {
+            throw AppVolumeShortcutError.duplicateBinding
         }
         let context = ShortcutConflictContext(
             sceneBindings: sceneBindingsProvider(),
@@ -202,7 +250,7 @@ final class AppVolumeShortcutService {
             appBindings: appBindingsProvider(),
             screenshotBindings: screenshotBindingsProvider(),
             clipboardBinding: clipboardBindingProvider(),
-            appVolumeBinding: binding,
+            appVolumeBinding: bindings.first(where: { $0.key != action })?.value,
             excludingScene: nil,
             excludingWindow: nil,
             excludingAppPath: nil,
@@ -219,24 +267,32 @@ final class AppVolumeShortcutService {
             throw AppVolumeShortcutError.sceneConflict(scene)
         case let .window(layout):
             throw AppVolumeShortcutError.windowConflict(layout)
+        case .windowManagement:
+            throw AppVolumeShortcutError.windowManagementConflict
         case let .app(path):
             throw AppVolumeShortcutError.appConflict(path)
         case .screenshot:
             throw AppVolumeShortcutError.screenshotConflict
         case .clipboard:
             throw AppVolumeShortcutError.clipboardConflict
+        case .translation:
+            throw AppVolumeShortcutError.translationConflict
         case .appVolume, nil:
             break
         }
-        binding = newBinding
+        bindings[action] = newBinding
         lastError = nil
-        saveBinding()
+        saveBindings()
     }
 
     func clearBinding() {
-        binding = nil
+        clearBinding(for: .showPanel)
+    }
+
+    func clearBinding(for action: AppVolumeShortcutAction) {
+        bindings.removeValue(forKey: action)
         lastError = nil
-        defaults.removeObject(forKey: Self.bindingKey)
+        saveBindings()
     }
 
     private func handle(
@@ -245,25 +301,66 @@ final class AppVolumeShortcutService {
         timestamp: TimeInterval,
         isARepeat: Bool
     ) {
-        guard AppVolumeShortcutCatalog.matches(keyCode: keyCode, modifiers: modifiers, binding: binding) else {
+        guard let action = bindings.first(where: {
+            AppVolumeShortcutCatalog.matches(keyCode: keyCode, modifiers: modifiers, binding: $0.value)
+        })?.key else {
             return
         }
         guard eventGate.accept(
             keyCode: keyCode,
             modifiers: modifiers,
             timestamp: timestamp,
-            isARepeat: isARepeat
+            isARepeat: isARepeat,
+            allowsRepeat: action == .increase || action == .decrease
         ) else { return }
-        onTrigger()
+        if action == .showPanel {
+            onTrigger()
+        } else if let onAction {
+            onAction(action)
+        } else {
+            performDefaultAction(action)
+        }
     }
 
-    private func saveBinding() {
-        guard let binding, let data = try? JSONEncoder().encode(binding) else { return }
-        defaults.set(data, forKey: Self.bindingKey)
+    private func performDefaultAction(_ action: AppVolumeShortcutAction) {
+        switch action {
+        case .showPanel:
+            onTrigger()
+        case .increase:
+            let service = AppVolumeService.shared
+            service.adjustMasterVolume(increase: true)
+            AppVolumeHUDController.shared.show(volume: service.output.volume, isMuted: service.output.isMuted)
+        case .decrease:
+            let service = AppVolumeService.shared
+            service.adjustMasterVolume(increase: false)
+            AppVolumeHUDController.shared.show(volume: service.output.volume, isMuted: service.output.isMuted)
+        case .toggleMute:
+            let service = AppVolumeService.shared
+            service.setMasterMuted(!service.output.isMuted)
+            AppVolumeHUDController.shared.show(volume: service.output.volume, isMuted: service.output.isMuted)
+        }
     }
 
-    private static func loadBinding(from defaults: UserDefaults) -> GlobalShortcut? {
-        guard let data = defaults.data(forKey: bindingKey) else { return nil }
-        return try? JSONDecoder().decode(GlobalShortcut.self, from: data)
+    private func saveBindings() {
+        if bindings.isEmpty {
+            defaults.removeObject(forKey: Self.bindingsKey)
+            defaults.removeObject(forKey: Self.bindingKey)
+            return
+        }
+        guard let data = try? JSONEncoder().encode(bindings) else { return }
+        defaults.set(data, forKey: Self.bindingsKey)
+        defaults.removeObject(forKey: Self.bindingKey)
+    }
+
+    private static func loadBindings(from defaults: UserDefaults) -> [AppVolumeShortcutAction: GlobalShortcut] {
+        if let data = defaults.data(forKey: bindingsKey),
+           let bindings = try? JSONDecoder().decode([AppVolumeShortcutAction: GlobalShortcut].self, from: data) {
+            return bindings
+        }
+        guard let data = defaults.data(forKey: bindingKey),
+              let binding = try? JSONDecoder().decode(GlobalShortcut.self, from: data) else {
+            return [:]
+        }
+        return [.showPanel: binding]
     }
 }

@@ -54,6 +54,11 @@ func rememberedAppVolumeRowRemainsAdjustable() {
     #expect(!AppVolumeRowInteractionPolicy.canAdjust(isEnabled: false))
 }
 
+@Test("系统输入输出行使用统一高度确保控件垂直居中")
+func systemVolumeRowsUseSharedControlHeight() {
+    #expect(AppVolumeSystemRowLayout.expandedControlHeight == 32)
+}
+
 @Test("音量图标会随静音和音量档位变化")
 func appVolumeIconReflectsCurrentLevel() {
     #expect(AppVolumeIconPolicy.symbolName(volume: 0.8, isMuted: true) == "speaker.slash.fill")
@@ -153,13 +158,39 @@ func appVolumeShortcutEventGatePreventsRepeatedPresentation() {
     #expect(!repeatAccepted)
 }
 
+@Test("音量增减快捷键允许节流后的按住连续调节")
+func appVolumeShortcutEventGateAllowsThrottledRepeats() {
+    var gate = AppVolumeShortcutEventGate()
+
+    let firstAccepted = gate.accept(
+        keyCode: 18, modifiers: GlobalShortcutModifier.controlOption,
+        timestamp: 1, isARepeat: false, allowsRepeat: true
+    )
+    let earlyRepeatAccepted = gate.accept(
+        keyCode: 18, modifiers: GlobalShortcutModifier.controlOption,
+        timestamp: 1.02, isARepeat: true, allowsRepeat: true
+    )
+    let throttledRepeatAccepted = gate.accept(
+        keyCode: 18, modifiers: GlobalShortcutModifier.controlOption,
+        timestamp: 1.06, isARepeat: true, allowsRepeat: true
+    )
+
+    #expect(firstAccepted)
+    #expect(!earlyRepeatAccepted)
+    #expect(throttledRepeatAccepted)
+}
+
 @Test("音量快捷键启动后触发一次并在停止时移除监听")
 @MainActor
 func appVolumeShortcutServiceManagesMonitorLifecycle() async throws {
+    let suiteName = "AppVolumeShortcutServiceTests.lifecycle.\(UUID().uuidString)"
+    let defaults = try #require(UserDefaults(suiteName: suiteName))
+    defer { UserDefaults().removePersistentDomain(forName: suiteName) }
     let monitor = AppVolumeShortcutEventMonitorSpy()
     let shortcut = GlobalShortcut(keyCode: 18, modifiers: GlobalShortcutModifier.controlOption)
     var triggerCount = 0
     let service = AppVolumeShortcutService(
+        defaults: defaults,
         conflictChecker: AppVolumeShortcutConflictChecker(),
         sceneBindingsProvider: { [:] },
         windowBindingsProvider: { [:] },
@@ -208,6 +239,36 @@ func appVolumeShortcutServiceManagesMonitorLifecycle() async throws {
 
     #expect(!service.isRunning)
     #expect(monitor.removedMonitorCount == 2)
+}
+
+@Test("音量增减与静音快捷键会分派对应动作且单独持久化")
+@MainActor
+func appVolumeShortcutActionsDispatchIndependently() throws {
+    let suiteName = "AppVolumeShortcutServiceTests.actions.\(UUID().uuidString)"
+    let defaults = try #require(UserDefaults(suiteName: suiteName))
+    defer { UserDefaults().removePersistentDomain(forName: suiteName) }
+
+    let increase = GlobalShortcut(keyCode: 18, modifiers: GlobalShortcutModifier.controlOption)
+    let mute = GlobalShortcut(keyCode: 19, modifiers: GlobalShortcutModifier.controlOption)
+    var actions: [AppVolumeShortcutAction] = []
+    let service = AppVolumeShortcutService(
+        defaults: defaults,
+        conflictChecker: AppVolumeShortcutConflictChecker(),
+        sceneBindingsProvider: { [:] },
+        windowBindingsProvider: { [:] },
+        appBindingsProvider: { [:] },
+        screenshotBindingsProvider: { [:] },
+        clipboardBindingProvider: { nil },
+        eventMonitor: AppVolumeShortcutEventMonitorSpy(),
+        onAction: { actions.append($0) }
+    )
+
+    try service.setBinding(increase, for: .increase)
+    try service.setBinding(mute, for: .toggleMute)
+
+    #expect(service.bindings[.increase] == increase)
+    #expect(service.bindings[.toggleMute] == mute)
+    #expect(AppVolumeShortcutCatalog.matches(keyCode: increase.keyCode, modifiers: increase.modifiers, binding: service.bindings[.increase]))
 }
 
 @Test("App 音量快捷键冲突会被统一冲突检测识别")
