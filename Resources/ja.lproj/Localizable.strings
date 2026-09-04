@@ -867,6 +867,8 @@
 "plugin.system-controls.description" = "外観、隠しファイル、Dock、メニューバー、スリープ防止、システム操作。";
 "plugin.system-insights.title" = "システム情報";
 "plugin.system-insights.description" = "リソース、ネットワーク、バッテリー、ディスプレイ、ストレージ、Bluetooth 機器の電池残量。";
+"plugin.network-traffic.title" = "ネットワーク通信量";
+"plugin.network-traffic.description" = "アップロードとダウンロードの速度、今回の累計通信量を表示します。";
 "plugin.clipboard.title" = "クリップボード";
 "plugin.clipboard.description" = "クリップボード履歴を記録し、固定、コピー、消去操作を提供します。";
 "plugin.app-volume.title" = "App 音量";

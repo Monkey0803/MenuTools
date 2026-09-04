@@ -867,6 +867,8 @@
 "plugin.system-controls.description" = "外觀、隱藏檔案、Dock、選單列、防止睡眠和系統快捷操作。";
 "plugin.system-insights.title" = "系統資訊";
 "plugin.system-insights.description" = "系統資源、網路、電池、顯示器、儲存空間和藍牙裝置電量。";
+"plugin.network-traffic.title" = "網路流量";
+"plugin.network-traffic.description" = "即時查看上傳、下載速度和本次執行的累計流量。";
 "plugin.clipboard.title" = "剪貼簿";
 "plugin.clipboard.description" = "持續記錄剪貼簿歷史，並提供固定、複製和清理操作。";
 "plugin.app-volume.title" = "App 音量";

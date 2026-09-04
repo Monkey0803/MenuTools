@@ -204,6 +204,25 @@ func currentScrollRangeBoundariesAreAccepted() throws {
     #expect(try document.validated() == document)
 }
 
+@Test("平滑滚动参数均提供说明文案")
+func scrollParameterDescriptionsAreLocalized() throws {
+    let projectRoot = URL(fileURLWithPath: #filePath)
+        .deletingLastPathComponent()
+        .deletingLastPathComponent()
+        .deletingLastPathComponent()
+    let keys = ["scroll.gain.desc", "scroll.duration.desc", "scroll.minStep.desc"]
+    for language in ["zh-Hans", "zh-Hant", "en", "ja", "ko"] {
+        let stringsURL = projectRoot
+            .appendingPathComponent("Resources")
+            .appendingPathComponent("\(language).lproj")
+            .appendingPathComponent("Localizable.strings")
+        let strings = try String(contentsOf: stringsURL, encoding: .utf8)
+        for key in keys {
+            #expect(strings.contains("\"\(key)\" = "))
+        }
+    }
+}
+
 @Test("修饰键只允许四种 Cocoa 修饰键的组合")
 func invalidModifierValueThrows() {
     var settings = AppBackupSettings.fixture

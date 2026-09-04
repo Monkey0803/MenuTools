@@ -867,6 +867,8 @@
 "plugin.system-controls.description" = "화면 모드, 숨김 파일, Dock, 메뉴 막대, 잠자기 방지 및 시스템 동작.";
 "plugin.system-insights.title" = "시스템 정보";
 "plugin.system-insights.description" = "리소스, 네트워크, 배터리, 디스플레이, 저장 공간 및 Bluetooth 기기 배터리.";
+"plugin.network-traffic.title" = "네트워크 트래픽";
+"plugin.network-traffic.description" = "실시간 업로드 및 다운로드 속도와 세션 누계를 확인합니다.";
 "plugin.clipboard.title" = "클립보드";
 "plugin.clipboard.description" = "클립보드 기록을 저장하고 고정, 복사 및 정리 기능을 제공합니다.";
 "plugin.app-volume.title" = "App 음량";
