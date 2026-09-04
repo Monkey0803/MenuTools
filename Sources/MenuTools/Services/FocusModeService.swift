@@ -12,6 +12,46 @@ enum FocusModeParser {
     }
 }
 
+enum FocusModeRefreshTrigger {
+    case userInitiated
+    case automation
+}
+
+enum FocusModeRefreshPolicy {
+    static func permitsControlCenterPresentation(for trigger: FocusModeRefreshTrigger) -> Bool {
+        trigger == .userInitiated
+    }
+}
+
+@MainActor
+protocol FocusModeScriptExecuting: AnyObject {
+    func state(using source: String) -> Bool?
+    func execute(_ source: String) throws
+}
+
+@MainActor
+final class DefaultFocusModeScriptExecutor: FocusModeScriptExecuting {
+    func state(using source: String) -> Bool? {
+        guard let script = NSAppleScript(source: source) else { return nil }
+        var errorInfo: NSDictionary?
+        let result = script.executeAndReturnError(&errorInfo)
+        guard errorInfo == nil, let value = result.stringValue else { return nil }
+        return FocusModeParser.state(from: value)
+    }
+
+    func execute(_ source: String) throws {
+        guard let script = NSAppleScript(source: source) else {
+            throw FocusModeError.unavailable
+        }
+        var errorInfo: NSDictionary?
+        script.executeAndReturnError(&errorInfo)
+        if let errorInfo {
+            let message = errorInfo[NSAppleScript.errorMessage] as? String ?? L("error.unknown")
+            throw FocusModeError.operationFailed(message)
+        }
+    }
+}
+
 enum FocusModeScript {
     /// 菜单栏项目的 description 会随系统语言变化，不能固定写死英文标题。
     private static let clickControlCenter = """
@@ -109,27 +149,29 @@ final class FocusModeService {
     private(set) var isEnabled: Bool?
     private(set) var isDoNotDisturbEnabled: Bool?
     private(set) var isBusy = false
+    private let scriptExecutor: any FocusModeScriptExecuting
 
-    func refresh() {
+    init(scriptExecutor: any FocusModeScriptExecuting = DefaultFocusModeScriptExecutor()) {
+        self.scriptExecutor = scriptExecutor
+    }
+
+    func refresh(trigger: FocusModeRefreshTrigger = .userInitiated) {
+        guard FocusModeRefreshPolicy.permitsControlCenterPresentation(for: trigger) else {
+            isEnabled = nil
+            isDoNotDisturbEnabled = nil
+            return
+        }
         isEnabled = nil
         isDoNotDisturbEnabled = nil
-        isEnabled = state(using: FocusModeScript.readState)
-        isDoNotDisturbEnabled = state(using: FocusModeScript.readDoNotDisturb)
+        isEnabled = scriptExecutor.state(using: FocusModeScript.readState)
+        isDoNotDisturbEnabled = scriptExecutor.state(using: FocusModeScript.readDoNotDisturb)
     }
 
     func toggle() throws {
         guard !isBusy else { return }
         isBusy = true
         defer { isBusy = false }
-        guard let script = NSAppleScript(source: FocusModeScript.toggle) else {
-            throw FocusModeError.unavailable
-        }
-        var errorInfo: NSDictionary?
-        script.executeAndReturnError(&errorInfo)
-        if let errorInfo {
-            let message = errorInfo[NSAppleScript.errorMessage] as? String ?? L("error.unknown")
-            throw FocusModeError.operationFailed(message)
-        }
+        try scriptExecutor.execute(FocusModeScript.toggle)
         refresh()
     }
 
@@ -137,15 +179,7 @@ final class FocusModeService {
         guard !isBusy else { return }
         isBusy = true
         defer { isBusy = false }
-        guard let script = NSAppleScript(source: FocusModeScript.toggleDoNotDisturb) else {
-            throw FocusModeError.unavailable
-        }
-        var errorInfo: NSDictionary?
-        script.executeAndReturnError(&errorInfo)
-        if let errorInfo {
-            let message = errorInfo[NSAppleScript.errorMessage] as? String ?? L("error.unknown")
-            throw FocusModeError.operationFailed(message)
-        }
+        try scriptExecutor.execute(FocusModeScript.toggleDoNotDisturb)
         refresh()
     }
 
@@ -154,13 +188,5 @@ final class FocusModeService {
             throw FocusModeError.unavailable
         }
         guard NSWorkspace.shared.open(url) else { throw FocusModeError.unavailable }
-    }
-
-    private func state(using source: String) -> Bool? {
-        guard let script = NSAppleScript(source: source) else { return nil }
-        var errorInfo: NSDictionary?
-        let result = script.executeAndReturnError(&errorInfo)
-        guard errorInfo == nil, let value = result.stringValue else { return nil }
-        return FocusModeParser.state(from: value)
     }
 }
