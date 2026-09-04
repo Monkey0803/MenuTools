@@ -24,12 +24,41 @@ enum AppLanguage: String, CaseIterable, Identifiable {
     }
 }
 
+enum AppLanguageResolver {
+    static func resourceLanguage(
+        configuredLanguage: String,
+        preferredLanguages: [String]
+    ) -> String? {
+        if configuredLanguage != AppLanguage.system.rawValue,
+           AppLanguage(rawValue: configuredLanguage) != nil {
+            return configuredLanguage
+        }
+        for language in preferredLanguages {
+            let normalized = language.lowercased().replacingOccurrences(of: "_", with: "-")
+            if normalized.hasPrefix("zh-hans") || normalized.hasPrefix("zh-cn") || normalized.hasPrefix("zh-sg") {
+                return AppLanguage.simplifiedChinese.rawValue
+            }
+            if normalized.hasPrefix("zh-hant") || normalized.hasPrefix("zh-tw")
+                || normalized.hasPrefix("zh-hk") || normalized.hasPrefix("zh-mo") {
+                return AppLanguage.traditionalChinese.rawValue
+            }
+            if normalized.hasPrefix("en") { return AppLanguage.english.rawValue }
+            if normalized.hasPrefix("ja") { return AppLanguage.japanese.rawValue }
+            if normalized.hasPrefix("ko") { return AppLanguage.korean.rawValue }
+        }
+        return nil
+    }
+}
+
 /// 解析当前生效的本地化 bundle：
 /// 用户手动选择语言时取对应 lproj，否则用主 bundle（随系统语言解析）
 private func l10nBundle() -> Bundle {
     let raw = UserDefaults.standard.string(forKey: SettingsKey.appLanguage) ?? AppLanguage.system.rawValue
-    guard raw != AppLanguage.system.rawValue,
-          let path = Bundle.main.path(forResource: raw, ofType: "lproj"),
+    guard let resourceLanguage = AppLanguageResolver.resourceLanguage(
+        configuredLanguage: raw,
+        preferredLanguages: Locale.preferredLanguages
+    ),
+          let path = Bundle.main.path(forResource: resourceLanguage, ofType: "lproj"),
           let bundle = Bundle(path: path) else {
         return .main
     }

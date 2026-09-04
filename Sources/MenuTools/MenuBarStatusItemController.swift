@@ -129,6 +129,13 @@ final class MenuBarStatusItemController: NSObject {
             return
         }
 
+        ClipboardAutoPasteTargetTracker.shared.rememberFrontmostApplication()
+
+        if ClipboardHistoryService.shared.hasActiveSequentialPaste {
+            _ = ClipboardHistoryService.shared.pasteNextSequentialItem()
+            return
+        }
+
         guard ClipboardQuickAccessPresentationPolicy.shouldShow(
             isShown: clipboardPopover?.isShown == true
         ) else { return }

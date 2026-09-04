@@ -6,6 +6,7 @@ enum BuiltInPluginID: String, CaseIterable, Codable, Hashable, Identifiable, Sen
     case systemInsights = "system-insights"
     case networkTraffic = "network-traffic"
     case clipboard
+    case translation
     case appVolume = "app-volume"
     case screenshot
     case windowManagement = "window-management"

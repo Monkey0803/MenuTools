@@ -9,8 +9,10 @@ enum ClipboardSnippetTemplate {
         calendar: Calendar = .current
     ) -> String {
         let date = now.formatted(.dateTime.year().month().day())
+        let time = now.formatted(.dateTime.hour().minute())
         return template
             .replacingOccurrences(of: "{{date}}", with: date)
+            .replacingOccurrences(of: "{{time}}", with: time)
             .replacingOccurrences(of: "{{clipboard}}", with: clipboardText ?? "")
     }
 }
@@ -29,6 +31,11 @@ struct ClipboardSnippet: Codable, Identifiable, Equatable, Sendable {
 }
 
 struct ClipboardSnippetStore {
+    enum MoveDirection {
+        case up
+        case down
+    }
+
     static let defaultGroupID = UUID(uuidString: "C6BEEFE8-690F-45F3-9E91-154E5F163A38")!
     static var defaultGroupName: String { L("clipboard.snippet.defaultGroup") }
 
@@ -64,7 +71,6 @@ struct ClipboardSnippetStore {
             }
             return snippet
         }
-        .sorted { $0.updatedAt > $1.updatedAt }
     }
 
     func snippets(in groupID: UUID) -> [ClipboardSnippet] {
@@ -103,6 +109,29 @@ struct ClipboardSnippetStore {
         }
     }
 
+    @discardableResult
+    mutating func updateGroup(id: UUID, name: String) -> Bool {
+        let normalizedName = name.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard id != Self.defaultGroupID,
+              !normalizedName.isEmpty,
+              let index = groups.firstIndex(where: { $0.id == id }),
+              !groups.contains(where: {
+                  $0.id != id && $0.name.compare(
+                      normalizedName,
+                      options: [.caseInsensitive, .diacriticInsensitive]
+                  ) == .orderedSame
+              }) else {
+            return false
+        }
+        groups[index].name = normalizedName
+        groups.sort { lhs, rhs in
+            if lhs.id == Self.defaultGroupID { return true }
+            if rhs.id == Self.defaultGroupID { return false }
+            return lhs.name.localizedStandardCompare(rhs.name) == .orderedAscending
+        }
+        return true
+    }
+
     mutating func addSnippet(
         title: String,
         content: String,
@@ -123,6 +152,49 @@ struct ClipboardSnippetStore {
         return snippet
     }
 
+    @discardableResult
+    mutating func updateSnippet(
+        id: UUID,
+        title: String,
+        content: String,
+        groupID: UUID,
+        now: Date = Date()
+    ) -> Bool {
+        let normalizedContent = content.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !normalizedContent.isEmpty,
+              let index = allSnippets.firstIndex(where: { $0.id == id }) else {
+            return false
+        }
+        let normalizedTitle = title.trimmingCharacters(in: .whitespacesAndNewlines)
+        let resolvedGroupID = groups.contains(where: { $0.id == groupID }) ? groupID : Self.defaultGroupID
+        var snippet = allSnippets.remove(at: index)
+        let didMoveGroups = snippet.groupID != resolvedGroupID
+        snippet.groupID = resolvedGroupID
+        snippet.title = normalizedTitle.isEmpty ? String(normalizedContent.prefix(24)) : normalizedTitle
+        snippet.content = normalizedContent
+        snippet.updatedAt = now
+        if didMoveGroups, let destinationIndex = allSnippets.firstIndex(where: { $0.groupID == resolvedGroupID }) {
+            allSnippets.insert(snippet, at: destinationIndex)
+        } else if didMoveGroups {
+            allSnippets.append(snippet)
+        } else {
+            allSnippets.insert(snippet, at: min(index, allSnippets.count))
+        }
+        return true
+    }
+
+    @discardableResult
+    mutating func moveSnippet(id: UUID, direction: MoveDirection) -> Bool {
+        guard let index = allSnippets.firstIndex(where: { $0.id == id }) else { return false }
+        let groupID = allSnippets[index].groupID
+        let groupIndexes = allSnippets.indices.filter { allSnippets[$0].groupID == groupID }
+        guard let position = groupIndexes.firstIndex(of: index) else { return false }
+        let destinationPosition = direction == .up ? position - 1 : position + 1
+        guard groupIndexes.indices.contains(destinationPosition) else { return false }
+        allSnippets.swapAt(index, groupIndexes[destinationPosition])
+        return true
+    }
+
     mutating func removeSnippet(id: UUID) {
         allSnippets.removeAll { $0.id == id }
     }
@@ -130,6 +202,17 @@ struct ClipboardSnippetStore {
     private var defaultGroup: ClipboardSnippetGroup {
         groups.first(where: { $0.id == Self.defaultGroupID })
             ?? ClipboardSnippetGroup(id: Self.defaultGroupID, name: Self.defaultGroupName)
+    }
+}
+
+enum ClipboardSnippetSearch {
+    static func results(in snippets: [ClipboardSnippet], query: String) -> [ClipboardSnippet] {
+        let normalized = query.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !normalized.isEmpty else { return snippets }
+        return snippets.filter {
+            $0.title.localizedCaseInsensitiveContains(normalized)
+                || $0.content.localizedCaseInsensitiveContains(normalized)
+        }
     }
 }
 
@@ -210,6 +293,13 @@ final class ClipboardSnippetService {
     }
 
     @discardableResult
+    func updateGroup(id: UUID, name: String) -> Bool {
+        let didUpdate = store.updateGroup(id: id, name: name)
+        if didUpdate { synchronizeAndPersist() }
+        return didUpdate
+    }
+
+    @discardableResult
     func addSnippet(title: String, content: String, groupID: UUID) -> ClipboardSnippet? {
         let snippet = store.addSnippet(title: title, content: content, groupID: groupID)
         if snippet != nil {
@@ -220,6 +310,25 @@ final class ClipboardSnippetService {
 
     func removeSnippet(id: UUID) {
         store.removeSnippet(id: id)
+        synchronizeAndPersist()
+    }
+
+    @discardableResult
+    func updateSnippet(id: UUID, title: String, content: String, groupID: UUID) -> Bool {
+        let didUpdate = store.updateSnippet(id: id, title: title, content: content, groupID: groupID)
+        if didUpdate { synchronizeAndPersist() }
+        return didUpdate
+    }
+
+    @discardableResult
+    func moveSnippet(id: UUID, direction: ClipboardSnippetStore.MoveDirection) -> Bool {
+        let didMove = store.moveSnippet(id: id, direction: direction)
+        if didMove { synchronizeAndPersist() }
+        return didMove
+    }
+
+    func replaceImported(groups: [ClipboardSnippetGroup], snippets: [ClipboardSnippet]) {
+        store = ClipboardSnippetStore(groups: groups, snippets: snippets)
         synchronizeAndPersist()
     }
 

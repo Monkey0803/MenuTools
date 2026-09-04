@@ -107,10 +107,12 @@ enum GlobalShortcutError: LocalizedError, Equatable {
     case systemConflict
     case otherApplicationConflict
     case windowConflict(WindowLayout)
+    case windowManagementConflict
     case appConflict(String)
     case screenshotConflict
     case clipboardConflict
     case appVolumeConflict
+    case translationConflict
 
     var errorDescription: String? {
         switch self {
@@ -119,6 +121,7 @@ enum GlobalShortcutError: LocalizedError, Equatable {
         case .systemConflict: return L("shortcut.error.systemConflict")
         case .otherApplicationConflict: return L("shortcut.error.otherApplicationConflict")
         case let .windowConflict(layout): return L("shortcut.error.conflict", L(layout.titleKey))
+        case .windowManagementConflict: return L("shortcut.error.conflict", L("window.title"))
         case let .appConflict(path):
             return L(
                 "shortcut.error.conflict",
@@ -130,6 +133,8 @@ enum GlobalShortcutError: LocalizedError, Equatable {
             return L("shortcut.error.conflict", L("settings.tab.clipboard"))
         case .appVolumeConflict:
             return L("shortcut.error.conflict", L("settings.tab.volume"))
+        case .translationConflict:
+            return L("shortcut.error.conflict", L("settings.tab.translation"))
         }
     }
 }
@@ -235,6 +240,8 @@ final class GlobalShortcutService {
             throw GlobalShortcutError.otherApplicationConflict
         case let .window(layout):
             throw GlobalShortcutError.windowConflict(layout)
+        case .windowManagement:
+            throw GlobalShortcutError.windowManagementConflict
         case let .scene(conflict):
             throw GlobalShortcutError.conflict(conflict)
         case let .app(path):
@@ -245,6 +252,8 @@ final class GlobalShortcutService {
             throw GlobalShortcutError.clipboardConflict
         case .appVolume:
             throw GlobalShortcutError.appVolumeConflict
+        case .translation:
+            throw GlobalShortcutError.translationConflict
         case nil:
             break
         }

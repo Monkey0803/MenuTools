@@ -50,11 +50,20 @@ struct ClipboardHistoryManagementSettingsSection: View {
 
             Divider()
 
-            Toggle(L("clipboard.autoPaste"), isOn: Binding(
-                get: { historyService.autoPasteAfterCopy },
-                set: { historyService.setAutoPasteAfterCopy($0) }
-            ))
-            .toggleStyle(.switch)
+            HStack {
+                Text(L("clipboard.primaryAction"))
+                Spacer()
+                Picker(L("clipboard.primaryAction"), selection: Binding(
+                    get: { historyService.primaryAction },
+                    set: { historyService.setPrimaryAction($0) }
+                )) {
+                    ForEach(ClipboardPrimaryAction.allCases) { action in
+                        Text(L(action.localizationKey)).tag(action)
+                    }
+                }
+                .labelsHidden()
+                .frame(width: 150)
+            }
 
             Text(L("clipboard.autoPasteDescription"))
                 .font(.caption)

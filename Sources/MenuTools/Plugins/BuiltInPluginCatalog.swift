@@ -71,6 +71,17 @@ enum BuiltInPluginCatalog {
                 }
             ),
             registration(
+                id: .translation,
+                category: .productivity,
+                symbol: "character.bubble",
+                permissions: [.accessibility],
+                start: { TranslationShortcutService.shared.start() },
+                stop: {
+                    TranslationShortcutService.shared.stop()
+                    TranslationWindowController.shared.close()
+                }
+            ),
+            registration(
                 id: .appVolume,
                 category: .media,
                 symbol: "speaker.wave.2.bubble",

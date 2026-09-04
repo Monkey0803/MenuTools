@@ -168,7 +168,6 @@ struct ClipboardHistorySettingsView: View {
                 }
 
                 Button(L("cleanup.clipboard"), role: .destructive, action: clearClipboard)
-                    .disabled(historyService.items.isEmpty)
             } label: {
                 Image(systemName: "ellipsis.circle")
                     .font(.title3)
@@ -219,10 +218,10 @@ struct ClipboardHistorySettingsView: View {
             Menu {
                 Button(L("clipboard.source.all")) { sourceBundleID = nil }
                 ForEach(sourceBundleIDs, id: \.self) { bundleID in
-                    Button(bundleID) { sourceBundleID = bundleID }
+                    Button(sourceApplicationName(for: bundleID)) { sourceBundleID = bundleID }
                 }
             } label: {
-                Label(sourceBundleID ?? L("clipboard.source.all"), systemImage: "app")
+                Label(sourceBundleID.map(sourceApplicationName) ?? L("clipboard.source.all"), systemImage: "app")
             }
             .menuStyle(.borderlessButton)
             .buttonStyle(.bordered)
@@ -265,6 +264,32 @@ struct ClipboardHistorySettingsView: View {
 
     @ViewBuilder
     private var historyContent: some View {
+        if historyService.canUndoLastRemoval {
+            HStack {
+                Text(L("clipboard.removed"))
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+                Button(L("clipboard.undo")) { _ = historyService.undoLastRemoval() }
+                    .controlSize(.small)
+            }
+        }
+
+        if let progress = historyService.sequentialPasteProgress {
+            HStack(spacing: 8) {
+                Label(
+                    L("clipboard.sequential.ready", progress.current, progress.total),
+                    systemImage: "list.number"
+                )
+                .font(.caption)
+                .foregroundStyle(.secondary)
+                Spacer()
+                Button(L("clipboard.sequential.cancel")) {
+                    historyService.cancelSequentialPaste()
+                }
+                .controlSize(.small)
+            }
+        }
+
         if filteredItems.isEmpty {
             ContentUnavailableView(
                 L("clipboard.empty"),
@@ -280,21 +305,32 @@ struct ClipboardHistorySettingsView: View {
                             .font(.caption)
                             .foregroundStyle(.secondary)
                         Spacer()
+                        Menu {
+                            Picker(L("clipboard.sequential.mode"), selection: Binding(
+                                get: { historyService.sequentialPasteMode },
+                                set: { mode in historyService.setSequentialPasteMode(mode) }
+                            )) {
+                                ForEach(ClipboardSequentialPasteMode.allCases) { mode in
+                                    Text(L(mode.localizationKey)).tag(mode)
+                                }
+                            }
+                        } label: {
+                            Label(L(historyService.sequentialPasteMode.localizationKey), systemImage: "repeat")
+                        }
+                        .disabled(selectedItemIDs.isEmpty)
+                        Button(L("clipboard.sequential.start")) {
+                            historyService.beginSequentialPaste(itemIDs: filteredItems
+                                .filter { selectedItemIDs.contains($0.id) }
+                                .map(\.id))
+                            isSelectingItems = false
+                            selectedItemIDs.removeAll()
+                        }
+                        .disabled(selectedItemIDs.isEmpty)
                         Button(L("clipboard.deleteSelected"), role: .destructive) {
                             historyService.remove(ids: selectedItemIDs)
                             selectedItemIDs.removeAll()
                         }
                         .disabled(selectedItemIDs.isEmpty)
-                    }
-                }
-
-                if historyService.canUndoLastRemoval {
-                    HStack {
-                        Text(L("clipboard.removed"))
-                            .font(.caption)
-                            .foregroundStyle(.secondary)
-                        Button(L("clipboard.undo")) { _ = historyService.undoLastRemoval() }
-                            .controlSize(.small)
                     }
                 }
 
@@ -318,6 +354,15 @@ struct ClipboardHistorySettingsView: View {
                                     onCopy: { historyService.copy(item) },
                                     onTogglePinned: { historyService.togglePinned(id: item.id) },
                                     onToggleSensitive: { historyService.setSensitive(!item.isSensitive, for: item.id) },
+                                    onSetTitle: { historyService.setTitle($0, for: item.id) },
+                                    onSetTags: { historyService.setTags($0, for: item.id) },
+                                    onSetNote: { historyService.setNote($0, for: item.id) },
+                                    onTransform: { _ = historyService.copyTransformed(item, transform: $0) },
+                                    onTranslate: {
+                                        if let text = item.content.plainTextRepresentation {
+                                            TranslationWindowController.shared.show(text: text)
+                                        }
+                                    },
                                     onRemove: { historyService.remove(id: item.id) },
                                     isHistoryScrolling: isHistoryScrolling,
                                     isSelecting: isSelectingItems,
@@ -416,9 +461,9 @@ struct ClipboardHistorySettingsView: View {
             from: historyService.items,
             query: searchText,
             category: category,
-            sortOrder: sortOrder
-            ,sourceBundleID: sourceBundleID
-            ,dateFilter: dateFilter
+            sortOrder: sortOrder,
+            sourceBundleID: sourceBundleID,
+            dateFilter: dateFilter
         )
     }
 
@@ -426,10 +471,13 @@ struct ClipboardHistorySettingsView: View {
         Array(Set(historyService.items.compactMap(\.sourceBundleID))).sorted()
     }
 
+    private func sourceApplicationName(for bundleID: String) -> String {
+        NSWorkspace.shared.urlForApplication(withBundleIdentifier: bundleID)?
+            .deletingPathExtension().lastPathComponent ?? bundleID
+    }
+
     private func clearClipboard() {
-        ClipboardService.clear()
-        historyService.clearHistory()
-        historyService.refresh()
+        historyService.clearSystemClipboard()
     }
 
     private func sectionTitle(_ kind: ClipboardHistoryDateSectionKind) -> String {
@@ -448,6 +496,11 @@ private struct ClipboardHistorySettingsCard: View {
     let onCopy: () -> Bool
     let onTogglePinned: () -> Void
     let onToggleSensitive: () -> Void
+    let onSetTitle: (String?) -> Void
+    let onSetTags: ([String]) -> Void
+    let onSetNote: (String?) -> Void
+    let onTransform: (ClipboardTextTransform) -> Void
+    let onTranslate: () -> Void
     let onRemove: () -> Void
     let isHistoryScrolling: Bool
     let isSelecting: Bool
@@ -456,6 +509,10 @@ private struct ClipboardHistorySettingsCard: View {
 
     @State private var isHovered = false
     @State private var didCopy = false
+    @State private var isEditingMetadata = false
+    @State private var draftTitle = ""
+    @State private var draftTags = ""
+    @State private var draftNote = ""
 
     var body: some View {
         HStack(alignment: .top, spacing: 10) {
@@ -469,18 +526,30 @@ private struct ClipboardHistorySettingsCard: View {
             }
             Button(action: copyItem) {
                 HStack(alignment: .top, spacing: 10) {
-                    ClipboardHistoryThumbnail(content: item.content)
+                    ClipboardHistoryThumbnail(content: item.content, isSensitive: item.isSensitive)
 
                     VStack(alignment: .leading, spacing: 6) {
+                        if let title = item.title {
+                            Text(title)
+                                .font(.callout.weight(.semibold))
+                                .lineLimit(1)
+                                .frame(maxWidth: .infinity, alignment: .leading)
+                        }
                         Text(previewText)
-                            .font(.callout)
-                            .lineLimit(3)
+                            .font(item.title == nil ? .callout : .caption)
+                            .foregroundStyle(item.title == nil ? AnyShapeStyle(.primary) : AnyShapeStyle(.secondary))
+                            .lineLimit(item.title == nil ? 3 : 2)
                             .multilineTextAlignment(.leading)
                             .frame(maxWidth: .infinity, alignment: .leading)
 
                         HStack(spacing: 5) {
                             Image(systemName: item.isPinned ? "pin.fill" : "clock")
                             Text(item.capturedAt, format: .dateTime.hour().minute())
+                            if let sourceBundleID = item.sourceBundleID {
+                                Text("·")
+                                Text(sourceApplicationName(for: sourceBundleID))
+                                    .lineLimit(1)
+                            }
                         }
                         .font(.caption2)
                         .foregroundStyle(item.isPinned ? AnyShapeStyle(.tint) : AnyShapeStyle(.tertiary))
@@ -507,6 +576,7 @@ private struct ClipboardHistorySettingsCard: View {
             Menu {
                 Button(L("clipboard.pin"), action: onTogglePinned)
                 Button(item.isSensitive ? L("clipboard.unmarkSensitive") : L("clipboard.markSensitive"), action: onToggleSensitive)
+                Button(L("clipboard.editMetadata"), action: beginEditingMetadata)
                 quickActions
                 Button(L("clipboard.delete"), role: .destructive, action: onRemove)
             } label: {
@@ -528,6 +598,15 @@ private struct ClipboardHistorySettingsCard: View {
             isHovered ? ClipboardHistoryHoverPreviewTarget(item: item, anchor: anchor) : nil
         }
         .controlCenterSurface(interactive: true, shape: AnyShape(.rect(cornerRadius: 14)))
+        .popover(isPresented: $isEditingMetadata, arrowEdge: .trailing) {
+            ClipboardHistoryMetadataEditor(
+                title: $draftTitle,
+                tags: $draftTags,
+                note: $draftNote,
+                onCancel: { isEditingMetadata = false },
+                onSave: saveMetadata
+            )
+        }
     }
 
     @ViewBuilder
@@ -538,8 +617,27 @@ private struct ClipboardHistorySettingsCard: View {
         case let .files(files):
             Button(L("clipboard.revealInFinder")) { ClipboardHistoryQuickAction.revealFiles(files) }
             Button(L("clipboard.copyPath")) { _ = ClipboardHistoryQuickAction.copyPaths(files) }
-        case .text, .image, .richText:
+        case .image:
+            if let recognizedText = item.recognizedText {
+                Button(L("clipboard.copyRecognizedText")) {
+                    _ = ClipboardHistoryQuickAction.copyRecognizedText(recognizedText)
+                }
+            }
+            if let url = item.recognizedURLs.first {
+                Button(L("clipboard.openRecognizedQR")) { NSWorkspace.shared.open(url) }
+            }
+        case .text, .richText:
             EmptyView()
+        }
+        if !item.isSensitive, item.content.plainTextRepresentation != nil {
+            Menu(L("clipboard.transform")) {
+                ForEach(ClipboardTextTransform.allCases) { transform in
+                    Button(L(transform.localizationKey)) { onTransform(transform) }
+                }
+            }
+            if BuiltInPluginManager.shared.isEnabled(.translation) {
+                Button(L("clipboard.translate"), action: onTranslate)
+            }
         }
     }
 
@@ -560,7 +658,27 @@ private struct ClipboardHistorySettingsCard: View {
         }
     }
 
+    private func beginEditingMetadata() {
+        draftTitle = item.title ?? ""
+        draftTags = item.tags.joined(separator: ", ")
+        draftNote = item.note ?? ""
+        isEditingMetadata = true
+    }
+
+    private func saveMetadata() {
+        onSetTitle(draftTitle)
+        onSetTags(draftTags.components(separatedBy: CharacterSet(charactersIn: ",，\n")))
+        onSetNote(draftNote)
+        isEditingMetadata = false
+    }
+
+    private func sourceApplicationName(for bundleID: String) -> String {
+        NSWorkspace.shared.urlForApplication(withBundleIdentifier: bundleID)?
+            .deletingPathExtension().lastPathComponent ?? bundleID
+    }
+
     private var previewText: String {
+        if item.isSensitive { return L("clipboard.sensitiveContent") }
         switch item.content {
         case let .text(text): return text
         case let .richText(richText): return richText.plainText
@@ -575,14 +693,73 @@ private struct ClipboardHistorySettingsCard: View {
     }
 }
 
+private struct ClipboardHistoryMetadataEditor: View {
+    @Binding var title: String
+    @Binding var tags: String
+    @Binding var note: String
+    let onCancel: () -> Void
+    let onSave: () -> Void
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            Text(L("clipboard.editMetadata"))
+                .font(.headline)
+            TextField(L("clipboard.customTitle"), text: $title)
+                .textFieldStyle(.roundedBorder)
+            TextField(L("clipboard.tagsPlaceholder"), text: $tags)
+                .textFieldStyle(.roundedBorder)
+            TextEditor(text: $note)
+                .frame(minHeight: 76)
+                .padding(6)
+                .background(.quaternary.opacity(0.4), in: .rect(cornerRadius: 8))
+                .overlay(alignment: .topLeading) {
+                    if note.isEmpty {
+                        Text(L("clipboard.notePlaceholder"))
+                            .font(.caption)
+                            .foregroundStyle(.tertiary)
+                            .padding(11)
+                            .allowsHitTesting(false)
+                    }
+                }
+            HStack {
+                Spacer()
+                Button(L("common.cancel"), action: onCancel)
+                Button(L("common.save"), action: onSave)
+                    .buttonStyle(.borderedProminent)
+            }
+        }
+        .padding(16)
+        .frame(width: 320)
+    }
+}
+
 private struct ClipboardHistoryThumbnail: View {
     let content: ClipboardHistoryContent
+    let isSensitive: Bool
 
     var body: some View {
         ZStack {
             Color.primary.opacity(0.045)
 
-            switch content {
+            if isSensitive {
+                Image(systemName: "eye.slash.fill")
+                    .font(.title3.weight(.semibold))
+                    .foregroundStyle(.secondary)
+            } else {
+                thumbnailContent
+            }
+        }
+        .frame(
+            width: ClipboardHistoryPreviewLayout.thumbnailSize.width,
+            height: ClipboardHistoryPreviewLayout.thumbnailSize.height
+        )
+        .clipped()
+        .clipShape(.rect(cornerRadius: 10))
+    }
+
+    @ViewBuilder
+    private var thumbnailContent: some View {
+        switch content {
             case let .text(text):
                 Text(text.prefix(2).uppercased())
                     .font(.headline.weight(.semibold))
@@ -614,14 +791,7 @@ private struct ClipboardHistoryThumbnail: View {
                 Image(systemName: files.count == 1 ? "doc.fill" : "doc.on.doc.fill")
                     .font(.title3.weight(.semibold))
                     .foregroundStyle(.tint)
-            }
         }
-        .frame(
-            width: ClipboardHistoryPreviewLayout.thumbnailSize.width,
-            height: ClipboardHistoryPreviewLayout.thumbnailSize.height
-        )
-        .clipped()
-        .clipShape(.rect(cornerRadius: 10))
     }
 }
 
@@ -660,6 +830,18 @@ private struct ClipboardHistoryHoverPreview: View {
 
     @ViewBuilder
     private var previewContent: some View {
+        if item.isSensitive {
+            ContentUnavailableView(
+                L("clipboard.sensitiveContent"),
+                systemImage: "eye.slash.fill"
+            )
+        } else {
+            regularPreviewContent
+        }
+    }
+
+    @ViewBuilder
+    private var regularPreviewContent: some View {
         switch item.content {
         case let .text(text):
             Text(text)
@@ -713,6 +895,7 @@ struct ClipboardHistoryQuickAccessView: View {
     let onCopy: () -> Void
 
     @State private var historyService = ClipboardHistoryService.shared
+    @State private var snippetService = ClipboardSnippetService.shared
 
     init(onCopy: @escaping () -> Void = {}) {
         self.onCopy = onCopy
@@ -726,11 +909,31 @@ struct ClipboardHistoryQuickAccessView: View {
                     onCopy()
                 }
             },
+            onPerformAction: { item, action in
+                if historyService.perform(item, action: action) {
+                    onCopy()
+                }
+            },
             onTogglePinned: historyService.togglePinned,
             onRemove: historyService.remove,
             onClearHistory: historyService.clearHistory,
             onClearClipboard: clearClipboard,
-            copyFeedback: historyService.copyFeedback
+            copyFeedback: historyService.copyFeedback,
+            canUndo: historyService.canUndoLastRemoval,
+            onUndo: { _ = historyService.undoLastRemoval() },
+            snippetGroups: snippetService.groups,
+            snippets: snippetService.snippets,
+            onCopySnippet: copySnippet,
+            onTransform: { item, transform in
+                if historyService.copyTransformed(item, transform: transform) {
+                    onCopy()
+                }
+            },
+            onTranslate: { item in
+                guard let text = item.content.plainTextRepresentation else { return }
+                TranslationWindowController.shared.show(text: text)
+                onCopy()
+            }
         )
         .task {
             await historyService.loadPersistedHistory()
@@ -739,8 +942,16 @@ struct ClipboardHistoryQuickAccessView: View {
     }
 
     private func clearClipboard() {
-        ClipboardService.clear()
-        historyService.clearHistory()
-        historyService.refresh()
+        historyService.clearSystemClipboard()
+    }
+
+    private func copySnippet(_ snippet: ClipboardSnippet) {
+        let renderedContent = ClipboardSnippetTemplate.render(
+            snippet.content,
+            clipboardText: NSPasteboard.general.string(forType: .string)
+        )
+        if historyService.copy(.text(renderedContent)) {
+            onCopy()
+        }
     }
 }

@@ -61,6 +61,7 @@ enum SettingsTab: String, CaseIterable, Hashable, Identifiable {
     case appLaunch
     case screenshot
     case clipboard
+    case translation
 
     var id: String { rawValue }
 
@@ -76,6 +77,7 @@ enum SettingsTab: String, CaseIterable, Hashable, Identifiable {
         case .appLaunch: return "settings.tab.appLaunch"
         case .screenshot: return "settings.tab.screenshot"
         case .clipboard: return "settings.tab.clipboard"
+        case .translation: return "settings.tab.translation"
         }
     }
 
@@ -91,6 +93,7 @@ enum SettingsTab: String, CaseIterable, Hashable, Identifiable {
         case .appLaunch: return "app.badge"
         case .screenshot: return "camera.viewfinder"
         case .clipboard: return "clipboard"
+        case .translation: return "character.bubble"
         }
     }
 
@@ -105,6 +108,7 @@ enum SettingsTab: String, CaseIterable, Hashable, Identifiable {
         case .appLaunch: return .appLauncher
         case .screenshot: return .screenshot
         case .clipboard: return .clipboard
+        case .translation: return .translation
         }
     }
 
@@ -131,6 +135,12 @@ enum SettingsTab: String, CaseIterable, Hashable, Identifiable {
     }
 }
 
+enum SettingsNavigationPolicy {
+    static func parent(for tab: SettingsTab) -> SettingsTab? {
+        tab.pluginID == nil ? nil : .plugins
+    }
+}
+
 /// 设置窗口（⌘, / 面板齿轮按钮打开）：左侧导航，右侧显示当前功能详情。
 struct SettingsView: View {
     @AppStorage(SettingsKey.appLanguage) private var appLanguage = AppLanguage.system.rawValue
@@ -148,6 +158,17 @@ struct SettingsView: View {
 
             VStack(spacing: 0) {
                 HStack(spacing: 10) {
+                    if let parent = SettingsNavigationPolicy.parent(for: currentTab) {
+                        Button {
+                            withAnimation(.spring(response: 0.28, dampingFraction: 0.82)) {
+                                selectedTab = parent
+                            }
+                        } label: {
+                            Label(L("settings.backToFeatures"), systemImage: "chevron.left")
+                                .labelStyle(.titleAndIcon)
+                        }
+                        .buttonStyle(.borderless)
+                    }
                     Image(systemName: currentTab.symbol)
                         .font(.title3)
                         .foregroundStyle(.secondary)
@@ -268,6 +289,8 @@ struct SettingsView: View {
             ScreenshotSettingsView()
         case .clipboard:
             ClipboardHistorySettingsView()
+        case .translation:
+            TranslationSettingsView()
         }
     }
 }

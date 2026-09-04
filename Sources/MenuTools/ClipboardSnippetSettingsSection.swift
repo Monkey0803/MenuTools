@@ -8,9 +8,16 @@ struct ClipboardSnippetSettingsSection: View {
     @State private var snippetService = ClipboardSnippetService.shared
     @State private var selectedSnippetGroupID = ClipboardSnippetStore.defaultGroupID
     @State private var isAddingSnippetGroup = false
+    @State private var isRenamingSnippetGroup = false
     @State private var newSnippetGroupName = ""
+    @State private var renamedSnippetGroupName = ""
     @State private var newSnippetTitle = ""
     @State private var newSnippetContent = ""
+    @State private var snippetSearchText = ""
+    @State private var editingSnippetID: UUID?
+    @State private var editingSnippetGroupID = ClipboardSnippetStore.defaultGroupID
+    @State private var editingSnippetTitle = ""
+    @State private var editingSnippetContent = ""
     @State private var copiedSnippetID: UUID?
 
     var body: some View {
@@ -41,6 +48,15 @@ struct ClipboardSnippetSettingsSection: View {
                 .help(L("clipboard.snippetGroup.add"))
 
                 if selectedSnippetGroupID != ClipboardSnippetStore.defaultGroupID {
+                    Button {
+                        renamedSnippetGroupName = selectedSnippetGroupName
+                        isRenamingSnippetGroup.toggle()
+                    } label: {
+                        Image(systemName: isRenamingSnippetGroup ? "xmark" : "pencil")
+                    }
+                    .buttonStyle(.bordered)
+                    .help(L("clipboard.snippetGroup.rename"))
+
                     Button(role: .destructive) {
                         snippetService.removeGroup(id: selectedSnippetGroupID)
                         selectedSnippetGroupID = ClipboardSnippetStore.defaultGroupID
@@ -65,6 +81,19 @@ struct ClipboardSnippetSettingsSection: View {
                 }
             }
 
+            if isRenamingSnippetGroup {
+                HStack(spacing: 8) {
+                    TextField(L("clipboard.snippetGroup.placeholder"), text: $renamedSnippetGroupName)
+                        .textFieldStyle(.roundedBorder)
+                        .onSubmit(renameSnippetGroup)
+                    Button(action: renameSnippetGroup) {
+                        Image(systemName: "checkmark")
+                    }
+                    .buttonStyle(.borderedProminent)
+                    .disabled(renamedSnippetGroupName.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
+                }
+            }
+
             VStack(alignment: .leading, spacing: 8) {
                 TextField(L("clipboard.snippetTitle"), text: $newSnippetTitle)
                     .textFieldStyle(.roundedBorder)
@@ -85,7 +114,20 @@ struct ClipboardSnippetSettingsSection: View {
                 }
             }
 
-            let snippets = snippetService.snippets(in: selectedSnippetGroupID)
+            HStack(spacing: 8) {
+                Image(systemName: "magnifyingglass")
+                    .foregroundStyle(.secondary)
+                TextField(L("clipboard.snippetSearch"), text: $snippetSearchText)
+                    .textFieldStyle(.plain)
+            }
+            .padding(.horizontal, 10)
+            .padding(.vertical, 8)
+            .background(.quaternary.opacity(0.4), in: .rect(cornerRadius: 9))
+
+            let snippets = ClipboardSnippetSearch.results(
+                in: snippetService.snippets(in: selectedSnippetGroupID),
+                query: snippetSearchText
+            )
             if snippets.isEmpty {
                 Text(L("clipboard.snippets.empty"))
                     .font(.caption)
@@ -93,43 +135,99 @@ struct ClipboardSnippetSettingsSection: View {
                     .frame(maxWidth: .infinity, alignment: .leading)
             } else {
                 ForEach(snippets) { snippet in
-                    HStack(spacing: 10) {
-                        Button(action: { copy(snippet) }) {
-                            VStack(alignment: .leading, spacing: 3) {
-                                Text(snippet.title)
-                                    .font(.callout.weight(.medium))
-                                    .lineLimit(1)
-                                Text(snippet.content)
-                                    .font(.caption)
-                                    .foregroundStyle(.secondary)
-                                    .lineLimit(2)
-                                    .multilineTextAlignment(.leading)
-                            }
-                            .frame(maxWidth: .infinity, alignment: .leading)
-                            .contentShape(.rect)
-                        }
-                        .buttonStyle(.plain)
-                        .help(L("clipboard.copy"))
-
-                        Image(systemName: copiedSnippetID == snippet.id ? "checkmark" : "doc.on.doc")
-                            .font(.caption.weight(.semibold))
-                            .foregroundStyle(copiedSnippetID == snippet.id ? AnyShapeStyle(.tint) : AnyShapeStyle(.secondary))
-                            .frame(width: 24, height: 24)
-
-                        Button(role: .destructive) {
-                            snippetService.removeSnippet(id: snippet.id)
-                        } label: {
-                            Image(systemName: "trash")
-                        }
-                        .buttonStyle(.plain)
-                        .help(L("clipboard.delete"))
+                    if editingSnippetID == snippet.id {
+                        snippetEditor(for: snippet)
+                    } else {
+                        snippetRow(snippet)
                     }
-                    .padding(.vertical, 4)
                 }
             }
         }
         .padding(14)
         .controlCenterSurface(interactive: true, shape: AnyShape(.rect(cornerRadius: 14)))
+    }
+
+    private func snippetRow(_ snippet: ClipboardSnippet) -> some View {
+        HStack(spacing: 10) {
+            Button(action: { copy(snippet) }) {
+                VStack(alignment: .leading, spacing: 3) {
+                    Text(snippet.title)
+                        .font(.callout.weight(.medium))
+                        .lineLimit(1)
+                    Text(snippet.content)
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                        .lineLimit(2)
+                        .multilineTextAlignment(.leading)
+                }
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .contentShape(.rect)
+            }
+            .buttonStyle(.plain)
+            .help(L("clipboard.copy"))
+
+            Image(systemName: copiedSnippetID == snippet.id ? "checkmark" : "doc.on.doc")
+                .font(.caption.weight(.semibold))
+                .foregroundStyle(copiedSnippetID == snippet.id ? AnyShapeStyle(.tint) : AnyShapeStyle(.secondary))
+                .frame(width: 24, height: 24)
+
+            Menu {
+                Button(L("clipboard.snippet.edit")) { beginEditing(snippet) }
+                Menu(L("clipboard.snippet.moveToGroup")) {
+                    ForEach(snippetService.groups.filter { $0.id != snippet.groupID }) { group in
+                        Button(group.name) {
+                            _ = snippetService.updateSnippet(
+                                id: snippet.id,
+                                title: snippet.title,
+                                content: snippet.content,
+                                groupID: group.id
+                            )
+                        }
+                    }
+                }
+                Button(L("clipboard.snippet.moveUp")) {
+                    _ = snippetService.moveSnippet(id: snippet.id, direction: .up)
+                }
+                Button(L("clipboard.snippet.moveDown")) {
+                    _ = snippetService.moveSnippet(id: snippet.id, direction: .down)
+                }
+                Divider()
+                Button(L("clipboard.delete"), role: .destructive) {
+                    snippetService.removeSnippet(id: snippet.id)
+                }
+            } label: {
+                Image(systemName: "ellipsis.circle")
+            }
+            .menuStyle(.borderlessButton)
+            .help(L("clipboard.actions"))
+        }
+        .padding(.vertical, 4)
+    }
+
+    private func snippetEditor(for snippet: ClipboardSnippet) -> some View {
+        VStack(alignment: .leading, spacing: 8) {
+            TextField(L("clipboard.snippetTitle"), text: $editingSnippetTitle)
+                .textFieldStyle(.roundedBorder)
+            TextEditor(text: $editingSnippetContent)
+                .frame(minHeight: 72)
+                .padding(6)
+                .background(.quaternary.opacity(0.4), in: .rect(cornerRadius: 8))
+            HStack {
+                Picker(L("clipboard.snippet.moveToGroup"), selection: $editingSnippetGroupID) {
+                    ForEach(snippetService.groups) { group in
+                        Text(group.name).tag(group.id)
+                    }
+                }
+                .labelsHidden()
+                Spacer()
+                Button(L("common.cancel")) { editingSnippetID = nil }
+                Button(L("common.save")) { saveEditingSnippet(snippet) }
+                    .buttonStyle(.borderedProminent)
+                    .disabled(editingSnippetContent.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
+            }
+        }
+        .padding(10)
+        .background(.quaternary.opacity(0.28), in: .rect(cornerRadius: 10))
     }
 
     private var selectedSnippetGroupName: String {
@@ -146,6 +244,14 @@ struct ClipboardSnippetSettingsSection: View {
         isAddingSnippetGroup = false
     }
 
+    private func renameSnippetGroup() {
+        guard snippetService.updateGroup(id: selectedSnippetGroupID, name: renamedSnippetGroupName) else {
+            return
+        }
+        isRenamingSnippetGroup = false
+        renamedSnippetGroupName = ""
+    }
+
     private func addSnippet() {
         guard snippetService.addSnippet(
             title: newSnippetTitle,
@@ -156,6 +262,25 @@ struct ClipboardSnippetSettingsSection: View {
         }
         newSnippetTitle = ""
         newSnippetContent = ""
+    }
+
+    private func beginEditing(_ snippet: ClipboardSnippet) {
+        editingSnippetID = snippet.id
+        editingSnippetGroupID = snippet.groupID
+        editingSnippetTitle = snippet.title
+        editingSnippetContent = snippet.content
+    }
+
+    private func saveEditingSnippet(_ snippet: ClipboardSnippet) {
+        guard snippetService.updateSnippet(
+            id: snippet.id,
+            title: editingSnippetTitle,
+            content: editingSnippetContent,
+            groupID: editingSnippetGroupID
+        ) else {
+            return
+        }
+        editingSnippetID = nil
     }
 
     private func copy(_ snippet: ClipboardSnippet) {

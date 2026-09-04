@@ -5,7 +5,12 @@ import UniformTypeIdentifiers
 /// 剪贴板隐私设置：暂停记录与前台 App 排除规则。
 struct ClipboardPrivacySettingsSection: View {
     @Bindable var historyService: ClipboardHistoryService
+    @State private var snippetService = ClipboardSnippetService.shared
     @State private var keywordInput = ""
+    @State private var archivePassphrase = ""
+    @State private var archiveStatus: ClipboardArchiveOperationStatus?
+    @State private var isArchiveOperationInProgress = false
+    @State private var syncFilePath = UserDefaults.standard.string(forKey: "clipboard.syncFilePath")
 
     var body: some View {
         VStack(alignment: .leading, spacing: 10) {
@@ -100,6 +105,59 @@ struct ClipboardPrivacySettingsSection: View {
             Text(L("clipboard.sensitiveRules.description"))
                 .font(.caption)
                 .foregroundStyle(.secondary)
+
+            Divider()
+
+            Text(L("clipboard.archive"))
+                .font(.subheadline.weight(.medium))
+            SecureField(L("clipboard.archive.passphrase"), text: $archivePassphrase)
+                .textFieldStyle(.roundedBorder)
+            HStack(spacing: 8) {
+                Button(action: exportArchive) {
+                    Label(L("clipboard.archive.export"), systemImage: "lock.doc")
+                }
+                Button(action: importArchive) {
+                    Label(L("clipboard.archive.import"), systemImage: "lock.open")
+                }
+                if isArchiveOperationInProgress {
+                    ProgressView()
+                        .controlSize(.small)
+                }
+            }
+            .disabled(isArchiveOperationInProgress || archivePassphrase.isEmpty)
+
+            Text(L("clipboard.archive.description"))
+                .font(.caption)
+                .foregroundStyle(.secondary)
+
+            if let persistenceErrorMessage = historyService.persistenceErrorMessage {
+                Label(persistenceErrorMessage, systemImage: "exclamationmark.triangle.fill")
+                    .font(.caption)
+                    .foregroundStyle(.red)
+            }
+
+            if let archiveStatus {
+                Text(archiveStatus.message)
+                    .font(.caption)
+                    .foregroundStyle(archiveStatus.isSuccess ? .green : .red)
+            }
+
+            HStack(spacing: 8) {
+                Button(L("clipboard.sync.chooseFolder"), action: chooseSyncFolder)
+                Button(L("clipboard.sync.now"), action: synchronizeSharedFile)
+                    .disabled(syncFilePath == nil || archivePassphrase.isEmpty || isArchiveOperationInProgress)
+                if let syncFilePath {
+                    Text(URL(fileURLWithPath: syncFilePath).deletingLastPathComponent().lastPathComponent)
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                        .lineLimit(1)
+                        .help(syncFilePath)
+                }
+            }
+
+            Text(L("clipboard.sync.description"))
+                .font(.caption)
+                .foregroundStyle(.secondary)
         }
         .padding(14)
         .background(.quaternary.opacity(0.28), in: .rect(cornerRadius: 14))
@@ -146,6 +204,127 @@ struct ClipboardPrivacySettingsSection: View {
         keywordInput = ""
     }
 
+    private func exportArchive() {
+        guard !archivePassphrase.isEmpty else { return }
+        let panel = NSSavePanel()
+        panel.title = L("clipboard.archive.export")
+        panel.allowedContentTypes = [archiveContentType]
+        panel.nameFieldStringValue = "MenuTools-Clipboard-\(Date().formatted(.iso8601.year().month().day())).mtclip"
+        guard panel.runModal() == .OK, let url = panel.url else { return }
+
+        let passphrase = archivePassphrase
+        let document = ClipboardArchiveDocument.current(
+            historyItems: historyService.items,
+            snippetGroups: snippetService.groups,
+            snippets: snippetService.snippets
+        )
+        isArchiveOperationInProgress = true
+        archiveStatus = nil
+        Task { @MainActor in
+            defer {
+                isArchiveOperationInProgress = false
+                archivePassphrase = ""
+            }
+            do {
+                try await Task.detached(priority: .utility) {
+                    let encrypted = try ClipboardArchiveCrypto.encrypt(document, passphrase: passphrase)
+                    try encrypted.write(to: url, options: .atomic)
+                }.value
+                archiveStatus = .success(L("clipboard.archive.exportSuccess"))
+            } catch {
+                archiveStatus = .failure(error.localizedDescription)
+            }
+        }
+    }
+
+    private func importArchive() {
+        guard !archivePassphrase.isEmpty else { return }
+        let panel = NSOpenPanel()
+        panel.title = L("clipboard.archive.import")
+        panel.allowedContentTypes = [archiveContentType]
+        panel.allowsMultipleSelection = false
+        panel.canChooseDirectories = false
+        panel.canChooseFiles = true
+        guard panel.runModal() == .OK, let url = panel.url else { return }
+
+        let passphrase = archivePassphrase
+        isArchiveOperationInProgress = true
+        archiveStatus = nil
+        Task { @MainActor in
+            defer {
+                isArchiveOperationInProgress = false
+                archivePassphrase = ""
+            }
+            do {
+                let document = try await Task.detached(priority: .utility) {
+                    let encrypted = try Data(contentsOf: url)
+                    return try ClipboardArchiveCrypto.decrypt(encrypted, passphrase: passphrase)
+                }.value
+                historyService.importItems(document.historyItems)
+                snippetService.replaceImported(
+                    groups: document.snippetGroups,
+                    snippets: document.snippets
+                )
+                archiveStatus = .success(L("clipboard.archive.importSuccess"))
+            } catch {
+                archiveStatus = .failure(error.localizedDescription)
+            }
+        }
+    }
+
+    private func chooseSyncFolder() {
+        let panel = NSOpenPanel()
+        panel.title = L("clipboard.sync.chooseFolder")
+        panel.canChooseFiles = false
+        panel.canChooseDirectories = true
+        panel.allowsMultipleSelection = false
+        if let syncFilePath {
+            panel.directoryURL = URL(fileURLWithPath: syncFilePath).deletingLastPathComponent()
+        }
+        guard panel.runModal() == .OK, let folderURL = panel.url else { return }
+        let fileURL = folderURL.appendingPathComponent("MenuTools-Clipboard.mtclipsync")
+        syncFilePath = fileURL.path
+        UserDefaults.standard.set(fileURL.path, forKey: "clipboard.syncFilePath")
+    }
+
+    private func synchronizeSharedFile() {
+        guard !archivePassphrase.isEmpty,
+              let syncFilePath else { return }
+        let passphrase = archivePassphrase
+        let fileURL = URL(fileURLWithPath: syncFilePath)
+        let local = ClipboardArchiveDocument.current(
+            historyItems: historyService.items.filter(\.isPinned),
+            snippetGroups: snippetService.groups,
+            snippets: snippetService.snippets
+        )
+        isArchiveOperationInProgress = true
+        archiveStatus = nil
+        Task { @MainActor in
+            defer {
+                isArchiveOperationInProgress = false
+                archivePassphrase = ""
+            }
+            do {
+                let merged = try await Task.detached(priority: .utility) {
+                    try ClipboardSharedFileSync.synchronize(
+                        local: local,
+                        at: fileURL,
+                        passphrase: passphrase
+                    )
+                }.value
+                historyService.importItems(merged.historyItems)
+                snippetService.replaceImported(groups: merged.snippetGroups, snippets: merged.snippets)
+                archiveStatus = .success(L("clipboard.sync.success"))
+            } catch {
+                archiveStatus = .failure(error.localizedDescription)
+            }
+        }
+    }
+
+    private var archiveContentType: UTType {
+        UTType(filenameExtension: "mtclip") ?? .data
+    }
+
     private func excludedApplicationName(for bundleID: String) -> String {
         guard let url = NSWorkspace.shared.urlForApplication(withBundleIdentifier: bundleID) else {
             return bundleID
@@ -165,5 +344,21 @@ struct ClipboardPrivacySettingsSection: View {
                 .scaledToFit()
                 .foregroundStyle(.secondary)
         }
+    }
+}
+
+private enum ClipboardArchiveOperationStatus {
+    case success(String)
+    case failure(String)
+
+    var message: String {
+        switch self {
+        case let .success(message), let .failure(message): message
+        }
+    }
+
+    var isSuccess: Bool {
+        if case .success = self { return true }
+        return false
     }
 }

@@ -244,6 +244,12 @@ struct ControlCenterHover: ViewModifier {
     }
 }
 
+enum TranslationPanelEntryPolicy {
+    static func shouldShow(isPluginEnabled: Bool) -> Bool {
+        isPluginEnabled
+    }
+}
+
 /// 菜单栏弹出的主面板：控制中心风格，自动适配深色 / 浅色
 struct MenuPanelView: View {
     private let openSettingsAction: ((SettingsTab) -> Void)?
@@ -313,6 +319,12 @@ struct MenuPanelView: View {
                         || pluginManager.isEnabled(.finderTools) {
                         heroTiles
                             .entrance(1, appeared: appeared)
+                    }
+                    if TranslationPanelEntryPolicy.shouldShow(
+                        isPluginEnabled: pluginManager.isEnabled(.translation)
+                    ) {
+                        translationCard
+                            .entrance(2, appeared: appeared)
                     }
                     if !enabledQuickActions.isEmpty {
                         quickActionsCard
@@ -625,6 +637,56 @@ struct MenuPanelView: View {
         .padding(14)
         .frame(maxWidth: .infinity, alignment: .leading)
         .contentShape(.rect(cornerRadius: 18))
+    }
+
+    private var translationCard: some View {
+        HStack(spacing: 8) {
+            Button(action: TranslationWindowController.shared.showFromClipboard) {
+                HStack(spacing: 12) {
+                    Image(systemName: "character.bubble")
+                        .font(.title3)
+                        .foregroundStyle(.tint)
+                        .frame(width: 28, height: 28)
+                        .background(.tint.opacity(0.14), in: .circle)
+                    VStack(alignment: .leading, spacing: 2) {
+                        Text(L("translation.windowTitle"))
+                            .font(.callout.weight(.semibold))
+                        Text(L("translation.panelDescription"))
+                            .font(.caption2)
+                            .foregroundStyle(.secondary)
+                            .lineLimit(1)
+                    }
+                    Spacer()
+                    Image(systemName: "chevron.right")
+                        .font(.caption.weight(.semibold))
+                        .foregroundStyle(.tertiary)
+                }
+                .contentShape(.rect(cornerRadius: 14))
+            }
+            .buttonStyle(.plain)
+            .accessibilityLabel(L("translation.openWindow"))
+
+            Button(action: openTranslationSettings) {
+                Image(systemName: "gearshape")
+                    .font(.callout)
+                    .foregroundStyle(.secondary)
+                    .frame(width: 28, height: 28)
+                    .contentShape(.circle)
+            }
+            .buttonStyle(.plain)
+            .help(L("settings.tab.translation"))
+        }
+        .padding(12)
+        .controlCenterSurface(tint: .indigo, interactive: true, shape: AnyShape(.rect(cornerRadius: 16)))
+    }
+
+    private func openTranslationSettings() {
+        if let openSettingsAction {
+            openSettingsAction(.translation)
+        } else {
+            NSApp.activate(ignoringOtherApps: true)
+            openSettings()
+        }
     }
 
     // MARK: - 快捷操作中心
@@ -1778,10 +1840,19 @@ struct ClipboardHistoryPopover: View {
 
     let items: [ClipboardHistoryItem]
     let onCopy: (ClipboardHistoryItem) -> Void
+    let onPerformAction: (ClipboardHistoryItem, ClipboardHistoryAction) -> Void
     let onTogglePinned: (UUID) -> Void
     let onRemove: (UUID) -> Void
     let onClearHistory: () -> Void
     let onClearClipboard: () -> Void
+    let copyFeedback: ClipboardCopyFeedback?
+    let canUndo: Bool
+    let onUndo: () -> Void
+    let snippetGroups: [ClipboardSnippetGroup]
+    let snippets: [ClipboardSnippet]
+    let onCopySnippet: (ClipboardSnippet) -> Void
+    let onTransform: (ClipboardHistoryItem, ClipboardTextTransform) -> Void
+    let onTranslate: (ClipboardHistoryItem) -> Void
 
     @State private var searchText = ""
     @State private var selectedItemID: UUID?
@@ -1808,10 +1879,31 @@ struct ClipboardHistoryPopover: View {
                 }
                 Spacer()
                 Menu {
+                    ForEach(snippetGroups) { group in
+                        let groupSnippets = snippets.filter { $0.groupID == group.id }
+                        if !groupSnippets.isEmpty {
+                            Menu(group.name) {
+                                ForEach(groupSnippets) { snippet in
+                                    Button(snippet.title) { onCopySnippet(snippet) }
+                                }
+                            }
+                        }
+                    }
+                } label: {
+                    Image(systemName: "text.badge.star")
+                        .font(.title3)
+                        .foregroundStyle(.secondary)
+                }
+                .menuStyle(.borderlessButton)
+                .focusable(false)
+                .focusEffectDisabled()
+                .disabled(snippets.isEmpty)
+                .help(L("clipboard.snippets"))
+
+                Menu {
                     Button(L("clipboard.clearHistory"), action: onClearHistory)
                         .disabled(items.isEmpty)
                     Button(L("cleanup.clipboard"), action: onClearClipboard)
-                        .disabled(items.isEmpty)
                 } label: {
                     Image(systemName: "ellipsis.circle")
                         .font(.title3)
@@ -1849,6 +1941,28 @@ struct ClipboardHistoryPopover: View {
             .padding(.vertical, 7)
             .background(.quaternary.opacity(0.35), in: .rect(cornerRadius: 9))
 
+            if let copyFeedback {
+                let isSuccess = copyFeedback == .copied || copyFeedback == .pasted
+                Label(
+                    L(copyFeedback.localizationKey),
+                    systemImage: isSuccess ? "checkmark.circle.fill" : "exclamationmark.triangle.fill"
+                )
+                    .font(.caption)
+                    .foregroundStyle(isSuccess ? AnyShapeStyle(.tint) : AnyShapeStyle(.orange))
+                    .frame(maxWidth: .infinity, alignment: .leading)
+            }
+
+            if canUndo {
+                HStack(spacing: 8) {
+                    Text(L("clipboard.removed"))
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                    Spacer()
+                    Button(L("clipboard.undo"), action: onUndo)
+                        .controlSize(.small)
+                }
+            }
+
             if filteredItems.isEmpty {
                 ContentUnavailableView(
                     L("clipboard.empty"),
@@ -1864,7 +1978,13 @@ struct ClipboardHistoryPopover: View {
                                 ClipboardHistoryRow(
                                     item: item,
                                     isSelected: selectedItemID == item.id,
-                                    onCopy: { onCopy(item) },
+                                    onCopy: {
+                                        selectedItemID = item.id
+                                        onCopy(item)
+                                    },
+                                    onPerformAction: { action in onPerformAction(item, action) },
+                                    onTransform: { transform in onTransform(item, transform) },
+                                    onTranslate: { onTranslate(item) },
                                     onTogglePinned: { onTogglePinned(item.id) },
                                     onRemove: { onRemove(item.id) }
                                 )
@@ -1925,10 +2045,13 @@ struct ClipboardHistoryPopover: View {
     }
 
     private func copySelectedItem() -> KeyPress.Result {
-        guard let selectedItemID,
-              let item = filteredItems.first(where: { $0.id == selectedItemID }) else {
+        guard let item = ClipboardHistoryKeyboardNavigation.itemToCopy(
+            in: filteredItems,
+            selectedID: selectedItemID
+        ) else {
             return .ignored
         }
+        selectedItemID = item.id
         onCopy(item)
         return .handled
     }
@@ -1938,6 +2061,9 @@ struct ClipboardHistoryRow: View {
     let item: ClipboardHistoryItem
     let isSelected: Bool
     let onCopy: () -> Void
+    let onPerformAction: (ClipboardHistoryAction) -> Void
+    let onTransform: (ClipboardTextTransform) -> Void
+    let onTranslate: () -> Void
     let onTogglePinned: () -> Void
     let onRemove: () -> Void
 
@@ -1945,12 +2071,12 @@ struct ClipboardHistoryRow: View {
 
     var body: some View {
         HStack(spacing: 8) {
-            Button(action: onCopy) {
-                contentPreview
-                    .frame(maxWidth: .infinity, alignment: .leading)
-                    .contentShape(.rect(cornerRadius: 8))
-            }
-            .buttonStyle(.plain)
+            contentPreview
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .contentShape(.rect(cornerRadius: 8))
+                .onTapGesture(perform: onCopy)
+                .accessibilityAddTraits(.isButton)
+                .accessibilityAction(named: Text(L("clipboard.copy")), onCopy)
 
             Button(action: onTogglePinned) {
                 Image(systemName: item.isPinned ? "pin.fill" : "pin")
@@ -1967,6 +2093,31 @@ struct ClipboardHistoryRow: View {
             .buttonStyle(.plain)
             .help(L("clipboard.delete"))
             .accessibilityLabel(L("clipboard.delete"))
+
+            quickActionButtons
+
+            Menu {
+                Button(L("clipboard.copy")) { onPerformAction(.copy) }
+                Button(L("clipboard.paste")) { onPerformAction(.paste) }
+                if item.content.plainTextRepresentation != nil {
+                    Button(L("clipboard.pastePlainText")) { onPerformAction(.pastePlainText) }
+                    if !item.isSensitive {
+                        Menu(L("clipboard.transform")) {
+                            ForEach(ClipboardTextTransform.allCases) { transform in
+                                Button(L(transform.localizationKey)) { onTransform(transform) }
+                            }
+                        }
+                        if BuiltInPluginManager.shared.isEnabled(.translation) {
+                            Button(L("clipboard.translate"), action: onTranslate)
+                        }
+                    }
+                }
+            } label: {
+                Image(systemName: "ellipsis.circle")
+                    .foregroundStyle(.secondary)
+            }
+            .menuStyle(.borderlessButton)
+            .help(L("clipboard.actions"))
         }
         .padding(8)
         .background(.quaternary.opacity(0.25), in: .rect(cornerRadius: 10))
@@ -1984,10 +2135,69 @@ struct ClipboardHistoryRow: View {
     }
 
     @ViewBuilder
+    private var quickActionButtons: some View {
+        switch item.content {
+        case let .url(value):
+            Button { ClipboardHistoryQuickAction.openURL(value) } label: {
+                Image(systemName: "safari")
+                    .foregroundStyle(.secondary)
+            }
+            .buttonStyle(.plain)
+            .help(L("clipboard.openURL"))
+        case let .files(files):
+            Menu {
+                Button(L("clipboard.revealInFinder")) { ClipboardHistoryQuickAction.revealFiles(files) }
+                Button(L("clipboard.copyPath")) { _ = ClipboardHistoryQuickAction.copyPaths(files) }
+            } label: {
+                Image(systemName: "folder")
+                    .foregroundStyle(.secondary)
+            }
+            .menuStyle(.borderlessButton)
+            .help(L("clipboard.revealInFinder"))
+        case .image:
+            if item.recognizedText != nil {
+                Menu {
+                    if let recognizedText = item.recognizedText {
+                        Button(L("clipboard.copyRecognizedText")) {
+                            _ = ClipboardHistoryQuickAction.copyRecognizedText(recognizedText)
+                        }
+                    }
+                    if let url = item.recognizedURLs.first {
+                        Button(L("clipboard.openRecognizedQR")) { NSWorkspace.shared.open(url) }
+                    }
+                } label: {
+                    Image(systemName: "text.viewfinder")
+                        .foregroundStyle(.secondary)
+                }
+                .menuStyle(.borderlessButton)
+                .help(L("clipboard.copyRecognizedText"))
+            }
+        case .text, .richText:
+            EmptyView()
+        }
+    }
+
+    @ViewBuilder
     private var contentPreview: some View {
+        if item.isSensitive {
+            Label(L("clipboard.sensitiveContent"), systemImage: "eye.slash.fill")
+                .font(.caption)
+                .foregroundStyle(.secondary)
+        } else {
+            regularContentPreview
+        }
+    }
+
+    @ViewBuilder
+    private var regularContentPreview: some View {
         switch item.content {
         case let .text(text):
             Text(text)
+                .font(.caption)
+                .lineLimit(2)
+                .multilineTextAlignment(.leading)
+        case let .richText(richText):
+            Text(richText.plainText)
                 .font(.caption)
                 .lineLimit(2)
                 .multilineTextAlignment(.leading)

@@ -8,10 +8,12 @@ enum ShortcutConflictSource: Equatable, Sendable {
     case otherApplication
     case scene(ScenePreset)
     case window(WindowLayout)
+    case windowManagement
     case app(String)
     case screenshot
     case clipboard
     case appVolume
+    case translation
 }
 
 struct ShortcutConflictContext: Sendable {
@@ -21,12 +23,52 @@ struct ShortcutConflictContext: Sendable {
     let screenshotBindings: [ScreenshotCaptureMode: GlobalShortcut]
     let clipboardBinding: GlobalShortcut?
     let appVolumeBinding: GlobalShortcut?
+    let translationBinding: GlobalShortcut?
     let excludingScene: ScenePreset?
     let excludingWindow: WindowLayout?
     let excludingAppPath: String?
     let excludingScreenshotMode: ScreenshotCaptureMode?
     let excludingClipboard: Bool
     let excludingAppVolume: Bool
+    let excludingTranslation: Bool
+    let windowQuickAccessBinding: GlobalShortcut?
+    let excludingWindowQuickAccess: Bool
+
+    init(
+        sceneBindings: [ScenePreset: GlobalShortcut],
+        windowBindings: [WindowLayout: GlobalShortcut],
+        appBindings: [String: GlobalShortcut],
+        screenshotBindings: [ScreenshotCaptureMode: GlobalShortcut],
+        clipboardBinding: GlobalShortcut?,
+        appVolumeBinding: GlobalShortcut?,
+        excludingScene: ScenePreset?,
+        excludingWindow: WindowLayout?,
+        excludingAppPath: String?,
+        excludingScreenshotMode: ScreenshotCaptureMode?,
+        excludingClipboard: Bool,
+        excludingAppVolume: Bool,
+        translationBinding: GlobalShortcut? = nil,
+        excludingTranslation: Bool = false,
+        windowQuickAccessBinding: GlobalShortcut? = nil,
+        excludingWindowQuickAccess: Bool = false
+    ) {
+        self.sceneBindings = sceneBindings
+        self.windowBindings = windowBindings
+        self.appBindings = appBindings
+        self.screenshotBindings = screenshotBindings
+        self.clipboardBinding = clipboardBinding
+        self.appVolumeBinding = appVolumeBinding
+        self.translationBinding = translationBinding
+        self.excludingScene = excludingScene
+        self.excludingWindow = excludingWindow
+        self.excludingAppPath = excludingAppPath
+        self.excludingScreenshotMode = excludingScreenshotMode
+        self.excludingClipboard = excludingClipboard
+        self.excludingAppVolume = excludingAppVolume
+        self.excludingTranslation = excludingTranslation
+        self.windowQuickAccessBinding = windowQuickAccessBinding
+        self.excludingWindowQuickAccess = excludingWindowQuickAccess
+    }
 }
 
 /// 快捷键冲突检测边界，便于测试时替换系统能力。
@@ -142,6 +184,11 @@ struct DefaultShortcutConflictChecker: ShortcutConflictChecking {
         })?.key {
             return .window(conflict)
         }
+        let windowQuickAccessBinding = context.windowQuickAccessBinding
+            ?? WindowShortcutService.shared.quickAccessBinding
+        if !context.excludingWindowQuickAccess, windowQuickAccessBinding == shortcut {
+            return .windowManagement
+        }
         if let conflict = context.appBindings.first(where: {
             $0.key != context.excludingAppPath && $0.value == shortcut
         })?.key {
@@ -155,8 +202,14 @@ struct DefaultShortcutConflictChecker: ShortcutConflictChecking {
         if !context.excludingClipboard, context.clipboardBinding == shortcut {
             return .clipboard
         }
-        if !context.excludingAppVolume, context.appVolumeBinding == shortcut {
+        if !context.excludingAppVolume,
+           (context.appVolumeBinding == shortcut
+               || AppVolumeShortcutService.shared.bindings.values.contains(shortcut)) {
             return .appVolume
+        }
+        let translationBinding = context.translationBinding ?? TranslationShortcutService.shared.binding
+        if !context.excludingTranslation, translationBinding == shortcut {
+            return .translation
         }
         if systemProvider.contains(shortcut) { return .system }
         if externalProbe.contains(shortcut) { return .otherApplication }
