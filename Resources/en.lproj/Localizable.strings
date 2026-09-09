@@ -321,6 +321,12 @@
 "clipboard.tab.settings" = "Settings";
 "clipboard.empty" = "No clipboard history";
 "clipboard.emptyDescription" = "Copied text, images, links, and files will appear here.";
+"clipboard.batchActions" = "Batch actions";
+"clipboard.pinSelected" = "Pin selected";
+"clipboard.unpinSelected" = "Unpin selected";
+"clipboard.markSelectedSensitive" = "Mark selected sensitive";
+"clipboard.unmarkSelectedSensitive" = "Unmark selected sensitive";
+"clipboard.cleanupSummary" = "Removed %d items, freed %@, preserved %d pinned items.";
 "clipboard.noResults" = "No matching history";
 "clipboard.noResultsDescription" = "Try a different search or filter.";
 "clipboard.image" = "Image";

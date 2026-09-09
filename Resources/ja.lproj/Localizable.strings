@@ -321,6 +321,12 @@
 "clipboard.tab.settings" = "設定";
 "clipboard.empty" = "クリップボード履歴なし";
 "clipboard.emptyDescription" = "コピーしたテキスト、画像、リンク、ファイルがここに表示されます。";
+"clipboard.batchActions" = "一括操作";
+"clipboard.pinSelected" = "選択項目を固定";
+"clipboard.unpinSelected" = "選択項目の固定を解除";
+"clipboard.markSelectedSensitive" = "選択項目を機密としてマーク";
+"clipboard.unmarkSelectedSensitive" = "選択項目の機密マークを解除";
+"clipboard.cleanupSummary" = "%d 件を削除し、%@ を解放しました。固定項目 %d 件は保持されています。";
 "clipboard.noResults" = "一致する履歴がありません";
 "clipboard.noResultsDescription" = "検索またはフィルタを変更してください。";
 "clipboard.image" = "画像";

@@ -49,6 +49,20 @@ struct ClipboardHistoryManagementSettingsSection: View {
                 .font(.caption)
                 .foregroundStyle(.secondary)
 
+            if let summary = historyService.lastCleanupSummary {
+                Label(
+                    L(
+                        "clipboard.cleanupSummary",
+                        summary.removedCount,
+                        ByteCountFormatter.string(fromByteCount: Int64(summary.reclaimedBytes), countStyle: .file),
+                        summary.preservedPinnedCount
+                    ),
+                    systemImage: "checkmark.circle"
+                )
+                .font(.caption)
+                .foregroundStyle(.secondary)
+            }
+
             Divider()
 
             HStack {

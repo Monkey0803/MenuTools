@@ -321,6 +321,12 @@
 "clipboard.tab.settings" = "设置";
 "clipboard.empty" = "暂无剪贴板历史";
 "clipboard.emptyDescription" = "复制的文本、图片、链接和文件会显示在这里。";
+"clipboard.batchActions" = "批量操作";
+"clipboard.pinSelected" = "置顶所选项目";
+"clipboard.unpinSelected" = "取消所选项目置顶";
+"clipboard.markSelectedSensitive" = "将所选项目标记为敏感";
+"clipboard.unmarkSelectedSensitive" = "取消所选项目敏感标记";
+"clipboard.cleanupSummary" = "已清理 %d 条，释放 %@，保留 %d 条置顶记录。";
 "clipboard.noResults" = "没有匹配的历史记录";
 "clipboard.noResultsDescription" = "请尝试更换搜索词或筛选条件。";
 "clipboard.image" = "图片";

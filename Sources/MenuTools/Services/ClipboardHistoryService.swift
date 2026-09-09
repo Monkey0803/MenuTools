@@ -3,6 +3,8 @@ import ApplicationServices
 import Foundation
 import Observation
 import SQLite3
+import CryptoKit
+import Security
 
 struct ClipboardHistoryFile: Codable, Equatable, Sendable, Identifiable {
     let path: String
@@ -129,6 +131,73 @@ enum ClipboardHistoryContent: Codable, Equatable, Sendable {
             return richText.plainText.lengthOfBytes(using: .utf8) + (richText.html?.count ?? 0) + (richText.rtf?.count ?? 0)
         }
     }
+}
+
+enum ClipboardHistoryEncryption {
+    private static let service = "com.qoder.menutools.clipboard-history"
+    private static let account = "database-key"
+    private static let magic = Data("MTCLIPDB1".utf8)
+
+    static func seal(_ data: Data) throws -> Data {
+        let sealed = try AES.GCM.seal(data, using: key())
+        guard let combined = sealed.combined else { throw ClipboardHistoryPersistenceError.encryptionFailed }
+        return magic + combined
+    }
+
+    static func open(_ data: Data) throws -> Data {
+        guard data.starts(with: magic) else { return data }
+        let box = try AES.GCM.SealedBox(combined: Data(data.dropFirst(magic.count)))
+        return try AES.GCM.open(box, using: key())
+    }
+
+    private static func key() throws -> SymmetricKey {
+        let query: [String: Any] = [
+            kSecClass as String: kSecClassGenericPassword,
+            kSecAttrService as String: service,
+            kSecAttrAccount as String: account,
+            kSecReturnData as String: true
+        ]
+        var result: CFTypeRef?
+        let status = SecItemCopyMatching(query as CFDictionary, &result)
+        if status == errSecSuccess, let data = result as? Data {
+            return SymmetricKey(data: data)
+        }
+        guard status == errSecItemNotFound else { return try fileBackedKey() }
+        let data = SymmetricKey(size: .bits256).withUnsafeBytes { Data($0) }
+        let attributes: [String: Any] = [
+            kSecClass as String: kSecClassGenericPassword,
+            kSecAttrService as String: service,
+            kSecAttrAccount as String: account,
+            kSecValueData as String: data,
+            kSecAttrAccessible as String: kSecAttrAccessibleAfterFirstUnlockThisDeviceOnly
+        ]
+        guard SecItemAdd(attributes as CFDictionary, nil) == errSecSuccess else {
+            return try fileBackedKey()
+        }
+        return SymmetricKey(data: data)
+    }
+
+    /// 某些无钥匙串权限的运行环境（例如独立测试进程）使用权限收紧的本地密钥文件，
+    /// 确保加密数据仍可跨启动恢复；正常 App 运行优先使用钥匙串。
+    private static func fileBackedKey() throws -> SymmetricKey {
+        let directory = FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask)[0]
+            .appendingPathComponent("MenuTools", isDirectory: true)
+        let url = directory.appendingPathComponent("clipboard-history.key")
+        let fileManager = FileManager.default
+        try fileManager.createDirectory(at: directory, withIntermediateDirectories: true)
+        if let existing = try? Data(contentsOf: url), existing.count == 32 {
+            return SymmetricKey(data: existing)
+        }
+        let data = SymmetricKey(size: .bits256).withUnsafeBytes { Data($0) }
+        try data.write(to: url, options: .atomic)
+        try? fileManager.setAttributes([.posixPermissions: 0o600], ofItemAtPath: url.path)
+        return SymmetricKey(data: data)
+    }
+}
+
+enum ClipboardHistoryPersistenceError: Error {
+    case encryptionKeyUnavailable
+    case encryptionFailed
 }
 
 /// 将系统剪贴板项目转换为历史记录内容。
@@ -699,6 +768,12 @@ enum ClipboardHistoryAction: String, Sendable, Equatable {
     var writeMode: ClipboardPasteboardWriteMode { self == .pastePlainText ? .plainText : .original }
 }
 
+struct ClipboardCleanupSummary: Equatable, Sendable {
+    let removedCount: Int
+    let reclaimedBytes: Int
+    let preservedPinnedCount: Int
+}
+
 enum ClipboardPrimaryAction: String, CaseIterable, Identifiable, Sendable {
     case copy
     case paste
@@ -1134,14 +1209,33 @@ enum ClipboardHistoryPersistence {
         databaseURL.deletingPathExtension().appendingPathExtension("blobs")
     }
 
+    static func backupURL(for databaseURL: URL) -> URL {
+        databaseURL.appendingPathExtension("backup")
+    }
+
     static func load(from url: URL) -> [ClipboardHistoryItem] {
         if FileManager.default.fileExists(atPath: url.path) {
             if isSQLiteDatabase(at: url) {
-                return (try? loadDatabase(from: url)) ?? []
+                if let items = try? loadDatabase(from: url) {
+                    return items
+                }
+                // 当前数据库损坏时回退到最近一次成功写入的备份，避免把历史误显示为空。
+                let backupURL = backupURL(for: url)
+                if isSQLiteDatabase(at: backupURL), let items = try? loadDatabase(from: backupURL) {
+                    try? FileManager.default.removeItem(at: url)
+                    try? FileManager.default.copyItem(at: backupURL, to: url)
+                    return items
+                }
+                return []
+            }
+            let backupURL = backupURL(for: url)
+            if isSQLiteDatabase(at: backupURL), let items = try? loadDatabase(from: backupURL) {
+                try? FileManager.default.removeItem(at: url)
+                try? FileManager.default.copyItem(at: backupURL, to: url)
+                return items
             }
             guard let legacyItems = loadLegacyJSON(from: url) else { return [] }
             do {
-                try FileManager.default.removeItem(at: url)
                 try save(legacyItems, to: url)
             } catch {
                 // 迁移失败不应阻止本次恢复，仍把已解码的旧历史交给服务层。
@@ -1168,6 +1262,13 @@ enum ClipboardHistoryPersistence {
         try fileManager.createDirectory(at: url.deletingLastPathComponent(), withIntermediateDirectories: true)
         if fileManager.fileExists(atPath: url.path), !isSQLiteDatabase(at: url) {
             try fileManager.removeItem(at: url)
+        }
+
+        // 在覆盖前保留最近一次可读取的数据库；下次启动发现损坏时可回退。
+        if isSQLiteDatabase(at: url) {
+            let backupURL = backupURL(for: url)
+            try? fileManager.removeItem(at: backupURL)
+            try fileManager.copyItem(at: url, to: backupURL)
         }
 
         let persistableItems = items.filter { !$0.isSensitive }
@@ -1264,7 +1365,8 @@ enum ClipboardHistoryPersistence {
         var items: [ClipboardHistoryItem] = []
         while sqlite3_step(statement) == SQLITE_ROW {
             guard let metadata = data(statement, column: 0),
-                  let item = try? decoder.decode(ClipboardHistoryItem.self, from: metadata),
+                  let decryptedMetadata = try? ClipboardHistoryEncryption.open(metadata),
+                  let item = try? decoder.decode(ClipboardHistoryItem.self, from: decryptedMetadata),
                   let hydrated = hydrate(item, blobsDirectory: blobsDirectory) else { continue }
             items.append(hydrated)
         }
@@ -1307,20 +1409,20 @@ enum ClipboardHistoryPersistence {
         )
         let encoder = JSONEncoder()
         encoder.dateEncodingStrategy = .millisecondsSince1970
-        return try encoder.encode(metadataItem)
+        return try ClipboardHistoryEncryption.seal(encoder.encode(metadataItem))
     }
 
     private static func hydrate(_ item: ClipboardHistoryItem, blobsDirectory: URL) -> ClipboardHistoryItem? {
         let content: ClipboardHistoryContent
         switch item.content {
         case .image:
-            guard let image = try? Data(contentsOf: blobURL(item.id, "image", blobsDirectory)) else { return nil }
+            guard let image = readBlob(item.id, "image", blobsDirectory) else { return nil }
             content = .image(image)
         case let .richText(richText):
             content = .richText(ClipboardRichText(
                 plainText: richText.plainText,
-                html: try? Data(contentsOf: blobURL(item.id, "html", blobsDirectory)),
-                rtf: try? Data(contentsOf: blobURL(item.id, "rtf", blobsDirectory))
+                html: readBlob(item.id, "html", blobsDirectory),
+                rtf: readBlob(item.id, "rtf", blobsDirectory)
             ))
         case .text, .url, .files:
             content = item.content
@@ -1350,9 +1452,15 @@ enum ClipboardHistoryPersistence {
         let name = "\(itemID.uuidString).\(suffix)"
         desired.insert(name)
         let url = directory.appendingPathComponent(name)
-        if (try? Data(contentsOf: url)) != data {
-            try data.write(to: url, options: .atomic)
+        let encrypted = try ClipboardHistoryEncryption.seal(data)
+        if (try? Data(contentsOf: url)) != encrypted {
+            try encrypted.write(to: url, options: .atomic)
         }
+    }
+
+    private static func readBlob(_ itemID: UUID, _ suffix: String, _ directory: URL) -> Data? {
+        guard let data = try? Data(contentsOf: blobURL(itemID, suffix, directory)) else { return nil }
+        return try? ClipboardHistoryEncryption.open(data)
     }
 
     private static func blobURL(_ itemID: UUID, _ suffix: String, _ directory: URL) -> URL {
@@ -1491,6 +1599,7 @@ final class ClipboardHistoryService {
     private(set) var sequentialPasteMode: ClipboardSequentialPasteMode
     private(set) var copyFeedback: ClipboardCopyFeedback?
     private(set) var persistenceErrorMessage: String?
+    private(set) var lastCleanupSummary: ClipboardCleanupSummary?
     var canUndoLastRemoval: Bool { !lastRemovedItems.isEmpty }
 
     init(
@@ -1545,6 +1654,7 @@ final class ClipboardHistoryService {
         self.autoPasteAfterCopy = configuredPrimaryAction == .paste
         self.copyFeedback = nil
         self.persistenceErrorMessage = nil
+        self.lastCleanupSummary = nil
         buffer = ClipboardHistoryBuffer(
             limit: configuredLimit,
             sensitiveLifetime: sensitiveLifetime,
@@ -1898,6 +2008,17 @@ final class ClipboardHistoryService {
         persist()
     }
 
+    func setPinned(_ isPinned: Bool, for ids: Set<UUID>) {
+        let existingIDs = Set(buffer.items.map(\.id)).intersection(ids)
+        guard !existingIDs.isEmpty else { return }
+        historyMutationGeneration &+= 1
+        for id in existingIDs where buffer.items.contains(where: { $0.id == id && $0.isPinned != isPinned }) {
+            buffer.togglePinned(id: id)
+        }
+        synchronizeItems()
+        persist()
+    }
+
     func setTags(_ tags: [String], for id: UUID) {
         guard buffer.items.contains(where: { $0.id == id }) else { return }
         let normalized = Array(Set(tags.map { $0.trimmingCharacters(in: .whitespacesAndNewlines) }.filter { !$0.isEmpty })).sorted()
@@ -1929,6 +2050,17 @@ final class ClipboardHistoryService {
         guard buffer.items.contains(where: { $0.id == id }) else { return }
         historyMutationGeneration &+= 1
         buffer.setSensitive(id: id, isSensitive: isSensitive)
+        synchronizeItems()
+        persist()
+    }
+
+    func setSensitive(_ isSensitive: Bool, for ids: Set<UUID>) {
+        let existingIDs = Set(buffer.items.map(\.id)).intersection(ids)
+        guard !existingIDs.isEmpty else { return }
+        historyMutationGeneration &+= 1
+        for id in existingIDs {
+            buffer.setSensitive(id: id, isSensitive: isSensitive)
+        }
         synchronizeItems()
         persist()
     }
@@ -2001,7 +2133,17 @@ final class ClipboardHistoryService {
             storageLimitBytes: storageLimitBytes,
             now: now
         )
-        guard buffer.items != before else { return }
+        guard buffer.items != before else {
+            lastCleanupSummary = nil
+            return
+        }
+        let beforeBytes = before.reduce(0) { $0 + $1.content.storageSize }
+        let afterBytes = buffer.items.reduce(0) { $0 + $1.content.storageSize }
+        lastCleanupSummary = ClipboardCleanupSummary(
+            removedCount: max(0, before.count - buffer.items.count),
+            reclaimedBytes: max(0, beforeBytes - afterBytes),
+            preservedPinnedCount: buffer.items.count(where: \.isPinned)
+        )
         historyMutationGeneration &+= 1
         synchronizeItems()
         persist()

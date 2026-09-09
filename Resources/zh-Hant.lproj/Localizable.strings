@@ -321,6 +321,12 @@
 "clipboard.tab.settings" = "設定";
 "clipboard.empty" = "暫無剪貼板歷史";
 "clipboard.emptyDescription" = "複製的文字、圖片、連結和檔案會顯示在這裡。";
+"clipboard.batchActions" = "批次操作";
+"clipboard.pinSelected" = "置頂所選項目";
+"clipboard.unpinSelected" = "取消所選項目置頂";
+"clipboard.markSelectedSensitive" = "將所選項目標記為敏感";
+"clipboard.unmarkSelectedSensitive" = "取消所選項目敏感標記";
+"clipboard.cleanupSummary" = "已清理 %d 條，釋放 %@，保留 %d 條置頂記錄。";
 "clipboard.noResults" = "沒有符合的歷史記錄";
 "clipboard.noResultsDescription" = "請嘗試更換搜尋字詞或篩選條件。";
 "clipboard.image" = "圖片";

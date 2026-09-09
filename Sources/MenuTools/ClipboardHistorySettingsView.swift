@@ -372,6 +372,24 @@ struct ClipboardHistorySettingsView: View {
                             selectedItemIDs.removeAll()
                         }
                         .disabled(selectedItemIDs.isEmpty)
+                        Menu {
+                            Button(L("clipboard.pinSelected")) {
+                                historyService.setPinned(true, for: selectedItemIDs)
+                            }
+                            Button(L("clipboard.unpinSelected")) {
+                                historyService.setPinned(false, for: selectedItemIDs)
+                            }
+                            Divider()
+                            Button(L("clipboard.markSelectedSensitive")) {
+                                historyService.setSensitive(true, for: selectedItemIDs)
+                            }
+                            Button(L("clipboard.unmarkSelectedSensitive")) {
+                                historyService.setSensitive(false, for: selectedItemIDs)
+                            }
+                        } label: {
+                            Label(L("clipboard.batchActions"), systemImage: "slider.horizontal.3")
+                        }
+                        .disabled(selectedItemIDs.isEmpty)
                         Button(L("clipboard.deleteSelected"), role: .destructive) {
                             historyService.remove(ids: selectedItemIDs)
                             selectedItemIDs.removeAll()

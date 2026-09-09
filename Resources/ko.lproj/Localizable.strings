@@ -321,6 +321,12 @@
 "clipboard.tab.settings" = "설정";
 "clipboard.empty" = "클립보드 기록 없음";
 "clipboard.emptyDescription" = "복사한 텍스트, 이미지, 링크 및 파일이 여기에 표시됩니다.";
+"clipboard.batchActions" = "일괄 작업";
+"clipboard.pinSelected" = "선택 항목 고정";
+"clipboard.unpinSelected" = "선택 항목 고정 해제";
+"clipboard.markSelectedSensitive" = "선택 항목을 민감하게 표시";
+"clipboard.unmarkSelectedSensitive" = "선택 항목 민감 표시 해제";
+"clipboard.cleanupSummary" = "%d개 항목을 삭제하고 %@를 확보했습니다. 고정 항목 %d개는 유지되었습니다.";
 "clipboard.noResults" = "일치하는 기록 없음";
 "clipboard.noResultsDescription" = "검색어나 필터를 변경해 보세요.";
 "clipboard.image" = "이미지";

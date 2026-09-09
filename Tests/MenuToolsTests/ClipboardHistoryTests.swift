@@ -46,6 +46,25 @@ func clipboardServiceAppliesPerContentRetentionImmediately() throws {
     #expect(service.items.isEmpty)
 }
 
+@Test("剪贴板历史支持批量置顶和敏感标记")
+@MainActor
+func clipboardHistorySupportsBatchMetadataActions() {
+    let first = ClipboardHistoryItem(
+        id: UUID(), content: .text("第一条"), capturedAt: Date(timeIntervalSince1970: 1_000), expiresAt: nil, isPinned: false
+    )
+    let second = ClipboardHistoryItem(
+        id: UUID(), content: .text("第二条"), capturedAt: Date(timeIntervalSince1970: 2_000), expiresAt: nil, isPinned: false
+    )
+    let service = ClipboardHistoryService(persistenceURL: nil)
+    service.importItems([first, second])
+    let ids = Set([first.id, second.id])
+
+    service.setPinned(true, for: ids)
+    service.setSensitive(true, for: ids)
+
+    #expect(service.items.allSatisfy { $0.isPinned && $0.isSensitive })
+}
+
 @Test("宽屏剪贴板设置页优先使用双列历史卡片")
 func clipboardSettingsUsesAdaptiveHistoryGrid() {
     #expect(ClipboardHistorySettingsLayout.columnCount(for: 552) == 2)
@@ -732,7 +751,32 @@ func historyPersistenceSeparatesMetadataAndBlobs() throws {
     #expect(String(data: databaseHeader, encoding: .utf8) == "SQLite format 3\0")
     let blobNames = try FileManager.default.contentsOfDirectory(atPath: blobsURL.path)
     #expect(Set(blobNames) == ["\(item.id.uuidString).html", "\(item.id.uuidString).rtf"])
+    let encryptedBlob = try Data(contentsOf: blobsURL.appendingPathComponent("\(item.id.uuidString).html"))
+    #expect(encryptedBlob != Data("<b>独立保存</b>".utf8))
+    #expect((try Data(contentsOf: url)).range(of: Data("独立保存".utf8)) == nil)
     #expect(ClipboardHistoryPersistence.load(from: url) == [item])
+}
+
+@Test("剪贴板历史数据库损坏时会从最近备份恢复")
+func historyPersistenceRecoversFromBackup() throws {
+    let url = FileManager.default.temporaryDirectory
+        .appendingPathComponent("MenuTools-Clipboard-Recovery-\(UUID().uuidString).db")
+    defer {
+        try? FileManager.default.removeItem(at: url)
+        try? FileManager.default.removeItem(at: ClipboardHistoryPersistence.backupURL(for: url))
+        try? FileManager.default.removeItem(at: ClipboardHistoryPersistence.blobsURL(for: url))
+    }
+    let first = ClipboardHistoryItem(
+        id: UUID(), content: .text("第一版"), capturedAt: Date(timeIntervalSince1970: 1_000), expiresAt: nil, isPinned: false
+    )
+    let second = ClipboardHistoryItem(
+        id: UUID(), content: .text("第二版"), capturedAt: Date(timeIntervalSince1970: 2_000), expiresAt: nil, isPinned: false
+    )
+    try ClipboardHistoryPersistence.save([first], to: url)
+    try ClipboardHistoryPersistence.save([second], to: url)
+    try Data("损坏".utf8).write(to: url, options: .atomic)
+
+    #expect(ClipboardHistoryPersistence.load(from: url) == [first])
 }
 
 @Test("旧版 JSON 剪贴板历史会原地迁移到新数据库")
