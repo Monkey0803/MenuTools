@@ -83,6 +83,9 @@ struct AppVolumeCard: View {
         .padding(12)
         .frame(maxWidth: .infinity, alignment: .leading)
         .controlCenterSurface(tint: .cyan)
+        .onDisappear {
+            service.setVolumeAdjustmentActive(false)
+        }
     }
 }
 
@@ -845,7 +848,7 @@ private struct SystemOutputVolumeRow: View {
                     .frame(width: compact ? 18 : 24)
             }
             .buttonStyle(.plain)
-            .foregroundStyle(service.output.isMuted ? Color.orange : Color.accentColor)
+            .foregroundStyle(service.output.isMuted ? Color.orange : Color.secondary)
             .disabled(!service.output.canSetMute)
             .accessibilityLabel(L("volume.mute"))
             .frame(height: controlHeight)
@@ -1067,8 +1070,10 @@ private struct AppVolumeRow: View {
 
                 Slider(value: Binding(
                     get: { service.session(id: session.rootBundleID)?.volume ?? session.volume },
-                    set: { service.setVolume($0, for: session.rootBundleID) }
-                ), in: 0...service.maximumAppGain)
+                    set: { service.setVolume($0, for: session.rootBundleID, isUserAdjustment: true) }
+                ), in: 0...service.maximumAppGain, onEditingChanged: { editing in
+                    service.setVolumeAdjustmentActive(editing)
+                })
                 .disabled(!AppVolumeRowInteractionPolicy.canAdjust(isEnabled: service.isEnabled))
                 .accessibilityLabel(L("volume.app", session.displayName))
             }
@@ -1175,8 +1180,10 @@ private struct AppVolumeRow: View {
             }
             Slider(value: Binding(
                 get: { service.session(id: session.rootBundleID)?.volume ?? session.volume },
-                set: { service.setVolume($0, for: session.rootBundleID) }
-            ), in: 0...service.maximumAppGain)
+                set: { service.setVolume($0, for: session.rootBundleID, isUserAdjustment: true) }
+            ), in: 0...service.maximumAppGain, onEditingChanged: { editing in
+                service.setVolumeAdjustmentActive(editing)
+            })
             .disabled(!AppVolumeRowInteractionPolicy.canAdjust(isEnabled: service.isEnabled))
             .accessibilityLabel(L("volume.app", session.displayName))
         }

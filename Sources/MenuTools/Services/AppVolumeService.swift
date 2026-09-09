@@ -582,6 +582,7 @@ final class AppVolumeService {
     private(set) var meetingDuckingEnabled: Bool
     private(set) var meetingDuckingFactor: Double
     private(set) var isMeetingDuckingActive = false
+    private(set) var isAdjustingVolume = false
     private(set) var devicePresetBindings: [String: UUID]
 
     var canUndoLatestAutomation: Bool { latestAutomationUndo != nil }
@@ -606,7 +607,8 @@ final class AppVolumeService {
         }
         switch sessionSort {
         case .recent:
-            return result.sorted { $0.lastAdjustedAt > $1.lastAdjustedAt }
+            // 保留 rebuildSessions 维护的稳定顺序，避免调节音量时条目因时间戳变化而换位。
+            return result
         case .volume:
             return result.sorted { $0.volume > $1.volume }
         case .name:
@@ -1258,7 +1260,17 @@ final class AppVolumeService {
         }
     }
 
-    func setVolume(_ requestedVolume: Double, for rootBundleID: String) {
+    func setVolumeAdjustmentActive(_ active: Bool) {
+        isAdjustingVolume = active
+    }
+
+    func setVolume(
+        _ requestedVolume: Double,
+        for rootBundleID: String,
+        isUserAdjustment: Bool = false
+    ) {
+        // Slider 的首个刻度可能早于 onEditingChanged(true)，在用户交互入口冻结最近排序。
+        if isUserAdjustment { isAdjustingVolume = true }
         guard let session = session(id: rootBundleID) else { return }
         let previousProfile = profiles[rootBundleID]
         let volume = AppVolumeSafetyPolicy.clamp(requestedVolume, boostEnabled: isBoostEnabled)
