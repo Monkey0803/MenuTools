@@ -994,5 +994,16 @@
 "traffic.tab.history" = "History";
 "traffic.tab.diagnostics" = "Diagnostics";
 "traffic.topApps" = "Top apps";
+"clipboard.applicationPolicies" = "App policies";
+"clipboard.applicationPolicies.description" = "Override recording and paste behavior for individual apps by bundle ID.";
+"clipboard.applicationPolicies.bundleID" = "Bundle ID";
+"clipboard.applicationPolicies.save" = "Save policy";
+"clipboard.applicationPolicies.blocked" = "Recording off";
+"clipboard.applicationPolicies.enabled" = "Recording on";
+"clipboard.applicationPolicies.record" = "Record";
+"clipboard.applicationPolicies.autoPaste" = "Auto-paste";
+"clipboard.applicationPolicies.retention" = "Retention";
 "traffic.viewAllApps" = "View all apps";
 "traffic.historyApp" = "App";
+"clipboard.pdf" = "PDF";
+"clipboard.loadMore" = "Load more";

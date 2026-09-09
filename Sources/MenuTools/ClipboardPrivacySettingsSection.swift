@@ -12,6 +12,13 @@ struct ClipboardPrivacySettingsSection: View {
     @State private var isArchiveOperationInProgress = false
     @State private var syncFilePath = UserDefaults.standard.string(forKey: "clipboard.syncFilePath")
     @State private var pendingArchiveAction: ClipboardArchivePendingAction?
+    @State private var applicationPolicyBundleID = ""
+    @State private var applicationPolicyRecord = true
+    @State private var applicationPolicyAutoPaste = false
+    @State private var applicationPolicyRetentionDays = 0
+    @State private var applicationPolicyPasswordManagers = true
+    @State private var applicationPolicyVerificationCodes = true
+    @State private var applicationPolicyBankCards = true
 
     var body: some View {
         VStack(alignment: .leading, spacing: 10) {
@@ -71,6 +78,44 @@ struct ClipboardPrivacySettingsSection: View {
             }
 
             Divider()
+
+            Text(L("clipboard.applicationPolicies"))
+                .font(.subheadline.weight(.medium))
+            Text(L("clipboard.applicationPolicies.description"))
+                .font(.caption)
+                .foregroundStyle(.secondary)
+            HStack {
+                TextField(L("clipboard.applicationPolicies.bundleID"), text: $applicationPolicyBundleID)
+                    .textFieldStyle(.roundedBorder)
+                Button(L("clipboard.applicationPolicies.save"), action: saveApplicationPolicy)
+                    .disabled(applicationPolicyBundleID.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
+            }
+            HStack {
+                Toggle(L("clipboard.applicationPolicies.record"), isOn: $applicationPolicyRecord)
+                Toggle(L("clipboard.applicationPolicies.autoPaste"), isOn: $applicationPolicyAutoPaste)
+                Picker(L("clipboard.applicationPolicies.retention"), selection: $applicationPolicyRetentionDays) {
+                    Text(L("clipboard.unlimited")).tag(0)
+                    Text(L("clipboard.retentionDaysValue", 1)).tag(1)
+                    Text(L("clipboard.retentionDaysValue", 7)).tag(7)
+                    Text(L("clipboard.retentionDaysValue", 30)).tag(30)
+                }
+            }
+            HStack {
+                Toggle(L("clipboard.sensitive.passwordManagers"), isOn: $applicationPolicyPasswordManagers)
+                Toggle(L("clipboard.sensitive.verificationCodes"), isOn: $applicationPolicyVerificationCodes)
+                Toggle(L("clipboard.sensitive.bankCards"), isOn: $applicationPolicyBankCards)
+            }
+            ForEach(historyService.applicationPolicies) { policy in
+                HStack {
+                    Text(policy.bundleID).font(.caption).lineLimit(1)
+                    Spacer()
+                    Text(policy.record == false ? L("clipboard.applicationPolicies.blocked") : L("clipboard.applicationPolicies.enabled"))
+                        .font(.caption2).foregroundStyle(.secondary)
+                    Button { historyService.removeApplicationPolicy(for: policy.bundleID) } label: {
+                        Image(systemName: "xmark.circle.fill").foregroundStyle(.secondary)
+                    }.buttonStyle(.plain)
+                }
+            }
 
             Text(L("clipboard.sensitiveRules"))
                 .font(.subheadline.weight(.medium))
@@ -272,6 +317,23 @@ struct ClipboardPrivacySettingsSection: View {
         rules.keywords.append(keyword)
         historyService.setSensitiveRules(rules)
         keywordInput = ""
+    }
+
+    private func saveApplicationPolicy() {
+        let bundleID = applicationPolicyBundleID.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !bundleID.isEmpty else { return }
+        historyService.setApplicationPolicy(ClipboardApplicationPolicy(
+            bundleID: bundleID,
+            record: applicationPolicyRecord,
+            autoPaste: applicationPolicyAutoPaste,
+            retentionDays: applicationPolicyRetentionDays > 0 ? applicationPolicyRetentionDays : nil,
+            sensitiveRules: ClipboardSensitiveRules(
+                passwordManagersEnabled: applicationPolicyPasswordManagers,
+                verificationCodesEnabled: applicationPolicyVerificationCodes,
+                bankCardsEnabled: applicationPolicyBankCards
+            )
+        ))
+        applicationPolicyBundleID = ""
     }
 
     private func exportArchive() {

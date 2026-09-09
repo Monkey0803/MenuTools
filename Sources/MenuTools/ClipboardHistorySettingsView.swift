@@ -106,6 +106,7 @@ struct ClipboardHistorySettingsView: View {
     @State private var selectedItemIDs = Set<UUID>()
     @State private var isSelectingItems = false
     @State private var selectedTab: ClipboardHistorySettingsTab = .history
+    @State private var historyPageSize = 50
 
     private var displayedShortcut: GlobalShortcut? {
         capturedShortcut ?? shortcutService.binding
@@ -443,6 +444,12 @@ struct ClipboardHistorySettingsView: View {
                         }
                     }
                 }
+                if filteredItems.count < allFilteredItems.count {
+                    Button(L("clipboard.loadMore")) {
+                        historyPageSize += 50
+                    }
+                    .frame(maxWidth: .infinity)
+                }
             }
         }
     }
@@ -520,6 +527,10 @@ struct ClipboardHistorySettingsView: View {
     }
 
     private var filteredItems: [ClipboardHistoryItem] {
+        Array(ClipboardHistoryList.page(allFilteredItems, offset: 0, pageSize: historyPageSize))
+    }
+
+    private var allFilteredItems: [ClipboardHistoryItem] {
         ClipboardHistoryList.items(
             from: historyService.items,
             query: searchText,
@@ -700,6 +711,8 @@ private struct ClipboardHistorySettingsCard: View {
             if let url = item.recognizedURLs.first {
                 Button(L("clipboard.openRecognizedQR")) { NSWorkspace.shared.open(url) }
             }
+        case .pdf:
+            Button(L("clipboard.copy")) { _ = ClipboardHistoryService.shared.copy(item) }
         case .text, .richText:
             EmptyView()
         }
@@ -757,6 +770,7 @@ private struct ClipboardHistorySettingsCard: View {
         case let .text(text): return text
         case let .richText(richText): return richText.plainText
         case .image: return L("clipboard.image")
+        case .pdf: return L("clipboard.pdf")
         case let .url(value): return value
         case let .files(files):
             guard let first = files.first else { return L("clipboard.files") }
@@ -848,6 +862,9 @@ private struct ClipboardHistoryThumbnail: View {
                 Text(richText.plainText.prefix(2).uppercased())
                     .font(.headline.weight(.semibold))
                     .foregroundStyle(.secondary)
+            case .pdf:
+                Image(systemName: "doc.richtext")
+                    .foregroundStyle(.secondary)
                     .lineLimit(1)
             case let .image(data):
                 if let image = NSImage(data: data) {
@@ -936,6 +953,9 @@ private struct ClipboardHistoryHoverPreview: View {
                 .multilineTextAlignment(.leading)
                 .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
                 .padding(12)
+        case .pdf:
+            Label(L("clipboard.pdf"), systemImage: "doc.richtext")
+                .frame(maxWidth: .infinity, maxHeight: .infinity)
         case let .image(data):
             if let image = NSImage(data: data) {
                 Image(nsImage: image)

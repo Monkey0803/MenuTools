@@ -1008,5 +1008,17 @@
 "traffic.tab.history" = "历史趋势";
 "traffic.tab.diagnostics" = "诊断与数据";
 "traffic.topApps" = "高流量 App";
+"traffic.viewAll" = "查看全部";
+"clipboard.applicationPolicies" = "应用级策略";
+"clipboard.applicationPolicies.description" = "按 Bundle ID 为不同应用覆盖记录和自动粘贴行为。";
+"clipboard.applicationPolicies.bundleID" = "Bundle ID";
+"clipboard.applicationPolicies.save" = "保存策略";
+"clipboard.applicationPolicies.blocked" = "关闭记录";
+"clipboard.applicationPolicies.enabled" = "开启记录";
+"clipboard.applicationPolicies.record" = "Record";
+"clipboard.applicationPolicies.autoPaste" = "Auto-paste";
+"clipboard.applicationPolicies.retention" = "Retention";
 "traffic.viewAllApps" = "查看全部 App";
 "traffic.historyApp" = "查看 App";
+"clipboard.pdf" = "PDF";
+"clipboard.loadMore" = "Load more";

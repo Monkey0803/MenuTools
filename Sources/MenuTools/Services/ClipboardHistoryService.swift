@@ -5,6 +5,7 @@ import Observation
 import SQLite3
 import CryptoKit
 import Security
+import ImageIO
 
 struct ClipboardHistoryFile: Codable, Equatable, Sendable, Identifiable {
     let path: String
@@ -13,6 +14,7 @@ struct ClipboardHistoryFile: Codable, Equatable, Sendable, Identifiable {
     var url: URL { URL(fileURLWithPath: path) }
     var displayName: String { url.lastPathComponent }
     var isAvailable: Bool { FileManager.default.fileExists(atPath: path) }
+    var isPDF: Bool { url.pathExtension.caseInsensitiveCompare("pdf") == .orderedSame }
 }
 
 struct ClipboardRichText: Codable, Equatable, Sendable {
@@ -21,12 +23,36 @@ struct ClipboardRichText: Codable, Equatable, Sendable {
     let rtf: Data?
 }
 
+struct ClipboardTextAnalysis: Equatable, Sendable {
+    let codeLanguage: String?
+    let markdownPreview: String?
+    let colorHex: String?
+    let structuredLines: [String]
+
+    static func analyze(_ text: String) -> ClipboardTextAnalysis {
+        let value = text.trimmingCharacters(in: .whitespacesAndNewlines)
+        let lines = value.split(whereSeparator: \.isNewline).map(String.init)
+        let language: String? = {
+            if value.contains("func ") || value.contains("import SwiftUI") { return "Swift" }
+            if value.contains("const ") || value.contains("function ") { return "JavaScript" }
+            if value.contains("def ") || value.contains("import ") && value.contains(":") { return "Python" }
+            if value.contains("SELECT ") || value.contains("select ") { return "SQL" }
+            return nil
+        }()
+        let color = value.range(of: "^#(?:[0-9a-fA-F]{3}|[0-9a-fA-F]{6}|[0-9a-fA-F]{8})$", options: .regularExpression)
+            .map { String(value[$0]).uppercased() }
+        let markdown = value.contains("# ") || value.contains("**") || value.contains("```") ? value : nil
+        return ClipboardTextAnalysis(codeLanguage: language, markdownPreview: markdown, colorHex: color, structuredLines: lines)
+    }
+}
+
 enum ClipboardHistoryContentType: String, CaseIterable, Codable, Sendable {
     case text
     case image
     case url
     case files
     case richText
+    case pdf
 }
 
 /// 剪贴板历史中的内容；图片使用 TIFF 数据保存，避免把 NSImage 带入并发边界。
@@ -36,6 +62,7 @@ enum ClipboardHistoryContent: Codable, Equatable, Sendable {
     case url(String)
     case files([ClipboardHistoryFile])
     case richText(ClipboardRichText)
+    case pdf(Data)
 
     private enum CodingKeys: String, CodingKey {
         case text
@@ -43,6 +70,7 @@ enum ClipboardHistoryContent: Codable, Equatable, Sendable {
         case url
         case files
         case richText
+        case pdf
     }
 
     init(from decoder: Decoder) throws {
@@ -57,6 +85,8 @@ enum ClipboardHistoryContent: Codable, Equatable, Sendable {
             self = .files(files)
         } else if let richText = try container.decodeIfPresent(ClipboardRichText.self, forKey: .richText) {
             self = .richText(richText)
+        } else if let pdf = try container.decodeIfPresent(Data.self, forKey: .pdf) {
+            self = .pdf(pdf)
         } else {
             throw DecodingError.dataCorruptedError(
                 forKey: .text,
@@ -79,6 +109,8 @@ enum ClipboardHistoryContent: Codable, Equatable, Sendable {
             try container.encode(files, forKey: .files)
         case let .richText(richText):
             try container.encode(richText, forKey: .richText)
+        case let .pdf(pdf):
+            try container.encode(pdf, forKey: .pdf)
         }
     }
 
@@ -92,6 +124,8 @@ enum ClipboardHistoryContent: Codable, Equatable, Sendable {
             richText.plainText
         case .image:
             nil
+        case let .pdf(data):
+            "PDF \(data.count) bytes"
         }
     }
 
@@ -102,6 +136,7 @@ enum ClipboardHistoryContent: Codable, Equatable, Sendable {
         case .url: .url
         case .files: .files
         case .richText: .richText
+        case .pdf: .pdf
         }
     }
 
@@ -114,6 +149,8 @@ enum ClipboardHistoryContent: Codable, Equatable, Sendable {
         case let .files(files):
             return files.map(\.path).joined(separator: "\n")
         case .image:
+            return nil
+        case .pdf:
             return nil
         }
     }
@@ -129,6 +166,8 @@ enum ClipboardHistoryContent: Codable, Equatable, Sendable {
             return files.reduce(0) { $0 + $1.path.lengthOfBytes(using: .utf8) }
         case let .richText(richText):
             return richText.plainText.lengthOfBytes(using: .utf8) + (richText.html?.count ?? 0) + (richText.rtf?.count ?? 0)
+        case let .pdf(data):
+            return data.count
         }
     }
 }
@@ -253,6 +292,9 @@ enum ClipboardHistoryPasteboardReader {
         if let data = item.data(forType: .tiff) {
             return .image(data)
         }
+        if let data = item.data(forType: NSPasteboard.PasteboardType("com.adobe.pdf")) {
+            return .pdf(data)
+        }
         return nil
     }
 
@@ -277,6 +319,26 @@ enum ClipboardHistoryRecordingPolicy {
         guard !isPaused else { return false }
         guard let sourceBundleID else { return true }
         return !excludedBundleIDs.contains(sourceBundleID)
+    }
+}
+
+/// 针对单个来源 App 的剪贴板行为覆盖。未填写的字段继承全局设置。
+struct ClipboardApplicationPolicy: Codable, Equatable, Sendable, Identifiable {
+    let bundleID: String
+    var record: Bool?
+    var autoPaste: Bool?
+    var retentionDays: Int?
+    var sensitiveRules: ClipboardSensitiveRules?
+
+    var id: String { bundleID }
+
+    init(bundleID: String, record: Bool? = nil, autoPaste: Bool? = nil,
+         retentionDays: Int? = nil, sensitiveRules: ClipboardSensitiveRules? = nil) {
+        self.bundleID = bundleID.trimmingCharacters(in: .whitespacesAndNewlines)
+        self.record = record
+        self.autoPaste = autoPaste
+        self.retentionDays = retentionDays
+        self.sensitiveRules = sensitiveRules
     }
 }
 
@@ -319,13 +381,14 @@ enum ClipboardHistoryCategory: String, CaseIterable, Identifiable {
 
     fileprivate func contains(_ content: ClipboardHistoryContent) -> Bool {
         switch (self, content) {
-        case (.all, _), (.text, .text), (.text, .richText), (.image, .image), (.url, .url), (.file, .files):
+        case (.all, _), (.text, .text), (.text, .richText), (.image, .image), (.url, .url), (.file, .files), (.file, .pdf):
             return true
         case (.text, .image), (.text, .url), (.text, .files),
              (.image, .text), (.image, .url), (.image, .files),
              (.url, .text), (.url, .image), (.url, .files),
              (.file, .text), (.file, .image), (.file, .url), (.file, .richText),
-             (.image, .richText), (.url, .richText):
+             (.image, .richText), (.url, .richText),
+             (.text, .pdf), (.image, .pdf), (.url, .pdf):
             return false
         }
     }
@@ -403,6 +466,77 @@ enum ClipboardHistoryList {
                 return lhs.capturedAt < rhs.capturedAt
             }
         }
+    }
+
+    static func page(_ items: [ClipboardHistoryItem], offset: Int, pageSize: Int) -> ArraySlice<ClipboardHistoryItem> {
+        guard pageSize > 0, offset >= 0, offset < items.count else { return items[0..<0] }
+        let end = min(items.count, offset + pageSize)
+        return items[offset..<end]
+    }
+}
+
+/// 增量维护历史搜索文本，避免每次查询都重新拼接标题、正文、标签和备注。
+struct ClipboardHistorySearchIndex: Sendable {
+    private(set) var values: [UUID: String] = [:]
+
+    mutating func upsert(_ item: ClipboardHistoryItem) {
+        values[item.id] = item.searchableText?.localizedLowercase ?? ""
+    }
+
+    mutating func remove(_ id: UUID) { values.removeValue(forKey: id) }
+
+    mutating func replace(_ items: [ClipboardHistoryItem]) {
+        values.removeAll(keepingCapacity: true)
+        for item in items { upsert(item) }
+    }
+
+    func matches(_ query: String, id: UUID) -> Bool {
+        let normalized = query.trimmingCharacters(in: .whitespacesAndNewlines).localizedLowercase
+        guard !normalized.isEmpty else { return true }
+        return values[id]?.localizedCaseInsensitiveContains(normalized) == true
+    }
+}
+
+/// 图片缩略图的有界内存缓存，避免历史列表滚动时反复解码原图。
+actor ClipboardImageThumbnailCache {
+    static let shared = ClipboardImageThumbnailCache()
+    private let capacity: Int
+    private var values: [UUID: Data] = [:]
+    private var order: [UUID] = []
+
+    init(capacity: Int = 120) { self.capacity = max(1, capacity) }
+
+    func thumbnail(for id: UUID, source: Data, maxPixel: Int = 256) -> Data? {
+        if let cached = values[id] {
+            touch(id)
+            return cached
+        }
+        guard let thumbnail = Self.makeThumbnail(source, maxPixel: maxPixel) else { return nil }
+        values[id] = thumbnail
+        touch(id)
+        while order.count > capacity, let evicted = order.first {
+            order.removeFirst()
+            values.removeValue(forKey: evicted)
+        }
+        return thumbnail
+    }
+
+    func removeAll() { values.removeAll(); order.removeAll() }
+
+    private func touch(_ id: UUID) {
+        order.removeAll { $0 == id }
+        order.append(id)
+    }
+
+    private static func makeThumbnail(_ source: Data, maxPixel: Int) -> Data? {
+        guard let sourceRef = CGImageSourceCreateWithData(source as CFData, nil) else { return nil }
+        let options: [CFString: Any] = [kCGImageSourceThumbnailMaxPixelSize: max(1, maxPixel), kCGImageSourceCreateThumbnailFromImageAlways: true]
+        guard let image = CGImageSourceCreateThumbnailAtIndex(sourceRef, 0, options as CFDictionary) else { return nil }
+        let destinationData = NSMutableData()
+        guard let destination = CGImageDestinationCreateWithData(destinationData, "public.png" as CFString, 1, nil) else { return nil }
+        CGImageDestinationAddImage(destination, image, nil)
+        guard CGImageDestinationFinalize(destination) else { return nil }
+        return destinationData as Data
     }
 }
 
@@ -489,6 +623,9 @@ enum ClipboardHistoryPasteboardWriter {
             if let rtf = richText.rtf { item.setData(rtf, forType: .rtf) }
             pasteboard.clearContents()
             return pasteboard.writeObjects([item])
+        case let .pdf(data):
+            pasteboard.clearContents()
+            return pasteboard.setData(data, forType: NSPasteboard.PasteboardType("com.adobe.pdf"))
         }
     }
 }
@@ -603,6 +740,12 @@ struct ClipboardSensitiveRules: Codable, Equatable, Sendable {
 
     init() {}
 
+    init(passwordManagersEnabled: Bool, verificationCodesEnabled: Bool, bankCardsEnabled: Bool) {
+        self.passwordManagersEnabled = passwordManagersEnabled
+        self.verificationCodesEnabled = verificationCodesEnabled
+        self.bankCardsEnabled = bankCardsEnabled
+    }
+
     init(from decoder: Decoder) throws {
         let container = try decoder.container(keyedBy: CodingKeys.self)
         passwordManagersEnabled = try container.decodeIfPresent(Bool.self, forKey: .passwordManagersEnabled) ?? true
@@ -637,7 +780,7 @@ struct ClipboardSensitiveRules: Codable, Equatable, Sendable {
             text = value
         case let .richText(richText):
             text = richText.plainText
-        case .image, .url, .files:
+        case .image, .url, .files, .pdf:
             return false
         }
         if verificationCodesEnabled, Self.isVerificationCode(text) { return true }
@@ -1025,6 +1168,7 @@ struct ClipboardHistoryBuffer {
         _ content: ClipboardHistoryContent,
         now: Date,
         sourceBundleID: String? = nil,
+        retentionOverride: TimeInterval? = nil,
         id: UUID = UUID()
     ) -> ClipboardHistoryItem? {
         if case let .text(text) = content,
@@ -1053,6 +1197,8 @@ struct ClipboardHistoryBuffer {
         } else if case let .text(text) = content,
            ClipboardSensitivity.isSensitiveText(text) {
             expiresAt = now.addingTimeInterval(sensitiveLifetime)
+        } else if let retentionOverride, retentionOverride > 0 {
+            expiresAt = now.addingTimeInterval(retentionOverride)
         } else {
             expiresAt = nil
         }
@@ -1393,6 +1539,9 @@ enum ClipboardHistoryPersistence {
             content = .richText(ClipboardRichText(plainText: richText.plainText, html: nil, rtf: nil))
         case .text, .url, .files:
             content = item.content
+        case let .pdf(data):
+            try writeBlob(data, suffix: "pdf", itemID: item.id, directory: blobsDirectory, desired: &desiredBlobNames)
+            content = .pdf(Data())
         }
         let metadataItem = ClipboardHistoryItem(
             id: item.id,
@@ -1426,6 +1575,9 @@ enum ClipboardHistoryPersistence {
             ))
         case .text, .url, .files:
             content = item.content
+        case .pdf:
+            guard let data = readBlob(item.id, "pdf", blobsDirectory) else { return nil }
+            content = .pdf(data)
         }
         return ClipboardHistoryItem(
             id: item.id,
@@ -1586,11 +1738,13 @@ final class ClipboardHistoryService {
     private var lastRemovedItems: [ClipboardHistoryItem] = []
 
     private(set) var items: [ClipboardHistoryItem] = []
+    private(set) var searchIndex = ClipboardHistorySearchIndex()
     private(set) var currentItemCount = 0
     private(set) var hasLoadedPersistedHistory: Bool
     private(set) var isRecordingPaused: Bool
     private(set) var excludedBundleIDs: [String]
     private(set) var sensitiveRules: ClipboardSensitiveRules
+    private(set) var applicationPolicies: [ClipboardApplicationPolicy]
     private(set) var retentionDays: Int
     private(set) var storageLimitBytes: Int
     private(set) var retentionByContentType: [ClipboardHistoryContentType: TimeInterval]
@@ -1642,6 +1796,7 @@ final class ClipboardHistoryService {
             Set(userDefaults.stringArray(forKey: StorageKey.excludedBundleIDs) ?? [])
         ).sorted()
         self.sensitiveRules = Self.loadSensitiveRules(from: userDefaults)
+        self.applicationPolicies = Self.loadApplicationPolicies(from: userDefaults)
         self.retentionDays = max(0, userDefaults.object(forKey: StorageKey.retentionDays) as? Int ?? 0)
         self.storageLimitBytes = max(0, userDefaults.object(forKey: StorageKey.storageLimitBytes) as? Int ?? .max)
         self.retentionByContentType = configuredRetentionByContentType
@@ -1758,13 +1913,16 @@ final class ClipboardHistoryService {
         var historyChanged = buffer.items != itemsBeforeRefresh
         let sourceBundleID = frontmostApplicationBundleIdentifier
             ?? frontmostApplicationBundleIdentifierProvider()
+        let policy = applicationPolicy(for: sourceBundleID)
         if ClipboardHistoryRecordingPolicy.shouldRecord(
             isPaused: isRecordingPaused,
             sourceBundleID: sourceBundleID,
             excludedBundleIDs: excludedBundleIDs
-        ), let content = readContent(from: pasteboard),
-           !sensitiveRules.shouldExclude(content, sourceBundleID: sourceBundleID) {
-            if let inserted = buffer.insert(content, now: now, sourceBundleID: sourceBundleID) {
+        ), policy?.record != false,
+           let content = readContent(from: pasteboard),
+           !(policy?.sensitiveRules ?? sensitiveRules).shouldExclude(content, sourceBundleID: sourceBundleID) {
+            let retention = policy?.retentionDays.flatMap(Self.retentionDuration)
+            if let inserted = buffer.insert(content, now: now, sourceBundleID: sourceBundleID, retentionOverride: retention) {
                 historyChanged = true
                 scheduleImageTextRecognitionIfNeeded(inserted)
             }
@@ -1782,12 +1940,14 @@ final class ClipboardHistoryService {
 
     @discardableResult
     func copy(_ item: ClipboardHistoryItem) -> Bool {
-        perform(item.content, action: primaryAction.historyAction)
+        let action: ClipboardHistoryAction = effectiveAutoPaste(for: frontmostApplicationBundleIdentifierProvider()) ? .paste : .copy
+        return perform(item.content, action: action)
     }
 
     @discardableResult
     func copy(_ content: ClipboardHistoryContent) -> Bool {
-        perform(content, action: primaryAction.historyAction)
+        let action: ClipboardHistoryAction = effectiveAutoPaste(for: frontmostApplicationBundleIdentifierProvider()) ? .paste : .copy
+        return perform(content, action: action)
     }
 
     @discardableResult
@@ -1798,20 +1958,23 @@ final class ClipboardHistoryService {
     @discardableResult
     func perform(_ content: ClipboardHistoryContent, action: ClipboardHistoryAction) -> Bool {
         let pasteboard = self.pasteboard
+        let targetBundleID = frontmostApplicationBundleIdentifierProvider()
         guard ClipboardHistoryPasteboardWriter.write(content, to: pasteboard, mode: action.writeMode) else {
             return false
         }
         if !isRecordingPaused,
            !sensitiveRules.shouldExclude(content, sourceBundleID: nil) {
             historyMutationGeneration &+= 1
-            let inserted = buffer.insert(content, now: Date())
+            let retention = applicationPolicy(for: targetBundleID)?.retentionDays
+                .flatMap(Self.retentionDuration)
+            let inserted = buffer.insert(content, now: Date(), retentionOverride: retention)
             synchronizeItems()
             persist()
             if let inserted { scheduleImageTextRecognitionIfNeeded(inserted) }
         }
         lastChangeCount = pasteboard.changeCount
         currentItemCount = pasteboard.pasteboardItems?.count ?? 0
-        if action.requiresPaste {
+        if action.requiresPaste, effectiveAutoPaste(for: targetBundleID) || action == .paste || action == .pastePlainText {
             copyFeedback = nil
             feedbackExpirationTask?.cancel()
             // 让调用方先关闭菜单栏弹窗，再将 Command-V 发回此前的前台应用。
@@ -1961,6 +2124,28 @@ final class ClipboardHistoryService {
         if let data = try? JSONEncoder().encode(rules) {
             userDefaults.set(data, forKey: StorageKey.sensitiveRules)
         }
+    }
+
+    func setApplicationPolicy(_ policy: ClipboardApplicationPolicy) {
+        guard !policy.bundleID.isEmpty else { return }
+        applicationPolicies.removeAll { $0.bundleID == policy.bundleID }
+        applicationPolicies.append(policy)
+        applicationPolicies.sort { $0.bundleID < $1.bundleID }
+        persistApplicationPolicies()
+    }
+
+    func removeApplicationPolicy(for bundleID: String) {
+        applicationPolicies.removeAll { $0.bundleID == bundleID }
+        persistApplicationPolicies()
+    }
+
+    func applicationPolicy(for bundleID: String?) -> ClipboardApplicationPolicy? {
+        guard let bundleID else { return nil }
+        return applicationPolicies.first { $0.bundleID == bundleID }
+    }
+
+    func effectiveAutoPaste(for bundleID: String?) -> Bool {
+        applicationPolicy(for: bundleID)?.autoPaste ?? autoPasteAfterCopy
     }
 
     func addSensitiveBundleID(_ bundleID: String) {
@@ -2207,7 +2392,17 @@ final class ClipboardHistoryService {
     }
 
     private func synchronizeItems() {
-        items = buffer.items
+        let nextItems = buffer.items
+        let nextIDs = Set(nextItems.map(\.id))
+        for removedID in Array(searchIndex.values.keys) where !nextIDs.contains(removedID) {
+            searchIndex.remove(removedID)
+        }
+        nextItems.forEach { item in
+            if items.first(where: { $0.id == item.id }) != item {
+                searchIndex.upsert(item)
+            }
+        }
+        items = nextItems
     }
 
     private func persist() {
@@ -2233,6 +2428,18 @@ final class ClipboardHistoryService {
         return rules
     }
 
+    private static func loadApplicationPolicies(from defaults: UserDefaults) -> [ClipboardApplicationPolicy] {
+        guard let data = defaults.data(forKey: StorageKey.applicationPolicies),
+              let policies = try? JSONDecoder().decode([ClipboardApplicationPolicy].self, from: data) else { return [] }
+        return policies.filter { !$0.bundleID.isEmpty }
+    }
+
+    private func persistApplicationPolicies() {
+        if let data = try? JSONEncoder().encode(applicationPolicies) {
+            userDefaults.set(data, forKey: StorageKey.applicationPolicies)
+        }
+    }
+
     private static func loadRetentionByContentType(from defaults: UserDefaults) -> [ClipboardHistoryContentType: TimeInterval] {
         guard let values = defaults.dictionary(forKey: StorageKey.retentionByContentType) as? [String: Int] else { return [:] }
         return Dictionary(uniqueKeysWithValues: values.compactMap { key, days in
@@ -2251,5 +2458,6 @@ final class ClipboardHistoryService {
         static let autoPasteAfterCopy = "clipboard.autoPasteAfterCopy"
         static let primaryAction = "clipboard.primaryAction"
         static let sequentialPasteMode = "clipboard.sequentialPasteMode"
+        static let applicationPolicies = "clipboard.applicationPolicies"
     }
 }

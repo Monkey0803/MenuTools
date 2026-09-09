@@ -2168,6 +2168,11 @@ struct ClipboardHistoryRow: View {
                 Image(systemName: "folder")
                     .foregroundStyle(.secondary)
             }
+        case .pdf:
+            Button { _ = ClipboardHistoryService.shared.copy(item) } label: {
+                Image(systemName: "doc.richtext")
+                    .foregroundStyle(.secondary)
+            }
             .menuStyle(.borderlessButton)
             .help(L("clipboard.revealInFinder"))
         case .image:
@@ -2216,6 +2221,9 @@ struct ClipboardHistoryRow: View {
             Text(richText.plainText)
                 .font(.caption)
                 .lineLimit(2)
+        case .pdf:
+            Label(L("clipboard.pdf"), systemImage: "doc.richtext")
+                .font(.caption)
                 .multilineTextAlignment(.leading)
         case let .image(data):
             if let image = NSImage(data: data) {

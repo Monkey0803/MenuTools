@@ -1498,3 +1498,84 @@ private actor ClipboardHistoryLoadGate {
         loadWaiter = nil
     }
 }
+
+@Test("剪贴板支持按来源 App 覆盖记录、自动粘贴、保留期限和敏感规则")
+@MainActor
+func clipboardApplicationPoliciesRoundTrip() {
+    let suiteName = "ClipboardApplicationPolicies-\(UUID().uuidString)"
+    let defaults = UserDefaults(suiteName: suiteName)!
+    defer { defaults.removePersistentDomain(forName: suiteName) }
+    let sensitive = ClipboardSensitiveRules()
+    let service = ClipboardHistoryService(
+        limit: 10,
+        persistenceURL: nil,
+        userDefaults: defaults,
+        frontmostApplicationBundleIdentifierProvider: { "com.example.editor" }
+    )
+    let policy = ClipboardApplicationPolicy(
+        bundleID: "com.example.editor",
+        record: false,
+        autoPaste: true,
+        retentionDays: 3,
+        sensitiveRules: sensitive
+    )
+    service.setApplicationPolicy(policy)
+    #expect(service.applicationPolicy(for: "com.example.editor") == policy)
+    #expect(service.effectiveAutoPaste(for: "com.example.editor"))
+
+    let restored = ClipboardHistoryService(limit: 10, persistenceURL: nil, userDefaults: defaults)
+    #expect(restored.applicationPolicies == [policy])
+    restored.removeApplicationPolicy(for: "com.example.editor")
+    #expect(restored.applicationPolicies.isEmpty)
+}
+
+@Test("剪贴板历史分页不会越界")
+func clipboardHistoryPagingIsBounded() {
+    let items = (0..<3).map { ClipboardHistoryItem(id: UUID(), content: .text("\($0)"), capturedAt: Date(), expiresAt: nil, isPinned: false) }
+    #expect(Array(ClipboardHistoryList.page(items, offset: 1, pageSize: 2)).count == 2)
+    #expect(ClipboardHistoryList.page(items, offset: 3, pageSize: 2).isEmpty)
+    #expect(ClipboardHistoryList.page(items, offset: 0, pageSize: 0).isEmpty)
+}
+
+@Test("剪贴板文本分析支持代码、Markdown、颜色和结构化行")
+func clipboardTextAnalysisRecognizesCommonFormats() {
+    let analysis = ClipboardTextAnalysis.analyze("# 标题\nfunc greet() {}\n#FF8800")
+    #expect(analysis.codeLanguage == "Swift")
+    #expect(analysis.markdownPreview != nil)
+    #expect(analysis.colorHex == nil)
+    #expect(analysis.structuredLines.count == 3)
+    #expect(ClipboardTextAnalysis.analyze("#12AbEF").colorHex == "#12ABEF")
+}
+
+@Test("剪贴板搜索索引支持增量更新和删除")
+func clipboardHistorySearchIndexUpdatesIncrementally() {
+    let first = ClipboardHistoryItem(id: UUID(), content: .text("Alpha"), capturedAt: Date(), expiresAt: nil, isPinned: false)
+    let second = ClipboardHistoryItem(id: UUID(), content: .text("Beta"), capturedAt: Date(), expiresAt: nil, isPinned: false)
+    var index = ClipboardHistorySearchIndex()
+    index.upsert(first)
+    #expect(index.matches("alpha", id: first.id))
+    #expect(!index.matches("beta", id: first.id))
+    index.upsert(second)
+    index.remove(first.id)
+    #expect(!index.matches("alpha", id: first.id))
+    #expect(index.matches("beta", id: second.id))
+}
+
+@Test("剪贴板文件历史能够识别 PDF")
+func clipboardHistoryFileRecognizesPDF() {
+    #expect(ClipboardHistoryFile(path: "/tmp/report.PDF").isPDF)
+    #expect(!ClipboardHistoryFile(path: "/tmp/report.txt").isPDF)
+}
+
+@Test("PDF 剪贴板内容可以持久化恢复")
+func clipboardPDFContentRoundTrips() throws {
+    let url = FileManager.default.temporaryDirectory.appendingPathComponent("Clipboard-PDF-\(UUID().uuidString).sqlite3")
+    defer {
+        try? FileManager.default.removeItem(at: url)
+        try? FileManager.default.removeItem(at: ClipboardHistoryPersistence.blobsURL(for: url))
+        try? FileManager.default.removeItem(at: ClipboardHistoryPersistence.backupURL(for: url))
+    }
+    let item = ClipboardHistoryItem(id: UUID(), content: .pdf(Data("%PDF-1.7".utf8)), capturedAt: Date(timeIntervalSince1970: 1_000), expiresAt: nil, isPinned: false)
+    try ClipboardHistoryPersistence.save([item], to: url)
+    #expect(ClipboardHistoryPersistence.load(from: url) == [item])
+}

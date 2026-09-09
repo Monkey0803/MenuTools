@@ -994,5 +994,17 @@
 "traffic.tab.history" = "履歴";
 "traffic.tab.diagnostics" = "診断とデータ";
 "traffic.topApps" = "通信量の多い App";
+"traffic.viewAll" = "すべて表示";
+"clipboard.applicationPolicies" = "アプリ別ポリシー";
+"clipboard.applicationPolicies.description" = "Bundle ID ごとに記録と自動ペーストを設定します。";
+"clipboard.applicationPolicies.bundleID" = "Bundle ID";
+"clipboard.applicationPolicies.save" = "保存";
+"clipboard.applicationPolicies.blocked" = "記録オフ";
+"clipboard.applicationPolicies.enabled" = "記録オン";
+"clipboard.applicationPolicies.record" = "Record";
+"clipboard.applicationPolicies.autoPaste" = "Auto-paste";
+"clipboard.applicationPolicies.retention" = "Retention";
 "traffic.viewAllApps" = "すべての App を表示";
 "traffic.historyApp" = "App";
+"clipboard.pdf" = "PDF";
+"clipboard.loadMore" = "Load more";

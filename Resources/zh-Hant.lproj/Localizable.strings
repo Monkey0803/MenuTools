@@ -994,5 +994,17 @@
 "traffic.tab.history" = "歷史趨勢";
 "traffic.tab.diagnostics" = "診斷與資料";
 "traffic.topApps" = "高流量 App";
+"traffic.viewAll" = "檢視全部";
+"clipboard.applicationPolicies" = "應用程式策略";
+"clipboard.applicationPolicies.description" = "按 Bundle ID 為不同應用程式覆蓋記錄和自動貼上行為。";
+"clipboard.applicationPolicies.bundleID" = "Bundle ID";
+"clipboard.applicationPolicies.save" = "儲存策略";
+"clipboard.applicationPolicies.blocked" = "關閉記錄";
+"clipboard.applicationPolicies.enabled" = "開啟記錄";
+"clipboard.applicationPolicies.record" = "Record";
+"clipboard.applicationPolicies.autoPaste" = "Auto-paste";
+"clipboard.applicationPolicies.retention" = "Retention";
 "traffic.viewAllApps" = "檢視所有 App";
 "traffic.historyApp" = "檢視 App";
+"clipboard.pdf" = "PDF";
+"clipboard.loadMore" = "Load more";
