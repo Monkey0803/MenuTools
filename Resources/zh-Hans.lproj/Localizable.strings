@@ -1002,3 +1002,11 @@
 "clipboard.sync.now" = "立即同步";
 "clipboard.sync.description" = "仅同步非敏感置顶历史和常用片段；可选择 iCloud Drive、Dropbox 等共享文件夹，文件使用上方口令加密。";
 "clipboard.sync.success" = "置顶历史和常用片段已同步。";
+"traffic.tabs" = "流量视图";
+"traffic.tab.overview" = "总览";
+"traffic.tab.apps" = "App 流量";
+"traffic.tab.history" = "历史趋势";
+"traffic.tab.diagnostics" = "诊断与数据";
+"traffic.topApps" = "高流量 App";
+"traffic.viewAllApps" = "查看全部 App";
+"traffic.historyApp" = "查看 App";

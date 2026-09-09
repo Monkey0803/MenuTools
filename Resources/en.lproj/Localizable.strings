@@ -988,3 +988,11 @@
 "clipboard.sync.now" = "Sync Now";
 "clipboard.sync.description" = "Syncs only non-sensitive pinned history and snippets. Choose an iCloud Drive, Dropbox, or other shared folder; the file uses the passphrase above.";
 "clipboard.sync.success" = "Pinned history and snippets synchronized.";
+"traffic.tabs" = "Traffic views";
+"traffic.tab.overview" = "Overview";
+"traffic.tab.apps" = "App traffic";
+"traffic.tab.history" = "History";
+"traffic.tab.diagnostics" = "Diagnostics";
+"traffic.topApps" = "Top apps";
+"traffic.viewAllApps" = "View all apps";
+"traffic.historyApp" = "App";

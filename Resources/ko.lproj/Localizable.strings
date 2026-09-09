@@ -988,3 +988,11 @@
 "clipboard.sync.now" = "지금 동기화";
 "clipboard.sync.description" = "민감하지 않은 고정 기록과 스니펫만 동기화합니다. iCloud Drive, Dropbox 등의 공유 폴더를 선택하면 위 암호로 파일을 보호합니다.";
 "clipboard.sync.success" = "고정 기록과 스니펫을 동기화했습니다.";
+"traffic.tabs" = "트래픽 보기";
+"traffic.tab.overview" = "개요";
+"traffic.tab.apps" = "앱 트래픽";
+"traffic.tab.history" = "기록";
+"traffic.tab.diagnostics" = "진단 및 데이터";
+"traffic.topApps" = "트래픽이 많은 앱";
+"traffic.viewAllApps" = "모든 앱 보기";
+"traffic.historyApp" = "앱";

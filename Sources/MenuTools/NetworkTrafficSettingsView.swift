@@ -34,6 +34,23 @@ enum NetworkTrafficSort: String, CaseIterable, Sendable {
     }
 }
 
+private enum NetworkTrafficSection: String, CaseIterable {
+    case overview
+    case apps
+    case history
+    case diagnostics
+
+    var titleKey: String { "traffic.tab.\(rawValue)" }
+    var symbol: String {
+        switch self {
+        case .overview: return "rectangle.grid.2x2"
+        case .apps: return "square.stack.3d.up"
+        case .history: return "chart.xyaxis.line"
+        case .diagnostics: return "stethoscope"
+        }
+    }
+}
+
 enum NetworkTrafficHistoryChartLayout {
     static func barWidth(totalWidth: CGFloat, sampleCount: Int, spacing: CGFloat = 2) -> CGFloat {
         guard totalWidth > 0, sampleCount > 0 else { return 0 }
@@ -68,13 +85,15 @@ struct NetworkTrafficSettingsView: View {
     @State private var filter: NetworkTrafficAppFilter = .all
     @State private var sort: NetworkTrafficSort = .activity
     @State private var historyRange: NetworkTrafficHistoryRange = .hour
-    @State private var expandedAppIDs: Set<String> = []
     @State private var showingClearHistory = false
     @State private var showingClearAllHistory = false
     @State private var exportPrivacy: NetworkTrafficExportPrivacy = .redacted
     @State private var exportError: String?
     @State private var exportMessage: String?
     @State private var interfaceInfos: [NetworkTrafficInterfaceInfo] = []
+    @State private var section: NetworkTrafficSection = .overview
+    @State private var selectedApp: NetworkAppTrafficSnapshot?
+    @State private var historyAppID: String?
 
     private var visibleApps: [NetworkAppTrafficSnapshot] {
         let query = searchText.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
@@ -102,14 +121,19 @@ struct NetworkTrafficSettingsView: View {
         Set(visibleApps.map(\.id))
     }
 
+    private var allApps: [NetworkAppTrafficSnapshot] {
+        service.snapshot.apps.sorted(by: sortComparator)
+    }
+
+    private var allAppIDs: Set<String> {
+        Set(service.snapshot.apps.map(\.id))
+    }
+
     var body: some View {
         ScrollView {
             VStack(alignment: .leading, spacing: 14) {
                 header
-                searchField
-                queryControls
-                networkQualityCard
-                diagnosticsCard
+                sectionPicker
 
                 if service.isPaused {
                     statusBanner(
@@ -126,35 +150,7 @@ struct NetworkTrafficSettingsView: View {
                     statusBanner(title: exportMessage, symbol: "checkmark.circle.fill", color: .green)
                 }
 
-                let apps = service.snapshot.apps
-                if service.snapshot.isAvailable || !apps.isEmpty {
-                    summary(visibleApps)
-                    historyChart
-
-                    if visibleApps.isEmpty {
-                        ContentUnavailableView(
-                            L("traffic.noMatches"),
-                            systemImage: "line.3.horizontal.decrease.circle",
-                            description: Text(L("traffic.noMatchesDescription"))
-                        )
-                        .frame(maxWidth: .infinity, minHeight: 130)
-                    } else {
-                        LazyVStack(spacing: 6) {
-                            ForEach(visibleApps) { app in
-                                appRow(app)
-                            }
-                        }
-                    }
-                } else {
-                    ContentUnavailableView(
-                        L("traffic.noApps"),
-                        systemImage: "network.slash",
-                        description: Text(L("traffic.emptyDescription"))
-                    )
-                    .frame(maxWidth: .infinity, minHeight: 180)
-                }
-
-                footerActions
+                sectionContent
             }
             .padding(20)
         }
@@ -196,6 +192,86 @@ struct NetworkTrafficSettingsView: View {
             Button(L("update.cancel"), role: .cancel) { exportError = nil }
         } message: {
             Text(exportError ?? L("traffic.exportFailed"))
+        }
+        .sheet(item: $selectedApp) { app in
+            ScrollView {
+                VStack(alignment: .leading, spacing: 14) {
+                    appDetailHeader(app)
+                    processDetails(app)
+                }
+                .padding(20)
+            }
+            .frame(minWidth: 560, minHeight: 420)
+        }
+    }
+
+    private var sectionPicker: some View {
+        Picker(L("traffic.tabs"), selection: $section) {
+            ForEach(NetworkTrafficSection.allCases, id: \.self) { item in
+                Label(L(item.titleKey), systemImage: item.symbol).tag(item)
+            }
+        }
+        .pickerStyle(.segmented)
+        .accessibilityLabel(L("traffic.tabs"))
+    }
+
+    @ViewBuilder
+    private var sectionContent: some View {
+        switch section {
+        case .overview:
+            overviewContent
+        case .apps:
+            appsContent
+        case .history:
+            historyContent
+        case .diagnostics:
+            diagnosticsContent
+        }
+    }
+
+    private var overviewContent: some View {
+        VStack(alignment: .leading, spacing: 14) {
+            summary(allApps)
+            networkQualityCard
+            topAppsCard
+        }
+    }
+
+    private var appsContent: some View {
+        VStack(alignment: .leading, spacing: 10) {
+            searchField
+            queryControls
+            if visibleApps.isEmpty {
+                ContentUnavailableView(L("traffic.noMatches"), systemImage: "line.3.horizontal.decrease.circle", description: Text(L("traffic.noMatchesDescription")))
+                    .frame(maxWidth: .infinity, minHeight: 180)
+            } else {
+                LazyVStack(spacing: 6) {
+                    ForEach(visibleApps) { app in appRow(app) }
+                }
+            }
+            footerActions
+        }
+    }
+
+    private var historyContent: some View {
+        VStack(alignment: .leading, spacing: 10) {
+            Picker(L("traffic.historyApp"), selection: $historyAppID) {
+                Text(L("traffic.filter.all")).tag(String?.none)
+                ForEach(allApps) { app in
+                    Text(app.appName).tag(Optional(app.id))
+                }
+            }
+            .pickerStyle(.menu)
+            .accessibilityLabel(L("traffic.historyApp"))
+            historyChart(appIDs: historyAppID.map { [$0] } ?? allAppIDs)
+        }
+    }
+
+    private var diagnosticsContent: some View {
+        VStack(alignment: .leading, spacing: 14) {
+            diagnosticsCard
+            networkQualityCard
+            footerActions
         }
     }
 
@@ -571,18 +647,46 @@ struct NetworkTrafficSettingsView: View {
         .frame(maxWidth: .infinity, alignment: .leading)
     }
 
-    private var historyChart: some View {
+    private var topAppsCard: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            HStack {
+                Label(L("traffic.topApps"), systemImage: "arrow.up.right")
+                    .font(.caption.weight(.semibold))
+                Spacer()
+                Button(L("traffic.viewAllApps")) { section = .apps }
+                    .buttonStyle(.borderless)
+                    .font(.caption2)
+            }
+            ForEach(Array(allApps.prefix(5))) { app in
+                Button { selectedApp = app } label: {
+                    HStack(spacing: 8) {
+                        appIcon(app).frame(width: 20, height: 20)
+                        Text(app.appName).lineLimit(1)
+                        Spacer()
+                        Text("↓ \(formattedRate(app.downloadBytesPerSecond))  ↑ \(formattedRate(app.uploadBytesPerSecond))")
+                            .font(.caption2)
+                            .monospacedDigit()
+                    }
+                }
+                .buttonStyle(.plain)
+            }
+        }
+        .padding(12)
+        .controlCenterSurface(tint: .blue)
+    }
+
+    private func historyChart(appIDs: Set<String>) -> some View {
         let points = NetworkTrafficHistorySeries.make(
             from: service.snapshot.history,
             range: historyRange,
             now: Date(),
-            appIDs: visibleAppIDs
+            appIDs: appIDs
         )
         let stats = NetworkTrafficHistoryStats.make(
             from: service.snapshot.history,
             range: historyRange,
             now: Date(),
-            appIDs: visibleAppIDs
+            appIDs: appIDs
         )
         let values = points.map(\.bytes)
         let maximum = max(values.max() ?? 0, 1)
@@ -591,7 +695,7 @@ struct NetworkTrafficSettingsView: View {
             range: historyRange,
             queryKey: service.query.storageKey,
             now: Date(),
-            appIDs: visibleAppIDs
+            appIDs: appIDs
         ).prefix(5))
 
         return VStack(alignment: .leading, spacing: 7) {
@@ -702,15 +806,7 @@ struct NetworkTrafficSettingsView: View {
     }
 
     private func appRow(_ app: NetworkAppTrafficSnapshot) -> some View {
-        DisclosureGroup(isExpanded: Binding(
-            get: { expandedAppIDs.contains(app.id) },
-            set: { isExpanded in
-                if isExpanded { expandedAppIDs.insert(app.id) }
-                else { expandedAppIDs.remove(app.id) }
-            }
-        )) {
-            processDetails(app)
-        } label: {
+        Button { selectedApp = app } label: {
             HStack(spacing: 10) {
                 appIcon(app)
                     .frame(width: 24, height: 24)
@@ -745,10 +841,28 @@ struct NetworkTrafficSettingsView: View {
                 .fixedSize(horizontal: true, vertical: false)
             }
         }
+        .buttonStyle(.plain)
         .padding(.horizontal, 12)
         .padding(.vertical, 9)
         .background(.quaternary.opacity(0.28), in: .rect(cornerRadius: 10))
         .accessibilityElement(children: .contain)
+    }
+
+    private func appDetailHeader(_ app: NetworkAppTrafficSnapshot) -> some View {
+        HStack(spacing: 12) {
+            appIcon(app).frame(width: 36, height: 36)
+            VStack(alignment: .leading, spacing: 3) {
+                Text(app.appName).font(.title3.weight(.semibold))
+                Text(L(app.identity.kind.titleKey)).font(.caption).foregroundStyle(.secondary)
+            }
+            Spacer()
+            VStack(alignment: .trailing, spacing: 3) {
+                Text("↓ \(formattedRate(app.downloadBytesPerSecond))  ↑ \(formattedRate(app.uploadBytesPerSecond))")
+                    .font(.caption.weight(.semibold)).monospacedDigit()
+                Text("↓ \(formattedBytes(app.sessionDownloadedBytes))  ↑ \(formattedBytes(app.sessionUploadedBytes))")
+                    .font(.caption2).foregroundStyle(.secondary).monospacedDigit()
+            }
+        }
     }
 
     private func miniTrend(_ app: NetworkAppTrafficSnapshot) -> some View {

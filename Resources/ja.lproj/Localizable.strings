@@ -988,3 +988,11 @@
 "clipboard.sync.now" = "今すぐ同期";
 "clipboard.sync.description" = "機密でないピン留め履歴とスニペットのみ同期します。iCloud Drive や Dropbox などの共有フォルダを選択し、上のパスフレーズで暗号化します。";
 "clipboard.sync.success" = "ピン留め履歴とスニペットを同期しました。";
+"traffic.tabs" = "通信ビュー";
+"traffic.tab.overview" = "概要";
+"traffic.tab.apps" = "App 通信";
+"traffic.tab.history" = "履歴";
+"traffic.tab.diagnostics" = "診断とデータ";
+"traffic.topApps" = "通信量の多い App";
+"traffic.viewAllApps" = "すべての App を表示";
+"traffic.historyApp" = "App";

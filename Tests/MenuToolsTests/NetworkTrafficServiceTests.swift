@@ -170,7 +170,8 @@ func networkTrafficSearchIsEmbeddedInModule() throws {
     let source = try String(contentsOf: sourceURL, encoding: .utf8)
 
     #expect(source.contains("private var searchField: some View"))
-    #expect(source.contains("header\n                searchField\n                queryControls"))
+    #expect(source.contains("private var appsContent: some View"))
+    #expect(source.contains("searchField\n            queryControls"))
     #expect(!source.contains(".searchable(text: $searchText, placement: .toolbar"))
 }
 
