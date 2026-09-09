@@ -161,6 +161,19 @@
 "traffic.kind.application" = "App";
 "traffic.kind.systemService" = "系統服務";
 "traffic.kind.unknown" = "未知程序";
+"traffic.diagnostics" = "取樣診斷";
+"traffic.diagnostics.sampleDuration" = "最近取樣";
+"traffic.diagnostics.failures" = "連續失敗";
+"traffic.diagnostics.storage" = "歷史佔用";
+"traffic.diagnostics.lastSuccess" = "最近成功";
+"traffic.diagnostics.lastFailure" = "最近失敗：%@";
+"traffic.exportPrivacy" = "匯出隱私";
+"traffic.exportPrivacy.full" = "完整明細";
+"traffic.exportPrivacy.redacted" = "隱藏敏感資料";
+"traffic.exportPrivacy.description" = "隱藏敏感資料的匯出會移除 App 身分、程序明細與連線位址。";
+"traffic.clearAllHistory" = "清除全部流量資料";
+"traffic.clearAllHistoryTitle" = "清除全部網路流量資料？";
+"traffic.clearAllHistoryMessage" = "將移除所有網路介面和協定範圍的歷史流量，以及目前執行累計。";
 
 /* 電池健康度 */
 "batteryHealth.title" = "電池健康度";

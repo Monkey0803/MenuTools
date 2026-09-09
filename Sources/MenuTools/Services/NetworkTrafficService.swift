@@ -774,10 +774,41 @@ struct NetworkTrafficHistoryBucket: Codable, Equatable, Identifiable, Sendable {
 ///
 /// App 元数据与分钟计数分表存储，避免旧版 JSON 在每个分钟桶中重复保存路径等长字符串，
 /// WAL 也让追加采样不再每次原子重写整份历史文件。
+struct NetworkTrafficHistoryStorageUsage: Equatable, Sendable {
+    let databaseBytes: Int64
+    let walBytes: Int64
+    let sharedMemoryBytes: Int64
+
+    init(databaseBytes: Int64 = 0, walBytes: Int64 = 0, sharedMemoryBytes: Int64 = 0) {
+        self.databaseBytes = max(databaseBytes, 0)
+        self.walBytes = max(walBytes, 0)
+        self.sharedMemoryBytes = max(sharedMemoryBytes, 0)
+    }
+
+    var totalBytes: Int64 {
+        NetworkTrafficMath.clampedAdd(
+            NetworkTrafficMath.clampedAdd(databaseBytes, walBytes),
+            sharedMemoryBytes
+        )
+    }
+}
+
+enum NetworkTrafficHistoryStoragePolicy {
+    static let maximumDatabaseBytes: Int64 = 64 * 1_024 * 1_024
+    static let maximumWALBytes: Int64 = 8 * 1_024 * 1_024
+
+    static func maximumPageCount(pageSize: Int64) -> Int64 {
+        guard pageSize > 0 else { return 0 }
+        return maximumDatabaseBytes / pageSize
+    }
+}
+
 protocol NetworkTrafficHistoryStoring: AnyObject {
     func load(queryKey: String?) -> [NetworkTrafficHistoryBucket]
     func save(_ buckets: [NetworkTrafficHistoryBucket])
     func clear(queryKey: String)
+    func clearAll()
+    func storageUsage() -> NetworkTrafficHistoryStorageUsage
 }
 
 final class NetworkTrafficHistoryStore: NetworkTrafficHistoryStoring {
@@ -895,6 +926,25 @@ final class NetworkTrafficHistoryStore: NetworkTrafficHistoryStoring {
         }
     }
 
+    func clearAll() {
+        withDatabase(default: ()) { database in
+            execute(database, "BEGIN IMMEDIATE TRANSACTION")
+            execute(database, "DELETE FROM traffic_samples")
+            execute(database, "DELETE FROM app_identities")
+            execute(database, "COMMIT")
+            execute(database, "PRAGMA wal_checkpoint(TRUNCATE)")
+            execute(database, "VACUUM")
+        }
+    }
+
+    func storageUsage() -> NetworkTrafficHistoryStorageUsage {
+        NetworkTrafficHistoryStorageUsage(
+            databaseBytes: fileSize(at: fileURL),
+            walBytes: fileSize(at: URL(fileURLWithPath: fileURL.path + "-wal")),
+            sharedMemoryBytes: fileSize(at: URL(fileURLWithPath: fileURL.path + "-shm"))
+        )
+    }
+
     private func withDatabase<T>(default defaultValue: T, _ body: (OpaquePointer) -> T) -> T {
         do {
             try FileManager.default.createDirectory(
@@ -921,6 +971,8 @@ final class NetworkTrafficHistoryStore: NetworkTrafficHistoryStoring {
         execute(database, "PRAGMA journal_mode=WAL")
         execute(database, "PRAGMA synchronous=NORMAL")
         execute(database, "PRAGMA foreign_keys=ON")
+        execute(database, "PRAGMA max_page_count=\(NetworkTrafficHistoryStoragePolicy.maximumPageCount(pageSize: 4_096))")
+        execute(database, "PRAGMA journal_size_limit=\(NetworkTrafficHistoryStoragePolicy.maximumWALBytes)")
         execute(database, """
             CREATE TABLE IF NOT EXISTS app_identities (
                 id TEXT PRIMARY KEY,
@@ -1084,6 +1136,11 @@ final class NetworkTrafficHistoryStore: NetworkTrafficHistoryStoring {
     private func optionalText(_ statement: OpaquePointer, column: Int32) -> String? {
         guard sqlite3_column_type(statement, column) != SQLITE_NULL else { return nil }
         return text(statement, column: column)
+    }
+
+    private func fileSize(at url: URL) -> Int64 {
+        let values = try? url.resourceValues(forKeys: [.fileSizeKey])
+        return Int64(values?.fileSize ?? 0)
     }
 
     private static func defaultFileURL() -> URL {
@@ -1760,6 +1817,14 @@ enum NetworkTrafficSamplingPolicy {
     }
 }
 
+struct NetworkTrafficDiagnostics: Equatable, Sendable {
+    let lastSampleDuration: TimeInterval?
+    let consecutiveSampleFailures: Int
+    let lastSuccessfulSampleAt: Date?
+    let lastFailureStatus: NetworkTrafficReadStatus?
+    let historyStorage: NetworkTrafficHistoryStorageUsage
+}
+
 /// 持续采样 nettop，并保存当前运行期间及最近 30 天的 App 流量。
 @MainActor
 @Observable
@@ -1791,6 +1856,8 @@ final class NetworkTrafficService {
     private(set) var lastSampleDuration: TimeInterval?
     private(set) var consecutiveSampleFailures = 0
     private(set) var lastSuccessfulSampleAt: Date?
+    private(set) var lastFailureStatus: NetworkTrafficReadStatus?
+    private(set) var historyStorageUsage: NetworkTrafficHistoryStorageUsage
 
     private(set) var snapshot: NetworkTrafficSnapshot {
         didSet {
@@ -1799,6 +1866,16 @@ final class NetworkTrafficService {
     }
     private(set) var query: NetworkTrafficQuery
     private(set) var isPaused = false
+
+    var diagnostics: NetworkTrafficDiagnostics {
+        NetworkTrafficDiagnostics(
+            lastSampleDuration: lastSampleDuration,
+            consecutiveSampleFailures: consecutiveSampleFailures,
+            lastSuccessfulSampleAt: lastSuccessfulSampleAt,
+            lastFailureStatus: lastFailureStatus,
+            historyStorage: historyStorageUsage
+        )
+    }
 
     init(
         provider: any NetworkTrafficProviding = DefaultNetworkTrafficProvider(),
@@ -1815,6 +1892,7 @@ final class NetworkTrafficService {
         let initialQuery = Self.loadQuery(from: userDefaults)
         self.query = initialQuery
         self.historyBuckets = historyStore.load(queryKey: initialQuery.storageKey)
+        self.historyStorageUsage = historyStore.storageUsage()
         self.snapshot = NetworkTrafficSnapshot(
             apps: [],
             status: .commandUnavailable,
@@ -1866,6 +1944,7 @@ final class NetworkTrafficService {
         guard !isRunning else { return }
         isRunning = true
         historyBuckets = historyStore.load(queryKey: query.storageKey)
+        historyStorageUsage = historyStore.storageUsage()
         restoreHistoricalIdentities()
         scheduleTimer()
     }
@@ -1949,6 +2028,7 @@ final class NetworkTrafficService {
             !$0.hasPrefix("\(query.storageKey):")
         })
         historyStore.clear(queryKey: query.storageKey)
+        historyStorageUsage = historyStore.storageUsage()
         let activeIDs = Set(sessionTotals.keys)
         knownIdentities = knownIdentities.filter { activeIDs.contains($0.key) }
         let visibleApps = snapshot.apps.filter { !$0.isHistoricalOnly || activeIDs.contains($0.id) }
@@ -1957,6 +2037,24 @@ final class NetworkTrafficService {
             status: snapshot.status,
             query: query,
             lastUpdated: snapshot.lastUpdated,
+            history: []
+        )
+    }
+
+    func clearAllHistory() {
+        historyStore.clearAll()
+        historyStorageUsage = historyStore.storageUsage()
+        historyBuckets.removeAll()
+        dirtyHistoryBucketIDs.removeAll()
+        previousReading = nil
+        sessionTotals.removeAll()
+        sessionTotalsByQuery.removeAll()
+        knownIdentities.removeAll()
+        snapshot = NetworkTrafficSnapshot(
+            apps: [],
+            status: snapshot.status,
+            query: query,
+            lastUpdated: nil,
             history: []
         )
     }
@@ -2023,6 +2121,7 @@ final class NetworkTrafficService {
         guard query == self.query else { return }
         guard current.isAvailable else {
             consecutiveSampleFailures += 1
+            lastFailureStatus = current.status
             snapshot = NetworkTrafficSnapshot(
                 apps: snapshot.apps,
                 status: current.status,
@@ -2034,6 +2133,7 @@ final class NetworkTrafficService {
         }
 
         consecutiveSampleFailures = 0
+        lastFailureStatus = nil
         lastSuccessfulSampleAt = now()
 
         let result = NetworkTrafficCalculator.calculate(
@@ -2141,6 +2241,7 @@ final class NetworkTrafficService {
         }
         historyStore.save(dirtyBuckets)
         dirtyHistoryBucketIDs.subtract(dirtyBuckets.map(\.id))
+        historyStorageUsage = historyStore.storageUsage()
     }
 
     private func historicalIdentities(for queryKey: String? = nil) -> [String: NetworkAppIdentity] {
@@ -2257,6 +2358,99 @@ enum NetworkTrafficExportSelection {
         }
         return NetworkTrafficSnapshot(
             apps: snapshot.apps.filter { appIDs.contains($0.id) },
+            status: snapshot.status,
+            query: snapshot.query,
+            lastUpdated: snapshot.lastUpdated,
+            history: history
+        )
+    }
+}
+
+enum NetworkTrafficExportPrivacy: String, CaseIterable, Codable, Sendable {
+    case full
+    case redacted
+
+    var titleKey: String {
+        switch self {
+        case .full: return "traffic.exportPrivacy.full"
+        case .redacted: return "traffic.exportPrivacy.redacted"
+        }
+    }
+}
+
+enum NetworkTrafficExportSanitizer {
+    static func make(
+        _ snapshot: NetworkTrafficSnapshot,
+        privacy: NetworkTrafficExportPrivacy
+    ) -> NetworkTrafficSnapshot {
+        guard privacy == .redacted else { return snapshot }
+
+        let identities = snapshot.apps.map(\.identity) + snapshot.history.flatMap {
+            $0.apps.values.map(\.identity)
+        }
+        var remappedIDs: [String: Int] = [:]
+        for identity in identities where remappedIDs[identity.id] == nil {
+            remappedIDs[identity.id] = remappedIDs.count + 1
+        }
+
+        func redactedIdentity(_ identity: NetworkAppIdentity) -> NetworkAppIdentity {
+            let number = remappedIDs[identity.id] ?? 0
+            return NetworkAppIdentity(
+                id: number > 0 ? "app-\(number)" : "app-unknown",
+                displayName: number > 0 ? "App \(number)" : "App",
+                bundleIdentifier: nil,
+                bundlePath: nil,
+                executablePath: nil,
+                kind: identity.kind
+            )
+        }
+
+        let apps = snapshot.apps.map { app in
+            NetworkAppTrafficSnapshot(
+                identity: redactedIdentity(app.identity),
+                downloadBytesPerSecond: app.downloadBytesPerSecond,
+                uploadBytesPerSecond: app.uploadBytesPerSecond,
+                sessionDownloadedBytes: app.sessionDownloadedBytes,
+                sessionUploadedBytes: app.sessionUploadedBytes,
+                processes: app.processes.map {
+                    NetworkProcessTrafficSnapshot(
+                        pid: 0,
+                        processName: "redacted",
+                        downloadBytesPerSecond: $0.downloadBytesPerSecond,
+                        uploadBytesPerSecond: $0.uploadBytesPerSecond,
+                        currentDownloadedBytes: $0.currentDownloadedBytes,
+                        currentUploadedBytes: $0.currentUploadedBytes
+                    )
+                },
+                connections: app.connections.map {
+                    NetworkConnectionTrafficSnapshot(
+                        transport: $0.transport,
+                        endpoint: "redacted",
+                        downloadedBytes: $0.downloadedBytes,
+                        uploadedBytes: $0.uploadedBytes
+                    )
+                },
+                isHistoricalOnly: app.isHistoricalOnly
+            )
+        }
+        let history = snapshot.history.map { bucket in
+            let samples = bucket.apps.values.reduce(into: [String: NetworkTrafficHistoryAppSample]()) {
+                result, sample in
+                let identity = redactedIdentity(sample.identity)
+                result[identity.id] = NetworkTrafficHistoryAppSample(
+                    identity: identity,
+                    downloadedBytes: sample.downloadedBytes,
+                    uploadedBytes: sample.uploadedBytes
+                )
+            }
+            return NetworkTrafficHistoryBucket(
+                timestamp: bucket.timestamp,
+                queryKey: bucket.queryKey,
+                apps: samples
+            )
+        }
+        return NetworkTrafficSnapshot(
+            apps: apps,
             status: snapshot.status,
             query: snapshot.query,
             lastUpdated: snapshot.lastUpdated,

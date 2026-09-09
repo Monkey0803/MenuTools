@@ -53,6 +53,8 @@ struct NetworkTrafficSettingsView: View {
     @State private var historyRange: NetworkTrafficHistoryRange = .hour
     @State private var expandedAppIDs: Set<String> = []
     @State private var showingClearHistory = false
+    @State private var showingClearAllHistory = false
+    @State private var exportPrivacy: NetworkTrafficExportPrivacy = .redacted
     @State private var exportError: String?
     @State private var exportMessage: String?
     @State private var interfaceInfos: [NetworkTrafficInterfaceInfo] = []
@@ -90,6 +92,7 @@ struct NetworkTrafficSettingsView: View {
                 searchField
                 queryControls
                 networkQualityCard
+                diagnosticsCard
 
                 if service.isPaused {
                     statusBanner(
@@ -157,6 +160,14 @@ struct NetworkTrafficSettingsView: View {
             Button(L("update.cancel"), role: .cancel) {}
         } message: {
             Text(L("traffic.clearHistoryMessage"))
+        }
+        .alert(L("traffic.clearAllHistoryTitle"), isPresented: $showingClearAllHistory) {
+            Button(L("traffic.clearAllHistory"), role: .destructive) {
+                service.clearAllHistory()
+            }
+            Button(L("update.cancel"), role: .cancel) {}
+        } message: {
+            Text(L("traffic.clearAllHistoryMessage"))
         }
         .alert(
             L("traffic.exportFailed"),
@@ -413,6 +424,56 @@ struct NetworkTrafficSettingsView: View {
                 .foregroundStyle(.secondary)
             Text(value)
                 .font(.caption.weight(.medium))
+                .monospacedDigit()
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+    }
+
+    private var diagnosticsCard: some View {
+        let diagnostics = service.diagnostics
+        return VStack(alignment: .leading, spacing: 8) {
+            Label(L("traffic.diagnostics"), systemImage: "stethoscope")
+                .font(.caption.weight(.semibold))
+
+            HStack(spacing: 10) {
+                diagnosticsMetric(
+                    L("traffic.diagnostics.sampleDuration"),
+                    diagnostics.lastSampleDuration.map { String(format: "%.0f ms", $0 * 1_000) } ?? "--"
+                )
+                diagnosticsMetric(
+                    L("traffic.diagnostics.failures"),
+                    String(diagnostics.consecutiveSampleFailures)
+                )
+                diagnosticsMetric(
+                    L("traffic.diagnostics.storage"),
+                    formattedBytes(diagnostics.historyStorage.totalBytes)
+                )
+                diagnosticsMetric(
+                    L("traffic.diagnostics.lastSuccess"),
+                    diagnostics.lastSuccessfulSampleAt.map { $0.formatted(date: .omitted, time: .shortened) } ?? "--"
+                )
+            }
+
+            if let status = diagnostics.lastFailureStatus {
+                Text(L("traffic.diagnostics.lastFailure", statusTitle(status)))
+                    .font(.caption2)
+                    .foregroundStyle(.orange)
+            }
+        }
+        .padding(10)
+        .controlCenterSurface(tint: .indigo)
+        .accessibilityElement(children: .contain)
+        .accessibilityLabel(L("traffic.diagnostics"))
+    }
+
+    private func diagnosticsMetric(_ title: String, _ value: String) -> some View {
+        VStack(alignment: .leading, spacing: 2) {
+            Text(title)
+                .font(.caption2)
+                .foregroundStyle(.secondary)
+            Text(value)
+                .font(.caption.weight(.medium))
+                .lineLimit(1)
                 .monospacedDigit()
         }
         .frame(maxWidth: .infinity, alignment: .leading)
@@ -833,7 +894,23 @@ struct NetworkTrafficSettingsView: View {
     }
 
     private var footerActions: some View {
-        HStack(spacing: 12) {
+        VStack(alignment: .leading, spacing: 8) {
+            HStack(spacing: 8) {
+                Text(L("traffic.exportPrivacy"))
+                    .foregroundStyle(.secondary)
+                Picker(L("traffic.exportPrivacy"), selection: $exportPrivacy) {
+                    ForEach(NetworkTrafficExportPrivacy.allCases, id: \.self) { privacy in
+                        Text(L(privacy.titleKey)).tag(privacy)
+                    }
+                }
+                .labelsHidden()
+                .pickerStyle(.menu)
+                Text(L("traffic.exportPrivacy.description"))
+                    .foregroundStyle(.tertiary)
+            }
+            .font(.caption2)
+
+            HStack(spacing: 12) {
             Menu {
                 Button(L("traffic.exportCSV")) {
                     exportCSV(snapshot: visibleExportSnapshot, nameSuffix: "Current")
@@ -872,6 +949,14 @@ struct NetworkTrafficSettingsView: View {
                 Label(L("traffic.clearHistory"), systemImage: "trash")
             }
             .buttonStyle(.borderless)
+
+            Button(role: .destructive) {
+                showingClearAllHistory = true
+            } label: {
+                Label(L("traffic.clearAllHistory"), systemImage: "trash.slash")
+            }
+            .buttonStyle(.borderless)
+            }
         }
         .font(.caption)
     }
@@ -984,7 +1069,7 @@ struct NetworkTrafficSettingsView: View {
         panel.nameFieldStringValue = "MenuTools-NetworkTraffic-\(nameSuffix).csv"
         guard panel.runModal() == .OK, let url = panel.url else { return }
         do {
-            try NetworkTrafficExporter.csv(snapshot).write(to: url, atomically: true, encoding: .utf8)
+            try NetworkTrafficExporter.csv(exportSnapshot(snapshot)).write(to: url, atomically: true, encoding: .utf8)
             exportMessage = L("traffic.exportSuccess")
         } catch {
             exportError = error.localizedDescription
@@ -998,7 +1083,7 @@ struct NetworkTrafficSettingsView: View {
         panel.nameFieldStringValue = "MenuTools-NetworkTraffic-\(nameSuffix).json"
         guard panel.runModal() == .OK, let url = panel.url else { return }
         do {
-            try NetworkTrafficExporter.json(snapshot).write(to: url, options: .atomic)
+            try NetworkTrafficExporter.json(exportSnapshot(snapshot)).write(to: url, options: .atomic)
             exportMessage = L("traffic.exportSuccess")
         } catch {
             exportError = error.localizedDescription
@@ -1012,12 +1097,16 @@ struct NetworkTrafficSettingsView: View {
         panel.nameFieldStringValue = "MenuTools-NetworkTraffic-History-\(nameSuffix).csv"
         guard panel.runModal() == .OK, let url = panel.url else { return }
         do {
-            try NetworkTrafficExporter.historyCSV(snapshot)
+            try NetworkTrafficExporter.historyCSV(exportSnapshot(snapshot))
                 .write(to: url, atomically: true, encoding: .utf8)
             exportMessage = L("traffic.exportSuccess")
         } catch {
             exportError = error.localizedDescription
         }
+    }
+
+    private func exportSnapshot(_ snapshot: NetworkTrafficSnapshot) -> NetworkTrafficSnapshot {
+        NetworkTrafficExportSanitizer.make(snapshot, privacy: exportPrivacy)
     }
 
     private func copyEndpoint(_ endpoint: String) {

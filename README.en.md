@@ -75,6 +75,7 @@ A lightweight system toolkit that lives in the macOS menu bar. MenuTools uses th
 | Clear clipboard | Shows the current clipboard item count and clears the clipboard. |
 | Clipboard History | Keeps recent text and images with search, pin, delete, and copy actions. |
 | System Resources | Shows CPU, memory pressure, free disk space, and network rates. |
+| Network Traffic | Per-app live upload/download rates, connection details, and 30-day history with interface/protocol filtering, quota alerts, redacted export, and data clearing. |
 | Check for updates | Checks for new releases and opens the download page when an update is available. |
 
 ### System Information
@@ -139,6 +140,22 @@ open dist/MenuTools.app
 
 The build script compiles the Swift Package, assembles the app bundle, builds the Finder extension, and signs the result. The app is written to `dist/MenuTools.app`.
 
+### Network Traffic Validation
+
+Network Traffic depends on the live output of the system `nettop` command. Run a short smoke test after a change or macOS major-version upgrade:
+
+```bash
+swift Scripts/test_network_traffic.swift --duration 30 --connections --strict
+```
+
+For an 8-hour stability run without generating extra download traffic:
+
+```bash
+swift Scripts/test_network_traffic.swift --duration 28800 --interval 10 --no-download --strict
+```
+
+The script reports sample duration, process-row counts, non-zero traffic rows, and a final summary. Then cross-check the matching app, rate, and connection details in MenuTools Settings.
+
 ## Permissions
 
 Some features request permissions the first time they are used:
@@ -173,6 +190,7 @@ If permission was denied, enable it again in **System Settings → Privacy & Sec
 | Screenshot Tools | ScreenCaptureKit native-pixel capture, frozen selection, window capture, multi-display compositing, Vision motion estimation, PNG stitching, and OCR/QR recognition; captures can be copied to the clipboard or opened in the built-in annotator |
 | App Volume Management | Public Core Audio Process Tap, a private aggregate device, and IOProc routing; routes only apps below 100% and destroys taps to restore original audio on exit or failure |
 | Network Status | CoreWLAN, interface addresses, VPN state, and on-demand URLSession probes |
+| Network Traffic | `/usr/bin/nettop` process sampling, SQLite/WAL history, diagnostics, quota alerts, and optional redacted exports |
 | Battery Health | `system_profiler SPPowerDataType -json`, with silent fallback when unavailable |
 | Displays | `NSScreen` and CoreGraphics display mode enumeration and switching |
 | Storage Analysis | Background recursive measurement of selected directories; cleanup keeps directories and never touches Downloads |

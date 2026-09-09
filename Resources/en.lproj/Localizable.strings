@@ -161,6 +161,19 @@
 "traffic.kind.application" = "App";
 "traffic.kind.systemService" = "System service";
 "traffic.kind.unknown" = "Unknown process";
+"traffic.diagnostics" = "Sampling diagnostics";
+"traffic.diagnostics.sampleDuration" = "Last sample";
+"traffic.diagnostics.failures" = "Failures";
+"traffic.diagnostics.storage" = "History storage";
+"traffic.diagnostics.lastSuccess" = "Last success";
+"traffic.diagnostics.lastFailure" = "Last failure: %@";
+"traffic.exportPrivacy" = "Export privacy";
+"traffic.exportPrivacy.full" = "Full details";
+"traffic.exportPrivacy.redacted" = "Redacted";
+"traffic.exportPrivacy.description" = "Redacted exports hide app identity, process details, and endpoints.";
+"traffic.clearAllHistory" = "Clear all traffic data";
+"traffic.clearAllHistoryTitle" = "Clear all network traffic data?";
+"traffic.clearAllHistoryMessage" = "All traffic history for every interface and protocol, plus current session totals, will be removed.";
 
 /* Battery Health */
 "batteryHealth.title" = "Battery Health";

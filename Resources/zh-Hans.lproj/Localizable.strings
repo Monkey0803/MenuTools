@@ -161,6 +161,19 @@
 "traffic.kind.application" = "App";
 "traffic.kind.systemService" = "系统服务";
 "traffic.kind.unknown" = "未知进程";
+"traffic.diagnostics" = "采样诊断";
+"traffic.diagnostics.sampleDuration" = "最近采样";
+"traffic.diagnostics.failures" = "连续失败";
+"traffic.diagnostics.storage" = "历史占用";
+"traffic.diagnostics.lastSuccess" = "最近成功";
+"traffic.diagnostics.lastFailure" = "最近失败：%@";
+"traffic.exportPrivacy" = "导出隐私";
+"traffic.exportPrivacy.full" = "完整详情";
+"traffic.exportPrivacy.redacted" = "脱敏导出";
+"traffic.exportPrivacy.description" = "脱敏导出会隐藏 App 身份、进程明细和连接端点。";
+"traffic.clearAllHistory" = "清除全部流量数据";
+"traffic.clearAllHistoryTitle" = "清除全部网络流量数据？";
+"traffic.clearAllHistoryMessage" = "将删除所有网卡和协议范围的历史流量，以及当前运行累计。";
 
 /* 电池健康 */
 "batteryHealth.title" = "电池健康";

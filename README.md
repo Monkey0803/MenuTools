@@ -68,6 +68,7 @@
 | 📋 清理剪贴板 | 显示当前剪贴板项数，一键清空 |
 | 🕘 剪贴板历史 | 保存最近文本和图片，支持搜索、固定、删除和一键复制 |
 | 📊 系统资源 | 显示 CPU、内存压力、磁盘可用空间和网络速率 |
+| 📶 网络流量 | 按 App 显示实时上下行、连接明细和 30 天历史；支持网卡/协议筛选、额度提醒、脱敏导出与数据清除 |
 | ⬇️ 检查更新 | 应用内检查新版本，发现更新可直接跳转下载 |
 
 ### 系统信息
@@ -163,6 +164,7 @@ open dist/MenuTools.app
 | 截图工具 | ScreenCaptureKit 原生像素采集、冻结选区、窗口捕获、跨显示器合成、Vision 位移估计、PNG 拼接和 OCR/二维码识别；截图可复制到剪贴板或进入内置标注器 |
 | App 音量管理 | 公开 Core Audio Process Tap、私有 Aggregate Device 和 IOProc；只为低于 100% 的 App 建立路由，退出或失败时销毁 Tap 并恢复原音 |
 | 网络状态 | CoreWLAN、网络接口地址、VPN 状态和按需 URLSession 探针 |
+| 网络流量 | `/usr/bin/nettop` 进程采样、SQLite/WAL 历史、诊断、额度提醒和可选脱敏导出 |
 | 电池健康 | `system_profiler SPPowerDataType -json`，无内置电池时静默降级 |
 | 显示器工具 | `NSScreen` + CoreGraphics 显示模式枚举和切换 |
 | 存储分析 | 后台递归统计指定目录，清理时保留目录本身且不操作 Downloads |
@@ -188,6 +190,22 @@ MenuTools/
     ├── MenuPanelView.swift     # 液态玻璃主面板
     └── Services/               # 各功能服务（单一职责）
 ```
+
+### 网络流量验证
+
+网络流量依赖系统 `nettop` 的实际输出；提交或系统大版本升级后，可先跑短时 smoke test：
+
+```bash
+swift Scripts/test_network_traffic.swift --duration 30 --connections --strict
+```
+
+长时间稳定性回归可持续 8 小时采样（不主动产生下载流量）：
+
+```bash
+swift Scripts/test_network_traffic.swift --duration 28800 --interval 10 --no-download --strict
+```
+
+脚本会输出每次采样耗时、进程行数、非零流量行和汇总结果；之后在 MenuTools 设置页核对 App、速率和连接明细。
 
 ## 🔄 发布更新
 

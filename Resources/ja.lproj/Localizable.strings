@@ -161,6 +161,19 @@
 "traffic.kind.application" = "App";
 "traffic.kind.systemService" = "システムサービス";
 "traffic.kind.unknown" = "不明なプロセス";
+"traffic.diagnostics" = "サンプリング診断";
+"traffic.diagnostics.sampleDuration" = "直近のサンプル";
+"traffic.diagnostics.failures" = "連続失敗";
+"traffic.diagnostics.storage" = "履歴ストレージ";
+"traffic.diagnostics.lastSuccess" = "最終成功";
+"traffic.diagnostics.lastFailure" = "最終失敗: %@";
+"traffic.exportPrivacy" = "書き出しのプライバシー";
+"traffic.exportPrivacy.full" = "完全な詳細";
+"traffic.exportPrivacy.redacted" = "匿名化";
+"traffic.exportPrivacy.description" = "匿名化した書き出しでは App 識別子、プロセス詳細、接続先を隠します。";
+"traffic.clearAllHistory" = "すべての通信データを消去";
+"traffic.clearAllHistoryTitle" = "すべてのネットワーク通信データを消去しますか？";
+"traffic.clearAllHistoryMessage" = "すべてのインターフェースとプロトコルの履歴、および現在の実行累計を削除します。";
 
 /* バッテリーの状態 */
 "batteryHealth.title" = "バッテリーの状態";

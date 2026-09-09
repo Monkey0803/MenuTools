@@ -1155,6 +1155,208 @@ func networkTrafficSamplingPolicyUsesAdaptiveIntervals() {
     #expect(NetworkTrafficSamplingPolicy.interval(liveObserverCount: 0, alertEnabled: false) == 60)
 }
 
+@Test("脱敏导出会隐藏 App 身份、进程和连接端点")
+func networkTrafficRedactedExportRemovesSensitiveFields() {
+    let identity = NetworkAppIdentity(
+        id: "com.example.browser",
+        displayName: "Example Browser",
+        bundleIdentifier: "com.example.browser",
+        bundlePath: "/Applications/Example Browser.app",
+        executablePath: "/Applications/Example Browser.app/Contents/MacOS/Example Browser",
+        kind: .application
+    )
+    let snapshot = NetworkTrafficSnapshot(
+        apps: [
+            NetworkAppTrafficSnapshot(
+                identity: identity,
+                downloadBytesPerSecond: 10,
+                uploadBytesPerSecond: 5,
+                sessionDownloadedBytes: 100,
+                sessionUploadedBytes: 50,
+                processes: [
+                    NetworkProcessTrafficSnapshot(
+                        pid: 42,
+                        processName: "Example Browser Helper",
+                        downloadBytesPerSecond: 10,
+                        uploadBytesPerSecond: 5,
+                        currentDownloadedBytes: 100,
+                        currentUploadedBytes: 50
+                    )
+                ],
+                connections: [
+                    NetworkConnectionTrafficSnapshot(
+                        transport: .tcp,
+                        endpoint: "192.0.2.1:443",
+                        downloadedBytes: 100,
+                        uploadedBytes: 50
+                    )
+                ]
+            )
+        ],
+        status: .available,
+        query: .default,
+        lastUpdated: Date(timeIntervalSince1970: 10),
+        history: [
+            NetworkTrafficHistoryBucket(
+                timestamp: Date(timeIntervalSince1970: 10),
+                queryKey: NetworkTrafficQuery.default.storageKey,
+                apps: [
+                    identity.id: NetworkTrafficHistoryAppSample(
+                        identity: identity,
+                        downloadedBytes: 100,
+                        uploadedBytes: 50
+                    )
+                ]
+            )
+        ]
+    )
+
+    let redacted = NetworkTrafficExportSanitizer.make(snapshot, privacy: .redacted)
+    let app = try! #require(redacted.apps.first)
+
+    #expect(app.identity.id == "app-1")
+    #expect(app.identity.displayName == "App 1")
+    #expect(app.identity.bundleIdentifier == nil)
+    #expect(app.identity.bundlePath == nil)
+    #expect(app.identity.executablePath == nil)
+    #expect(app.processes.first?.pid == 0)
+    #expect(app.processes.first?.processName == "redacted")
+    #expect(app.connections.first?.endpoint == "redacted")
+    #expect(redacted.history.first?.apps["app-1"]?.identity == app.identity)
+    #expect(!NetworkTrafficExporter.csv(redacted).contains("192.0.2.1"))
+    #expect(!String(data: try! NetworkTrafficExporter.json(redacted), encoding: .utf8)!.contains("Example Browser"))
+}
+
+@Test("历史存储策略会限制数据库与 WAL 文件大小")
+func networkTrafficHistoryStoragePolicyCapsSQLiteFiles() {
+    #expect(NetworkTrafficHistoryStoragePolicy.maximumDatabaseBytes == 64 * 1_024 * 1_024)
+    #expect(NetworkTrafficHistoryStoragePolicy.maximumWALBytes == 8 * 1_024 * 1_024)
+    #expect(NetworkTrafficHistoryStoragePolicy.maximumPageCount(pageSize: 4_096) == 16_384)
+}
+
+@Test("网络流量治理功能在所有内置语言中都有文案")
+func networkTrafficGovernanceLocalizationKeysExistInEveryLocale() throws {
+    let projectRoot = URL(fileURLWithPath: #filePath)
+        .deletingLastPathComponent()
+        .deletingLastPathComponent()
+        .deletingLastPathComponent()
+    let keys = [
+        "traffic.diagnostics",
+        "traffic.exportPrivacy",
+        "traffic.clearAllHistory"
+    ]
+
+    for locale in ["en", "ja", "ko", "zh-Hans", "zh-Hant"] {
+        let stringsURL = projectRoot
+            .appendingPathComponent("Resources")
+            .appendingPathComponent("\(locale).lproj")
+            .appendingPathComponent("Localizable.strings")
+        let source = try String(contentsOf: stringsURL, encoding: .utf8)
+        for key in keys {
+            #expect(source.contains("\"\(key)\""), "\(locale) 缺少 \(key)")
+        }
+    }
+}
+
+@Test("历史存储可以报告占用并清除所有查询范围")
+func networkTrafficHistoryStoreReportsUsageAndClearsAll() {
+    let databaseURL = FileManager.default.temporaryDirectory
+        .appendingPathComponent("network-traffic-usage-\(UUID().uuidString).sqlite3")
+    let identity = NetworkAppIdentity.fallback(processName: "Safari")
+    let store = NetworkTrafficHistoryStore(fileURL: databaseURL)
+    store.save([
+        NetworkTrafficHistoryBucket(
+            timestamp: Date(),
+            queryKey: NetworkTrafficQuery.default.storageKey,
+            apps: [
+                identity.id: NetworkTrafficHistoryAppSample(
+                    identity: identity,
+                    downloadedBytes: 10,
+                    uploadedBytes: 20
+                )
+            ]
+        )
+    ])
+
+    #expect(store.storageUsage().totalBytes > 0)
+    #expect(!store.load(queryKey: nil).isEmpty)
+
+    store.clearAll()
+
+    #expect(store.load(queryKey: nil).isEmpty)
+    try? FileManager.default.removeItem(at: databaseURL)
+    try? FileManager.default.removeItem(at: URL(fileURLWithPath: databaseURL.path + "-wal"))
+    try? FileManager.default.removeItem(at: URL(fileURLWithPath: databaseURL.path + "-shm"))
+}
+
+@MainActor
+@Test("服务诊断会暴露失败原因和历史存储占用")
+func networkTrafficServiceDiagnosticsIncludeFailureAndStorage() async {
+    let provider = TestNetworkTrafficProvider(readings: [
+        NetworkTrafficReading(timestamp: 10, apps: [], status: .timedOut)
+    ])
+    let service = NetworkTrafficService(
+        provider: provider,
+        historyStore: RecordingNetworkTrafficHistoryStore(buckets: [], storageUsage: .init(databaseBytes: 1_024, walBytes: 24)),
+        userDefaults: UserDefaults(suiteName: "NetworkTrafficDiagnosticsSummary.\(UUID().uuidString)")!,
+        alerter: TestNetworkTrafficAlerter()
+    )
+
+    await service.refresh()
+
+    #expect(service.diagnostics.lastFailureStatus == .timedOut)
+    #expect(service.diagnostics.consecutiveSampleFailures == 1)
+    #expect(service.diagnostics.historyStorage.totalBytes == 1_048)
+    service.stop()
+}
+
+@MainActor
+@Test("清除全部流量数据会同时清空历史和本次运行累计")
+func networkTrafficServiceClearAllHistoryResetsEveryScope() async {
+    let identity = NetworkAppIdentity.fallback(processName: "Safari")
+    let store = RecordingNetworkTrafficHistoryStore(buckets: [
+        NetworkTrafficHistoryBucket(
+            timestamp: Date(),
+            queryKey: NetworkTrafficQuery(interface: .wifi, transport: .tcp).storageKey,
+            apps: [
+                identity.id: NetworkTrafficHistoryAppSample(
+                    identity: identity,
+                    downloadedBytes: 100,
+                    uploadedBytes: 20
+                )
+            ]
+        )
+    ])
+    let service = NetworkTrafficService(
+        provider: TestNetworkTrafficProvider(readings: [
+            NetworkTrafficReading(
+                timestamp: 10,
+                apps: [.init(identity: identity, pid: 2, receivedBytes: 100, sentBytes: 20)],
+                status: .available
+            ),
+            NetworkTrafficReading(
+                timestamp: 12,
+                apps: [.init(identity: identity, pid: 2, receivedBytes: 300, sentBytes: 70)],
+                status: .available
+            )
+        ]),
+        historyStore: store,
+        userDefaults: UserDefaults(suiteName: "NetworkTrafficClearAll.\(UUID().uuidString)")!,
+        alerter: TestNetworkTrafficAlerter()
+    )
+
+    await service.refresh()
+    await service.refresh()
+    #expect(service.snapshot.apps.first?.sessionDownloadedBytes == 200)
+
+    service.clearAllHistory()
+
+    #expect(service.snapshot.apps.isEmpty)
+    #expect(service.snapshot.history.isEmpty)
+    #expect(store.load(queryKey: nil).isEmpty)
+    service.stop()
+}
+
 @MainActor
 @Test("连接明细读取失败会暴露错误并允许重试")
 func networkTrafficServiceExposesConnectionLoadFailure() async {
@@ -1277,9 +1479,14 @@ private final class TestNetworkTrafficAlerter: NetworkTrafficAlerting {
 private final class RecordingNetworkTrafficHistoryStore: NetworkTrafficHistoryStoring {
     private var buckets: [NetworkTrafficHistoryBucket]
     private(set) var savedBatches: [[NetworkTrafficHistoryBucket]] = []
+    private let configuredStorageUsage: NetworkTrafficHistoryStorageUsage
 
-    init(buckets: [NetworkTrafficHistoryBucket]) {
+    init(
+        buckets: [NetworkTrafficHistoryBucket],
+        storageUsage: NetworkTrafficHistoryStorageUsage = .init()
+    ) {
         self.buckets = buckets
+        configuredStorageUsage = storageUsage
     }
 
     func load(queryKey: String?) -> [NetworkTrafficHistoryBucket] {
@@ -1299,5 +1506,13 @@ private final class RecordingNetworkTrafficHistoryStore: NetworkTrafficHistorySt
 
     func clear(queryKey: String) {
         buckets.removeAll { $0.queryKey == queryKey }
+    }
+
+    func clearAll() {
+        buckets.removeAll()
+    }
+
+    func storageUsage() -> NetworkTrafficHistoryStorageUsage {
+        configuredStorageUsage
     }
 }
