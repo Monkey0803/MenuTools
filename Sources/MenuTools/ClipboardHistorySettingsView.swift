@@ -152,6 +152,10 @@ struct ClipboardHistorySettingsView: View {
             capturedShortcut = nil
             errorMessage = nil
         }
+        .onChange(of: searchText) { _, _ in historyPageSize = 50 }
+        .onChange(of: category) { _, _ in historyPageSize = 50 }
+        .onChange(of: sourceBundleID) { _, _ in historyPageSize = 50 }
+        .onChange(of: dateFilter) { _, _ in historyPageSize = 50 }
     }
 
     private var workspacePicker: some View {
@@ -492,6 +496,10 @@ struct ClipboardHistorySettingsView: View {
                     .help(L("shortcut.clear"))
                 }
             }
+            Label(L(shortcutService.registrationMode.localizationKey), systemImage: shortcutService.registrationMode == .carbonExclusive ? "checkmark.shield" : "exclamationmark.triangle")
+                .font(.caption)
+                .foregroundStyle(shortcutService.registrationMode == .carbonExclusive ? AnyShapeStyle(.secondary) : AnyShapeStyle(.orange))
+                .help(L("clipboard.shortcut.status.help"))
         }
         .help(L("clipboard.shortcutDescription"))
         .overlay(alignment: .bottomLeading) {
@@ -611,7 +619,7 @@ private struct ClipboardHistorySettingsCard: View {
             }
             Button(action: copyItem) {
                 HStack(alignment: .top, spacing: 10) {
-                    ClipboardHistoryThumbnail(content: item.content, isSensitive: item.isSensitive)
+                    ClipboardHistoryThumbnail(id: item.id, content: item.content, isSensitive: item.isSensitive)
 
                     VStack(alignment: .leading, spacing: 6) {
                         if let title = item.title {
@@ -827,8 +835,10 @@ private struct ClipboardHistoryMetadataEditor: View {
 }
 
 private struct ClipboardHistoryThumbnail: View {
+    let id: UUID
     let content: ClipboardHistoryContent
     let isSensitive: Bool
+    @State private var cachedImageData: Data?
 
     var body: some View {
         ZStack {
@@ -848,6 +858,10 @@ private struct ClipboardHistoryThumbnail: View {
         )
         .clipped()
         .clipShape(.rect(cornerRadius: 10))
+        .task(id: id) {
+            guard case let .image(data) = content, !isSensitive else { return }
+            cachedImageData = await ClipboardImageThumbnailCache.shared.thumbnail(for: id, source: data)
+        }
     }
 
     @ViewBuilder
@@ -867,7 +881,7 @@ private struct ClipboardHistoryThumbnail: View {
                     .foregroundStyle(.secondary)
                     .lineLimit(1)
             case let .image(data):
-                if let image = NSImage(data: data) {
+                if let image = NSImage(data: cachedImageData ?? data) {
                     Image(nsImage: image)
                         .resizable()
                         .scaledToFill()

@@ -1091,13 +1091,10 @@ enum ClipboardHistoryAutoPaste {
         }
         keyDown.flags = .maskCommand
         keyUp.flags = .maskCommand
-        if let targetPID {
-            keyDown.postToPid(targetPID)
-            keyUp.postToPid(targetPID)
-        } else {
-            keyDown.post(tap: .cghidEventTap)
-            keyUp.post(tap: .cghidEventTap)
-        }
+        // 目标 App 已在前台时必须通过系统事件 tap 投递。部分 App（TextEdit、WebView）
+        // 对 postToPid 投递的 flags 处理不完整，会把 Command-V 解释成控制字符。
+        keyDown.post(tap: .cghidEventTap)
+        keyUp.post(tap: .cghidEventTap)
         return .pasted
     }
 

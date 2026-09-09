@@ -1579,3 +1579,11 @@ func clipboardPDFContentRoundTrips() throws {
     try ClipboardHistoryPersistence.save([item], to: url)
     #expect(ClipboardHistoryPersistence.load(from: url) == [item])
 }
+
+@Test("PDF 剪贴板项目能够从系统剪贴板读取并写回")
+func clipboardPDFPasteboardRoundTrips() {
+    let pasteboard = NSPasteboard(name: NSPasteboard.Name("MenuToolsTests.\(UUID().uuidString)"))
+    let pdf = Data("%PDF-1.7 test".utf8)
+    #expect(ClipboardHistoryPasteboardWriter.write(.pdf(pdf), to: pasteboard))
+    #expect(ClipboardHistoryPasteboardReader.content(from: pasteboard.pasteboardItems ?? []) == .pdf(pdf))
+}

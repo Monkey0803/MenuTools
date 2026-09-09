@@ -1008,3 +1008,7 @@
 "traffic.historyApp" = "앱";
 "clipboard.pdf" = "PDF";
 "clipboard.loadMore" = "Load more";
+"clipboard.shortcut.status.disabled" = "Shortcut disabled";
+"clipboard.shortcut.status.exclusive" = "Exclusive shortcut";
+"clipboard.shortcut.status.fallback" = "Fallback listener";
+"clipboard.shortcut.status.help" = "Exclusive registration prevents the shortcut from entering the target app.";
