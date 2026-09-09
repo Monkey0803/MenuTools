@@ -59,6 +59,21 @@ enum NetworkTrafficHistoryChartLayout {
         let availableWidth = (totalWidth - CGFloat(sampleCount - 1) * spacing) / CGFloat(sampleCount)
         return min(10, max(3, availableWidth))
     }
+
+    static func hoveredIndex(
+        x: CGFloat,
+        totalWidth: CGFloat,
+        sampleCount: Int,
+        spacing: CGFloat = 2
+    ) -> Int? {
+        guard x >= 0, totalWidth > 0, sampleCount > 0 else { return nil }
+        let width = barWidth(totalWidth: totalWidth, sampleCount: sampleCount, spacing: spacing)
+        guard width > 0 else { return nil }
+        let slot = width + spacing
+        let index = Int(x / slot)
+        guard index >= 0, index < sampleCount else { return nil }
+        return x - CGFloat(index) * slot <= width ? index : nil
+    }
 }
 
 enum NetworkTrafficMiniTrendLayout {
@@ -94,6 +109,7 @@ struct NetworkTrafficSettingsView: View {
     @State private var section: NetworkTrafficSection = .overview
     @State private var selectedApp: NetworkAppTrafficSnapshot?
     @State private var historyAppID: String?
+    @State private var hoveredHistoryIndex: Int?
 
     private var visibleApps: [NetworkAppTrafficSnapshot] {
         let query = searchText.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
@@ -719,6 +735,9 @@ struct NetworkTrafficSettingsView: View {
                     .foregroundStyle(.secondary)
                     .frame(maxWidth: .infinity, minHeight: 44, alignment: .center)
             } else {
+                if let hoveredHistoryIndex, points.indices.contains(hoveredHistoryIndex) {
+                    historyHoverDetail(points[hoveredHistoryIndex])
+                }
                 GeometryReader { geometry in
                     let spacing: CGFloat = 2
                     let barWidth = NetworkTrafficHistoryChartLayout.barWidth(
@@ -728,7 +747,7 @@ struct NetworkTrafficSettingsView: View {
                     )
 
                     HStack(alignment: .bottom, spacing: spacing) {
-                        ForEach(Array(points.enumerated()), id: \.offset) { _, point in
+                        ForEach(Array(points.enumerated()), id: \.offset) { index, point in
                             VStack(spacing: 0) {
                                 Spacer(minLength: 0)
                                 RoundedRectangle(cornerRadius: 1)
@@ -739,6 +758,11 @@ struct NetworkTrafficSettingsView: View {
                                     .frame(height: max(CGFloat(point.downloadedBytes) / CGFloat(maximum) * 54, point.bytes > 0 ? 1 : 3))
                             }
                             .frame(width: barWidth, height: 54)
+                            .opacity(hoveredHistoryIndex == nil || hoveredHistoryIndex == index ? 1 : 0.42)
+                            .contentShape(Rectangle())
+                            .onHover { hovering in
+                                hoveredHistoryIndex = hovering ? index : nil
+                            }
                             .help(historyPointDescription(point))
                         }
                     }
@@ -779,6 +803,21 @@ struct NetworkTrafficSettingsView: View {
         }
         .padding(12)
         .controlCenterSurface(tint: .blue)
+    }
+
+    private func historyHoverDetail(_ point: NetworkTrafficHistoryPoint) -> some View {
+        HStack(spacing: 10) {
+            Image(systemName: "cursorarrow.rays")
+                .foregroundStyle(.tint)
+            Text(historyPointDescription(point))
+                .font(.caption2)
+                .foregroundStyle(.secondary)
+                .lineLimit(1)
+        }
+        .padding(.horizontal, 8)
+        .padding(.vertical, 5)
+        .background(.thinMaterial, in: .rect(cornerRadius: 6))
+        .transition(.opacity)
     }
 
     private func historyMetric(_ title: String, _ value: String) -> some View {

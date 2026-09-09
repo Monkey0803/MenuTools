@@ -182,6 +182,15 @@ func singleHistoryBucketUsesNarrowBar() {
     #expect(NetworkTrafficHistoryChartLayout.barWidth(totalWidth: 560, sampleCount: 0) == 0)
 }
 
+@Test("历史趋势悬停位置可以命中对应柱子并避开间隙")
+func historyChartHoverMapsToBarIndex() {
+    let width = NetworkTrafficHistoryChartLayout.barWidth(totalWidth: 100, sampleCount: 4)
+    #expect(NetworkTrafficHistoryChartLayout.hoveredIndex(x: width / 2, totalWidth: 100, sampleCount: 4) == 0)
+    #expect(NetworkTrafficHistoryChartLayout.hoveredIndex(x: width + 1.5, totalWidth: 100, sampleCount: 4) == nil)
+    #expect(NetworkTrafficHistoryChartLayout.hoveredIndex(x: width + 3, totalWidth: 100, sampleCount: 4) == 1)
+    #expect(NetworkTrafficHistoryChartLayout.hoveredIndex(x: 101, totalWidth: 100, sampleCount: 4) == nil)
+}
+
 @Test("App 迷你趋势的所有采样柱都位于画布边界内")
 func networkTrafficMiniTrendFitsCanvas() {
     let size = CGSize(width: 50, height: 22)
