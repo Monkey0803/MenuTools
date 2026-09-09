@@ -44,6 +44,23 @@ enum NetworkTrafficHistoryChartLayout {
     }
 }
 
+enum NetworkTrafficMiniTrendLayout {
+    // 柱子按画布分配宽度，避免固定柱宽在采样增多时溢出并覆盖相邻文字。
+    static func barFrames(bytes: [Int64], size: CGSize) -> [CGRect] {
+        guard !bytes.isEmpty, size.width > 0, size.height > 0 else { return [] }
+        let maximum = max(bytes.max() ?? 0, 1)
+        let slotWidth = size.width / CGFloat(bytes.count)
+        return bytes.enumerated().map { index, value in
+            let x = CGFloat(index) * slotWidth
+            let height = min(size.height, max(1, CGFloat(max(value, 0)) / CGFloat(maximum) * size.height))
+            return CGRect(
+                x: x, y: size.height - height,
+                width: min(slotWidth * 0.7, size.width - x), height: height
+            )
+        }
+    }
+}
+
 struct NetworkTrafficSettingsView: View {
     @State private var service = NetworkTrafficService.shared
     @State private var networkStatusService = NetworkStatusService.shared
@@ -702,6 +719,7 @@ struct NetworkTrafficSettingsView: View {
                         Text(app.appName)
                             .font(.body.weight(.medium))
                             .lineLimit(1)
+                            .frame(maxWidth: .infinity, alignment: .leading)
                         if app.isHistoricalOnly {
                             Text(L("traffic.historical"))
                                 .font(.caption2)
@@ -712,8 +730,9 @@ struct NetworkTrafficSettingsView: View {
                         .font(.caption2)
                         .foregroundStyle(.secondary)
                 }
+                .frame(minWidth: 0, maxWidth: .infinity, alignment: .leading)
+                .layoutPriority(1)
                 miniTrend(app)
-                Spacer(minLength: 8)
                 VStack(alignment: .trailing, spacing: 3) {
                     Text("↓ \(formattedRate(app.downloadBytesPerSecond))  ↑ \(formattedRate(app.uploadBytesPerSecond))")
                         .font(.caption.weight(.semibold))
@@ -723,6 +742,7 @@ struct NetworkTrafficSettingsView: View {
                         .foregroundStyle(.secondary)
                         .monospacedDigit()
                 }
+                .fixedSize(horizontal: true, vertical: false)
             }
         }
         .padding(.horizontal, 12)
@@ -738,19 +758,19 @@ struct NetworkTrafficSettingsView: View {
             now: Date(),
             appIDs: [app.id]
         )
-        let maximum = max(points.map(\.bytes).max() ?? 0, 1)
+        let bytes = points.map(\.bytes)
 
-        return HStack(alignment: .bottom, spacing: 1) {
-            ForEach(Array(points.enumerated()), id: \.offset) { _, point in
-                RoundedRectangle(cornerRadius: 1)
-                    .fill(Color.teal.opacity(point.bytes == 0 ? 0.16 : 0.7))
-                    .frame(
-                        width: 1.5,
-                        height: max(CGFloat(point.bytes) / CGFloat(maximum) * 20, 1)
-                    )
+        return Canvas { context, size in
+            let bars = NetworkTrafficMiniTrendLayout.barFrames(bytes: bytes, size: size)
+            for (index, bar) in bars.enumerated() {
+                context.fill(
+                    Path(bar),
+                    with: .color(.teal.opacity(bytes[index] == 0 ? 0.16 : 0.7))
+                )
             }
         }
         .frame(width: 50, height: 22, alignment: .bottom)
+        .clipped()
         .accessibilityHidden(true)
     }
 

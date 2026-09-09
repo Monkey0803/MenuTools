@@ -181,6 +181,26 @@ func singleHistoryBucketUsesNarrowBar() {
     #expect(NetworkTrafficHistoryChartLayout.barWidth(totalWidth: 560, sampleCount: 0) == 0)
 }
 
+@Test("App 迷你趋势的所有采样柱都位于画布边界内")
+func networkTrafficMiniTrendFitsCanvas() {
+    let size = CGSize(width: 50, height: 22)
+    for count in [1, 60, 120] {
+        let bars = NetworkTrafficMiniTrendLayout.barFrames(
+            bytes: (0..<count).map { Int64($0) }, size: size
+        )
+        #expect(bars.count == count)
+        for bar in bars {
+            #expect(bar.minX >= 0 && bar.maxX <= size.width)
+            #expect(bar.minY >= 0 && bar.maxY <= size.height)
+        }
+        for (left, right) in zip(bars, bars.dropFirst()) {
+            #expect(left.maxX <= right.minX)
+        }
+    }
+    #expect(NetworkTrafficMiniTrendLayout.barFrames(bytes: [], size: size).isEmpty)
+    #expect(NetworkTrafficMiniTrendLayout.barFrames(bytes: [1], size: .zero).isEmpty)
+}
+
 @Test("历史趋势按真实时间补齐无流量空档")
 func historySeriesFillsTimeGaps() {
     let identity = NetworkAppIdentity.fallback(processName: "Safari")
