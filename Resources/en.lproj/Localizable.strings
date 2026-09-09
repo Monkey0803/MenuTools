@@ -308,6 +308,8 @@
 "clipboard.tab.settings" = "Settings";
 "clipboard.empty" = "No clipboard history";
 "clipboard.emptyDescription" = "Copied text, images, links, and files will appear here.";
+"clipboard.noResults" = "No matching history";
+"clipboard.noResultsDescription" = "Try a different search or filter.";
 "clipboard.image" = "Image";
 "clipboard.copied" = "Copied to clipboard";
 "clipboard.clearHistory" = "Clear History";
@@ -328,6 +330,7 @@
 "clipboard.limit" = "History limit";
 "clipboard.limitValue" = "%d items";
 "clipboard.files" = "Files";
+"clipboard.filesMissing" = "%d file(s) no longer exist";
 "clipboard.filesCount" = "%d files: %@";
 "clipboard.privacy" = "Privacy";
 "clipboard.pauseRecording" = "Pause Recording";
@@ -344,7 +347,9 @@
 "clipboard.snippetGroup.delete" = "Delete Group";
 "clipboard.snippetGroup.placeholder" = "Group name";
 "clipboard.snippetTitle" = "Snippet title (optional)";
-"clipboard.snippetDescription" = "Click a snippet to copy it and add it to clipboard history.";
+"clipboard.snippetTags" = "Tags (comma-separated, optional)";
+"clipboard.snippetDescription" = "Click a snippet to copy it and add it to clipboard history. Supports {{date}}, {{time}}, {{newline}}, and {{clipboard}}.";
+"clipboard.snippet.preview" = "Template preview";
 "clipboard.snippet.add" = "Add Snippet";
 
 /* Footer */
@@ -501,6 +506,8 @@
 "clipboard.notePlaceholder" = "Note (optional)";
 "clipboard.snippetSearch" = "Search snippets";
 "clipboard.snippet.edit" = "Edit Snippet";
+"clipboard.snippet.favorite" = "Favorite snippet";
+"clipboard.snippet.unfavorite" = "Unfavorite snippet";
 "clipboard.snippet.moveToGroup" = "Move to Group";
 "clipboard.snippet.moveUp" = "Move Up";
 "clipboard.snippet.moveDown" = "Move Down";
@@ -509,6 +516,11 @@
 "common.save" = "Save";
 "clipboard.autoPasteDescription" = "Allow MenuTools under Privacy & Security > Accessibility to send the paste shortcut.";
 "clipboard.sensitiveRules" = "Sensitive content rules";
+"clipboard.sensitiveApps" = "Sensitive apps";
+"clipboard.sensitiveApps.add" = "Add app";
+"clipboard.sensitiveApps.remove" = "Remove sensitive app";
+"clipboard.sensitiveApps.empty" = "No additional apps specified";
+"clipboard.sensitiveApps.description" = "Content copied from these apps will never enter clipboard history.";
 "clipboard.sensitiveRules.description" = "Content matching enabled rules is not saved to history.";
 "clipboard.sensitiveContent" = "Sensitive content (hidden)";
 "clipboard.sensitive.passwordManagers" = "Do not record from password managers";
@@ -705,6 +717,7 @@
 "shortcut.active" = "Listening";
 "shortcut.inactive" = "Not listening";
 "shortcut.permission" = "Accessibility permission required";
+"shortcut.permission.granted" = "Accessibility permission granted";
 "shortcut.openPermission" = "Open Accessibility settings";
 "shortcut.recording" = "Press a shortcut…";
 "shortcut.record" = "Record shortcut";
@@ -927,6 +940,10 @@
 "clipboard.archive.export" = "Export Encrypted Archive";
 "clipboard.archive.import" = "Import Encrypted Archive";
 "clipboard.archive.description" = "Includes non-sensitive history and snippets. The passphrase is never saved and cannot be recovered.";
+"clipboard.archive.confirm.title" = "Confirm clipboard data operation";
+"clipboard.archive.confirm.action" = "Continue";
+"clipboard.archive.confirm.importMessage" = "Import merges history but replaces the current snippet groups. Continue?";
+"clipboard.archive.confirm.syncMessage" = "Shared sync merges pinned history and snippets only; ordinary history is not synchronized. Continue?";
 "clipboard.archive.exportSuccess" = "Encrypted clipboard archive exported.";
 "clipboard.archive.importSuccess" = "Clipboard history merged and snippets restored.";
 "clipboard.archive.error.emptyPassphrase" = "Enter an archive passphrase.";

@@ -2,7 +2,8 @@ import CryptoKit
 import Foundation
 
 struct ClipboardArchiveDocument: Codable, Equatable, Sendable {
-    static let currentFormatVersion = 1
+    static let currentFormatVersion = 2
+    private static let legacyFormatVersions: Set<Int> = [1]
 
     var formatVersion: Int
     var createdAt: Date
@@ -26,10 +27,11 @@ struct ClipboardArchiveDocument: Codable, Equatable, Sendable {
     }
 
     func validated() throws -> ClipboardArchiveDocument {
-        guard formatVersion == Self.currentFormatVersion else {
+        guard formatVersion == Self.currentFormatVersion || Self.legacyFormatVersions.contains(formatVersion) else {
             throw ClipboardArchiveError.unsupportedVersion
         }
         var document = self
+        document.formatVersion = Self.currentFormatVersion
         document.historyItems.removeAll(where: \.isSensitive)
         return document
     }

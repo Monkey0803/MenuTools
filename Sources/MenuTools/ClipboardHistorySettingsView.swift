@@ -338,9 +338,9 @@ struct ClipboardHistorySettingsView: View {
 
         if filteredItems.isEmpty {
             ContentUnavailableView(
-                L("clipboard.empty"),
-                systemImage: "doc.on.clipboard",
-                description: Text(L("clipboard.emptyDescription"))
+                historyService.items.isEmpty ? L("clipboard.empty") : L("clipboard.noResults"),
+                systemImage: historyService.items.isEmpty ? "doc.on.clipboard" : "magnifyingglass",
+                description: Text(historyService.items.isEmpty ? L("clipboard.emptyDescription") : L("clipboard.noResultsDescription"))
             )
             .frame(maxWidth: .infinity, minHeight: 210)
         } else {
@@ -742,9 +742,14 @@ private struct ClipboardHistorySettingsCard: View {
         case let .url(value): return value
         case let .files(files):
             guard let first = files.first else { return L("clipboard.files") }
-            return files.count == 1
+            let missingCount = files.filter { !$0.isAvailable }.count
+            let title = files.count == 1
                 ? first.displayName
                 : L("clipboard.filesCount", files.count, first.displayName)
+            let missingLabel = L("clipboard.filesMissing", missingCount)
+            return missingCount == 0
+                ? title
+                : "\(title) · \(missingLabel)"
         }
     }
 }

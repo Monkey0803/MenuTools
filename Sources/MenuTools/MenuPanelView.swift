@@ -1832,6 +1832,15 @@ private struct ToggleTooltipKey: PreferenceKey {
 }
 
 /// 剪贴板历史弹出面板。
+enum ClipboardHistoryPopoverLayout {
+    static let minWidth: CGFloat = 300
+    static let idealWidth: CGFloat = 360
+    static let maxWidth: CGFloat = 420
+    static let minHeight: CGFloat = 360
+    static let idealHeight: CGFloat = 420
+    static let maxHeight: CGFloat = 520
+}
+
 struct ClipboardHistoryPopover: View {
     private enum FocusTarget: Hashable {
         case search
@@ -1965,9 +1974,9 @@ struct ClipboardHistoryPopover: View {
 
             if filteredItems.isEmpty {
                 ContentUnavailableView(
-                    L("clipboard.empty"),
-                    systemImage: "doc.on.clipboard",
-                    description: Text(L("clipboard.emptyDescription"))
+                    items.isEmpty ? L("clipboard.empty") : L("clipboard.noResults"),
+                    systemImage: items.isEmpty ? "doc.on.clipboard" : "magnifyingglass",
+                    description: Text(items.isEmpty ? L("clipboard.emptyDescription") : L("clipboard.noResultsDescription"))
                 )
                 .frame(maxHeight: .infinity)
             } else {
@@ -2003,7 +2012,14 @@ struct ClipboardHistoryPopover: View {
             }
         }
         .padding(14)
-        .frame(width: 300, height: 360)
+        .frame(
+            minWidth: ClipboardHistoryPopoverLayout.minWidth,
+            idealWidth: ClipboardHistoryPopoverLayout.idealWidth,
+            maxWidth: ClipboardHistoryPopoverLayout.maxWidth,
+            minHeight: ClipboardHistoryPopoverLayout.minHeight,
+            idealHeight: ClipboardHistoryPopoverLayout.idealHeight,
+            maxHeight: ClipboardHistoryPopoverLayout.maxHeight
+        )
         .focusable()
         .focused($focusTarget, equals: .keyboard)
         .focusEffectDisabled()
@@ -2244,6 +2260,13 @@ struct ClipboardHistoryRow: View {
                         Text(L("clipboard.filesCount", files.count, files.first?.displayName ?? ""))
                             .font(.caption2)
                             .foregroundStyle(.secondary)
+                            .lineLimit(1)
+                    }
+                    let missingCount = files.filter { !$0.isAvailable }.count
+                    if missingCount > 0 {
+                        Text(L("clipboard.filesMissing", missingCount))
+                            .font(.caption2)
+                            .foregroundStyle(.orange)
                             .lineLimit(1)
                     }
                 }

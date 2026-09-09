@@ -15,6 +15,14 @@ func clipboardSnippetTemplateExpandsVariables() {
     )
 }
 
+@Test("常用片段模板支持显式换行变量")
+func clipboardSnippetTemplateExpandsNewline() {
+    #expect(
+        ClipboardSnippetTemplate.render("第一行{{newline}}第二行", clipboardText: nil)
+            .contains("第一行\n第二行")
+    )
+}
+
 @Test("常用片段支持编辑、移动分组和手动排序")
 func clipboardSnippetsCanBeEditedMovedAndReordered() throws {
     var store = ClipboardSnippetStore()
@@ -58,6 +66,23 @@ func clipboardSnippetsCanBeSearched() throws {
     _ = store.addSnippet(title: "开发地址", content: "localhost", groupID: ClipboardSnippetStore.defaultGroupID)
 
     #expect(ClipboardSnippetSearch.results(in: store.allSnippets, query: "反馈") == [first])
+}
+
+@Test("常用片段支持标签和收藏状态")
+func clipboardSnippetsSupportTagsAndFavorites() throws {
+    var store = ClipboardSnippetStore()
+    let added = store.addSnippet(
+        title: "回复",
+        content: "内容",
+        groupID: ClipboardSnippetStore.defaultGroupID,
+        tags: [" 客服 ", "客服"]
+    )
+    let snippet = try #require(added)
+    #expect(snippet.tags == ["客服"])
+    #expect(ClipboardSnippetSearch.results(in: store.allSnippets, query: "客服") == [snippet])
+
+    store.toggleFavorite(id: snippet.id)
+    #expect(store.snippets(in: ClipboardSnippetStore.defaultGroupID).first?.isFavorite == true)
 }
 
 @Test("常用片段可按分组管理，删除分组后保留到默认分组")
@@ -120,4 +145,24 @@ func clipboardSnippetsPersistAcrossReload() throws {
     let reloadedStore = ClipboardSnippetPersistence.load(from: url)
     #expect(reloadedStore.groups.contains(group))
     #expect(reloadedStore.snippets(in: group.id) == [snippet])
+}
+
+@Test("常用片段持久化失败时会暴露错误状态")
+@MainActor
+func clipboardSnippetServiceExposesPersistenceErrors() {
+    let expectedError = NSError(domain: "ClipboardSnippetTests", code: 42, userInfo: [
+        NSLocalizedDescriptionKey: "无法写入片段"
+    ])
+    let service = ClipboardSnippetService(
+        persistenceURL: URL(fileURLWithPath: "/tmp/clipboard-snippets-test.json"),
+        persistenceSaver: { _, _ in throw expectedError }
+    )
+
+    _ = service.addSnippet(
+        title: "测试",
+        content: "内容",
+        groupID: ClipboardSnippetStore.defaultGroupID
+    )
+
+    #expect(service.persistenceErrorMessage == "无法写入片段")
 }

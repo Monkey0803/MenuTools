@@ -308,6 +308,8 @@
 "clipboard.tab.settings" = "설정";
 "clipboard.empty" = "클립보드 기록 없음";
 "clipboard.emptyDescription" = "복사한 텍스트, 이미지, 링크 및 파일이 여기에 표시됩니다.";
+"clipboard.noResults" = "일치하는 기록 없음";
+"clipboard.noResultsDescription" = "검색어나 필터를 변경해 보세요.";
 "clipboard.image" = "이미지";
 "clipboard.copied" = "클립보드에 복사했습니다";
 "clipboard.clearHistory" = "기록 지우기";
@@ -328,6 +330,7 @@
 "clipboard.limit" = "저장 개수";
 "clipboard.limitValue" = "%d개";
 "clipboard.files" = "파일";
+"clipboard.filesMissing" = "%d개 파일이 없습니다";
 "clipboard.filesCount" = "%d개 파일: %@";
 "clipboard.privacy" = "개인정보 보호";
 "clipboard.pauseRecording" = "기록 일시 정지";
@@ -344,7 +347,9 @@
 "clipboard.snippetGroup.delete" = "그룹 삭제";
 "clipboard.snippetGroup.placeholder" = "그룹 이름";
 "clipboard.snippetTitle" = "문구 제목(선택 사항)";
-"clipboard.snippetDescription" = "문구를 클릭하면 복사되고 클립보드 기록에 추가됩니다.";
+"clipboard.snippetTags" = "태그(쉼표로 구분, 선택 사항)";
+"clipboard.snippetDescription" = "문구를 클릭하면 복사되고 클립보드 기록에 추가됩니다. {{date}}, {{time}}, {{newline}}, {{clipboard}} 변수를 지원합니다.";
+"clipboard.snippet.preview" = "템플릿 미리보기";
 "clipboard.snippet.add" = "문구 추가";
 
 /* 하단 */
@@ -501,6 +506,8 @@
 "clipboard.notePlaceholder" = "메모(선택 사항)";
 "clipboard.snippetSearch" = "스니펫 검색";
 "clipboard.snippet.edit" = "스니펫 편집";
+"clipboard.snippet.favorite" = "스니펫 즐겨찾기";
+"clipboard.snippet.unfavorite" = "스니펫 즐겨찾기 해제";
 "clipboard.snippet.moveToGroup" = "그룹으로 이동";
 "clipboard.snippet.moveUp" = "위로 이동";
 "clipboard.snippet.moveDown" = "아래로 이동";
@@ -509,6 +516,11 @@
 "common.save" = "저장";
 "clipboard.autoPasteDescription" = "붙여넣기 단축키를 보내려면 개인정보 보호 및 보안 > 손쉬운 사용에서 MenuTools를 허용하세요.";
 "clipboard.sensitiveRules" = "민감한 콘텐츠 규칙";
+"clipboard.sensitiveApps" = "민감한 앱";
+"clipboard.sensitiveApps.add" = "앱 추가";
+"clipboard.sensitiveApps.remove" = "민감한 앱 제거";
+"clipboard.sensitiveApps.empty" = "추가로 지정된 앱 없음";
+"clipboard.sensitiveApps.description" = "이 앱에서 복사한 콘텐츠는 클립보드 기록에 저장되지 않습니다.";
 "clipboard.sensitiveRules.description" = "활성화된 규칙과 일치하는 콘텐츠는 기록에 저장되지 않습니다.";
 "clipboard.sensitiveContent" = "민감한 콘텐츠(숨김)";
 "clipboard.sensitive.passwordManagers" = "비밀번호 관리자에서 기록 안 함";
@@ -705,6 +717,7 @@
 "shortcut.active" = "수신 중";
 "shortcut.inactive" = "수신 안 함";
 "shortcut.permission" = "손쉬운 사용 권한 필요";
+"shortcut.permission.granted" = "손쉬운 사용 권한이 허용되었습니다";
 "shortcut.openPermission" = "손쉬운 사용 설정 열기";
 "shortcut.recording" = "단축키를 누르세요…";
 "shortcut.record" = "단축키 기록";
@@ -927,6 +940,10 @@
 "clipboard.archive.export" = "암호화 아카이브 내보내기";
 "clipboard.archive.import" = "암호화 아카이브 가져오기";
 "clipboard.archive.description" = "민감하지 않은 기록과 스니펫을 포함합니다. 암호는 저장되지 않으며 복구할 수 없습니다.";
+"clipboard.archive.confirm.title" = "클립보드 데이터 작업 확인";
+"clipboard.archive.confirm.action" = "계속";
+"clipboard.archive.confirm.importMessage" = "가져오기는 기록을 병합하지만 현재 스니펫 그룹을 대체합니다. 계속할까요?";
+"clipboard.archive.confirm.syncMessage" = "공유 동기화는 고정 기록과 스니펫만 병합하며 일반 기록은 동기화하지 않습니다. 계속할까요?";
 "clipboard.archive.exportSuccess" = "암호화된 클립보드 아카이브를 내보냈습니다.";
 "clipboard.archive.importSuccess" = "클립보드 기록을 병합하고 스니펫을 복원했습니다.";
 "clipboard.archive.error.emptyPassphrase" = "아카이브 암호를 입력하세요.";

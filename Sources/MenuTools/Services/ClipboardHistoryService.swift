@@ -10,12 +10,21 @@ struct ClipboardHistoryFile: Codable, Equatable, Sendable, Identifiable {
     var id: String { path }
     var url: URL { URL(fileURLWithPath: path) }
     var displayName: String { url.lastPathComponent }
+    var isAvailable: Bool { FileManager.default.fileExists(atPath: path) }
 }
 
 struct ClipboardRichText: Codable, Equatable, Sendable {
     let plainText: String
     let html: Data?
     let rtf: Data?
+}
+
+enum ClipboardHistoryContentType: String, CaseIterable, Codable, Sendable {
+    case text
+    case image
+    case url
+    case files
+    case richText
 }
 
 /// 剪贴板历史中的内容；图片使用 TIFF 数据保存，避免把 NSImage 带入并发边界。
@@ -81,6 +90,16 @@ enum ClipboardHistoryContent: Codable, Equatable, Sendable {
             richText.plainText
         case .image:
             nil
+        }
+    }
+
+    var contentType: ClipboardHistoryContentType {
+        switch self {
+        case .text: .text
+        case .image: .image
+        case .url: .url
+        case .files: .files
+        case .richText: .richText
         }
     }
 
@@ -503,9 +522,46 @@ struct ClipboardSensitiveRules: Codable, Equatable, Sendable {
     var verificationCodesEnabled = true
     var bankCardsEnabled = true
     var keywords = ["password", "passwd", "secret", "token", "密码"]
+    var applicationBundleIDs: [String] = []
+
+    private enum CodingKeys: String, CodingKey {
+        case passwordManagersEnabled
+        case verificationCodesEnabled
+        case bankCardsEnabled
+        case keywords
+        case applicationBundleIDs
+    }
+
+    init() {}
+
+    init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        passwordManagersEnabled = try container.decodeIfPresent(Bool.self, forKey: .passwordManagersEnabled) ?? true
+        verificationCodesEnabled = try container.decodeIfPresent(Bool.self, forKey: .verificationCodesEnabled) ?? true
+        bankCardsEnabled = try container.decodeIfPresent(Bool.self, forKey: .bankCardsEnabled) ?? true
+        keywords = try container.decodeIfPresent([String].self, forKey: .keywords) ?? ["password", "passwd", "secret", "token", "密码"]
+        applicationBundleIDs = Array(Set(
+            (try container.decodeIfPresent([String].self, forKey: .applicationBundleIDs) ?? [])
+                .map { $0.trimmingCharacters(in: .whitespacesAndNewlines) }
+                .filter { !$0.isEmpty }
+        )).sorted()
+    }
+
+    func encode(to encoder: Encoder) throws {
+        var container = encoder.container(keyedBy: CodingKeys.self)
+        try container.encode(passwordManagersEnabled, forKey: .passwordManagersEnabled)
+        try container.encode(verificationCodesEnabled, forKey: .verificationCodesEnabled)
+        try container.encode(bankCardsEnabled, forKey: .bankCardsEnabled)
+        try container.encode(keywords, forKey: .keywords)
+        try container.encode(applicationBundleIDs, forKey: .applicationBundleIDs)
+    }
 
     func shouldExclude(_ content: ClipboardHistoryContent, sourceBundleID: String?) -> Bool {
         if passwordManagersEnabled, Self.isPasswordManager(sourceBundleID) { return true }
+        if let sourceBundleID,
+           applicationBundleIDs.contains(sourceBundleID) {
+            return true
+        }
         let text: String
         switch content {
         case let .text(value):
@@ -619,6 +675,19 @@ enum ClipboardAutoPasteResult: Sendable, Equatable {
     case accessibilityPermissionDenied
     case noEditableTarget
     case failed
+}
+
+enum ClipboardAccessibilityPermission {
+    static let settingsURL = URL(string: "x-apple.systempreferences:com.apple.preference.security?Privacy_Accessibility")!
+
+    static var isTrusted: Bool {
+        AXIsProcessTrusted()
+    }
+
+    @discardableResult
+    static func openSettings() -> Bool {
+        NSWorkspace.shared.open(settingsURL)
+    }
 }
 
 enum ClipboardHistoryAction: String, Sendable, Equatable {
@@ -848,12 +917,14 @@ struct ClipboardHistoryBuffer {
     private let sensitiveLifetime: TimeInterval
     private var retentionDuration: TimeInterval?
     private var storageLimitBytes: Int
+    private var retentionByContentType: [ClipboardHistoryContentType: TimeInterval]
 
     init(
         limit: Int = 50,
         sensitiveLifetime: TimeInterval = 60,
         retentionDuration: TimeInterval? = nil,
         storageLimitBytes: Int = .max,
+        retentionByContentType: [ClipboardHistoryContentType: TimeInterval] = [:],
         items: [ClipboardHistoryItem] = []
     ) {
         self.items = items
@@ -861,6 +932,7 @@ struct ClipboardHistoryBuffer {
         self.sensitiveLifetime = max(0, sensitiveLifetime)
         self.retentionDuration = retentionDuration.map { max(0, $0) }
         self.storageLimitBytes = max(0, storageLimitBytes)
+        self.retentionByContentType = retentionByContentType.mapValues { max(0, $0) }
         applyAutomaticCleanup(now: Date())
     }
 
@@ -973,6 +1045,15 @@ struct ClipboardHistoryBuffer {
         applyAutomaticCleanup(now: now)
     }
 
+    mutating func setRetentionDuration(_ duration: TimeInterval?, for type: ClipboardHistoryContentType, now: Date = Date()) {
+        if let duration {
+            retentionByContentType[type] = max(0, duration)
+        } else {
+            retentionByContentType.removeValue(forKey: type)
+        }
+        applyAutomaticCleanup(now: now)
+    }
+
     mutating func restore(_ restoredItems: [ClipboardHistoryItem], now: Date = Date()) {
         items.append(contentsOf: restoredItems.filter { restored in !items.contains(where: { $0.id == restored.id }) })
         items.sort { $0.capturedAt > $1.capturedAt }
@@ -984,6 +1065,10 @@ struct ClipboardHistoryBuffer {
         if let retentionDuration {
             let cutoff = now.addingTimeInterval(-retentionDuration)
             items.removeAll { !$0.isPinned && $0.capturedAt < cutoff }
+        }
+        items.removeAll { item in
+            guard !item.isPinned, let duration = retentionByContentType[item.content.contentType] else { return false }
+            return item.capturedAt < now.addingTimeInterval(-duration)
         }
         trimToLimit()
         trimToStorageLimit()
@@ -1391,6 +1476,7 @@ final class ClipboardHistoryService {
     private(set) var sensitiveRules: ClipboardSensitiveRules
     private(set) var retentionDays: Int
     private(set) var storageLimitBytes: Int
+    private(set) var retentionByContentType: [ClipboardHistoryContentType: TimeInterval]
     private(set) var autoPasteAfterCopy: Bool
     private(set) var primaryAction: ClipboardPrimaryAction
     private(set) var sequentialPasteMode: ClipboardSequentialPasteMode
@@ -1421,6 +1507,7 @@ final class ClipboardHistoryService {
         }
     ) {
         let configuredLimit = limit ?? ClipboardHistoryLimit.storedValue
+        let configuredRetentionByContentType = Self.loadRetentionByContentType(from: userDefaults)
         self.persistenceURL = persistenceURL
         self.persistenceLoader = persistenceLoader
         self.pasteboard = pasteboard
@@ -1439,6 +1526,7 @@ final class ClipboardHistoryService {
         self.sensitiveRules = Self.loadSensitiveRules(from: userDefaults)
         self.retentionDays = max(0, userDefaults.object(forKey: StorageKey.retentionDays) as? Int ?? 0)
         self.storageLimitBytes = max(0, userDefaults.object(forKey: StorageKey.storageLimitBytes) as? Int ?? .max)
+        self.retentionByContentType = configuredRetentionByContentType
         let legacyAutoPaste = userDefaults.bool(forKey: StorageKey.autoPasteAfterCopy)
         let configuredPrimaryAction = userDefaults.string(forKey: StorageKey.primaryAction)
             .flatMap(ClipboardPrimaryAction.init(rawValue:)) ?? (legacyAutoPaste ? .paste : .copy)
@@ -1452,7 +1540,8 @@ final class ClipboardHistoryService {
             limit: configuredLimit,
             sensitiveLifetime: sensitiveLifetime,
             retentionDuration: Self.retentionDuration(for: max(0, userDefaults.object(forKey: StorageKey.retentionDays) as? Int ?? 0)),
-            storageLimitBytes: max(0, userDefaults.object(forKey: StorageKey.storageLimitBytes) as? Int ?? .max)
+            storageLimitBytes: max(0, userDefaults.object(forKey: StorageKey.storageLimitBytes) as? Int ?? .max),
+            retentionByContentType: configuredRetentionByContentType
         )
     }
 
@@ -1484,6 +1573,7 @@ final class ClipboardHistoryService {
                 sensitiveLifetime: sensitiveLifetime,
                 retentionDuration: Self.retentionDuration(for: retentionDays),
                 storageLimitBytes: storageLimitBytes,
+                retentionByContentType: retentionByContentType,
                 items: restored
             )
             restoredBuffer.applyAutomaticCleanup(now: Date())
@@ -1676,6 +1766,21 @@ final class ClipboardHistoryService {
         applyAutomaticCleanup()
     }
 
+    func setRetentionDays(_ days: Int, for type: ClipboardHistoryContentType) {
+        let normalized = max(0, days)
+        let duration = normalized == 0 ? nil : TimeInterval(normalized * 86_400)
+        if normalized == 0 {
+            retentionByContentType.removeValue(forKey: type)
+        } else {
+            retentionByContentType[type] = duration
+        }
+        let persisted = Dictionary(uniqueKeysWithValues: retentionByContentType.map { ($0.key.rawValue, Int($0.value / 86_400)) })
+        userDefaults.set(persisted, forKey: StorageKey.retentionByContentType)
+        buffer.setRetentionDuration(duration, for: type)
+        synchronizeItems()
+        applyAutomaticCleanup()
+    }
+
     func setAutoPasteAfterCopy(_ enabled: Bool) {
         setPrimaryAction(enabled ? .paste : .copy)
     }
@@ -1737,6 +1842,20 @@ final class ClipboardHistoryService {
         if let data = try? JSONEncoder().encode(rules) {
             userDefaults.set(data, forKey: StorageKey.sensitiveRules)
         }
+    }
+
+    func addSensitiveBundleID(_ bundleID: String) {
+        let normalized = bundleID.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !normalized.isEmpty else { return }
+        var rules = sensitiveRules
+        rules.applicationBundleIDs = Array(Set(rules.applicationBundleIDs + [normalized])).sorted()
+        setSensitiveRules(rules)
+    }
+
+    func removeSensitiveBundleID(_ bundleID: String) {
+        var rules = sensitiveRules
+        rules.applicationBundleIDs.removeAll { $0 == bundleID }
+        setSensitiveRules(rules)
     }
 
     func setRecordingPaused(_ paused: Bool) {
@@ -1963,12 +2082,21 @@ final class ClipboardHistoryService {
         return rules
     }
 
+    private static func loadRetentionByContentType(from defaults: UserDefaults) -> [ClipboardHistoryContentType: TimeInterval] {
+        guard let values = defaults.dictionary(forKey: StorageKey.retentionByContentType) as? [String: Int] else { return [:] }
+        return Dictionary(uniqueKeysWithValues: values.compactMap { key, days in
+            guard let type = ClipboardHistoryContentType(rawValue: key), days > 0 else { return nil }
+            return (type, TimeInterval(days * 86_400))
+        })
+    }
+
     private enum StorageKey {
         static let isRecordingPaused = "clipboard.isRecordingPaused"
         static let excludedBundleIDs = "clipboard.excludedBundleIDs"
         static let sensitiveRules = "clipboard.sensitiveRules"
         static let retentionDays = "clipboard.retentionDays"
         static let storageLimitBytes = "clipboard.storageLimitBytes"
+        static let retentionByContentType = "clipboard.retentionByContentType"
         static let autoPasteAfterCopy = "clipboard.autoPasteAfterCopy"
         static let primaryAction = "clipboard.primaryAction"
         static let sequentialPasteMode = "clipboard.sequentialPasteMode"

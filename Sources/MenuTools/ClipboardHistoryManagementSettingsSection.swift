@@ -3,6 +3,7 @@ import SwiftUI
 /// 剪贴板历史的自动清理和复制后粘贴设置。
 struct ClipboardHistoryManagementSettingsSection: View {
     @Bindable var historyService: ClipboardHistoryService
+    @State private var isAccessibilityTrusted = ClipboardAccessibilityPermission.isTrusted
 
     private let retentionOptions = [0, 1, 7, 30, 90]
     private let storageOptions = [0, 10, 50, 100, 500]
@@ -68,8 +69,29 @@ struct ClipboardHistoryManagementSettingsSection: View {
             Text(L("clipboard.autoPasteDescription"))
                 .font(.caption)
                 .foregroundStyle(.secondary)
+
+            if historyService.primaryAction == .paste {
+                HStack(spacing: 8) {
+                    Image(systemName: isAccessibilityTrusted ? "checkmark.circle.fill" : "exclamationmark.triangle.fill")
+                        .foregroundStyle(isAccessibilityTrusted ? AnyShapeStyle(.green) : AnyShapeStyle(.orange))
+                    Text(isAccessibilityTrusted ? L("shortcut.permission.granted") : L("shortcut.permission"))
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                    Spacer()
+                    if !isAccessibilityTrusted {
+                        Button(L("shortcut.openPermission")) {
+                            _ = ClipboardAccessibilityPermission.openSettings()
+                            isAccessibilityTrusted = ClipboardAccessibilityPermission.isTrusted
+                        }
+                        .controlSize(.small)
+                    }
+                }
+            }
         }
         .padding(14)
         .background(.quaternary.opacity(0.28), in: .rect(cornerRadius: 14))
+        .onAppear {
+            isAccessibilityTrusted = ClipboardAccessibilityPermission.isTrusted
+        }
     }
 }

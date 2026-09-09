@@ -13,6 +13,7 @@ enum ClipboardSnippetTemplate {
         return template
             .replacingOccurrences(of: "{{date}}", with: date)
             .replacingOccurrences(of: "{{time}}", with: time)
+            .replacingOccurrences(of: "{{newline}}", with: "\n")
             .replacingOccurrences(of: "{{clipboard}}", with: clipboardText ?? "")
     }
 }
@@ -28,6 +29,52 @@ struct ClipboardSnippet: Codable, Identifiable, Equatable, Sendable {
     var title: String
     var content: String
     var updatedAt: Date
+    var tags: [String] = []
+    var isFavorite = false
+
+    private enum CodingKeys: String, CodingKey {
+        case id, groupID, title, content, updatedAt, tags, isFavorite
+    }
+
+    init(
+        id: UUID,
+        groupID: UUID,
+        title: String,
+        content: String,
+        updatedAt: Date,
+        tags: [String] = [],
+        isFavorite: Bool = false
+    ) {
+        self.id = id
+        self.groupID = groupID
+        self.title = title
+        self.content = content
+        self.updatedAt = updatedAt
+        self.tags = tags
+        self.isFavorite = isFavorite
+    }
+
+    init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        id = try container.decode(UUID.self, forKey: .id)
+        groupID = try container.decode(UUID.self, forKey: .groupID)
+        title = try container.decode(String.self, forKey: .title)
+        content = try container.decode(String.self, forKey: .content)
+        updatedAt = try container.decode(Date.self, forKey: .updatedAt)
+        tags = try container.decodeIfPresent([String].self, forKey: .tags) ?? []
+        isFavorite = try container.decodeIfPresent(Bool.self, forKey: .isFavorite) ?? false
+    }
+
+    func encode(to encoder: Encoder) throws {
+        var container = encoder.container(keyedBy: CodingKeys.self)
+        try container.encode(id, forKey: .id)
+        try container.encode(groupID, forKey: .groupID)
+        try container.encode(title, forKey: .title)
+        try container.encode(content, forKey: .content)
+        try container.encode(updatedAt, forKey: .updatedAt)
+        try container.encode(tags, forKey: .tags)
+        try container.encode(isFavorite, forKey: .isFavorite)
+    }
 }
 
 struct ClipboardSnippetStore {
@@ -66,7 +113,9 @@ struct ClipboardSnippetStore {
                     groupID: Self.defaultGroupID,
                     title: snippet.title,
                     content: snippet.content,
-                    updatedAt: snippet.updatedAt
+                    updatedAt: snippet.updatedAt,
+                    tags: snippet.tags,
+                    isFavorite: snippet.isFavorite
                 )
             }
             return snippet
@@ -136,6 +185,7 @@ struct ClipboardSnippetStore {
         title: String,
         content: String,
         groupID: UUID,
+        tags: [String] = [],
         now: Date = Date()
     ) -> ClipboardSnippet? {
         let normalizedContent = content.trimmingCharacters(in: .whitespacesAndNewlines)
@@ -146,7 +196,8 @@ struct ClipboardSnippetStore {
             groupID: groups.contains(where: { $0.id == groupID }) ? groupID : Self.defaultGroupID,
             title: normalizedTitle.isEmpty ? String(normalizedContent.prefix(24)) : normalizedTitle,
             content: normalizedContent,
-            updatedAt: now
+            updatedAt: now,
+            tags: Self.normalizedTags(tags)
         )
         allSnippets.insert(snippet, at: 0)
         return snippet
@@ -158,6 +209,7 @@ struct ClipboardSnippetStore {
         title: String,
         content: String,
         groupID: UUID,
+        tags: [String]? = nil,
         now: Date = Date()
     ) -> Bool {
         let normalizedContent = content.trimmingCharacters(in: .whitespacesAndNewlines)
@@ -172,6 +224,9 @@ struct ClipboardSnippetStore {
         snippet.groupID = resolvedGroupID
         snippet.title = normalizedTitle.isEmpty ? String(normalizedContent.prefix(24)) : normalizedTitle
         snippet.content = normalizedContent
+        if let tags {
+            snippet.tags = Self.normalizedTags(tags)
+        }
         snippet.updatedAt = now
         if didMoveGroups, let destinationIndex = allSnippets.firstIndex(where: { $0.groupID == resolvedGroupID }) {
             allSnippets.insert(snippet, at: destinationIndex)
@@ -199,6 +254,15 @@ struct ClipboardSnippetStore {
         allSnippets.removeAll { $0.id == id }
     }
 
+    mutating func toggleFavorite(id: UUID) {
+        guard let index = allSnippets.firstIndex(where: { $0.id == id }) else { return }
+        allSnippets[index].isFavorite.toggle()
+    }
+
+    private static func normalizedTags(_ tags: [String]) -> [String] {
+        Array(Set(tags.map { $0.trimmingCharacters(in: .whitespacesAndNewlines) }.filter { !$0.isEmpty })).sorted()
+    }
+
     private var defaultGroup: ClipboardSnippetGroup {
         groups.first(where: { $0.id == Self.defaultGroupID })
             ?? ClipboardSnippetGroup(id: Self.defaultGroupID, name: Self.defaultGroupName)
@@ -212,6 +276,7 @@ enum ClipboardSnippetSearch {
         return snippets.filter {
             $0.title.localizedCaseInsensitiveContains(normalized)
                 || $0.content.localizedCaseInsensitiveContains(normalized)
+                || $0.tags.contains { $0.localizedCaseInsensitiveContains(normalized) }
         }
     }
 }
@@ -263,17 +328,24 @@ final class ClipboardSnippetService {
     static let shared = ClipboardSnippetService()
 
     private let persistenceURL: URL?
+    private let persistenceSaver: @Sendable (ClipboardSnippetStore, URL) throws -> Void
     private var store: ClipboardSnippetStore
 
     private(set) var groups: [ClipboardSnippetGroup]
     private(set) var snippets: [ClipboardSnippet]
+    private(set) var persistenceErrorMessage: String?
 
-    init(persistenceURL: URL? = ClipboardSnippetPersistence.defaultURL()) {
+    init(
+        persistenceURL: URL? = ClipboardSnippetPersistence.defaultURL(),
+        persistenceSaver: @escaping @Sendable (ClipboardSnippetStore, URL) throws -> Void = ClipboardSnippetPersistence.save
+    ) {
         let loadedStore = persistenceURL.map(ClipboardSnippetPersistence.load) ?? ClipboardSnippetStore()
         self.persistenceURL = persistenceURL
+        self.persistenceSaver = persistenceSaver
         self.store = loadedStore
         self.groups = loadedStore.groups
         self.snippets = loadedStore.allSnippets
+        self.persistenceErrorMessage = nil
     }
 
     func snippets(in groupID: UUID) -> [ClipboardSnippet] {
@@ -300,8 +372,8 @@ final class ClipboardSnippetService {
     }
 
     @discardableResult
-    func addSnippet(title: String, content: String, groupID: UUID) -> ClipboardSnippet? {
-        let snippet = store.addSnippet(title: title, content: content, groupID: groupID)
+    func addSnippet(title: String, content: String, groupID: UUID, tags: [String] = []) -> ClipboardSnippet? {
+        let snippet = store.addSnippet(title: title, content: content, groupID: groupID, tags: tags)
         if snippet != nil {
             synchronizeAndPersist()
         }
@@ -314,10 +386,22 @@ final class ClipboardSnippetService {
     }
 
     @discardableResult
-    func updateSnippet(id: UUID, title: String, content: String, groupID: UUID) -> Bool {
-        let didUpdate = store.updateSnippet(id: id, title: title, content: content, groupID: groupID)
+    func updateSnippet(
+        id: UUID,
+        title: String,
+        content: String,
+        groupID: UUID,
+        tags: [String]? = nil
+    ) -> Bool {
+        let didUpdate = store.updateSnippet(id: id, title: title, content: content, groupID: groupID, tags: tags)
         if didUpdate { synchronizeAndPersist() }
         return didUpdate
+    }
+
+    func toggleFavorite(id: UUID) {
+        guard store.allSnippets.contains(where: { $0.id == id }) else { return }
+        store.toggleFavorite(id: id)
+        synchronizeAndPersist()
     }
 
     @discardableResult
@@ -336,6 +420,11 @@ final class ClipboardSnippetService {
         groups = store.groups
         snippets = store.allSnippets
         guard let persistenceURL else { return }
-        try? ClipboardSnippetPersistence.save(store, to: persistenceURL)
+        do {
+            try persistenceSaver(store, persistenceURL)
+            persistenceErrorMessage = nil
+        } catch {
+            persistenceErrorMessage = error.localizedDescription
+        }
     }
 }

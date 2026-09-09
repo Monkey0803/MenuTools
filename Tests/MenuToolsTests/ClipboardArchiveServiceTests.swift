@@ -83,6 +83,20 @@ func clipboardArchiveExcludesSensitiveHistory() throws {
     #expect(document.historyItems == [ordinary])
 }
 
+@Test("剪贴板归档会把旧版本迁移到当前格式")
+func clipboardArchiveMigratesLegacyFormat() throws {
+    let legacy = ClipboardArchiveDocument(
+        formatVersion: 1,
+        createdAt: Date(timeIntervalSince1970: 100),
+        historyItems: [],
+        snippetGroups: [],
+        snippets: []
+    )
+
+    let migrated = try legacy.validated()
+    #expect(migrated.formatVersion == ClipboardArchiveDocument.currentFormatVersion)
+}
+
 @Test("导入剪贴板归档会合并历史并替换片段分组")
 @MainActor
 func clipboardArchiveAppliesToServices() throws {

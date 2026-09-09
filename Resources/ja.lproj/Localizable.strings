@@ -308,6 +308,8 @@
 "clipboard.tab.settings" = "設定";
 "clipboard.empty" = "クリップボード履歴なし";
 "clipboard.emptyDescription" = "コピーしたテキスト、画像、リンク、ファイルがここに表示されます。";
+"clipboard.noResults" = "一致する履歴がありません";
+"clipboard.noResultsDescription" = "検索またはフィルタを変更してください。";
 "clipboard.image" = "画像";
 "clipboard.copied" = "クリップボードにコピーしました";
 "clipboard.clearHistory" = "履歴を消去";
@@ -328,6 +330,7 @@
 "clipboard.limit" = "保存件数";
 "clipboard.limitValue" = "%d 件";
 "clipboard.files" = "ファイル";
+"clipboard.filesMissing" = "%d 件のファイルが存在しません";
 "clipboard.filesCount" = "%d 件のファイル: %@";
 "clipboard.privacy" = "プライバシー";
 "clipboard.pauseRecording" = "記録を一時停止";
@@ -344,7 +347,9 @@
 "clipboard.snippetGroup.delete" = "グループを削除";
 "clipboard.snippetGroup.placeholder" = "グループ名";
 "clipboard.snippetTitle" = "定型文のタイトル（任意）";
-"clipboard.snippetDescription" = "定型文をクリックするとコピーされ、履歴にも追加されます。";
+"clipboard.snippetTags" = "タグ（カンマ区切り、任意）";
+"clipboard.snippetDescription" = "定型文をクリックするとコピーされ、履歴にも追加されます。{{date}}、{{time}}、{{newline}}、{{clipboard}} 変数に対応。";
+"clipboard.snippet.preview" = "テンプレートプレビュー";
 "clipboard.snippet.add" = "定型文を追加";
 
 /* フッター */
@@ -501,6 +506,8 @@
 "clipboard.notePlaceholder" = "メモ（任意）";
 "clipboard.snippetSearch" = "スニペットを検索";
 "clipboard.snippet.edit" = "スニペットを編集";
+"clipboard.snippet.favorite" = "スニペットをお気に入りに追加";
+"clipboard.snippet.unfavorite" = "お気に入りから削除";
 "clipboard.snippet.moveToGroup" = "グループへ移動";
 "clipboard.snippet.moveUp" = "上へ移動";
 "clipboard.snippet.moveDown" = "下へ移動";
@@ -509,6 +516,11 @@
 "common.save" = "保存";
 "clipboard.autoPasteDescription" = "ペースト操作には「プライバシーとセキュリティ > アクセシビリティ」で MenuTools を許可してください。";
 "clipboard.sensitiveRules" = "機密内容ルール";
+"clipboard.sensitiveApps" = "機密アプリ";
+"clipboard.sensitiveApps.add" = "アプリを追加";
+"clipboard.sensitiveApps.remove" = "機密アプリを削除";
+"clipboard.sensitiveApps.empty" = "追加のアプリはありません";
+"clipboard.sensitiveApps.description" = "これらのアプリからコピーした内容は履歴に保存されません。";
 "clipboard.sensitiveRules.description" = "有効なルールに一致する内容は履歴に保存されません。";
 "clipboard.sensitiveContent" = "機密コンテンツ（非表示）";
 "clipboard.sensitive.passwordManagers" = "パスワードマネージャーから記録しない";
@@ -705,6 +717,7 @@
 "shortcut.active" = "監視中";
 "shortcut.inactive" = "未監視";
 "shortcut.permission" = "アクセシビリティ権限が必要です";
+"shortcut.permission.granted" = "アクセシビリティ権限が許可されています";
 "shortcut.openPermission" = "アクセシビリティ設定を開く";
 "shortcut.recording" = "ショートカットを押してください…";
 "shortcut.record" = "ショートカットを記録";
@@ -927,6 +940,10 @@
 "clipboard.archive.export" = "暗号化アーカイブを書き出す";
 "clipboard.archive.import" = "暗号化アーカイブを読み込む";
 "clipboard.archive.description" = "機密でない履歴とスニペットを含みます。パスフレーズは保存されず、復元できません。";
+"clipboard.archive.confirm.title" = "クリップボードデータ操作を確認";
+"clipboard.archive.confirm.action" = "続ける";
+"clipboard.archive.confirm.importMessage" = "インポートすると履歴は統合されますが、現在のスニペットグループは置き換えられます。続けますか？";
+"clipboard.archive.confirm.syncMessage" = "共有同期で統合されるのは固定履歴とスニペットのみです。通常の履歴は同期されません。続けますか？";
 "clipboard.archive.exportSuccess" = "暗号化クリップボードアーカイブを書き出しました。";
 "clipboard.archive.importSuccess" = "履歴を統合し、スニペットを復元しました。";
 "clipboard.archive.error.emptyPassphrase" = "アーカイブのパスフレーズを入力してください。";

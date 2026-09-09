@@ -308,6 +308,8 @@
 "clipboard.tab.settings" = "設定";
 "clipboard.empty" = "暫無剪貼板歷史";
 "clipboard.emptyDescription" = "複製的文字、圖片、連結和檔案會顯示在這裡。";
+"clipboard.noResults" = "沒有符合的歷史記錄";
+"clipboard.noResultsDescription" = "請嘗試更換搜尋字詞或篩選條件。";
 "clipboard.image" = "圖片";
 "clipboard.copied" = "已複製到剪貼板";
 "clipboard.clearHistory" = "清空歷史";
@@ -328,6 +330,7 @@
 "clipboard.limit" = "儲存數量";
 "clipboard.limitValue" = "%d 筆";
 "clipboard.files" = "檔案";
+"clipboard.filesMissing" = "%d 個檔案已不存在";
 "clipboard.filesCount" = "%d 個檔案：%@";
 "clipboard.privacy" = "隱私";
 "clipboard.pauseRecording" = "暫停記錄";
@@ -344,7 +347,9 @@
 "clipboard.snippetGroup.delete" = "刪除分組";
 "clipboard.snippetGroup.placeholder" = "分組名稱";
 "clipboard.snippetTitle" = "片段標題（選填）";
-"clipboard.snippetDescription" = "點擊已有片段即可複製，並自動加入剪貼簿歷史。";
+"clipboard.snippetTags" = "標籤（以逗號分隔，可選）";
+"clipboard.snippetDescription" = "點擊已有片段即可複製，並自動加入剪貼簿歷史。支援 {{date}}、{{time}}、{{newline}} 和 {{clipboard}}。";
+"clipboard.snippet.preview" = "範本預覽";
 "clipboard.snippet.add" = "加入片段";
 
 /* 底欄 */
@@ -501,6 +506,8 @@
 "clipboard.notePlaceholder" = "備註（可選）";
 "clipboard.snippetSearch" = "搜尋常用片段";
 "clipboard.snippet.edit" = "編輯片段";
+"clipboard.snippet.favorite" = "收藏片段";
+"clipboard.snippet.unfavorite" = "取消收藏片段";
 "clipboard.snippet.moveToGroup" = "移動到群組";
 "clipboard.snippet.moveUp" = "上移";
 "clipboard.snippet.moveDown" = "下移";
@@ -509,6 +516,11 @@
 "common.save" = "儲存";
 "clipboard.autoPasteDescription" = "需要在「隱私權與安全性 > 輔助使用」中允許 MenuTools 控制鍵盤。";
 "clipboard.sensitiveRules" = "敏感內容規則";
+"clipboard.sensitiveApps" = "敏感應用程式";
+"clipboard.sensitiveApps.add" = "加入應用程式";
+"clipboard.sensitiveApps.remove" = "移除敏感應用程式";
+"clipboard.sensitiveApps.empty" = "未指定其他應用程式";
+"clipboard.sensitiveApps.description" = "來自這些應用程式的內容不會進入剪貼簿歷史。";
 "clipboard.sensitiveRules.description" = "符合已啟用規則的內容不會進入歷史記錄。";
 "clipboard.sensitiveContent" = "敏感內容（已隱藏）";
 "clipboard.sensitive.passwordManagers" = "密碼管理器前台時不記錄";
@@ -705,6 +717,7 @@
 "shortcut.active" = "監聽中";
 "shortcut.inactive" = "未監聽";
 "shortcut.permission" = "需要輔助使用權限";
+"shortcut.permission.granted" = "已取得輔助使用權限";
 "shortcut.openPermission" = "開啟輔助使用設定";
 "shortcut.recording" = "請按快捷鍵…";
 "shortcut.record" = "錄製快捷鍵";
@@ -927,6 +940,10 @@
 "clipboard.archive.export" = "匯出加密封存";
 "clipboard.archive.import" = "匯入加密封存";
 "clipboard.archive.description" = "封存包含非敏感歷史和常用片段；密碼不會儲存，遺忘後無法復原。";
+"clipboard.archive.confirm.title" = "確認剪貼簿資料操作";
+"clipboard.archive.confirm.action" = "繼續操作";
+"clipboard.archive.confirm.importMessage" = "匯入會合併歷史記錄，但會取代目前常用片段分組。是否繼續？";
+"clipboard.archive.confirm.syncMessage" = "共享同步只合併置頂歷史和常用片段，不會同步普通歷史。是否繼續？";
 "clipboard.archive.exportSuccess" = "剪貼簿加密封存已匯出。";
 "clipboard.archive.importSuccess" = "剪貼簿歷史已合併，常用片段已復原。";
 "clipboard.archive.error.emptyPassphrase" = "請輸入封存密碼。";

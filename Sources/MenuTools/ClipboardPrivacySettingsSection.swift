@@ -11,6 +11,7 @@ struct ClipboardPrivacySettingsSection: View {
     @State private var archiveStatus: ClipboardArchiveOperationStatus?
     @State private var isArchiveOperationInProgress = false
     @State private var syncFilePath = UserDefaults.standard.string(forKey: "clipboard.syncFilePath")
+    @State private var pendingArchiveAction: ClipboardArchivePendingAction?
 
     var body: some View {
         VStack(alignment: .leading, spacing: 10) {
@@ -77,6 +78,40 @@ struct ClipboardPrivacySettingsSection: View {
             Toggle(L("clipboard.sensitive.verificationCodes"), isOn: ruleBinding(\.verificationCodesEnabled))
             Toggle(L("clipboard.sensitive.bankCards"), isOn: ruleBinding(\.bankCardsEnabled))
 
+            HStack {
+                Text(L("clipboard.sensitiveApps"))
+                    .font(.subheadline.weight(.medium))
+                Spacer()
+                Button(L("clipboard.sensitiveApps.add"), action: chooseSensitiveApplication)
+            }
+            Text(L("clipboard.sensitiveApps.description"))
+                .font(.caption)
+                .foregroundStyle(.secondary)
+            if historyService.sensitiveRules.applicationBundleIDs.isEmpty {
+                Text(L("clipboard.sensitiveApps.empty"))
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+            } else {
+                ForEach(historyService.sensitiveRules.applicationBundleIDs, id: \.self) { bundleID in
+                    HStack(spacing: 8) {
+                        excludedApplicationIcon(for: bundleID)
+                            .frame(width: 18, height: 18)
+                        Text(excludedApplicationName(for: bundleID))
+                            .font(.caption)
+                            .lineLimit(1)
+                        Spacer()
+                        Button {
+                            historyService.removeSensitiveBundleID(bundleID)
+                        } label: {
+                            Image(systemName: "xmark.circle.fill")
+                                .foregroundStyle(.secondary)
+                        }
+                        .buttonStyle(.plain)
+                        .accessibilityLabel(L("clipboard.sensitiveApps.remove"))
+                    }
+                }
+            }
+
             HStack(spacing: 8) {
                 TextField(L("clipboard.sensitive.keywordPlaceholder"), text: $keywordInput)
                     .textFieldStyle(.roundedBorder)
@@ -116,7 +151,7 @@ struct ClipboardPrivacySettingsSection: View {
                 Button(action: exportArchive) {
                     Label(L("clipboard.archive.export"), systemImage: "lock.doc")
                 }
-                Button(action: importArchive) {
+                Button(action: requestImportArchive) {
                     Label(L("clipboard.archive.import"), systemImage: "lock.open")
                 }
                 if isArchiveOperationInProgress {
@@ -144,7 +179,7 @@ struct ClipboardPrivacySettingsSection: View {
 
             HStack(spacing: 8) {
                 Button(L("clipboard.sync.chooseFolder"), action: chooseSyncFolder)
-                Button(L("clipboard.sync.now"), action: synchronizeSharedFile)
+                Button(L("clipboard.sync.now"), action: requestSynchronizeSharedFile)
                     .disabled(syncFilePath == nil || archivePassphrase.isEmpty || isArchiveOperationInProgress)
                 if let syncFilePath {
                     Text(URL(fileURLWithPath: syncFilePath).deletingLastPathComponent().lastPathComponent)
@@ -161,6 +196,24 @@ struct ClipboardPrivacySettingsSection: View {
         }
         .padding(14)
         .background(.quaternary.opacity(0.28), in: .rect(cornerRadius: 14))
+        .alert(
+            L("clipboard.archive.confirm.title"),
+            isPresented: Binding(
+                get: { pendingArchiveAction != nil },
+                set: { isPresented in
+                    if !isPresented { pendingArchiveAction = nil }
+                }
+            )
+        ) {
+            Button(L("common.cancel"), role: .cancel) {
+                pendingArchiveAction = nil
+            }
+            Button(L("clipboard.archive.confirm.action"), role: .destructive) {
+                confirmPendingArchiveAction()
+            }
+        } message: {
+            Text(pendingArchiveAction?.confirmationMessage ?? "")
+        }
     }
 
     private func chooseExcludedApplication() {
@@ -177,6 +230,23 @@ struct ClipboardPrivacySettingsSection: View {
                 return
             }
             historyService.addExcludedBundleID(bundleID)
+        }
+    }
+
+    private func chooseSensitiveApplication() {
+        let panel = NSOpenPanel()
+        panel.canChooseFiles = true
+        panel.canChooseDirectories = false
+        panel.allowsMultipleSelection = false
+        panel.allowedContentTypes = [.applicationBundle]
+        panel.prompt = L("clipboard.sensitiveApps.add")
+        panel.begin { response in
+            guard response == .OK,
+                  let url = panel.url,
+                  let bundleID = Bundle(url: url)?.bundleIdentifier else {
+                return
+            }
+            historyService.addSensitiveBundleID(bundleID)
         }
     }
 
@@ -223,7 +293,9 @@ struct ClipboardPrivacySettingsSection: View {
         Task { @MainActor in
             defer {
                 isArchiveOperationInProgress = false
-                archivePassphrase = ""
+                if archiveStatus?.isSuccess == true {
+                    archivePassphrase = ""
+                }
             }
             do {
                 try await Task.detached(priority: .utility) {
@@ -237,7 +309,7 @@ struct ClipboardPrivacySettingsSection: View {
         }
     }
 
-    private func importArchive() {
+    private func requestImportArchive() {
         guard !archivePassphrase.isEmpty else { return }
         let panel = NSOpenPanel()
         panel.title = L("clipboard.archive.import")
@@ -246,14 +318,19 @@ struct ClipboardPrivacySettingsSection: View {
         panel.canChooseDirectories = false
         panel.canChooseFiles = true
         guard panel.runModal() == .OK, let url = panel.url else { return }
+        pendingArchiveAction = .importArchive(url)
+    }
 
+    private func performImportArchive(from url: URL) {
         let passphrase = archivePassphrase
         isArchiveOperationInProgress = true
         archiveStatus = nil
         Task { @MainActor in
             defer {
                 isArchiveOperationInProgress = false
-                archivePassphrase = ""
+                if archiveStatus?.isSuccess == true {
+                    archivePassphrase = ""
+                }
             }
             do {
                 let document = try await Task.detached(priority: .utility) {
@@ -287,11 +364,15 @@ struct ClipboardPrivacySettingsSection: View {
         UserDefaults.standard.set(fileURL.path, forKey: "clipboard.syncFilePath")
     }
 
-    private func synchronizeSharedFile() {
+    private func requestSynchronizeSharedFile() {
         guard !archivePassphrase.isEmpty,
               let syncFilePath else { return }
-        let passphrase = archivePassphrase
         let fileURL = URL(fileURLWithPath: syncFilePath)
+        pendingArchiveAction = .synchronize(fileURL)
+    }
+
+    private func performSynchronizeSharedFile(at fileURL: URL) {
+        let passphrase = archivePassphrase
         let local = ClipboardArchiveDocument.current(
             historyItems: historyService.items.filter(\.isPinned),
             snippetGroups: snippetService.groups,
@@ -302,7 +383,9 @@ struct ClipboardPrivacySettingsSection: View {
         Task { @MainActor in
             defer {
                 isArchiveOperationInProgress = false
-                archivePassphrase = ""
+                if archiveStatus?.isSuccess == true {
+                    archivePassphrase = ""
+                }
             }
             do {
                 let merged = try await Task.detached(priority: .utility) {
@@ -318,6 +401,17 @@ struct ClipboardPrivacySettingsSection: View {
             } catch {
                 archiveStatus = .failure(error.localizedDescription)
             }
+        }
+    }
+
+    private func confirmPendingArchiveAction() {
+        guard let pendingArchiveAction else { return }
+        self.pendingArchiveAction = nil
+        switch pendingArchiveAction {
+        case let .importArchive(url):
+            performImportArchive(from: url)
+        case let .synchronize(url):
+            performSynchronizeSharedFile(at: url)
         }
     }
 
@@ -360,5 +454,19 @@ private enum ClipboardArchiveOperationStatus {
     var isSuccess: Bool {
         if case .success = self { return true }
         return false
+    }
+}
+
+private enum ClipboardArchivePendingAction {
+    case importArchive(URL)
+    case synchronize(URL)
+
+    var confirmationMessage: String {
+        switch self {
+        case .importArchive:
+            return L("clipboard.archive.confirm.importMessage")
+        case .synchronize:
+            return L("clipboard.archive.confirm.syncMessage")
+        }
     }
 }

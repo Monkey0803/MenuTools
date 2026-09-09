@@ -13,11 +13,13 @@ struct ClipboardSnippetSettingsSection: View {
     @State private var renamedSnippetGroupName = ""
     @State private var newSnippetTitle = ""
     @State private var newSnippetContent = ""
+    @State private var newSnippetTags = ""
     @State private var snippetSearchText = ""
     @State private var editingSnippetID: UUID?
     @State private var editingSnippetGroupID = ClipboardSnippetStore.defaultGroupID
     @State private var editingSnippetTitle = ""
     @State private var editingSnippetContent = ""
+    @State private var editingSnippetTags = ""
     @State private var copiedSnippetID: UUID?
 
     var body: some View {
@@ -97,11 +99,28 @@ struct ClipboardSnippetSettingsSection: View {
             VStack(alignment: .leading, spacing: 8) {
                 TextField(L("clipboard.snippetTitle"), text: $newSnippetTitle)
                     .textFieldStyle(.roundedBorder)
+                TextField(L("clipboard.snippetTags"), text: $newSnippetTags)
+                    .textFieldStyle(.roundedBorder)
                 TextEditor(text: $newSnippetContent)
                     .font(.body)
                     .frame(minHeight: 72)
                     .padding(8)
                     .background(.quaternary.opacity(0.45), in: .rect(cornerRadius: 10))
+
+                if !newSnippetContent.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+                    VStack(alignment: .leading, spacing: 4) {
+                        Label(L("clipboard.snippet.preview"), systemImage: "eye")
+                            .font(.caption.weight(.medium))
+                            .foregroundStyle(.secondary)
+                        Text(renderedPreview)
+                            .font(.caption)
+                            .foregroundStyle(.primary)
+                            .lineLimit(4)
+                            .frame(maxWidth: .infinity, alignment: .leading)
+                            .padding(8)
+                            .background(.quaternary.opacity(0.25), in: .rect(cornerRadius: 8))
+                    }
+                }
 
                 HStack {
                     Text(L("clipboard.snippetDescription"))
@@ -142,6 +161,12 @@ struct ClipboardSnippetSettingsSection: View {
                     }
                 }
             }
+
+            if let persistenceErrorMessage = snippetService.persistenceErrorMessage {
+                Label(persistenceErrorMessage, systemImage: "exclamationmark.triangle.fill")
+                    .font(.caption)
+                    .foregroundStyle(.red)
+            }
         }
         .padding(14)
         .controlCenterSurface(interactive: true, shape: AnyShape(.rect(cornerRadius: 14)))
@@ -166,12 +191,24 @@ struct ClipboardSnippetSettingsSection: View {
             .buttonStyle(.plain)
             .help(L("clipboard.copy"))
 
+            Button {
+                snippetService.toggleFavorite(id: snippet.id)
+            } label: {
+                Image(systemName: snippet.isFavorite ? "star.fill" : "star")
+                    .foregroundStyle(snippet.isFavorite ? AnyShapeStyle(.yellow) : AnyShapeStyle(.secondary))
+            }
+            .buttonStyle(.plain)
+            .help(snippet.isFavorite ? L("clipboard.snippet.unfavorite") : L("clipboard.snippet.favorite"))
+
             Image(systemName: copiedSnippetID == snippet.id ? "checkmark" : "doc.on.doc")
                 .font(.caption.weight(.semibold))
                 .foregroundStyle(copiedSnippetID == snippet.id ? AnyShapeStyle(.tint) : AnyShapeStyle(.secondary))
                 .frame(width: 24, height: 24)
 
             Menu {
+                Button(snippet.isFavorite ? L("clipboard.snippet.unfavorite") : L("clipboard.snippet.favorite")) {
+                    snippetService.toggleFavorite(id: snippet.id)
+                }
                 Button(L("clipboard.snippet.edit")) { beginEditing(snippet) }
                 Menu(L("clipboard.snippet.moveToGroup")) {
                     ForEach(snippetService.groups.filter { $0.id != snippet.groupID }) { group in
@@ -212,6 +249,8 @@ struct ClipboardSnippetSettingsSection: View {
                 .frame(minHeight: 72)
                 .padding(6)
                 .background(.quaternary.opacity(0.4), in: .rect(cornerRadius: 8))
+            TextField(L("clipboard.snippetTags"), text: $editingSnippetTags)
+                .textFieldStyle(.roundedBorder)
             HStack {
                 Picker(L("clipboard.snippet.moveToGroup"), selection: $editingSnippetGroupID) {
                     ForEach(snippetService.groups) { group in
@@ -256,12 +295,14 @@ struct ClipboardSnippetSettingsSection: View {
         guard snippetService.addSnippet(
             title: newSnippetTitle,
             content: newSnippetContent,
-            groupID: selectedSnippetGroupID
+            groupID: selectedSnippetGroupID,
+            tags: newSnippetTags.components(separatedBy: CharacterSet(charactersIn: ",，\n"))
         ) != nil else {
             return
         }
         newSnippetTitle = ""
         newSnippetContent = ""
+        newSnippetTags = ""
     }
 
     private func beginEditing(_ snippet: ClipboardSnippet) {
@@ -269,6 +310,7 @@ struct ClipboardSnippetSettingsSection: View {
         editingSnippetGroupID = snippet.groupID
         editingSnippetTitle = snippet.title
         editingSnippetContent = snippet.content
+        editingSnippetTags = snippet.tags.joined(separator: ", ")
     }
 
     private func saveEditingSnippet(_ snippet: ClipboardSnippet) {
@@ -276,7 +318,8 @@ struct ClipboardSnippetSettingsSection: View {
             id: snippet.id,
             title: editingSnippetTitle,
             content: editingSnippetContent,
-            groupID: editingSnippetGroupID
+            groupID: editingSnippetGroupID,
+            tags: editingSnippetTags.components(separatedBy: CharacterSet(charactersIn: ",，\n"))
         ) else {
             return
         }
@@ -299,5 +342,12 @@ struct ClipboardSnippetSettingsSection: View {
                 copiedSnippetID = nil
             }
         }
+    }
+
+    private var renderedPreview: String {
+        ClipboardSnippetTemplate.render(
+            newSnippetContent,
+            clipboardText: NSPasteboard.general.string(forType: .string)
+        )
     }
 }

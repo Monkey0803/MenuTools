@@ -5,6 +5,47 @@ import Foundation
 import Testing
 @testable import MenuTools
 
+@Test("剪贴板历史可以按内容类型应用独立保留期限")
+func clipboardHistorySupportsPerContentRetention() {
+    let now = Date(timeIntervalSince1970: 10_000)
+    let oldText = ClipboardHistoryItem(
+        id: UUID(), content: .text("旧文本"), capturedAt: now.addingTimeInterval(-3 * 86_400), expiresAt: nil, isPinned: false
+    )
+    let oldImage = ClipboardHistoryItem(
+        id: UUID(), content: .image(Data([1, 2, 3])), capturedAt: now.addingTimeInterval(-3 * 86_400), expiresAt: nil, isPinned: false
+    )
+    let pinnedImage = ClipboardHistoryItem(
+        id: UUID(), content: .image(Data([4, 5, 6])), capturedAt: now.addingTimeInterval(-3 * 86_400), expiresAt: nil, isPinned: true
+    )
+    var history = ClipboardHistoryBuffer(
+        retentionDuration: 30 * 86_400,
+        retentionByContentType: [.text: 1.0 * 86_400, .image: 2.0 * 86_400],
+        items: [oldText, oldImage, pinnedImage]
+    )
+
+    history.applyAutomaticCleanup(now: now)
+
+    #expect(history.items == [pinnedImage])
+}
+
+@Test("服务调整内容类型保留期限后会立即清理历史")
+@MainActor
+func clipboardServiceAppliesPerContentRetentionImmediately() throws {
+    let suiteName = "MenuTools-ClipboardRetention-\(UUID().uuidString)"
+    let defaults = try #require(UserDefaults(suiteName: suiteName))
+    defer { UserDefaults().removePersistentDomain(forName: suiteName) }
+    let oldItem = ClipboardHistoryItem(
+        id: UUID(), content: .text("旧文本"),
+        capturedAt: Date().addingTimeInterval(-2 * 86_400), expiresAt: nil, isPinned: false
+    )
+    let service = ClipboardHistoryService(persistenceURL: nil, userDefaults: defaults)
+    service.importItems([oldItem])
+
+    service.setRetentionDays(1, for: .text)
+
+    #expect(service.items.isEmpty)
+}
+
 @Test("宽屏剪贴板设置页优先使用双列历史卡片")
 func clipboardSettingsUsesAdaptiveHistoryGrid() {
     #expect(ClipboardHistorySettingsLayout.columnCount(for: 552) == 2)
@@ -19,6 +60,30 @@ func clipboardSettingsUsesFocusedWorkspaces() {
         "clipboard.snippets",
         "clipboard.tab.settings"
     ])
+}
+
+@Test("剪贴板辅助功能设置链接指向隐私与安全性页面")
+func clipboardAccessibilitySettingsURLIsStable() {
+    #expect(ClipboardAccessibilityPermission.settingsURL.absoluteString.contains("Privacy_Accessibility"))
+}
+
+@Test("文件历史会区分仍存在和已失效的路径")
+func clipboardFileHistoryReportsAvailability() throws {
+    let existingURL = FileManager.default.temporaryDirectory
+        .appendingPathComponent("MenuTools-Clipboard-Existing-\(UUID().uuidString)")
+    try Data().write(to: existingURL)
+    defer { try? FileManager.default.removeItem(at: existingURL) }
+
+    #expect(ClipboardHistoryFile(path: existingURL.path).isAvailable)
+    #expect(!ClipboardHistoryFile(path: existingURL.appendingPathExtension("missing").path).isAvailable)
+}
+
+@Test("剪贴板快捷面板提供可伸缩的阅读尺寸")
+func clipboardPopoverUsesFlexibleDimensions() {
+    #expect(ClipboardHistoryPopoverLayout.minWidth < ClipboardHistoryPopoverLayout.idealWidth)
+    #expect(ClipboardHistoryPopoverLayout.idealWidth < ClipboardHistoryPopoverLayout.maxWidth)
+    #expect(ClipboardHistoryPopoverLayout.minHeight < ClipboardHistoryPopoverLayout.idealHeight)
+    #expect(ClipboardHistoryPopoverLayout.idealHeight < ClipboardHistoryPopoverLayout.maxHeight)
 }
 
 @Test("剪贴板卡片缩略图和悬停预览使用固定尺寸")
@@ -1175,6 +1240,24 @@ func clipboardSensitiveRulesAreIndividuallyConfigurable() {
     #expect(!rules.shouldExclude(.text("4242 4242 4242 4242"), sourceBundleID: nil))
     #expect(!rules.shouldExclude(.text("普通文本"), sourceBundleID: "com.1password.1password"))
     #expect(rules.shouldExclude(.text("包含仅此关键词的内容"), sourceBundleID: nil))
+}
+
+@Test("敏感规则支持用户指定应用并兼容旧配置")
+func clipboardSensitiveRulesSupportCustomApplications() throws {
+    let appBundleID = "com.example.password-vault"
+    var rules = ClipboardSensitiveRules()
+    rules.applicationBundleIDs = [appBundleID]
+
+    #expect(rules.shouldExclude(.text("普通内容"), sourceBundleID: appBundleID))
+    #expect(!rules.shouldExclude(.text("普通内容"), sourceBundleID: "com.example.editor"))
+
+    let data = try JSONEncoder().encode(rules)
+    let decoded = try JSONDecoder().decode(ClipboardSensitiveRules.self, from: data)
+    #expect(decoded == rules)
+
+    let legacy = #"{"passwordManagersEnabled":true,"verificationCodesEnabled":true,"bankCardsEnabled":true,"keywords":["password"]}"#.data(using: .utf8)!
+    let legacyRules = try JSONDecoder().decode(ClipboardSensitiveRules.self, from: legacy)
+    #expect(legacyRules.applicationBundleIDs.isEmpty)
 }
 
 @Test("开启自动粘贴后复制历史会调用粘贴动作")
