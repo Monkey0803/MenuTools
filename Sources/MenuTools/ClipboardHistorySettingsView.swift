@@ -954,11 +954,16 @@ private struct ClipboardHistoryHoverPreview: View {
 /// 可嵌入设置页或菜单栏 Popover 的剪贴板历史内容。
 struct ClipboardHistoryQuickAccessView: View {
     let onCopy: () -> Void
+    let selectionAction: ClipboardHistoryAction
 
     @State private var historyService = ClipboardHistoryService.shared
     @State private var snippetService = ClipboardSnippetService.shared
 
-    init(onCopy: @escaping () -> Void = {}) {
+    init(
+        selectionAction: ClipboardHistoryAction = .copy,
+        onCopy: @escaping () -> Void = {}
+    ) {
+        self.selectionAction = selectionAction
         self.onCopy = onCopy
     }
 
@@ -966,7 +971,7 @@ struct ClipboardHistoryQuickAccessView: View {
         ClipboardHistoryPopover(
             items: historyService.items,
             onCopy: { item in
-                if historyService.copy(item) {
+                if historyService.perform(item, action: selectionAction) {
                     onCopy()
                 }
             },
@@ -1011,7 +1016,7 @@ struct ClipboardHistoryQuickAccessView: View {
             snippet.content,
             clipboardText: NSPasteboard.general.string(forType: .string)
         )
-        if historyService.copy(.text(renderedContent)) {
+        if historyService.perform(.text(renderedContent), action: selectionAction) {
             onCopy()
         }
     }

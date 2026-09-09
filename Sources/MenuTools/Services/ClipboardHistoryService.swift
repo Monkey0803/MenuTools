@@ -854,8 +854,18 @@ enum ClipboardHistoryAutoPaste {
             targetApplication = nil
         }
         let targetPID = targetApplication?.processIdentifier
+        if let targetApplication {
+            // 先把快捷键前的应用恢复到前台，再读取 AX 焦点。
+            // 菜单栏 Popover 关闭期间，目标应用的焦点树可能暂时为空。
+            _ = targetApplication.activate(options: [])
+        }
         let accessibilityRoot = targetPID.map(AXUIElementCreateApplication) ?? AXUIElementCreateSystemWide()
-        guard focusedElementIsEditable(in: accessibilityRoot) else { return .noEditableTarget }
+        let hasEditableTarget = focusedElementIsEditable(in: accessibilityRoot)
+        let targetIsFrontmost = targetPID != nil
+            && NSWorkspace.shared.frontmostApplication?.processIdentifier == targetPID
+        // 某些 Electron/WebView 输入框不完整暴露 AXEditable/AXRole，但已知目标应用
+        // 已被恢复到前台时，发送 Command-V 仍能正确交给当前输入框。
+        guard hasEditableTarget || targetIsFrontmost else { return .noEditableTarget }
         guard let source = CGEventSource(stateID: .hidSystemState),
               let keyDown = CGEvent(keyboardEventSource: source, virtualKey: 9, keyDown: true),
               let keyUp = CGEvent(keyboardEventSource: source, virtualKey: 9, keyDown: false) else {
@@ -863,8 +873,7 @@ enum ClipboardHistoryAutoPaste {
         }
         keyDown.flags = .maskCommand
         keyUp.flags = .maskCommand
-        if let targetApplication, let targetPID {
-            _ = targetApplication.activate(options: [])
+        if let targetPID {
             keyDown.postToPid(targetPID)
             keyUp.postToPid(targetPID)
         } else {

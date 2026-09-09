@@ -159,7 +159,7 @@ final class MenuBarStatusItemController: NSObject {
             popover.animates = true
             popover.contentSize = NSSize(width: 328, height: 388)
             popover.contentViewController = NSHostingController(
-                rootView: ClipboardHistoryQuickAccessView { [weak self] in
+                rootView: ClipboardHistoryQuickAccessView(selectionAction: .paste) { [weak self] in
                     guard let self, let button = self.statusItem?.button else { return }
                     self.clipboardPopover?.performClose(button)
                 }
