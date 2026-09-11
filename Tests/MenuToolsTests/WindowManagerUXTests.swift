@@ -297,3 +297,79 @@ func windowManagerConfigurationDecodesLegacyPayload() throws {
     #expect(decoded.cycleLayouts == WindowManagerConfiguration().cycleLayouts)
     #expect(decoded.showSnapPreview == WindowManagerConfiguration().showSnapPreview)
 }
+
+// MARK: - 窗口贴边时的吸附（光标离屏幕边缘还很远的自然操作）
+
+@Test("把窗口推到屏幕边缘时也能命中吸附")
+func windowPressedAgainstEdgeSnaps() {
+    let screen = CGRect(x: 0, y: 0, width: 2560, height: 1440)
+    let threshold: CGFloat = 24
+    let size = CGSize(width: 586, height: 488)
+
+    #expect(WindowSnapResolver.layout(
+        pressedWindowFrame: CGRect(origin: CGPoint(x: 0, y: 300), size: size),
+        in: screen,
+        threshold: threshold
+    ) == .leftHalf)
+    #expect(WindowSnapResolver.layout(
+        pressedWindowFrame: CGRect(origin: CGPoint(x: screen.maxX - size.width, y: 300), size: size),
+        in: screen,
+        threshold: threshold
+    ) == .rightHalf)
+    #expect(WindowSnapResolver.layout(
+        pressedWindowFrame: CGRect(origin: CGPoint(x: 800, y: screen.maxY - size.height), size: size),
+        in: screen,
+        threshold: threshold
+    ) == .topHalf)
+    #expect(WindowSnapResolver.layout(
+        pressedWindowFrame: CGRect(origin: CGPoint(x: 0, y: screen.maxY - size.height), size: size),
+        in: screen,
+        threshold: threshold
+    ) == .topLeft)
+
+    // 完全在屏幕中间不吸附
+    #expect(WindowSnapResolver.layout(
+        pressedWindowFrame: CGRect(origin: CGPoint(x: 900, y: 500), size: size),
+        in: screen,
+        threshold: threshold
+    ) == nil)
+
+    // 最大化窗口四条边都贴着屏幕，没有方向信息
+    #expect(WindowSnapResolver.layout(pressedWindowFrame: screen, in: screen, threshold: threshold) == nil)
+
+    // 已经是左半屏的窗口，再拖时仍判定为左半屏
+    #expect(WindowSnapResolver.layout(
+        pressedWindowFrame: CGRect(x: 0, y: 0, width: 1272, height: 1394),
+        in: screen,
+        threshold: threshold
+    ) == .leftHalf)
+}
+
+@Test("光标不在吸附带但窗口已贴边时，预览仍给出落点")
+func previewPlanFallsBackToWindowEdge() throws {
+    let screens = [
+        WindowSnapScreen(
+            frame: CGRect(x: 0, y: 0, width: 2560, height: 1440),
+            visibleFrame: CGRect(x: 0, y: 0, width: 2560, height: 1410)
+        )
+    ]
+    let options = WindowManagerOptions(screenPadding: 8, windowGap: 8, snapDistance: 24)
+
+    // 光标在屏幕中部，离任何边都远
+    let plan = try #require(WindowSnapPreviewPlanner.plan(
+        for: CGPoint(x: 400, y: 1000),
+        windowFrame: CGRect(x: 0, y: 300, width: 586, height: 488),
+        screens: screens,
+        options: options
+    ))
+    #expect(plan.layout == .leftHalf)
+    #expect(plan.frame.minX == 8)
+
+    // 两者都不满足时仍然没有落点
+    #expect(WindowSnapPreviewPlanner.plan(
+        for: CGPoint(x: 400, y: 1000),
+        windowFrame: CGRect(x: 900, y: 500, width: 586, height: 488),
+        screens: screens,
+        options: options
+    ) == nil)
+}

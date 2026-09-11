@@ -802,7 +802,7 @@ final class WindowManagementService {
             dragWindowLookupAttempts = 0
             lastDragWindowLookup = 0
             captureDragWindow(at: NSEvent.mouseLocation)
-            SnapDebugLog.log("mouseDown: windowHit=\(dragWindow != nil) frame=\(dragWindowFrameAtMouseDown.map(NSStringFromRect) ?? "nil")")
+            SnapDebugLog.log("mouseDown: point=\(NSStringFromPoint(NSEvent.mouseLocation)) windowHit=\(dragWindow != nil) frame=\(dragWindowFrameAtMouseDown.map(NSStringFromRect) ?? "nil") titleBar=\(dragStartedInWindowChrome)")
         case .leftMouseDragged:
             if dragWindow == nil { captureDragWindow(at: NSEvent.mouseLocation) }
             logDragEvent()
@@ -813,7 +813,7 @@ final class WindowManagementService {
             snapPreview.hide()
             let end = NSEvent.mouseLocation
             let distance = mouseDownLocation.map { hypot(end.x - $0.x, end.y - $0.y) } ?? 0
-            SnapDebugLog.log("mouseUp: windowHit=\(hadWindow) startedInTitleBar=\(startedInChrome) dragDistance=\(Int(distance))")
+            SnapDebugLog.log("mouseUp: point=\(NSStringFromPoint(end)) windowHit=\(hadWindow) startedInTitleBar=\(startedInChrome) dragDistance=\(Int(distance))")
             // 必须带着拖拽窗口调用吸附，所以清理状态放在它之后。
             if distance > 12, startedInChrome {
                 snapWindow(at: end)
@@ -855,6 +855,7 @@ final class WindowManagementService {
         guard dragStartedInWindowChrome else { return }
         guard let plan = WindowSnapPreviewPlanner.plan(
             for: point,
+            windowFrame: dragWindowFrame,
             screens: snapScreens,
             options: configuration.options
         ) else {
@@ -872,15 +873,22 @@ final class WindowManagementService {
               let processIdentifier = dragWindowPID,
               let plan = WindowSnapPreviewPlanner.plan(
                 for: point,
+                windowFrame: dragWindowFrame,
                 screens: snapScreens,
                 options: configuration.options
               ) else {
-            SnapDebugLog.log("snap on mouseUp: no drag window or no plan, skipped")
+            SnapDebugLog.log("snap on mouseUp: skipped (window=\(dragWindow != nil) pid=\(dragWindowPID != nil) point=\(NSStringFromPoint(NSEvent.mouseLocation)) windowFrame=\(dragWindowFrame.map(NSStringFromRect) ?? "nil"))")
             return
         }
         SnapDebugLog.log("snap on mouseUp: apply layout=\(plan.layout.rawValue)")
         rememberFrameBeforeLayout(of: window, processIdentifier: processIdentifier)
         try? setFrame(plan.frame, of: window)
+    }
+
+    /// 被拖动窗口当前的位置（AX 在拖动过程中可能仍报旧值，松手时才是最新的）。
+    private var dragWindowFrame: CGRect? {
+        guard let dragWindow else { return nil }
+        return try? cocoaFrame(of: dragWindow)
     }
 
     private var snapScreens: [WindowSnapScreen] {

@@ -21,34 +21,104 @@ struct WindowSnapScreen: Equatable, Sendable {
     }
 }
 
+extension WindowSnapResolver {
+    /// 窗口边缘已经贴住屏幕边缘时的布局判定。
+    ///
+    /// 很多人是「把窗口推到屏幕边缘就松手」，此时光标离屏幕边缘可能还有几百点（抓标题栏的位置
+    /// 离窗口左缘很远），只按光标判定会完全漏掉这种最自然的操作。
+    static func layout(
+        pressedWindowFrame frame: CGRect,
+        in screen: CGRect,
+        threshold: CGFloat
+    ) -> WindowLayout? {
+        guard screen.width > 0, screen.height > 0 else { return nil }
+
+        // 用 2 倍阈值判断“几乎占满某个轴”：半屏窗口的高度其实已经接近屏幕高度
+        //（只差屏幕边距），如果不排除，它的下边缘会被误判成“贴住屏幕下边缘”。
+        let spansWidth = frame.width >= screen.width - threshold * 2
+        let spansHeight = frame.height >= screen.height - threshold * 2
+        // 最大化窗口四条边都贴着屏幕，没有方向信息。
+        guard !(spansWidth && spansHeight) else { return nil }
+
+        let nearLeft = !spansWidth && frame.minX <= screen.minX + threshold
+        let nearRight = !spansWidth && frame.maxX >= screen.maxX - threshold
+        let nearTop = !spansHeight && frame.maxY >= screen.maxY - threshold
+        let nearBottom = !spansHeight && frame.minY <= screen.minY + threshold
+
+        if nearTop && nearLeft { return .topLeft }
+        if nearTop && nearRight { return .topRight }
+        if nearBottom && nearLeft { return .bottomLeft }
+        if nearBottom && nearRight { return .bottomRight }
+        if nearTop { return .topHalf }
+        if nearBottom { return .bottomHalf }
+        if nearLeft { return .leftHalf }
+        if nearRight { return .rightHalf }
+        return nil
+    }
+}
+
 enum WindowSnapPreviewPlanner {
-    /// 根据鼠标位置推导将要吸附的布局与落点；不在任何吸附区域时返回 nil。
+    /// 推导将要吸附的布局与落点；不在任何吸附区域时返回 nil。
+    ///
+    /// 先按光标命中吸附带（能实时显示预览的那条路径），再回落到「被拖动窗口的边缘是否已经贴住
+    /// 屏幕边缘」，覆盖「把窗口推到边缘就松手」这种光标离边缘还很远的操作。
     static func plan(
         for point: CGPoint,
+        windowFrame: CGRect? = nil,
         screens: [WindowSnapScreen],
         options: WindowManagerOptions
     ) -> WindowSnapPreviewPlan? {
-        guard let index = WindowSnapResolver.screenIndex(
-            for: point,
-            screens: screens.map(\.frame)
-        ) else { return nil }
+        if let index = WindowSnapResolver.screenIndex(for: point, screens: screens.map(\.frame)),
+           let layout = WindowSnapResolver.layout(
+               for: point,
+               in: screens[index].frame,
+               threshold: options.snapDistance
+           ) {
+            return WindowSnapPreviewPlan(
+                layout: layout,
+                screenIndex: index,
+                frame: WindowLayoutCalculator.frame(
+                    for: layout,
+                    in: screens[index].visibleFrame,
+                    options: options
+                )
+            )
+        }
 
-        let screen = screens[index]
-        guard let layout = WindowSnapResolver.layout(
-            for: point,
-            in: screen.frame,
-            threshold: options.snapDistance
-        ) else { return nil }
+        guard let windowFrame,
+              let index = screenIndex(for: windowFrame, screens: screens),
+              let layout = WindowSnapResolver.layout(
+                  pressedWindowFrame: windowFrame,
+                  in: screens[index].frame,
+                  threshold: options.snapDistance
+              ) else { return nil }
 
         return WindowSnapPreviewPlan(
             layout: layout,
             screenIndex: index,
             frame: WindowLayoutCalculator.frame(
                 for: layout,
-                in: screen.visibleFrame,
+                in: screens[index].visibleFrame,
                 options: options
             )
         )
+    }
+
+    /// 与窗口重叠面积最大的显示器。
+    static func screenIndex(for windowFrame: CGRect, screens: [WindowSnapScreen]) -> Int? {
+        guard !screens.isEmpty else { return nil }
+        let overlaps = screens.enumerated().map { index, screen -> (index: Int, area: CGFloat) in
+            let intersection = screen.frame.intersection(windowFrame)
+            let area = intersection.isNull ? 0 : intersection.width * intersection.height
+            return (index, area)
+        }
+        if let best = overlaps.max(by: { $0.area < $1.area }), best.area > 0 {
+            return best.index
+        }
+        return screens.indices.min { lhs, rhs in
+            hypot(screens[lhs].frame.midX - windowFrame.midX, screens[lhs].frame.midY - windowFrame.midY)
+                < hypot(screens[rhs].frame.midX - windowFrame.midX, screens[rhs].frame.midY - windowFrame.midY)
+        }
     }
 }
 
