@@ -1006,6 +1006,9 @@ enum ClipboardCopyFeedback: Sendable, Equatable, CaseIterable {
     case accessibilityPermissionDenied
     case noEditableTarget
     case pasteFailed
+    /// 清理系统剪贴板的结果：清空成功，或本来就没有内容。
+    case clipboardCleared
+    case clipboardAlreadyEmpty
 
     init(autoPasteResult: ClipboardAutoPasteResult) {
         switch autoPasteResult {
@@ -1023,6 +1026,8 @@ enum ClipboardCopyFeedback: Sendable, Equatable, CaseIterable {
         case .accessibilityPermissionDenied: return "clipboard.feedback.permissionDenied"
         case .noEditableTarget: return "clipboard.feedback.noEditableTarget"
         case .pasteFailed: return "clipboard.feedback.pasteFailed"
+        case .clipboardCleared: return "status.clipboardCleared"
+        case .clipboardAlreadyEmpty: return "cleanup.clipboardEmpty"
         }
     }
 }
@@ -2014,11 +2019,15 @@ final class ClipboardHistoryService {
     }
 
     /// 仅清空当前系统剪贴板；历史记录是独立数据，不能被这个动作连带删除。
-    func clearSystemClipboard() {
+    /// 返回是否真的清掉了内容，并给出“已清空/本来就是空的”反馈。
+    @discardableResult
+    func clearSystemClipboard() -> Bool {
+        let hadContent = !(pasteboard.pasteboardItems ?? []).isEmpty
         pasteboard.clearContents()
         lastChangeCount = pasteboard.changeCount
         currentItemCount = pasteboard.pasteboardItems?.count ?? 0
-        copyFeedback = nil
+        publishFeedback(hadContent ? .clipboardCleared : .clipboardAlreadyEmpty)
+        return hadContent
     }
 
     private func startObservingExcludedApplicationDeactivation() {

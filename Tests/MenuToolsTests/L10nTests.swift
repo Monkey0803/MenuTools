@@ -42,6 +42,17 @@ func clipboardLocalizationCoversEveryReferencedKey() throws {
     }
 }
 
+@Test("全部语言的本地化文件都不含重复键")
+func localizationFilesHaveNoDuplicateKeys() throws {
+    let locales = try LocalizationAudit.localeFiles(repositoryRoot: LocalizationAudit.repositoryRoot)
+    #expect(locales.count == 5)
+
+    for locale in locales {
+        let duplicates = try LocalizationAudit.duplicateKeys(at: locale.url)
+        #expect(duplicates.isEmpty, "\(locale.name) 存在重复键：\(duplicates)")
+    }
+}
+
 /// 从仓库源码里收集本地化键，避免“代码新增文案但漏了某个 lproj”再次发生。
 enum LocalizationAudit {
     static let repositoryRoot = URL(fileURLWithPath: #filePath)
@@ -125,5 +136,26 @@ enum LocalizationAudit {
             entries[String(text[keyRange])] = String(text[valueRange])
         }
         return entries
+    }
+
+    /// 重复键会让取值依赖行序（实际是后者覆盖前者），必须报出来。
+    static func duplicateKeys(at url: URL) throws -> [String] {
+        let source = try String(contentsOf: url, encoding: .utf8)
+        let expression = try NSRegularExpression(pattern: #"^\s*"([^"]+)"\s*="#)
+        var seen = Set<String>()
+        var duplicates = Set<String>()
+        for line in source.split(separator: "\n", omittingEmptySubsequences: false) {
+            let text = String(line)
+            let range = NSRange(text.startIndex ..< text.endIndex, in: text)
+            guard let match = expression.firstMatch(in: text, range: range),
+                  let keyRange = Range(match.range(at: 1), in: text) else {
+                continue
+            }
+            let key = String(text[keyRange])
+            if !seen.insert(key).inserted {
+                duplicates.insert(key)
+            }
+        }
+        return duplicates.sorted()
     }
 }

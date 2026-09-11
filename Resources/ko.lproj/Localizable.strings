@@ -36,7 +36,7 @@
 "traffic.title" = "네트워크 트래픽";
 "traffic.description" = "앱별 실시간 네트워크 속도와 세션 누계를 확인합니다.";
 "traffic.refresh" = "네트워크 트래픽 새로 고침";
-"traffic.viewAll" = "모든 앱 보기";
+"traffic.viewAll" = "모두 보기";
 "traffic.noApps" = "활성 네트워크 앱 없음";
 "traffic.unavailable" = "네트워크 트래픽을 일시적으로 사용할 수 없음";
 "traffic.emptyDescription" = "네트워크 연결이 활성화되면 트래픽 데이터가 표시됩니다.";
@@ -511,7 +511,6 @@
 "clipboard.storageLimitValue" = "%d MB";
 "clipboard.unlimited" = "제한 없음";
 "clipboard.cleanupDescription" = "개수, 보관 기간 또는 저장 공간 한도에 도달하면 가장 오래된 고정되지 않은 항목을 자동 삭제합니다.";
-"clipboard.autoPaste" = "복사 후 이전 App에 자동 붙여넣기";
 "clipboard.primaryAction" = "기본 동작";
 "clipboard.primaryAction.copy" = "클립보드에 복사";
 "clipboard.primaryAction.paste" = "이전 App에 붙여넣기";
@@ -1008,7 +1007,6 @@
 "traffic.tab.history" = "기록";
 "traffic.tab.diagnostics" = "진단 및 데이터";
 "traffic.topApps" = "트래픽이 많은 앱";
-"traffic.viewAll" = "모두 보기";
 "clipboard.applicationPolicies" = "앱별 정책";
 "clipboard.applicationPolicies.description" = "Bundle ID별 기록 및 자동 붙여넣기 동작을 설정합니다.";
 "clipboard.applicationPolicies.bundleID" = "Bundle ID";

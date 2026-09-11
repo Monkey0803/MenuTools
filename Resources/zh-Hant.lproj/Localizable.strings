@@ -36,7 +36,7 @@
 "traffic.title" = "網路流量";
 "traffic.description" = "依 App 查看即時網路速度和本次執行的累計流量。";
 "traffic.refresh" = "重新整理網路流量";
-"traffic.viewAll" = "查看所有 App";
+"traffic.viewAll" = "檢視全部";
 "traffic.noApps" = "目前沒有活躍的網路 App";
 "traffic.unavailable" = "暫時無法讀取網路流量";
 "traffic.emptyDescription" = "建立網路連線後，流量資料會自動出現在這裡。";
@@ -511,7 +511,6 @@
 "clipboard.storageLimitValue" = "%d MB";
 "clipboard.unlimited" = "不限制";
 "clipboard.cleanupDescription" = "達到儲存數量、保留天數或佔用空間限制時，自動清理最早的非置頂記錄。";
-"clipboard.autoPaste" = "複製後自動貼到上一個 App";
 "clipboard.primaryAction" = "預設動作";
 "clipboard.primaryAction.copy" = "複製到剪貼簿";
 "clipboard.primaryAction.paste" = "貼到上一個 App";
@@ -1008,7 +1007,6 @@
 "traffic.tab.history" = "歷史趨勢";
 "traffic.tab.diagnostics" = "診斷與資料";
 "traffic.topApps" = "高流量 App";
-"traffic.viewAll" = "檢視全部";
 "clipboard.applicationPolicies" = "應用程式策略";
 "clipboard.applicationPolicies.description" = "按 Bundle ID 為不同應用程式覆蓋記錄和自動貼上行為。";
 "clipboard.applicationPolicies.bundleID" = "Bundle ID";

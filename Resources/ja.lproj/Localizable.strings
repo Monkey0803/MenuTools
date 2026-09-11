@@ -36,7 +36,7 @@
 "traffic.title" = "ネットワーク通信量";
 "traffic.description" = "App ごとのリアルタイム通信速度と今回の累計通信量を表示します。";
 "traffic.refresh" = "ネットワーク通信量を更新";
-"traffic.viewAll" = "すべての App を表示";
+"traffic.viewAll" = "すべて表示";
 "traffic.noApps" = "アクティブなネットワーク App なし";
 "traffic.unavailable" = "ネットワーク通信量を一時的に取得できません";
 "traffic.emptyDescription" = "ネットワーク接続が有効になると通信量が表示されます。";
@@ -511,7 +511,6 @@
 "clipboard.storageLimitValue" = "%d MB";
 "clipboard.unlimited" = "無制限";
 "clipboard.cleanupDescription" = "件数、保持期間、容量の上限に達すると、古い未固定項目を自動的に削除します。";
-"clipboard.autoPaste" = "コピー後に前の App へ自動ペースト";
 "clipboard.primaryAction" = "デフォルト操作";
 "clipboard.primaryAction.copy" = "クリップボードにコピー";
 "clipboard.primaryAction.paste" = "前の App にペースト";
@@ -1008,7 +1007,6 @@
 "traffic.tab.history" = "履歴";
 "traffic.tab.diagnostics" = "診断とデータ";
 "traffic.topApps" = "通信量の多い App";
-"traffic.viewAll" = "すべて表示";
 "clipboard.applicationPolicies" = "アプリ別ポリシー";
 "clipboard.applicationPolicies.description" = "Bundle ID ごとに記録と自動ペーストを設定します。";
 "clipboard.applicationPolicies.bundleID" = "Bundle ID";

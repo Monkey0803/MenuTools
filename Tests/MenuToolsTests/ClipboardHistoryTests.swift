@@ -1547,6 +1547,30 @@ func clipboardAutoPasteResultsExposeClearFeedback() {
     #expect(ClipboardCopyFeedback(autoPasteResult: .failed) == .pasteFailed)
 }
 
+@Test("清理系统剪贴板会区分已清空和本来就为空")
+@MainActor
+func clipboardClearPublishesFeedback() {
+    let recorder = ClipboardFeedbackRecorder()
+    let pasteboard = NSPasteboard(name: NSPasteboard.Name("MenuToolsTests.\(UUID().uuidString)"))
+    let service = ClipboardHistoryService(
+        persistenceURL: nil,
+        pasteboard: pasteboard,
+        feedbackPresenter: { recorder.show($0) }
+    )
+
+    pasteboard.clearContents()
+    pasteboard.setString("待清理内容", forType: .string)
+
+    #expect(service.clearSystemClipboard())
+    #expect(pasteboard.string(forType: .string) == nil)
+    #expect(recorder.feedbacks.last == .clipboardCleared)
+    #expect(ClipboardCopyFeedback.clipboardCleared.localizationKey == "status.clipboardCleared")
+
+    #expect(service.clearSystemClipboard() == false)
+    #expect(recorder.feedbacks.last == .clipboardAlreadyEmpty)
+    #expect(ClipboardCopyFeedback.clipboardAlreadyEmpty.localizationKey == "cleanup.clipboardEmpty")
+}
+
 @Test("删除历史支持多选并在短暂窗口内撤销")
 @MainActor
 func clipboardHistoryMultipleRemovalCanBeUndone() async {

@@ -1951,7 +1951,9 @@ struct ClipboardHistoryPopover: View {
             .background(.quaternary.opacity(0.35), in: .rect(cornerRadius: 9))
 
             if let copyFeedback {
-                let isSuccess = copyFeedback == .copied || copyFeedback == .pasted
+                let isSuccess = copyFeedback == .copied
+                    || copyFeedback == .pasted
+                    || copyFeedback == .clipboardCleared
                 Label(
                     L(copyFeedback.localizationKey),
                     systemImage: isSuccess ? "checkmark.circle.fill" : "exclamationmark.triangle.fill"

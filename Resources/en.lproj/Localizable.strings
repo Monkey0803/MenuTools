@@ -36,7 +36,7 @@
 "traffic.title" = "Network Traffic";
 "traffic.description" = "View live network speeds and session totals for each app.";
 "traffic.refresh" = "Refresh network traffic";
-"traffic.viewAll" = "View all apps";
+"traffic.viewAll" = "View all";
 "traffic.noApps" = "No active network apps";
 "traffic.unavailable" = "Network traffic is temporarily unavailable";
 "traffic.emptyDescription" = "Traffic data will appear here when network connections are active.";
@@ -511,7 +511,6 @@
 "clipboard.storageLimitValue" = "%d MB";
 "clipboard.unlimited" = "Unlimited";
 "clipboard.cleanupDescription" = "The oldest unpinned entries are removed when an item, retention, or storage limit is reached.";
-"clipboard.autoPaste" = "Paste into previous app after copying";
 "clipboard.primaryAction" = "Default action";
 "clipboard.primaryAction.copy" = "Copy to Clipboard";
 "clipboard.primaryAction.paste" = "Paste into Previous App";
@@ -1008,7 +1007,6 @@
 "traffic.tab.history" = "History";
 "traffic.tab.diagnostics" = "Diagnostics";
 "traffic.topApps" = "Top apps";
-"traffic.viewAll" = "View all";
 "clipboard.applicationPolicies" = "App policies";
 "clipboard.applicationPolicies.description" = "Override recording and paste behavior for individual apps by bundle ID.";
 "clipboard.applicationPolicies.bundleID" = "Bundle ID";
