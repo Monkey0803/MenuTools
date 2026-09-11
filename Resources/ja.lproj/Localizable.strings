@@ -113,6 +113,11 @@
 "traffic.alert.description" = "しきい値超過時に通知（App ごとに 5 分間隔）";
 "traffic.notification.title" = "MenuTools · %@";
 "traffic.notification.body" = "ネットワーク通信量が %@/s に達しました";
+"traffic.notification.permission" = "通知";
+"traffic.notification.permission.authorized" = "許可済み";
+"traffic.notification.permission.denied" = "通知が許可されていないため、通知は届きません";
+"traffic.notification.permission.notRequested" = "通知を初めて有効にしたときに確認されます";
+"traffic.notification.openSettings" = "システム設定を開く";
 "traffic.menuBar" = "メニューバー速度";
 "traffic.menuBar.off" = "オフ";
 "traffic.menuBar.total" = "合計速度";
@@ -989,6 +994,7 @@
 "plugin.permission.accessibility" = "アクセシビリティ";
 "plugin.permission.automation" = "オートメーション";
 "plugin.permission.bluetooth" = "Bluetooth";
+"plugin.permission.notifications" = "通知";
 "plugin.permission.screenRecording" = "画面収録";
 "plugin.permission.systemAudioRecording" = "システムオーディオ収録";
 "plugin.category.system" = "システム";

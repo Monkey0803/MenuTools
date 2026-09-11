@@ -213,6 +213,56 @@ func historyChartHoverUsesSharedHitTest() throws {
     #expect(source.contains(".frame(height: NetworkTrafficHistoryChartLayout.blockHeight(hasHoverDetail:"))
 }
 
+@Test("通知授权状态会映射为提醒可用性")
+func notificationAuthorizationMapsSystemStatus() {
+    #expect(NetworkTrafficNotificationAuthorization.permission(for: .notDetermined) == .notRequested)
+    #expect(NetworkTrafficNotificationAuthorization.permission(for: .denied) == .denied)
+    #expect(NetworkTrafficNotificationAuthorization.permission(for: .authorized) == .authorized)
+    #expect(NetworkTrafficNotificationAuthorization.permission(for: .provisional) == .authorized)
+    // 每个界面状态都要有文案，否则被拒时用户只能看到键名。
+    #expect(NetworkTrafficNotificationPermission.allCases.count == 3)
+    #expect(NetworkTrafficNotificationPermission.allCases.allSatisfy { $0.titleKey.hasPrefix("traffic.notification.permission.") })
+}
+
+@Test("服务会把系统通知授权状态暴露给设置页")
+@MainActor
+func serviceExposesNotificationPermission() async {
+    let alerter = TestNetworkTrafficAlerter()
+    alerter.permission = .denied
+    let service = NetworkTrafficService(
+        provider: TestNetworkTrafficProvider(
+            readings: [NetworkTrafficReading(timestamp: 0, apps: [], status: .commandUnavailable)]
+        ),
+        historyStore: RecordingNetworkTrafficHistoryStore(buckets: []),
+        userDefaults: UserDefaults(suiteName: "NetworkTrafficNotificationTests.\(UUID().uuidString)")!,
+        alerter: alerter
+    )
+
+    await service.refreshNotificationPermission()
+    #expect(service.notificationPermission == .denied)
+
+    alerter.permission = .authorized
+    await service.refreshNotificationPermission()
+    #expect(service.notificationPermission == .authorized)
+}
+
+@Test("开启提醒会请求通知授权并回读状态")
+@MainActor
+func enablingAlertRequestsNotificationPermission() async {
+    let alerter = TestNetworkTrafficAlerter()
+    let service = NetworkTrafficService(
+        provider: TestNetworkTrafficProvider(
+            readings: [NetworkTrafficReading(timestamp: 0, apps: [], status: .commandUnavailable)]
+        ),
+        historyStore: RecordingNetworkTrafficHistoryStore(buckets: []),
+        userDefaults: UserDefaults(suiteName: "NetworkTrafficNotificationRequestTests.\(UUID().uuidString)")!,
+        alerter: alerter
+    )
+
+    service.alertThresholdBytesPerSecond = 1_024 * 1_024
+    #expect(alerter.permissionRequestCount == 1)
+}
+
 private func networkTrafficSettingsViewSource() throws -> String {
     let projectRoot = URL(fileURLWithPath: #filePath)
         .deletingLastPathComponent()
@@ -1528,8 +1578,16 @@ private final class TestNetworkTrafficProvider: NetworkTrafficProviding, @unchec
 private final class TestNetworkTrafficAlerter: NetworkTrafficAlerting {
     private(set) var sentAppIDs: [String] = []
     private(set) var sentQuotaStages: [NetworkTrafficQuotaStage] = []
+    private(set) var permissionRequestCount = 0
+    var permission: NetworkTrafficNotificationPermission = .notRequested
 
-    func requestPermission() {}
+    func requestPermission() {
+        permissionRequestCount += 1
+    }
+
+    func currentPermission() async -> NetworkTrafficNotificationPermission {
+        permission
+    }
 
     func send(app: NetworkAppTrafficSnapshot, threshold: Int64) {
         sentAppIDs.append(app.id)

@@ -42,20 +42,20 @@ enum BuiltInPluginCatalog {
                 category: .system,
                 symbol: "gauge.with.dots.needle.67percent",
                 permissions: [.bluetooth],
-                stop: { BLEBatteryMonitor.shared.stop() }
+                // 网络状态卡片属于本插件，它的后台采样也由本插件启停。
+                start: { NetworkStatusService.shared.beginMonitoring() },
+                stop: {
+                    NetworkStatusService.shared.endMonitoring()
+                    BLEBatteryMonitor.shared.stop()
+                }
             ),
             registration(
                 id: .networkTraffic,
                 category: .system,
                 symbol: "arrow.up.arrow.down.circle",
-                start: {
-                    NetworkStatusService.shared.startMonitoring()
-                    NetworkTrafficService.shared.start()
-                },
-                stop: {
-                    NetworkTrafficService.shared.stop()
-                    NetworkStatusService.shared.stopMonitoring()
-                }
+                permissions: [.notifications],
+                start: { NetworkTrafficService.shared.start() },
+                stop: { NetworkTrafficService.shared.stop() }
             ),
             registration(
                 id: .clipboard,

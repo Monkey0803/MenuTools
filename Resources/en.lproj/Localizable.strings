@@ -113,6 +113,11 @@
 "traffic.alert.description" = "Notify above the threshold, at most once per app every 5 minutes";
 "traffic.notification.title" = "MenuTools · %@";
 "traffic.notification.body" = "Network traffic reached %@/s";
+"traffic.notification.permission" = "Notifications";
+"traffic.notification.permission.authorized" = "Allowed";
+"traffic.notification.permission.denied" = "Notifications are blocked, so alerts will not arrive";
+"traffic.notification.permission.notRequested" = "macOS asks when you first enable alerts";
+"traffic.notification.openSettings" = "Open System Settings";
 "traffic.menuBar" = "Menu bar speed";
 "traffic.menuBar.off" = "Off";
 "traffic.menuBar.total" = "Total speed";
@@ -989,6 +994,7 @@
 "plugin.permission.accessibility" = "Accessibility";
 "plugin.permission.automation" = "Automation";
 "plugin.permission.bluetooth" = "Bluetooth";
+"plugin.permission.notifications" = "Notifications";
 "plugin.permission.screenRecording" = "Screen Recording";
 "plugin.permission.systemAudioRecording" = "System Audio Recording";
 "plugin.category.system" = "System";

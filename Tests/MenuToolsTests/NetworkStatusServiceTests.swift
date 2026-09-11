@@ -95,3 +95,57 @@ func networkTransitionDetectorRecordsMeaningfulChanges() {
     #expect(event?.timestamp == Date(timeIntervalSince1970: 100))
     #expect(NetworkStatusTransitionDetector.transition(from: current, to: current, at: Date()) == nil)
 }
+
+@Test("网络状态监控按观察者计数启停，调用方不会互相停掉")
+@MainActor
+func networkStatusMonitoringUsesObserverCount() {
+    let service = NetworkStatusService(
+        provider: StubNetworkStatusProvider(),
+        probe: StubNetworkProbe()
+    )
+
+    #expect(!service.isMonitoring)
+
+    // 功能中心与网络流量设置页可以同时持有监控。
+    service.beginMonitoring()
+    service.beginMonitoring()
+    #expect(service.isMonitoring)
+
+    service.endMonitoring()
+    #expect(service.isMonitoring)
+
+    service.endMonitoring()
+    #expect(!service.isMonitoring)
+
+    // 多余的释放不会把计数降到负数，也不会影响后续重新启用。
+    service.endMonitoring()
+    #expect(!service.isMonitoring)
+    service.beginMonitoring()
+    #expect(service.isMonitoring)
+    service.endMonitoring()
+    #expect(!service.isMonitoring)
+}
+
+private struct StubNetworkStatusProvider: NetworkStatusProviding {
+    func read() -> NetworkStatusReading {
+        NetworkStatusReading(
+            addresses: [NetworkIPv4Address(interfaceName: "en0", address: "192.168.1.8", isUp: true)],
+            interfaceName: "en0",
+            wifiName: "Office",
+            vpnConnected: false
+        )
+    }
+}
+
+private struct StubNetworkProbe: NetworkProbe {
+    func publicIPv4() async throws -> String { "203.0.113.8" }
+    func latencyMilliseconds() async throws -> Int { 12 }
+    func networkQuality() async -> NetworkQualityMetrics {
+        NetworkQualityMetrics(
+            latencyMilliseconds: 12,
+            jitterMilliseconds: 1,
+            packetLossPercent: 0,
+            dnsMilliseconds: 4
+        )
+    }
+}

@@ -1749,9 +1749,38 @@ struct DefaultNetworkTrafficProvider: NetworkTrafficProviding {
 
 }
 
+/// 通知授权状态；被拒后高流量与额度提醒不会送达，设置页需要给出可恢复的出口。
+enum NetworkTrafficNotificationPermission: String, CaseIterable, Equatable, Sendable {
+    case notRequested
+    case authorized
+    case denied
+
+    var titleKey: String {
+        switch self {
+        case .notRequested: return "traffic.notification.permission.notRequested"
+        case .authorized: return "traffic.notification.permission.authorized"
+        case .denied: return "traffic.notification.permission.denied"
+        }
+    }
+}
+
+enum NetworkTrafficNotificationAuthorization {
+    /// 系统授权状态到界面状态的映射；纯函数，便于回归。
+    /// `.ephemeral` 在 macOS 上不可用，交给 @unknown default 保持中性提示。
+    static func permission(for status: UNAuthorizationStatus) -> NetworkTrafficNotificationPermission {
+        switch status {
+        case .notDetermined: return .notRequested
+        case .denied: return .denied
+        case .authorized, .provisional: return .authorized
+        @unknown default: return .notRequested
+        }
+    }
+}
+
 @MainActor
 protocol NetworkTrafficAlerting {
     func requestPermission()
+    func currentPermission() async -> NetworkTrafficNotificationPermission
     func send(app: NetworkAppTrafficSnapshot, threshold: Int64)
     func sendQuota(stage: NetworkTrafficQuotaStage, usedBytes: Int64, quotaBytes: Int64)
 }
@@ -1762,6 +1791,20 @@ final class UserNotificationNetworkTrafficAlerter: NetworkTrafficAlerting {
 
     func requestPermission() {
         center.requestAuthorization(options: [.alert, .sound]) { _, _ in }
+    }
+
+    func currentPermission() async -> NetworkTrafficNotificationPermission {
+        // 用回调版本读出授权状态：UNNotificationSettings 不是 Sendable，
+        // 只在回调内部取 Sendable 的状态值，避免跨 actor 传递。
+        await withCheckedContinuation { continuation in
+            center.getNotificationSettings { settings in
+                continuation.resume(
+                    returning: NetworkTrafficNotificationAuthorization.permission(
+                        for: settings.authorizationStatus
+                    )
+                )
+            }
+        }
     }
 
     func send(app: NetworkAppTrafficSnapshot, threshold: Int64) {
@@ -1866,6 +1909,7 @@ final class NetworkTrafficService {
     }
     private(set) var query: NetworkTrafficQuery
     private(set) var isPaused = false
+    private(set) var notificationPermission: NetworkTrafficNotificationPermission = .notRequested
 
     var diagnostics: NetworkTrafficDiagnostics {
         NetworkTrafficDiagnostics(
@@ -1938,6 +1982,11 @@ final class NetworkTrafficService {
             }
             if newValue > 0 { alerter.requestPermission() }
         }
+    }
+
+    /// 重新读取系统通知授权状态，设置页据此提示提醒是否可用。
+    func refreshNotificationPermission() async {
+        notificationPermission = await alerter.currentPermission()
     }
 
     func start() {

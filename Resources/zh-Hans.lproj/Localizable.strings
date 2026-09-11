@@ -113,6 +113,11 @@
 "traffic.alert.description" = "超过阈值时通知，每个 App 每 5 分钟最多一次";
 "traffic.notification.title" = "MenuTools · %@";
 "traffic.notification.body" = "网络流量已达到 %@/s";
+"traffic.notification.permission" = "通知";
+"traffic.notification.permission.authorized" = "已授权";
+"traffic.notification.permission.denied" = "系统未允许通知，提醒不会送达";
+"traffic.notification.permission.notRequested" = "开启提醒时系统会询问";
+"traffic.notification.openSettings" = "打开系统设置";
 "traffic.menuBar" = "菜单栏网速";
 "traffic.menuBar.off" = "关闭";
 "traffic.menuBar.total" = "总速率";
@@ -989,6 +994,7 @@
 "plugin.permission.accessibility" = "辅助功能";
 "plugin.permission.automation" = "自动化";
 "plugin.permission.bluetooth" = "蓝牙";
+"plugin.permission.notifications" = "通知";
 "plugin.permission.screenRecording" = "屏幕录制";
 "plugin.permission.systemAudioRecording" = "系统音频录制";
 "plugin.category.system" = "系统";

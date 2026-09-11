@@ -185,14 +185,19 @@ struct NetworkTrafficSettingsView: View {
         }
         .task {
             interfaceInfos = NetworkTrafficInterfaceInspector.read()
+            networkStatusService.beginMonitoring()
+            defer { networkStatusService.endMonitoring() }
             networkStatusService.refresh()
             service.start()
             service.beginLiveView()
+            await service.refreshNotificationPermission()
             defer { service.endLiveView() }
             while !Task.isCancelled {
                 try? await Task.sleep(for: .seconds(30))
                 guard !Task.isCancelled else { return }
                 interfaceInfos = NetworkTrafficInterfaceInspector.read()
+                // 系统授权弹窗是异步的，进入页面后定期回读，用户作答后无需重开页面。
+                await service.refreshNotificationPermission()
             }
         }
         .alert(L("traffic.clearHistoryTitle"), isPresented: $showingClearHistory) {
@@ -424,6 +429,26 @@ struct NetworkTrafficSettingsView: View {
                 Text(L("traffic.alert.description"))
                     .font(.caption2)
                     .foregroundStyle(.tertiary)
+            }
+
+            LabeledContent(L("traffic.notification.permission")) {
+                switch service.notificationPermission {
+                case .denied:
+                    HStack(spacing: 8) {
+                        Text(L(NetworkTrafficNotificationPermission.denied.titleKey))
+                            .foregroundStyle(.orange)
+                        Button(L("traffic.notification.openSettings"), action: openNotificationSettings)
+                    }
+                case .authorized:
+                    Label(
+                        L(NetworkTrafficNotificationPermission.authorized.titleKey),
+                        systemImage: "checkmark.circle.fill"
+                    )
+                    .foregroundStyle(.green)
+                case .notRequested:
+                    Text(L(NetworkTrafficNotificationPermission.notRequested.titleKey))
+                        .foregroundStyle(.secondary)
+                }
             }
 
             HStack(spacing: 8) {
@@ -883,6 +908,13 @@ struct NetworkTrafficSettingsView: View {
             formattedBytes(point.downloadedBytes),
             formattedBytes(point.uploadedBytes)
         )
+    }
+
+    private func openNotificationSettings() {
+        guard let url = URL(
+            string: "x-apple.systempreferences:com.apple.Notifications-Settings.extension"
+        ) else { return }
+        NSWorkspace.shared.open(url)
     }
 
     private func appRow(_ app: NetworkAppTrafficSnapshot) -> some View {

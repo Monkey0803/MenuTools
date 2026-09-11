@@ -314,6 +314,10 @@ final class NetworkStatusService {
     private let now: () -> Date
     private var previousEnvironment: NetworkEnvironmentSignature?
     private var monitorTimer: Timer?
+    private var monitoringObservers = 0
+
+    /// 是否正在后台采样；计数归零后为 false。
+    var isMonitoring: Bool { monitorTimer != nil }
 
     private(set) var snapshot = NetworkStatusSnapshot.empty
     private(set) var isPublicIPLoading = false
@@ -349,7 +353,10 @@ final class NetworkStatusService {
         snapshot = refreshed
     }
 
-    func startMonitoring() {
+    /// 监控按观察者计数：功能中心与网络流量设置页可以各自持有，
+    /// 任一方释放都不会停掉另一方仍在使用的采样。
+    func beginMonitoring() {
+        monitoringObservers += 1
         guard monitorTimer == nil else { return }
         refresh()
         monitorTimer = Timer.scheduledTimer(withTimeInterval: 30, repeats: true) { [weak self] _ in
@@ -359,7 +366,9 @@ final class NetworkStatusService {
         }
     }
 
-    func stopMonitoring() {
+    func endMonitoring() {
+        monitoringObservers = max(monitoringObservers - 1, 0)
+        guard monitoringObservers == 0 else { return }
         monitorTimer?.invalidate()
         monitorTimer = nil
     }

@@ -113,6 +113,11 @@
 "traffic.alert.description" = "超過門檻時通知，每個 App 每 5 分鐘最多一次";
 "traffic.notification.title" = "MenuTools · %@";
 "traffic.notification.body" = "網路流量已達到 %@/s";
+"traffic.notification.permission" = "通知";
+"traffic.notification.permission.authorized" = "已授權";
+"traffic.notification.permission.denied" = "系統未允許通知，提醒不會送達";
+"traffic.notification.permission.notRequested" = "開啟提醒時系統會詢問";
+"traffic.notification.openSettings" = "打開系統設定";
 "traffic.menuBar" = "選單列網速";
 "traffic.menuBar.off" = "關閉";
 "traffic.menuBar.total" = "總速率";
@@ -989,6 +994,7 @@
 "plugin.permission.accessibility" = "輔助使用";
 "plugin.permission.automation" = "自動化";
 "plugin.permission.bluetooth" = "藍牙";
+"plugin.permission.notifications" = "通知";
 "plugin.permission.screenRecording" = "螢幕錄製";
 "plugin.permission.systemAudioRecording" = "系統音訊錄製";
 "plugin.category.system" = "系統";

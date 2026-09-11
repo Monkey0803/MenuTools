@@ -29,6 +29,7 @@ enum BuiltInPluginPermission: String, Codable, CaseIterable, Hashable, Sendable 
     case accessibility
     case automation
     case bluetooth
+    case notifications
     case screenRecording
     case systemAudioRecording
 }

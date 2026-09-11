@@ -188,6 +188,7 @@ enum LocalizationAudit {
         // 存储与网络流量（NetworkTrafficSection 是 private，这里显式列出；新增 tab 需同步）
         keys.formUnion(StorageCategory.allCases.map(\.titleKey))
         keys.formUnion(["overview", "apps", "history", "diagnostics"].map { "traffic.tab.\($0)" })
+        keys.formUnion(NetworkTrafficNotificationPermission.allCases.map(\.titleKey))
         // App 音量
         keys.formUnion(AppVolumeEqualizerPreset.allCases.map(\.titleKey))
         keys.formUnion(AppVolumeSessionFilter.allCases.map { "volume.filter.\($0.rawValue)" })

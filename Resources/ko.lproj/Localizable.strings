@@ -113,6 +113,11 @@
 "traffic.alert.description" = "임계값 초과 시 알림, 앱별 5분에 한 번";
 "traffic.notification.title" = "MenuTools · %@";
 "traffic.notification.body" = "네트워크 트래픽이 %@/s에 도달했습니다";
+"traffic.notification.permission" = "알림";
+"traffic.notification.permission.authorized" = "허용됨";
+"traffic.notification.permission.denied" = "알림이 허용되지 않아 알림이 전달되지 않습니다";
+"traffic.notification.permission.notRequested" = "알림을 처음 켤 때 시스템이 확인합니다";
+"traffic.notification.openSettings" = "시스템 설정 열기";
 "traffic.menuBar" = "메뉴 막대 속도";
 "traffic.menuBar.off" = "끔";
 "traffic.menuBar.total" = "전체 속도";
@@ -989,6 +994,7 @@
 "plugin.permission.accessibility" = "손쉬운 사용";
 "plugin.permission.automation" = "자동화";
 "plugin.permission.bluetooth" = "Bluetooth";
+"plugin.permission.notifications" = "알림";
 "plugin.permission.screenRecording" = "화면 기록";
 "plugin.permission.systemAudioRecording" = "시스템 오디오 기록";
 "plugin.category.system" = "시스템";
