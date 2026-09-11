@@ -81,7 +81,7 @@ enum ClipboardShortcutError: LocalizedError, Equatable {
     }
 }
 
-enum ClipboardShortcutRegistrationMode: Equatable, Sendable {
+enum ClipboardShortcutRegistrationMode: Equatable, Sendable, CaseIterable {
     case disabled
     case carbonExclusive
     case monitorFallback

@@ -1000,7 +1000,7 @@ enum ClipboardTextTransform: String, CaseIterable, Identifiable, Sendable {
     }
 }
 
-enum ClipboardCopyFeedback: Sendable, Equatable {
+enum ClipboardCopyFeedback: Sendable, Equatable, CaseIterable {
     case copied
     case pasted
     case accessibilityPermissionDenied
