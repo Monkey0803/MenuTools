@@ -64,10 +64,12 @@ enum BuiltInPluginCatalog {
                 start: {
                     ClipboardHistoryService.shared.startMonitoring()
                     ClipboardShortcutService.shared.start()
+                    ClipboardAutoSyncService.shared.start()
                 },
                 stop: {
                     ClipboardShortcutService.shared.stop()
                     ClipboardHistoryService.shared.stopMonitoring()
+                    ClipboardAutoSyncService.shared.stop()
                 }
             ),
             registration(

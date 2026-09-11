@@ -76,7 +76,7 @@ A lightweight system toolkit that lives in the macOS menu bar. MenuTools uses th
 | Clipboard History | Keeps text, rich text, images, links, and files (including PDFs) with search, category/source/time filters, pinning, batch pin and sensitive marking, plain-text paste, and direct paste. |
 | Clipboard Tools | Sequential paste queue, text transforms (case, join lines, URL encoding, JSON formatting), snippet templates such as `{{date}}` and `{{clipboard}}`, plus on-device OCR and QR recognition for images. |
 | Clipboard Privacy | Pause recording, exclude apps, override recording and retention per bundle ID, and automatically hold back passwords, verification codes, card numbers, and custom keywords with a short expiry. |
-| Clipboard Management | Automatic cleanup by item count, retention days, and storage size, plus passphrase-encrypted archive import/export (`.mtclip`) and shared-folder sync of pinned items and snippets. |
+| Clipboard Management | Automatic cleanup by item count, retention days, and storage size, plus passphrase-encrypted archive import/export (`.mtclip`) and shared-folder sync of pinned items and snippets, with an optional automatic interval, a keychain-stored passphrase, and last-sync/error status. |
 | Clipboard Shortcut | A global shortcut opens the clipboard panel and falls back to a monitor listener when exclusive registration is unavailable. |
 | System Resources | Shows CPU, memory pressure, free disk space, and network rates. |
 | Network Traffic | Per-app live upload/download rates, connection details, and 30-day history with interface/protocol filtering, quota alerts, redacted export, and data clearing. |
@@ -204,7 +204,7 @@ If permission was denied, enable it again in **System Settings → Privacy & Sec
 | DerivedData | Background file-system size calculation and cleanup |
 | Quick Action Center | Process commands, Finder AppleScript, System Settings URL, and `screencapture` |
 | Screenshot Tools | ScreenCaptureKit native-pixel capture, frozen selection, window capture, multi-display compositing, Vision motion estimation, PNG stitching, and OCR/QR recognition; captures can be copied to the clipboard or opened in the built-in annotator |
-| Clipboard History | One-second `NSPasteboard` polling, SQLite/WAL metadata with binary blobs stored separately, passphrase-encrypted archives, shared-folder sync, Vision OCR/QR recognition behind a process-wide gate with retry, and synthesized ⌘V paste via CGEvent |
+| Clipboard History | One-second `NSPasteboard` polling, SQLite metadata with binary blobs stored separately (schema version guard and migration), passphrase-encrypted archives, scheduled shared-folder sync with a keychain passphrase, Vision OCR/QR recognition behind a process-wide gate with retry and a manual retry action, and synthesized ⌘V paste via CGEvent |
 | App Volume Management | Public Core Audio Process Tap, a private aggregate device, and IOProc routing; routes only apps below 100% and destroys taps to restore original audio on exit or failure |
 | Network Status | CoreWLAN, interface addresses, VPN state, and on-demand URLSession probes |
 | Network Traffic | `/usr/bin/nettop` process sampling, SQLite/WAL history, diagnostics, quota alerts, and optional redacted exports |

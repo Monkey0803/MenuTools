@@ -6,11 +6,12 @@ import UniformTypeIdentifiers
 struct ClipboardPrivacySettingsSection: View {
     @Bindable var historyService: ClipboardHistoryService
     @State private var snippetService = ClipboardSnippetService.shared
+    @State private var autoSync = ClipboardAutoSyncService.shared
     @State private var keywordInput = ""
     @State private var archivePassphrase = ""
     @State private var archiveStatus: ClipboardArchiveOperationStatus?
     @State private var isArchiveOperationInProgress = false
-    @State private var syncFilePath = UserDefaults.standard.string(forKey: "clipboard.syncFilePath")
+    @State private var syncFilePath = UserDefaults.standard.string(forKey: ClipboardSyncSettings.filePathKey)
     @State private var pendingArchiveAction: ClipboardArchivePendingAction?
     @State private var applicationPolicyBundleID = ""
     @State private var applicationPolicyRecord = true
@@ -238,6 +239,68 @@ struct ClipboardPrivacySettingsSection: View {
             Text(L("clipboard.sync.description"))
                 .font(.caption)
                 .foregroundStyle(.secondary)
+
+            Divider()
+
+            Toggle(L("clipboard.sync.auto"), isOn: Binding(
+                get: { autoSync.isEnabled },
+                set: { autoSync.setEnabled($0) }
+            ))
+            .disabled(syncFilePath == nil || isArchiveOperationInProgress)
+
+            HStack(spacing: 8) {
+                Picker(L("clipboard.sync.interval"), selection: Binding(
+                    get: { autoSync.intervalMinutes },
+                    set: { autoSync.setIntervalMinutes($0) }
+                )) {
+                    ForEach(ClipboardSyncSettings.intervalOptions, id: \.self) { minutes in
+                        Text(L("clipboard.sync.intervalValue", minutes)).tag(minutes)
+                    }
+                }
+                .disabled(!autoSync.isEnabled)
+
+                if autoSync.hasStoredPassphrase {
+                    Button(L("clipboard.sync.clearPassphrase")) {
+                        autoSync.clearStoredPassphrase()
+                        autoSync.clearLastError()
+                    }
+                } else {
+                    Button(L("clipboard.sync.savePassphrase")) {
+                        autoSync.storePassphrase(archivePassphrase)
+                        autoSync.clearLastError()
+                    }
+                    .disabled(archivePassphrase.isEmpty)
+                }
+            }
+
+            Label(
+                autoSync.hasStoredPassphrase
+                    ? L("clipboard.sync.passphraseSaved")
+                    : L("clipboard.sync.auto.notReady"),
+                systemImage: autoSync.hasStoredPassphrase ? "checkmark.seal" : "exclamationmark.triangle"
+            )
+            .font(.caption)
+            .foregroundStyle(autoSync.hasStoredPassphrase ? AnyShapeStyle(.secondary) : AnyShapeStyle(.orange))
+
+            if let lastSyncAt = autoSync.lastSyncAt {
+                Text(L("clipboard.sync.lastSync", lastSyncAt.formatted(date: .abbreviated, time: .shortened)))
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+            } else if autoSync.isEnabled {
+                Text(L("clipboard.sync.neverSynced"))
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+            }
+
+            if let syncError = autoSync.lastError {
+                Label(L("clipboard.sync.failed", syncError), systemImage: "exclamationmark.triangle.fill")
+                    .font(.caption)
+                    .foregroundStyle(.red)
+            }
+
+            Text(L("clipboard.sync.auto.description"))
+                .font(.caption)
+                .foregroundStyle(.secondary)
         }
         .padding(14)
         .background(.quaternary.opacity(0.28), in: .rect(cornerRadius: 14))
@@ -423,7 +486,9 @@ struct ClipboardPrivacySettingsSection: View {
         guard panel.runModal() == .OK, let folderURL = panel.url else { return }
         let fileURL = folderURL.appendingPathComponent("MenuTools-Clipboard.mtclipsync")
         syncFilePath = fileURL.path
-        UserDefaults.standard.set(fileURL.path, forKey: "clipboard.syncFilePath")
+        UserDefaults.standard.set(fileURL.path, forKey: ClipboardSyncSettings.filePathKey)
+        autoSync.refreshStoredPassphraseState()
+        autoSync.clearLastError()
     }
 
     private func requestSynchronizeSharedFile() {
@@ -435,13 +500,9 @@ struct ClipboardPrivacySettingsSection: View {
 
     private func performSynchronizeSharedFile(at fileURL: URL) {
         let passphrase = archivePassphrase
-        let local = ClipboardArchiveDocument.current(
-            historyItems: historyService.items.filter(\.isPinned),
-            snippetGroups: snippetService.groups,
-            snippets: snippetService.snippets
-        )
         isArchiveOperationInProgress = true
         archiveStatus = nil
+        autoSync.clearLastError()
         Task { @MainActor in
             defer {
                 isArchiveOperationInProgress = false
@@ -449,19 +510,11 @@ struct ClipboardPrivacySettingsSection: View {
                     archivePassphrase = ""
                 }
             }
-            do {
-                let merged = try await Task.detached(priority: .utility) {
-                    try ClipboardSharedFileSync.synchronize(
-                        local: local,
-                        at: fileURL,
-                        passphrase: passphrase
-                    )
-                }.value
-                historyService.importItems(merged.historyItems)
-                snippetService.replaceImported(groups: merged.snippetGroups, snippets: merged.snippets)
+            // 手动同步与自动同步共用同一条链路，状态也记在同一处。
+            if await autoSync.synchronize(trigger: .manual, passphrase: passphrase) {
                 archiveStatus = .success(L("clipboard.sync.success"))
-            } catch {
-                archiveStatus = .failure(error.localizedDescription)
+            } else {
+                archiveStatus = .failure(autoSync.lastError ?? L("clipboard.sync.failed", ""))
             }
         }
     }
