@@ -213,6 +213,17 @@ swift Scripts/test_network_traffic.swift --duration 28800 --interval 10 --no-dow
 
 脚本会输出每次采样耗时、进程行数、非零流量行和汇总结果；之后在 MenuTools 设置页核对 App、速率和连接明细。
 
+### 剪贴板验证
+
+剪贴板的图片识别与自动粘贴依赖系统能力（Vision、辅助功能、CGEvent），可用独立脚本回归：
+
+```bash
+swift Scripts/test_clipboard_autopaste.swift                # 粘贴板读写、图片/富文本表示、Vision 二维码识别
+swift Scripts/test_clipboard_autopaste.swift --interactive   # 追加合成 ⌘V 的端到端粘贴验证（会覆盖系统剪贴板）
+```
+
+`--interactive` 需要先授予辅助功能权限，并在提示后 5 秒内点击任意可编辑输入框；默认非交互模式只使用私有粘贴板，不会改动系统剪贴板。
+
 ## 🔄 发布更新
 
 更新功能使用 **[Sparkle](https://github.com/sparkle-project/Sparkle)**，由 Sparkle 负责 appcast 检查、下载、Ed25519 签名校验、安装和重启：

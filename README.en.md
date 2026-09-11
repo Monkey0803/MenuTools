@@ -160,6 +160,17 @@ swift Scripts/test_network_traffic.swift --duration 28800 --interval 10 --no-dow
 
 The script reports sample duration, process-row counts, non-zero traffic rows, and a final summary. Then cross-check the matching app, rate, and connection details in MenuTools Settings.
 
+### Clipboard Verification
+
+Clipboard image recognition and auto-paste depend on system capabilities (Vision, Accessibility, CGEvent), so a standalone script covers them:
+
+```bash
+swift Scripts/test_clipboard_autopaste.swift                # pasteboard read/write, image and rich-text representations, Vision QR recognition
+swift Scripts/test_clipboard_autopaste.swift --interactive   # adds the end-to-end ⌘V paste check (overwrites the system clipboard)
+```
+
+`--interactive` requires Accessibility permission and a focused editable field within 5 seconds of the prompt. The default non-interactive mode uses a private pasteboard only and leaves the system clipboard untouched.
+
 ## Permissions
 
 Some features request permissions the first time they are used:
