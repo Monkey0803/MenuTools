@@ -31,7 +31,7 @@ enum ScreenshotCaptureMode: String, CaseIterable, Codable, Hashable, Identifiabl
 }
 
 /// 长截图在用户滚动、确认和写入过程中的可观察状态。
-enum ScreenshotLongCapturePhase: String, Equatable, Sendable {
+enum ScreenshotLongCapturePhase: String, CaseIterable, Equatable, Sendable {
     case ready
     case streaming
     case previewing

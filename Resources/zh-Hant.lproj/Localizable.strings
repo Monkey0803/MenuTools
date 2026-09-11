@@ -251,6 +251,7 @@
 "screenshot.editor.save" = "儲存";
 "screenshot.editSaved" = "編輯後的截圖已儲存到剪貼簿";
 "screenshot.editor.tool" = "標註工具";
+"screenshot.editor.tool.crop" = "裁切";
 "screenshot.editor.tool.pen" = "畫筆";
 "screenshot.editor.tool.arrow" = "箭頭";
 "screenshot.editor.tool.rectangle" = "矩形";
@@ -290,6 +291,8 @@
 "screenshot.shortcutSaved" = "截圖快捷鍵已儲存";
 "screenshot.error.busy" = "已有截圖工作正在執行";
 "screenshot.error.cancelled" = "截圖已取消";
+"screenshot.error.selectionCancelled" = "已取消選取範圍";
+"screenshot.error.selectionUnavailable" = "無法讀取螢幕畫面，請檢查螢幕錄製權限";
 "screenshot.error.capture" = "截圖失敗：%@";
 "screenshot.error.noWindow" = "找不到可截圖的最前端視窗";
 "screenshot.error.noSavedRegion" = "尚未儲存過截圖區域";
@@ -826,6 +829,7 @@
 "volume.error.permission" = "沒有系統音訊錄製權限，請在系統設定中允許 MenuTools。";
 "volume.error.format" = "目前音訊裝置格式暫不支援單 App 音量。";
 "volume.error.operation" = "%@失敗（錯誤 %d）";
+"volume.error.presetArchive" = "無法讀取該預設封存檔";
 "volume.shortcut" = "音量快速鍵";
 "volume.shortcutDescription" = "透過全域快速鍵隨時開啟音量管理面板。";
 "volume.shortcutSave" = "儲存快速鍵";
@@ -837,6 +841,13 @@
 "volume.filter.all" = "全部";
 "volume.filter.active" = "正在發聲";
 "volume.filter.favorites" = "僅收藏";
+"volume.sort.recent" = "最近發聲";
+"volume.sort.volume" = "依音量";
+"volume.sort.name" = "依名稱";
+"volume.group.browser" = "瀏覽器";
+"volume.group.meeting" = "會議";
+"volume.group.game" = "遊戲";
+"volume.group.other" = "其他";
 "volume.step" = "音量步長";
 "volume.boost" = "允許 App 增強到 150%（含限幅保護）";
 "volume.output.select" = "選擇輸出裝置";
@@ -877,6 +888,8 @@
 "volume.section.automation" = "自動化規則";
 "volume.automation.add" = "連線目前輸出裝置時套用";
 "volume.automation.desc" = "每個預設每天只會自動套用一次，避免覆蓋剛剛手動調整的音量。";
+"volume.hearing.warning" = "音量偏高且持續時間較長，建議降低音量以保護聽力";
+"volume.hud.muted" = "已靜音";
 
 /* 內建功能中心 */
 "settings.tab.plugins" = "功能";

@@ -251,6 +251,7 @@
 "screenshot.editor.save" = "Save";
 "screenshot.editSaved" = "Edited screenshot saved to clipboard";
 "screenshot.editor.tool" = "Annotation tool";
+"screenshot.editor.tool.crop" = "Crop";
 "screenshot.editor.tool.pen" = "Pen";
 "screenshot.editor.tool.arrow" = "Arrow";
 "screenshot.editor.tool.rectangle" = "Rectangle";
@@ -290,6 +291,8 @@
 "screenshot.shortcutSaved" = "Screenshot shortcut saved";
 "screenshot.error.busy" = "A screenshot is already in progress";
 "screenshot.error.cancelled" = "Screenshot cancelled";
+"screenshot.error.selectionCancelled" = "Selection cancelled";
+"screenshot.error.selectionUnavailable" = "Could not read the screen. Check Screen Recording permission.";
 "screenshot.error.capture" = "Screenshot failed: %@";
 "screenshot.error.noWindow" = "No frontmost window was found";
 "screenshot.error.noSavedRegion" = "No previous screenshot area is available";
@@ -826,6 +829,7 @@
 "volume.error.permission" = "System audio recording permission is missing. Allow MenuTools in System Settings.";
 "volume.error.format" = "The current audio device format does not support per-app volume.";
 "volume.error.operation" = "%@ failed (error %d)";
+"volume.error.presetArchive" = "Could not read the preset archive";
 "volume.shortcut" = "Volume Shortcut";
 "volume.shortcutDescription" = "Open the volume manager from anywhere.";
 "volume.shortcutSave" = "Save Shortcut";
@@ -837,6 +841,13 @@
 "volume.filter.all" = "All";
 "volume.filter.active" = "Playing Audio";
 "volume.filter.favorites" = "Favorites Only";
+"volume.sort.recent" = "Recently active";
+"volume.sort.volume" = "By volume";
+"volume.sort.name" = "By name";
+"volume.group.browser" = "Browser";
+"volume.group.meeting" = "Meeting";
+"volume.group.game" = "Game";
+"volume.group.other" = "Other";
 "volume.step" = "Volume Step";
 "volume.boost" = "Allow up to 150% app gain (limiter protected)";
 "volume.output.select" = "Choose Output Device";
@@ -877,6 +888,8 @@
 "volume.section.automation" = "Automation Rules";
 "volume.automation.add" = "Apply when this output connects";
 "volume.automation.desc" = "Each preset applies automatically at most once per day to avoid overwriting recent manual changes.";
+"volume.hearing.warning" = "Volume has stayed high for a while. Lower it to protect your hearing.";
+"volume.hud.muted" = "Muted";
 
 /* Built-in Feature Center */
 "settings.tab.plugins" = "Features";

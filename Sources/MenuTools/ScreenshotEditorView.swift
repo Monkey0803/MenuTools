@@ -6,7 +6,7 @@ import ImageIO
 import SwiftUI
 import UniformTypeIdentifiers
 
-private enum ScreenshotEditorTool: String, CaseIterable, Identifiable {
+enum ScreenshotEditorTool: String, CaseIterable, Identifiable {
     case crop
     case pen
     case arrow

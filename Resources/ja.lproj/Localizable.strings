@@ -251,6 +251,7 @@
 "screenshot.editor.save" = "保存";
 "screenshot.editSaved" = "編集したスクリーンショットをクリップボードに保存しました";
 "screenshot.editor.tool" = "注釈ツール";
+"screenshot.editor.tool.crop" = "トリミング";
 "screenshot.editor.tool.pen" = "ペン";
 "screenshot.editor.tool.arrow" = "矢印";
 "screenshot.editor.tool.rectangle" = "長方形";
@@ -290,6 +291,8 @@
 "screenshot.shortcutSaved" = "スクリーンショットショートカットを保存しました";
 "screenshot.error.busy" = "すでに撮影中です";
 "screenshot.error.cancelled" = "スクリーンショットをキャンセルしました";
+"screenshot.error.selectionCancelled" = "範囲選択をキャンセルしました";
+"screenshot.error.selectionUnavailable" = "画面を読み取れません。画面収録の権限を確認してください。";
 "screenshot.error.capture" = "撮影に失敗：%@";
 "screenshot.error.noWindow" = "最前面のウインドウが見つかりません";
 "screenshot.error.noSavedRegion" = "前回の撮影範囲がありません";
@@ -826,6 +829,7 @@
 "volume.error.permission" = "システムオーディオ録音の許可がありません。システム設定で MenuTools を許可してください。";
 "volume.error.format" = "現在のオーディオデバイス形式では App ごとの音量を利用できません。";
 "volume.error.operation" = "%@に失敗しました（エラー %d）";
+"volume.error.presetArchive" = "プリセットのアーカイブを読み取れません";
 "volume.shortcut" = "音量ショートカット";
 "volume.shortcutDescription" = "グローバルショートカットでいつでも音量管理を開きます。";
 "volume.shortcutSave" = "ショートカットを保存";
@@ -837,6 +841,13 @@
 "volume.filter.all" = "すべて";
 "volume.filter.active" = "再生中";
 "volume.filter.favorites" = "お気に入りのみ";
+"volume.sort.recent" = "最近の再生順";
+"volume.sort.volume" = "音量順";
+"volume.sort.name" = "名前順";
+"volume.group.browser" = "ブラウザ";
+"volume.group.meeting" = "会議";
+"volume.group.game" = "ゲーム";
+"volume.group.other" = "その他";
 "volume.step" = "音量ステップ";
 "volume.boost" = "Appゲインを150%まで許可（リミッター保護）";
 "volume.output.select" = "出力デバイスを選択";
@@ -877,6 +888,8 @@
 "volume.section.automation" = "自動化ルール";
 "volume.automation.add" = "現在の出力接続時に適用";
 "volume.automation.desc" = "直前の手動調整を上書きしないよう、各プリセットの自動適用は1日1回までです。";
+"volume.hearing.warning" = "高い音量が長時間続いています。聴力を守るため音量を下げてください。";
+"volume.hud.muted" = "ミュート中";
 
 /* 内蔵機能センター */
 "settings.tab.plugins" = "機能";

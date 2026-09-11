@@ -251,6 +251,7 @@
 "screenshot.editor.save" = "저장";
 "screenshot.editSaved" = "편집한 스크린샷을 클립보드에 저장했습니다";
 "screenshot.editor.tool" = "주석 도구";
+"screenshot.editor.tool.crop" = "자르기";
 "screenshot.editor.tool.pen" = "펜";
 "screenshot.editor.tool.arrow" = "화살표";
 "screenshot.editor.tool.rectangle" = "사각형";
@@ -290,6 +291,8 @@
 "screenshot.shortcutSaved" = "스크린샷 단축키를 저장했습니다";
 "screenshot.error.busy" = "이미 스크린샷을 촬영 중입니다";
 "screenshot.error.cancelled" = "스크린샷이 취소되었습니다";
+"screenshot.error.selectionCancelled" = "선택을 취소했습니다";
+"screenshot.error.selectionUnavailable" = "화면을 읽을 수 없습니다. 화면 기록 권한을 확인하세요.";
 "screenshot.error.capture" = "스크린샷 실패: %@";
 "screenshot.error.noWindow" = "전면 창을 찾을 수 없습니다";
 "screenshot.error.noSavedRegion" = "이전 캡처 영역이 없습니다";
@@ -826,6 +829,7 @@
 "volume.error.permission" = "시스템 오디오 녹음 권한이 없습니다. 시스템 설정에서 MenuTools를 허용해 주세요.";
 "volume.error.format" = "현재 오디오 기기 형식은 App별 볼륨을 지원하지 않습니다.";
 "volume.error.operation" = "%@ 실패(오류 %d)";
+"volume.error.presetArchive" = "프리셋 보관 파일을 읽을 수 없습니다";
 "volume.shortcut" = "볼륨 단축키";
 "volume.shortcutDescription" = "전역 단축키로 언제든지 볼륨 관리를 엽니다.";
 "volume.shortcutSave" = "단축키 저장";
@@ -837,6 +841,13 @@
 "volume.filter.all" = "전체";
 "volume.filter.active" = "재생 중";
 "volume.filter.favorites" = "즐겨찾기만";
+"volume.sort.recent" = "최근 재생순";
+"volume.sort.volume" = "음량순";
+"volume.sort.name" = "이름순";
+"volume.group.browser" = "브라우저";
+"volume.group.meeting" = "회의";
+"volume.group.game" = "게임";
+"volume.group.other" = "기타";
 "volume.step" = "음량 단계";
 "volume.boost" = "앱 게인을 최대 150% 허용(리미터 보호)";
 "volume.output.select" = "출력 장치 선택";
@@ -877,6 +888,8 @@
 "volume.section.automation" = "자동화 규칙";
 "volume.automation.add" = "현재 출력 연결 시 적용";
 "volume.automation.desc" = "최근 수동 조정을 덮어쓰지 않도록 각 프리셋은 하루에 한 번만 자동 적용됩니다.";
+"volume.hearing.warning" = "높은 음량이 오래 지속되었습니다. 청력을 보호하려면 음량을 낮추세요.";
+"volume.hud.muted" = "음소거됨";
 
 /* 내장 기능 센터 */
 "settings.tab.plugins" = "기능";

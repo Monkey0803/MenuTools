@@ -25,7 +25,7 @@ enum BuiltInPluginCategory: String, Codable, CaseIterable, Sendable {
     case developer
 }
 
-enum BuiltInPluginPermission: String, Codable, Hashable, Sendable {
+enum BuiltInPluginPermission: String, Codable, CaseIterable, Hashable, Sendable {
     case accessibility
     case automation
     case bluetooth

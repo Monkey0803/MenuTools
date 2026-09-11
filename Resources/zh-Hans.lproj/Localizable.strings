@@ -251,6 +251,7 @@
 "screenshot.editor.save" = "保存";
 "screenshot.editSaved" = "编辑后的截图已保存到剪贴板";
 "screenshot.editor.tool" = "标注工具";
+"screenshot.editor.tool.crop" = "裁剪";
 "screenshot.editor.tool.pen" = "画笔";
 "screenshot.editor.tool.arrow" = "箭头";
 "screenshot.editor.tool.rectangle" = "矩形";
@@ -290,6 +291,8 @@
 "screenshot.shortcutSaved" = "截图快捷键已保存";
 "screenshot.error.busy" = "已有截图任务正在执行";
 "screenshot.error.cancelled" = "截图已取消";
+"screenshot.error.selectionCancelled" = "已取消选区";
+"screenshot.error.selectionUnavailable" = "无法读取屏幕画面，请检查屏幕录制权限";
 "screenshot.error.capture" = "截图失败：%@";
 "screenshot.error.noWindow" = "没有找到可截图的前台窗口";
 "screenshot.error.noSavedRegion" = "还没有保存过截图区域";
@@ -826,6 +829,7 @@
 "volume.error.permission" = "没有系统音频录制权限，请在系统设置中允许 MenuTools。";
 "volume.error.format" = "当前音频设备格式暂不支持单 App 音量。";
 "volume.error.operation" = "%@失败（错误 %d）";
+"volume.error.presetArchive" = "无法读取该预设归档文件";
 "volume.shortcut" = "音量快捷键";
 "volume.shortcutDescription" = "通过全局快捷键随时打开音量管理面板。";
 "volume.shortcutSave" = "保存快捷键";
@@ -837,6 +841,13 @@
 "volume.filter.all" = "全部";
 "volume.filter.active" = "正在发声";
 "volume.filter.favorites" = "仅收藏";
+"volume.sort.recent" = "最近发声";
+"volume.sort.volume" = "按音量";
+"volume.sort.name" = "按名称";
+"volume.group.browser" = "浏览器";
+"volume.group.meeting" = "会议";
+"volume.group.game" = "游戏";
+"volume.group.other" = "其他";
 "volume.step" = "音量步长";
 "volume.boost" = "允许 App 增强到 150%（带限幅保护）";
 "volume.output.select" = "选择输出设备";
@@ -877,6 +888,8 @@
 "volume.section.automation" = "自动化规则";
 "volume.automation.add" = "连接当前输出设备时应用";
 "volume.automation.desc" = "每个预设每天仅自动应用一次，避免覆盖刚刚手动调整的音量。";
+"volume.hearing.warning" = "音量偏高且持续时间较长，建议降低音量以保护听力";
+"volume.hud.muted" = "已静音";
 
 /* 内置功能中心 */
 "settings.tab.plugins" = "功能";

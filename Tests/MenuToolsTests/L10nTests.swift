@@ -28,7 +28,8 @@ func configuredLanguageOverridesSystemLanguage() {
 
 @Test("剪贴板引用的文案在全部五种语言里都存在")
 func clipboardLocalizationCoversEveryReferencedKey() throws {
-    let referencedKeys = try LocalizationAudit.clipboardReferencedKeys(repositoryRoot: LocalizationAudit.repositoryRoot)
+    let referencedKeys = try LocalizationAudit.referencedKeys(repositoryRoot: LocalizationAudit.repositoryRoot)
+        .filter { $0.hasPrefix("clipboard.") }
     #expect(!referencedKeys.isEmpty)
 
     let locales = try LocalizationAudit.localeFiles(repositoryRoot: LocalizationAudit.repositoryRoot)
@@ -39,6 +40,21 @@ func clipboardLocalizationCoversEveryReferencedKey() throws {
         // 取值为 key 本身说明运行时会直接把 key 显示给用户。
         let missing = referencedKeys.subtracting(entries.keys).sorted()
         #expect(missing.isEmpty, "\(locale.name) 缺少剪贴板文案：\(missing)")
+    }
+}
+
+@Test("代码引用的全部文案在五种语言里都存在")
+func localizationCoversEveryReferencedKey() throws {
+    let referencedKeys = try LocalizationAudit.referencedKeys(repositoryRoot: LocalizationAudit.repositoryRoot)
+    #expect(referencedKeys.count > 500)
+
+    let locales = try LocalizationAudit.localeFiles(repositoryRoot: LocalizationAudit.repositoryRoot)
+    #expect(locales.count == 5)
+
+    for locale in locales {
+        let entries = try LocalizationAudit.entries(at: locale.url)
+        let missing = referencedKeys.subtracting(entries.keys).sorted()
+        #expect(missing.isEmpty, "\(locale.name) 缺少文案：\(missing)")
     }
 }
 
@@ -66,10 +82,9 @@ enum LocalizationAudit {
     }
 
     /// 代码直接引用的字面量键 + 通过枚举拼接的动态键族。
-    static func clipboardReferencedKeys(repositoryRoot: URL) throws -> Set<String> {
+    static func referencedKeys(repositoryRoot: URL) throws -> Set<String> {
         var keys = try literalKeys(repositoryRoot: repositoryRoot)
-            .filter { $0.hasPrefix("clipboard.") }
-        keys.formUnion(dynamicClipboardKeys)
+        keys.formUnion(dynamicKeys)
         return keys
     }
 
@@ -87,15 +102,21 @@ enum LocalizationAudit {
             let range = NSRange(source.startIndex ..< source.endIndex, in: source)
             for match in expression.matches(in: source, range: range) {
                 guard let keyRange = Range(match.range(at: 1), in: source) else { continue }
-                keys.insert(String(source[keyRange]))
+                let key = String(source[keyRange])
+                // 带插值的拼接键交给 dynamicKeys 展开，正则只负责字面量。
+                guard !key.contains(#"\("#) else { continue }
+                keys.insert(key)
             }
         }
         return keys
     }
 
     /// `localizationKey` / `titleKey` 这类拼接出来的键，必须逐个枚举，正则扫不到。
-    private static var dynamicClipboardKeys: Set<String> {
-        var keys = Set(ClipboardHistoryCategory.allCases.map(\.titleKey))
+    /// 新增枚举或枚举 case 时这里要同步补上，否则对应文案的缺失不会被发现。
+    private static var dynamicKeys: Set<String> {
+        var keys = Set<String>()
+        // 剪贴板
+        keys.formUnion(ClipboardHistoryCategory.allCases.map(\.titleKey))
         keys.formUnion(ClipboardHistorySortOrder.allCases.map(\.titleKey))
         keys.formUnion(ClipboardHistoryDateFilter.allCases.map(\.titleKey))
         keys.formUnion(ClipboardPrimaryAction.allCases.map(\.localizationKey))
@@ -104,6 +125,37 @@ enum LocalizationAudit {
         keys.formUnion(ClipboardHistorySettingsTab.allCases.map(\.titleKey))
         keys.formUnion(ClipboardCopyFeedback.allCases.map(\.localizationKey))
         keys.formUnion(ClipboardShortcutRegistrationMode.allCases.map(\.localizationKey))
+        // 功能中心
+        keys.formUnion(BuiltInPluginID.allCases.flatMap {
+            ["plugin.\($0.rawValue).title", "plugin.\($0.rawValue).description"]
+        })
+        keys.formUnion(BuiltInPluginCategory.allCases.map { "plugin.category.\($0.rawValue)" })
+        keys.formUnion(BuiltInPluginPermission.allCases.map { "plugin.permission.\($0.rawValue)" })
+        keys.formUnion(PluginCenterFilter.allCases.map(\.titleKey))
+        // 快捷操作与右键菜单
+        keys.formUnion(QuickAction.allCases.map(\.titleKey))
+        keys.formUnion(RightClickItem.allCases.map(\.titleKey))
+        keys.formUnion(RightClickItem.allCases.compactMap(\.subtitleKey))
+        keys.formUnion(RightClickItem.Group.allCases.map(\.titleKey))
+        // 场景与窗口
+        keys.formUnion(ScenePreset.allCases.map(\.titleKey))
+        keys.formUnion(ScenePreset.allCases.map(\.subtitleKey))
+        keys.formUnion(WindowLayout.allCases.map(\.titleKey))
+        // 截图
+        keys.formUnion(ScreenshotCaptureMode.allCases.map(\.titleKey))
+        keys.formUnion(ScreenshotCaptureMode.allCases.map { "screenshot.shortcut.desc.\($0.rawValue)" })
+        keys.formUnion(ScreenshotLongCapturePhase.allCases.map(\.titleKey))
+        keys.formUnion(ScreenshotOutputFormat.allCases.map(\.titleKey))
+        keys.formUnion(ScreenshotEditorTool.allCases.map(\.titleKey))
+        keys.formUnion(ScreenshotEditorColor.allCases.map(\.titleKey))
+        // 存储与网络流量（NetworkTrafficSection 是 private，这里显式列出；新增 tab 需同步）
+        keys.formUnion(StorageCategory.allCases.map(\.titleKey))
+        keys.formUnion(["overview", "apps", "history", "diagnostics"].map { "traffic.tab.\($0)" })
+        // App 音量
+        keys.formUnion(AppVolumeEqualizerPreset.allCases.map(\.titleKey))
+        keys.formUnion(AppVolumeSessionFilter.allCases.map { "volume.filter.\($0.rawValue)" })
+        keys.formUnion(AppVolumeAppGroup.allCases.map(\.titleKey))
+        keys.formUnion(AppVolumeSessionSort.allCases.map(\.titleKey))
         return keys
     }
 
