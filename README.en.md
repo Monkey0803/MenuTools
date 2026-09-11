@@ -72,8 +72,12 @@ A lightweight system toolkit that lives in the macOS menu bar. MenuTools uses th
 |---|---|
 | Bluetooth battery levels | Shows AirPods left/right/case levels, BLE keyboard and mouse batteries, and classic Bluetooth headset levels when reported by macOS. |
 | Clean DerivedData | Shows the size of Xcode DerivedData and cleans it with one click. |
-| Clear clipboard | Shows the current clipboard item count and clears the clipboard. |
-| Clipboard History | Keeps recent text and images with search, pin, delete, and copy actions. |
+| Clear clipboard | Shows the current clipboard item count, clears it with one click, and distinguishes "cleared" from "already empty". |
+| Clipboard History | Keeps text, rich text, images, links, and files (including PDFs) with search, category/source/time filters, pinning, batch pin and sensitive marking, plain-text paste, and direct paste. |
+| Clipboard Tools | Sequential paste queue, text transforms (case, join lines, URL encoding, JSON formatting), snippet templates such as `{{date}}` and `{{clipboard}}`, plus on-device OCR and QR recognition for images. |
+| Clipboard Privacy | Pause recording, exclude apps, override recording and retention per bundle ID, and automatically hold back passwords, verification codes, card numbers, and custom keywords with a short expiry. |
+| Clipboard Management | Automatic cleanup by item count, retention days, and storage size, plus passphrase-encrypted archive import/export (`.mtclip`) and shared-folder sync of pinned items and snippets. |
+| Clipboard Shortcut | A global shortcut opens the clipboard panel and falls back to a monitor listener when exclusive registration is unavailable. |
 | System Resources | Shows CPU, memory pressure, free disk space, and network rates. |
 | Network Traffic | Per-app live upload/download rates, connection details, and 30-day history with interface/protocol filtering, quota alerts, redacted export, and data clearing. |
 | Check for updates | Checks for new releases and opens the download page when an update is available. |
@@ -171,8 +175,9 @@ Some features request permissions the first time they are used:
 | System Audio Recording | Captures active app audio and replays it with an independent gain. | Per-app volume management |
 | Accessibility | Reads and sets the position and size of the frontmost window. | Window Management |
 | Accessibility | Receives global keyboard events and triggers scenes. | Global scene shortcuts, Focus |
+| Accessibility | Synthesizes ⌘V to paste back into the previous app. | Clipboard auto-paste |
 
-If permission was denied, enable it again in **System Settings → Privacy & Security**. Mute, prevent sleep, Night Shift, cleanup features, and clipboard cleanup do not require these permissions.
+If permission was denied, enable it again in **System Settings → Privacy & Security**. Mute, prevent sleep, Night Shift, clipboard history recording, and cleanup features do not require these permissions (clipboard auto-paste does).
 
 ## Technical Implementation
 
@@ -188,6 +193,7 @@ If permission was denied, enable it again in **System Settings → Privacy & Sec
 | DerivedData | Background file-system size calculation and cleanup |
 | Quick Action Center | Process commands, Finder AppleScript, System Settings URL, and `screencapture` |
 | Screenshot Tools | ScreenCaptureKit native-pixel capture, frozen selection, window capture, multi-display compositing, Vision motion estimation, PNG stitching, and OCR/QR recognition; captures can be copied to the clipboard or opened in the built-in annotator |
+| Clipboard History | One-second `NSPasteboard` polling, SQLite/WAL metadata with binary blobs stored separately, passphrase-encrypted archives, shared-folder sync, Vision OCR/QR recognition behind a process-wide gate with retry, and synthesized ⌘V paste via CGEvent |
 | App Volume Management | Public Core Audio Process Tap, a private aggregate device, and IOProc routing; routes only apps below 100% and destroys taps to restore original audio on exit or failure |
 | Network Status | CoreWLAN, interface addresses, VPN state, and on-demand URLSession probes |
 | Network Traffic | `/usr/bin/nettop` process sampling, SQLite/WAL history, diagnostics, quota alerts, and optional redacted exports |
@@ -250,6 +256,8 @@ export SPARKLE_DOWNLOAD_URL_PREFIX="https://your-server/releases/"
 - Per-app volume requires System Audio Recording permission. DRM-protected or otherwise untappable audio keeps its original system volume.
 - Empty Trash and screenshot actions depend on macOS Automation and Screen Recording permissions; denied access is reported in the panel.
 - Shortcut conflict detection covers system hotkeys and exclusive Carbon hotkeys registered by other apps; apps using private event taps cannot be fully enumerated through public APIs.
+- Clipboard history works by polling the system pasteboard, so it only records what has already been copied. macOS does not expose the copy source, so "excluded apps" are judged by the frontmost app at copy time.
+- Image text recognition relies on on-device Vision and may briefly return empty results under heavy system load; failures are retried automatically and again when the clipboard panel is reopened.
 
 ## Acknowledgements
 
