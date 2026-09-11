@@ -725,6 +725,7 @@
 "window.error.writeFrame" = "윈도우 위치 또는 크기를 설정할 수 없습니다";
 "window.error.fullscreen" = "현재 윈도우는 전체 화면 전환을 지원하지 않습니다";
 "window.error.excludedApplication" = "현재 앱은 윈도우 관리에서 제외되었습니다";
+"window.error.presetName" = "프리셋 이름을 입력해야 합니다";
 "window.manager.section" = "윈도우 관리자";
 "window.manager.padding" = "화면 여백";
 "window.manager.gap" = "윈도우 간격";
@@ -734,6 +735,10 @@
 "window.manager.nudgeStep" = "방향키 이동 폭";
 "window.manager.cycleLayouts" = "같은 단축키를 반복하면 같은 계열 레이아웃으로 순환";
 "window.manager.snapPreview" = "드래그할 때 이동할 위치 미리보기 표시";
+"window.manager.capturePreset" = "현재 창 기억";
+"window.manager.capturedPreset" = "프리셋을 저장했습니다: %@";
+"window.manager.presetFrame" = "고정 크기";
+"window.manager.traverseDisplays" = "반 화면 단축키를 반복하면 인접 디스플레이로 이동";
 "window.manager.presets" = "레이아웃 프리셋";
 "window.manager.presetName" = "프리셋 이름";
 "window.manager.applicationRules" = "앱 규칙";

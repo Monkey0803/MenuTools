@@ -725,6 +725,7 @@
 "window.error.writeFrame" = "無法設定視窗位置或尺寸";
 "window.error.fullscreen" = "目前視窗不支援切換全螢幕";
 "window.error.excludedApplication" = "目前應用程式已從視窗管理器排除";
+"window.error.presetName" = "預設名稱不能為空";
 "window.manager.section" = "視窗管理器";
 "window.manager.padding" = "螢幕邊距";
 "window.manager.gap" = "視窗間距";
@@ -734,6 +735,10 @@
 "window.manager.nudgeStep" = "方向鍵挪動步長";
 "window.manager.cycleLayouts" = "連按同一快速鍵循環切換同族佈局";
 "window.manager.snapPreview" = "拖曳視窗到邊緣時顯示落點預覽";
+"window.manager.capturePreset" = "記住目前視窗";
+"window.manager.capturedPreset" = "已儲存預設：%@";
+"window.manager.presetFrame" = "固定尺寸";
+"window.manager.traverseDisplays" = "連按半屏佈局時把視窗帶到相鄰螢幕";
 "window.manager.presets" = "版面配置預設";
 "window.manager.presetName" = "預設名稱";
 "window.manager.applicationRules" = "應用程式視窗規則";

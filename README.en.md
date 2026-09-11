@@ -51,7 +51,7 @@ A lightweight system toolkit that lives in the macOS menu bar. MenuTools uses th
 |---|---|
 | App Launcher | Search and launch installed apps, with favorites and recent-app ordering. |
 | Scenes | Apply Work, Presentation, or Night presets manually. |
-| Window Management | Use 58 layouts with edge snapping and drop previews, repeat a shortcut to cycle through layouts of the same family, and rely on per-app window size memory; layout presets, app rules, multi-window tiling, and cross-display movement included. |
+| Window Management | Use 58 layouts with edge snapping and drop previews; repeat a shortcut to cycle through layouts of the same family or to send the window to the adjacent display; save named presets that store a fixed window size and apply them from the quick-access panel; app rules, multi-window tiling, and per-app size memory included. |
 | Focus | Toggle the system Focus state and open Focus settings. |
 | Global scene shortcuts | Record global shortcuts for Work, Presentation, and Night scenes. |
 
@@ -272,6 +272,8 @@ export SPARKLE_DOWNLOAD_URL_PREFIX="https://your-server/releases/"
 - Window Management needs Accessibility permission; without it layout shortcuts and edge snapping do nothing, and the settings pane shows a warning instead.
 - Edge snapping only previews a drop target while the window itself is following the pointer, and full-screen windows are excluded from multi-window tiling.
 - Some apps enforce a minimum window size, so very small layouts (such as a sixth of the screen) may leave the window larger than requested.
+- Fixed-size presets store only a position and size, not a specific display; when applied after a display change they are clamped back into the current display's usable area.
+- Repeating a half-screen shortcut to reach the adjacent display requires at least two displays and is off by default; enable it in Settings.
 
 ## Acknowledgements
 

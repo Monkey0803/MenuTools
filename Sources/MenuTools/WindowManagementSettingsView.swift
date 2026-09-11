@@ -8,6 +8,7 @@ struct WindowManagementSettingsView: View {
     @State private var recordingLayout: WindowLayout?
     @State private var isRecordingQuickAccessShortcut = false
     @State private var errorMessage: String?
+    @State private var statusMessage: String?
     @State private var newPresetName = ""
     @State private var presetLayout: WindowLayout = .leftHalf
     @State private var ruleLayout: WindowLayout = .leftHalf
@@ -106,6 +107,10 @@ struct WindowManagementSettingsView: View {
                     Text(errorMessage)
                         .font(.caption)
                         .foregroundStyle(.red)
+                } else if let statusMessage {
+                    Text(statusMessage)
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
                 } else if let lastError = shortcutService.lastError {
                     Text(lastError)
                         .font(.caption)
@@ -192,6 +197,11 @@ struct WindowManagementSettingsView: View {
                 get: { windowService.configuration.cycleLayouts },
                 set: { windowService.setCycleLayoutsEnabled($0) }
             ))
+            Toggle(L("window.manager.traverseDisplays"), isOn: Binding(
+                get: { windowService.configuration.traverseDisplaysOnRepeat },
+                set: { windowService.setTraverseDisplaysEnabled($0) }
+            ))
+            .disabled(NSScreen.screens.count < 2)
             Toggle(L("window.manager.autoRules"), isOn: Binding(
                 get: { windowService.configuration.automaticApplicationRules },
                 set: { windowService.setAutomaticApplicationRulesEnabled($0) }
@@ -227,6 +237,13 @@ struct WindowManagementSettingsView: View {
                     WindowLayoutIcon(layout: preset.layout)
                         .frame(width: 18, height: 14)
                     Text(preset.name)
+                    if preset.hasCustomFrame {
+                        Text(L("window.manager.presetFrame"))
+                            .font(.caption2)
+                            .padding(.horizontal, 5)
+                            .padding(.vertical, 1)
+                            .background(.quaternary, in: .capsule)
+                    }
                     Spacer()
                     Button(L("window.apply")) { apply(preset) }
                     Button { windowService.removePreset(preset) } label: {
@@ -237,6 +254,13 @@ struct WindowManagementSettingsView: View {
                 }
                 .font(.caption)
             }
+            Button {
+                capturePreset()
+            } label: {
+                Label(L("window.manager.capturePreset"), systemImage: "ruler")
+                    .font(.caption)
+            }
+            .disabled(newPresetName.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
         }
         .padding(12)
         .glassEffect(.regular, in: .rect(cornerRadius: 12))
@@ -346,6 +370,19 @@ struct WindowManagementSettingsView: View {
             try windowService.apply(preset)
             errorMessage = nil
         } catch {
+            errorMessage = error.localizedDescription
+        }
+    }
+
+    /// 把当前窗口的位置与尺寸保存成固定尺寸预设，避免预设只能引用布局。
+    private func capturePreset() {
+        do {
+            let preset = try windowService.capturePreset(name: newPresetName)
+            statusMessage = L("window.manager.capturedPreset", preset.name)
+            errorMessage = nil
+            newPresetName = ""
+        } catch {
+            statusMessage = nil
             errorMessage = error.localizedDescription
         }
     }

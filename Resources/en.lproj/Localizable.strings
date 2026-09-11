@@ -725,6 +725,7 @@
 "window.error.writeFrame" = "Unable to set the window frame";
 "window.error.fullscreen" = "The current window does not support fullscreen toggling";
 "window.error.excludedApplication" = "The current application is excluded from window management";
+"window.error.presetName" = "Preset name cannot be empty";
 "window.manager.section" = "Window Manager";
 "window.manager.padding" = "Screen padding";
 "window.manager.gap" = "Window gap";
@@ -734,6 +735,10 @@
 "window.manager.nudgeStep" = "Arrow key nudge step";
 "window.manager.cycleLayouts" = "Cycle through layouts of the same family when the shortcut is pressed again";
 "window.manager.snapPreview" = "Show a preview of the target frame while dragging to an edge";
+"window.manager.capturePreset" = "Remember current window";
+"window.manager.capturedPreset" = "Preset saved: %@";
+"window.manager.presetFrame" = "Fixed size";
+"window.manager.traverseDisplays" = "Move the window to the adjacent display when a half-screen shortcut is pressed again";
 "window.manager.presets" = "Layout presets";
 "window.manager.presetName" = "Preset name";
 "window.manager.applicationRules" = "Application rules";

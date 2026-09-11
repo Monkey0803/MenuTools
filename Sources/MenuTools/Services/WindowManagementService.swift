@@ -352,6 +352,7 @@ final class WindowManagementService {
     private let frameMemory: WindowFrameMemory
     private let snapPreview = WindowSnapPreviewController()
     private var cycleState = WindowLayoutCycleState()
+    private var traversalTracker = WindowRepeatTracker()
     private var globalMouseMonitor: Any?
     private var localMouseMonitor: Any?
     private var mouseDownLocation: CGPoint?
@@ -391,6 +392,7 @@ final class WindowManagementService {
         dragWindowFrameAtMouseDown = nil
         snapPreview.hide()
         cycleState.reset()
+        traversalTracker.reset()
     }
 
     func updateOptions(_ options: WindowManagerOptions) {
@@ -415,6 +417,13 @@ final class WindowManagementService {
         configuration.showSnapPreview = enabled
         saveConfiguration()
         if !enabled { snapPreview.hide() }
+    }
+
+    func setTraverseDisplaysEnabled(_ enabled: Bool) {
+        configuration.traverseDisplaysOnRepeat = enabled
+        saveConfiguration()
+        // 开关状态变化后重新计数，避免用旧状态判定“连按”。
+        traversalTracker.reset()
     }
 
     func setAutomaticApplicationRulesEnabled(_ enabled: Bool) {
@@ -535,7 +544,16 @@ final class WindowManagementService {
         }
         let screen = screen(for: window) ?? NSScreen.main?.visibleFrame ?? .zero
         guard !screen.isEmpty else { throw WindowManagementError.operationFailed(L("window.error.noScreen")) }
-        let target = resolvedLayout(layout, processIdentifier: processIdentifier, window: window)
+        let targetKey = cycleTargetKey(processIdentifier: processIdentifier, window: window)
+        let target = resolvedLayout(layout, targetKey: targetKey)
+        // 连按半屏布局：把窗口带到相邻显示器再套用同一布局（对标 Rectangle 的跨显示器遍历）。
+        if configuration.traverseDisplaysOnRepeat,
+           let offset = WindowDisplayTraversal.displayOffset(for: target),
+           traversalTracker.isRepeat(layout: target, targetKey: targetKey) {
+            rememberFrameBeforeLayout(of: window, processIdentifier: processIdentifier)
+            try applyOnAdjacentDisplay(target, window: window, offset: offset)
+            return
+        }
         rememberFrameBeforeLayout(of: window, processIdentifier: processIdentifier)
         let frame = WindowLayoutCalculator.frame(
             for: target,
@@ -546,6 +564,22 @@ final class WindowManagementService {
         try setFrame(frame, of: window)
     }
 
+    /// 把窗口移到相邻显示器，再在新显示器上套用同一布局。
+    private func applyOnAdjacentDisplay(_ layout: WindowLayout, window: AXUIElement, offset: Int) throws {
+        try move(window: window, displayOffset: offset)
+        guard let screen = screen(for: window) else {
+            throw WindowManagementError.operationFailed(L("window.error.noScreen"))
+        }
+        let frame = WindowLayoutCalculator.frame(
+            for: layout,
+            in: screen,
+            preferredSize: currentSize(of: window),
+            options: configuration.options
+        )
+        try setFrame(frame, of: window)
+    }
+
+    /// 应用固定尺寸预设：先把记录帧夹取回当前显示器，再写入窗口。
     func apply(_ preset: WindowLayoutPreset) throws {
         if let frame = preset.frame {
             guard AXIsProcessTrusted() else { throw WindowManagementError.accessibilityPermission }
@@ -553,10 +587,32 @@ final class WindowManagementService {
             guard !isExcluded(processIdentifier: processIdentifier) else {
                 throw WindowManagementError.excludedApplication
             }
-            try setFrame(frame, of: try focusedWindow(of: processIdentifier))
+            let window = try focusedWindow(of: processIdentifier)
+            rememberFrameBeforeLayout(of: window, processIdentifier: processIdentifier)
+            try setFrame(
+                WindowFrameClamper.clamp(frame, into: NSScreen.screens.map(\.visibleFrame)),
+                of: window
+            )
         } else {
             try apply(preset.layout)
         }
+    }
+
+    /// 把当前窗口的位置与尺寸保存为固定尺寸预设。
+    @discardableResult
+    func capturePreset(name: String) throws -> WindowLayoutPreset {
+        guard AXIsProcessTrusted() else { throw WindowManagementError.accessibilityPermission }
+        let processIdentifier = try externalProcessIdentifier()
+        guard !isExcluded(processIdentifier: processIdentifier) else {
+            throw WindowManagementError.excludedApplication
+        }
+        let window = try focusedWindow(of: processIdentifier)
+        guard let preset = WindowPresetFactory.preset(name: name, frame: try cocoaFrame(of: window)) else {
+            throw WindowManagementError.operationFailed(L("window.error.presetName"))
+        }
+        configuration.presets.append(preset)
+        saveConfiguration()
+        return preset
     }
 
     @discardableResult
@@ -923,19 +979,17 @@ final class WindowManagementService {
     }
 
     /// 连按同一快捷键时，在同一分数族内循环到下一个布局。
-    private func resolvedLayout(
-        _ layout: WindowLayout,
-        processIdentifier: pid_t,
-        window: AXUIElement
-    ) -> WindowLayout {
+    private func resolvedLayout(_ layout: WindowLayout, targetKey: String) -> WindowLayout {
         guard configuration.cycleLayouts else {
             cycleState.reset()
             return layout
         }
-        return cycleState.nextLayout(
-            requested: layout,
-            targetKey: "\(bundleIdentifier(for: processIdentifier))|\(windowTitle(of: window) ?? "")"
-        )
+        return cycleState.nextLayout(requested: layout, targetKey: targetKey)
+    }
+
+    /// 循环布局与跨显示器遍历共用的目标标识：应用 + 窗口标题。
+    private func cycleTargetKey(processIdentifier: pid_t, window: AXUIElement) -> String {
+        "\(bundleIdentifier(for: processIdentifier))|\(windowTitle(of: window) ?? "")"
     }
 
     /// 应用布局前记录当前帧，让「还原」不需要用户先手动记住尺寸。

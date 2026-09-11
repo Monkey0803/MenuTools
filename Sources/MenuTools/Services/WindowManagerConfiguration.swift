@@ -120,6 +120,8 @@ struct WindowManagerConfiguration: Codable, Equatable, Sendable {
     var cycleLayouts: Bool
     /// 拖动窗口靠近屏幕边缘时显示落点预览。
     var showSnapPreview: Bool
+    /// 连按半屏布局时把窗口带到相邻显示器。
+    var traverseDisplaysOnRepeat: Bool
 
     init(
         options: WindowManagerOptions = WindowManagerOptions(),
@@ -129,7 +131,8 @@ struct WindowManagerConfiguration: Codable, Equatable, Sendable {
         automaticApplicationRules: Bool = false,
         edgeSnappingEnabled: Bool = false,
         cycleLayouts: Bool = true,
-        showSnapPreview: Bool = true
+        showSnapPreview: Bool = true,
+        traverseDisplaysOnRepeat: Bool = false
     ) {
         self.options = options
         self.presets = presets
@@ -139,6 +142,7 @@ struct WindowManagerConfiguration: Codable, Equatable, Sendable {
         self.edgeSnappingEnabled = edgeSnappingEnabled
         self.cycleLayouts = cycleLayouts
         self.showSnapPreview = showSnapPreview
+        self.traverseDisplaysOnRepeat = traverseDisplaysOnRepeat
     }
 
     private enum CodingKeys: String, CodingKey {
@@ -150,6 +154,7 @@ struct WindowManagerConfiguration: Codable, Equatable, Sendable {
         case edgeSnappingEnabled
         case cycleLayouts
         case showSnapPreview
+        case traverseDisplaysOnRepeat
     }
 
     /// 顶层同样逐字段解码：新增开关不会让旧配置整份丢失。
@@ -164,7 +169,8 @@ struct WindowManagerConfiguration: Codable, Equatable, Sendable {
             automaticApplicationRules: try container.decodeIfPresent(Bool.self, forKey: .automaticApplicationRules) ?? fallback.automaticApplicationRules,
             edgeSnappingEnabled: try container.decodeIfPresent(Bool.self, forKey: .edgeSnappingEnabled) ?? fallback.edgeSnappingEnabled,
             cycleLayouts: try container.decodeIfPresent(Bool.self, forKey: .cycleLayouts) ?? fallback.cycleLayouts,
-            showSnapPreview: try container.decodeIfPresent(Bool.self, forKey: .showSnapPreview) ?? fallback.showSnapPreview
+            showSnapPreview: try container.decodeIfPresent(Bool.self, forKey: .showSnapPreview) ?? fallback.showSnapPreview,
+            traverseDisplaysOnRepeat: try container.decodeIfPresent(Bool.self, forKey: .traverseDisplaysOnRepeat) ?? fallback.traverseDisplaysOnRepeat
         )
     }
 
@@ -178,6 +184,7 @@ struct WindowManagerConfiguration: Codable, Equatable, Sendable {
         try container.encode(edgeSnappingEnabled, forKey: .edgeSnappingEnabled)
         try container.encode(cycleLayouts, forKey: .cycleLayouts)
         try container.encode(showSnapPreview, forKey: .showSnapPreview)
+        try container.encode(traverseDisplaysOnRepeat, forKey: .traverseDisplaysOnRepeat)
     }
 }
 

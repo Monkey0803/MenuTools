@@ -28,6 +28,18 @@ struct WindowManagementQuickAccessView: View {
                 .foregroundStyle(.secondary)
 
             ScrollView {
+                if !windowService.configuration.presets.isEmpty {
+                    VStack(alignment: .leading, spacing: 4) {
+                        Text(L("window.manager.presets"))
+                            .font(.caption2.weight(.semibold))
+                            .foregroundStyle(.secondary)
+                        ForEach(windowService.configuration.presets) { preset in
+                            presetButton(preset)
+                        }
+                    }
+                    .padding(.bottom, 6)
+                }
+
                 LazyVGrid(
                     columns: [
                         GridItem(.flexible(), spacing: 8),
@@ -71,10 +83,49 @@ struct WindowManagementQuickAccessView: View {
         .frame(width: 340, height: 430, alignment: .top)
     }
 
+    /// 固定尺寸预设排在布局网格之前：它们是用户自己命名的高频动作。
+    private func presetButton(_ preset: WindowLayoutPreset) -> some View {
+        Button {
+            apply(preset)
+        } label: {
+            HStack(spacing: 6) {
+                Image(systemName: preset.hasCustomFrame ? "ruler" : "bookmark")
+                    .font(.caption2)
+                    .foregroundStyle(.tint)
+                    .frame(width: 16)
+                Text(preset.name)
+                    .font(.caption)
+                    .lineLimit(1)
+                Spacer(minLength: 0)
+                if preset.hasCustomFrame {
+                    Text(L("window.manager.presetFrame"))
+                        .font(.caption2)
+                        .foregroundStyle(.secondary)
+                }
+            }
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .padding(.horizontal, 8)
+            .padding(.vertical, 6)
+            .contentShape(.rect(cornerRadius: 8))
+        }
+        .buttonStyle(.plain)
+        .controlCenterHover(shape: AnyShape(.rect(cornerRadius: 8)))
+        .accessibilityLabel(preset.name)
+    }
+
     private func apply(_ layout: WindowLayout) {
         // 快捷键触发时服务已记录外部前台应用；此处不激活 MenuTools。
         do {
             try windowService.apply(layout)
+            dismiss()
+        } catch {
+            errorMessage = error.localizedDescription
+        }
+    }
+
+    private func apply(_ preset: WindowLayoutPreset) {
+        do {
+            try windowService.apply(preset)
             dismiss()
         } catch {
             errorMessage = error.localizedDescription

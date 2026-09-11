@@ -725,6 +725,7 @@
 "window.error.writeFrame" = "ウインドウの位置またはサイズを設定できません";
 "window.error.fullscreen" = "現在のウインドウはフルスクリーン切替に対応していません";
 "window.error.excludedApplication" = "現在のアプリケーションはウインドウ管理から除外されています";
+"window.error.presetName" = "プリセット名を入力してください";
 "window.manager.section" = "ウインドウマネージャー";
 "window.manager.padding" = "画面の余白";
 "window.manager.gap" = "ウインドウ間隔";
@@ -734,6 +735,10 @@
 "window.manager.nudgeStep" = "方向キーでの移動幅";
 "window.manager.cycleLayouts" = "同じショートカットの連続実行で同系統のレイアウトを順に切り替え";
 "window.manager.snapPreview" = "ドラッグ中に移動先のプレビューを表示";
+"window.manager.capturePreset" = "現在のウインドウを記憶";
+"window.manager.capturedPreset" = "プリセットを保存しました：%@";
+"window.manager.presetFrame" = "固定サイズ";
+"window.manager.traverseDisplays" = "半画面ショートカットの連続実行で隣のディスプレイへ移動";
 "window.manager.presets" = "レイアウトプリセット";
 "window.manager.presetName" = "プリセット名";
 "window.manager.applicationRules" = "アプリケーションルール";
