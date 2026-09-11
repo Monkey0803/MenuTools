@@ -52,6 +52,7 @@ enum ScreenshotShortcutError: LocalizedError, Equatable {
     case otherApplicationConflict
     case sceneConflict(ScenePreset)
     case windowConflict(WindowLayout)
+    case windowPresetConflict(String)
     case windowManagementConflict
     case appConflict(String)
     case screenshotConflict(ScreenshotCaptureMode)
@@ -71,6 +72,8 @@ enum ScreenshotShortcutError: LocalizedError, Equatable {
             return L("shortcut.error.conflict", L(scene.titleKey))
         case let .windowConflict(layout):
             return L("shortcut.error.conflict", L(layout.titleKey))
+        case let .windowPresetConflict(name):
+            return L("shortcut.error.windowPresetConflict", name)
         case .windowManagementConflict:
             return L("shortcut.error.conflict", L("window.title"))
         case let .appConflict(path):
@@ -213,6 +216,8 @@ final class ScreenshotShortcutService {
             throw ScreenshotShortcutError.sceneConflict(scene)
         case let .window(layout):
             throw ScreenshotShortcutError.windowConflict(layout)
+        case let .windowPreset(name):
+            throw ScreenshotShortcutError.windowPresetConflict(name)
         case .windowManagement:
             throw ScreenshotShortcutError.windowManagementConflict
         case let .app(path):

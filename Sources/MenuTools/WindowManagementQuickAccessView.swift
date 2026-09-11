@@ -3,6 +3,7 @@ import SwiftUI
 /// 由全局快捷键调出的紧凑窗口管理面板。
 struct WindowManagementQuickAccessView: View {
     @State private var windowService = WindowManagementService.shared
+    @State private var shortcutService = WindowShortcutService.shared
     @State private var errorMessage: String?
     let dismiss: () -> Void
 
@@ -97,7 +98,11 @@ struct WindowManagementQuickAccessView: View {
                     .font(.caption)
                     .lineLimit(1)
                 Spacer(minLength: 0)
-                if preset.hasCustomFrame {
+                if let binding = shortcutService.presetBinding(for: preset.id) {
+                    Text(binding.displayName)
+                        .font(.caption2.monospaced())
+                        .foregroundStyle(.secondary)
+                } else if preset.hasCustomFrame {
                     Text(L("window.manager.presetFrame"))
                         .font(.caption2)
                         .foregroundStyle(.secondary)

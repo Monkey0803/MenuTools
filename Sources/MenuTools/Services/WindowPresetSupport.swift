@@ -1,6 +1,16 @@
 import CoreGraphics
 import Foundation
 
+/// 预设的全局快捷键绑定。
+///
+/// 连名称一起记录：冲突提示可以直接引用预设名，不必回查窗口服务，因此这份数据在
+/// 非 MainActor 上下文里也能安全读取。
+struct WindowPresetShortcut: Codable, Equatable, Identifiable, Sendable {
+    let id: UUID
+    var name: String
+    var shortcut: GlobalShortcut
+}
+
 /// 把预设记录的窗口帧夹取回可见区域。
 ///
 /// 预设可能是几个月前在另一套显示器布局下保存的：显示器被拔掉、分辨率变化、主屏换边之后，

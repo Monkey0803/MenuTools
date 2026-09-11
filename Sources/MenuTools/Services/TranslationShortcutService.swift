@@ -15,6 +15,7 @@ enum TranslationShortcutError: LocalizedError, Equatable {
     case otherApplicationConflict
     case sceneConflict(ScenePreset)
     case windowConflict(WindowLayout)
+    case windowPresetConflict(String)
     case windowManagementConflict
     case appConflict(String)
     case screenshotConflict
@@ -28,6 +29,7 @@ enum TranslationShortcutError: LocalizedError, Equatable {
         case .otherApplicationConflict: return L("shortcut.error.otherApplicationConflict")
         case let .sceneConflict(scene): return L("shortcut.error.conflict", L(scene.titleKey))
         case let .windowConflict(layout): return L("shortcut.error.conflict", L(layout.titleKey))
+        case let .windowPresetConflict(name): return L("shortcut.error.windowPresetConflict", name)
         case .windowManagementConflict: return L("shortcut.error.conflict", L("window.title"))
         case let .appConflict(path):
             return L("shortcut.error.conflict", URL(fileURLWithPath: path).deletingPathExtension().lastPathComponent)
@@ -133,6 +135,7 @@ final class TranslationShortcutService {
         case .otherApplication: throw TranslationShortcutError.otherApplicationConflict
         case let .scene(scene): throw TranslationShortcutError.sceneConflict(scene)
         case let .window(layout): throw TranslationShortcutError.windowConflict(layout)
+        case let .windowPreset(name): throw TranslationShortcutError.windowPresetConflict(name)
         case .windowManagement: throw TranslationShortcutError.windowManagementConflict
         case let .app(path): throw TranslationShortcutError.appConflict(path)
         case .screenshot: throw TranslationShortcutError.screenshotConflict

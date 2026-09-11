@@ -46,6 +46,7 @@ enum ClipboardShortcutError: LocalizedError, Equatable {
     case otherApplicationConflict
     case sceneConflict(ScenePreset)
     case windowConflict(WindowLayout)
+    case windowPresetConflict(String)
     case windowManagementConflict
     case appConflict(String)
     case screenshotConflict
@@ -64,6 +65,8 @@ enum ClipboardShortcutError: LocalizedError, Equatable {
             return L("shortcut.error.conflict", L(scene.titleKey))
         case let .windowConflict(layout):
             return L("shortcut.error.conflict", L(layout.titleKey))
+        case let .windowPresetConflict(name):
+            return L("shortcut.error.windowPresetConflict", name)
         case .windowManagementConflict:
             return L("shortcut.error.conflict", L("window.title"))
         case let .appConflict(path):
@@ -284,6 +287,8 @@ final class ClipboardShortcutService {
             throw ClipboardShortcutError.sceneConflict(scene)
         case let .window(layout):
             throw ClipboardShortcutError.windowConflict(layout)
+        case let .windowPreset(name):
+            throw ClipboardShortcutError.windowPresetConflict(name)
         case .windowManagement:
             throw ClipboardShortcutError.windowManagementConflict
         case let .app(path):

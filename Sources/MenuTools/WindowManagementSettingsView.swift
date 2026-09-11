@@ -12,6 +12,7 @@ struct WindowManagementSettingsView: View {
     @State private var newPresetName = ""
     @State private var presetLayout: WindowLayout = .leftHalf
     @State private var ruleLayout: WindowLayout = .leftHalf
+    @State private var recordingPresetID: UUID?
 
     init(
         shortcutService: WindowShortcutService = .shared,
@@ -42,12 +43,24 @@ struct WindowManagementSettingsView: View {
                 exclusionSection
 
                 // 必须放在滚动内容顶部，确保窗口打开时就已创建并可成为第一响应者。
-                WindowShortcutCaptureView(isRecording: recordingLayout != nil || isRecordingQuickAccessShortcut) { shortcut in
+                WindowShortcutCaptureView(isRecording: recordingLayout != nil || isRecordingQuickAccessShortcut || recordingPresetID != nil) { shortcut in
                     if isRecordingQuickAccessShortcut {
                         isRecordingQuickAccessShortcut = false
                         guard let shortcut else { return }
                         do {
                             try shortcutService.setQuickAccessBinding(shortcut)
+                            errorMessage = nil
+                        } catch {
+                            errorMessage = error.localizedDescription
+                        }
+                        return
+                    }
+                    if let presetID = recordingPresetID {
+                        recordingPresetID = nil
+                        guard let shortcut,
+                              let preset = windowService.configuration.presets.first(where: { $0.id == presetID }) else { return }
+                        do {
+                            try shortcutService.setPresetBinding(shortcut, for: preset)
                             errorMessage = nil
                         } catch {
                             errorMessage = error.localizedDescription
@@ -122,6 +135,10 @@ struct WindowManagementSettingsView: View {
         }
         .frame(width: SettingsLayout.width, height: SettingsLayout.height)
         .navigationTitle(L("settings.title"))
+        .onAppear {
+            // 清理上一版删除预设后残留的快捷键绑定。
+            shortcutService.prunePresetBindings(keeping: Set(windowService.configuration.presets.map(\.id)))
+        }
     }
 
     private var quickAccessShortcutSection: some View {
@@ -245,8 +262,38 @@ struct WindowManagementSettingsView: View {
                             .background(.quaternary, in: .capsule)
                     }
                     Spacer()
+                    Text(recordingPresetID == preset.id
+                         ? L("shortcut.recording")
+                         : (shortcutService.presetBinding(for: preset.id)?.displayName ?? L("settings.unset")))
+                        .font(.caption2.monospaced())
+                        .lineLimit(1)
+                        .foregroundStyle(recordingPresetID == preset.id ? AnyShapeStyle(.tint) : AnyShapeStyle(.secondary))
+                    Button {
+                        recordingLayout = nil
+                        isRecordingQuickAccessShortcut = false
+                        errorMessage = nil
+                        recordingPresetID = recordingPresetID == preset.id ? nil : preset.id
+                    } label: {
+                        Image(systemName: recordingPresetID == preset.id ? "xmark" : "record.circle")
+                    }
+                    .buttonStyle(.plain)
+                    .help(L("shortcut.record"))
+                    if shortcutService.presetBinding(for: preset.id) != nil {
+                        Button {
+                            shortcutService.clearPresetBinding(for: preset.id)
+                        } label: {
+                            Image(systemName: "delete.left")
+                        }
+                        .buttonStyle(.plain)
+                        .foregroundStyle(.secondary)
+                        .help(L("shortcut.clear"))
+                    }
                     Button(L("window.apply")) { apply(preset) }
-                    Button { windowService.removePreset(preset) } label: {
+                    Button {
+                        recordingPresetID = recordingPresetID == preset.id ? nil : recordingPresetID
+                        shortcutService.clearPresetBinding(for: preset.id)
+                        windowService.removePreset(preset)
+                    } label: {
                         Image(systemName: "trash")
                     }
                     .buttonStyle(.plain)

@@ -51,7 +51,7 @@ A lightweight system toolkit that lives in the macOS menu bar. MenuTools uses th
 |---|---|
 | App Launcher | Search and launch installed apps, with favorites and recent-app ordering. |
 | Scenes | Apply Work, Presentation, or Night presets manually. |
-| Window Management | Use 60 layouts, including Loop-style edge stashing, with edge snapping and drop previews; repeat a shortcut to cycle through layouts of the same family or to send the window to the adjacent display; save named presets that store a fixed window size and apply them from the quick-access panel; app rules, multi-window tiling, and per-app size memory included. |
+| Window Management | Use 60 layouts, including Loop-style edge stashing, with edge snapping and drop previews; repeat a shortcut to cycle through layouts of the same family or to send the window to the adjacent display; save named presets that store a fixed window size, bind them to global shortcuts, and apply them from the quick-access panel; app rules, multi-window tiling, and per-app size memory included. |
 | Focus | Toggle the system Focus state and open Focus settings. |
 | Global scene shortcuts | Record global shortcuts for Work, Presentation, and Night scenes. |
 

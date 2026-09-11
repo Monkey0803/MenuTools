@@ -268,3 +268,142 @@ func windowShortcutDetectsSceneConflict() {
 
     #expect(ShortcutBindingConflictCatalog.sceneConflict(for: binding, in: bindings) == .work)
 }
+
+@Test("窗口预设快捷键可持久化，并与布局、预设、快速面板快捷键互斥")
+@MainActor
+func windowPresetShortcutPersistsAndRejectsConflicts() throws {
+    let suiteName = "MenuTools-WindowPresetShortcutTests-\(UUID().uuidString)"
+    let defaults = try #require(UserDefaults(suiteName: suiteName))
+    defer { UserDefaults().removePersistentDomain(forName: suiteName) }
+
+    let presetA = WindowLayoutPreset(
+        name: "开发",
+        layout: .centered,
+        frame: CGRect(x: 0, y: 0, width: 800, height: 600)
+    )
+    let presetB = WindowLayoutPreset(name: "阅读", layout: .centered, frame: CGRect(x: 10, y: 10, width: 900, height: 700))
+    let shortcutA = GlobalShortcut(keyCode: 19, modifiers: GlobalShortcutModifier.controlOption)
+    let layoutShortcut = GlobalShortcut(keyCode: 20, modifiers: GlobalShortcutModifier.controlOption)
+
+    let service = WindowShortcutService(
+        defaults: defaults,
+        conflictChecker: NoShortcutConflictChecker(),
+        sceneBindingsProvider: { [:] }
+    )
+    #expect(service.presetBinding(for: presetA.id) == nil)
+
+    try service.setPresetBinding(shortcutA, for: presetA)
+    #expect(service.presetBinding(for: presetA.id) == shortcutA)
+
+    // 与布局绑定互斥（双向）
+    try service.setBinding(layoutShortcut, for: .leftHalf)
+    #expect(throws: WindowShortcutError.conflict(.leftHalf)) {
+        try service.setPresetBinding(layoutShortcut, for: presetB)
+    }
+    // 布局反向撞预设时，报出的是预设（已有绑定的那一侧），比报“与左半屏冲突”更准确。
+    #expect(throws: WindowShortcutError.presetConflict("开发")) {
+        try service.setBinding(shortcutA, for: .leftHalf)
+    }
+
+    // 预设之间互斥
+    #expect(throws: WindowShortcutError.presetConflict("开发")) {
+        try service.setPresetBinding(shortcutA, for: presetB)
+    }
+
+    // 与快速面板快捷键互斥（同样报出已占用该快捷键的预设）
+    #expect(throws: WindowShortcutError.presetConflict("开发")) {
+        try service.setQuickAccessBinding(shortcutA)
+    }
+
+    // 重新创建服务后绑定仍然有效
+    let restored = WindowShortcutService(
+        defaults: defaults,
+        conflictChecker: NoShortcutConflictChecker(),
+        sceneBindingsProvider: { [:] }
+    )
+    #expect(restored.presetBinding(for: presetA.id) == shortcutA)
+
+    restored.clearPresetBinding(for: presetA.id)
+    #expect(restored.presetBinding(for: presetA.id) == nil)
+}
+
+@Test("同一预设改绑快捷键会覆盖旧绑定且不留下重复项")
+@MainActor
+func windowPresetShortcutRebindingReplacesOldValue() throws {
+    let suiteName = "MenuTools-WindowPresetShortcutTests-\(UUID().uuidString)"
+    let defaults = try #require(UserDefaults(suiteName: suiteName))
+    defer { UserDefaults().removePersistentDomain(forName: suiteName) }
+
+    let preset = WindowLayoutPreset(name: "开发", layout: .leftHalf)
+    let first = GlobalShortcut(keyCode: 19, modifiers: GlobalShortcutModifier.controlOption)
+    let second = GlobalShortcut(keyCode: 20, modifiers: GlobalShortcutModifier.controlOption)
+
+    let service = WindowShortcutService(
+        defaults: defaults,
+        conflictChecker: NoShortcutConflictChecker(),
+        sceneBindingsProvider: { [:] }
+    )
+    try service.setPresetBinding(first, for: preset)
+    try service.setPresetBinding(second, for: preset)
+
+    #expect(service.presetBinding(for: preset.id) == second)
+    #expect(service.presetShortcuts.count == 1)
+}
+
+@Test("统一冲突检测会识别窗口预设快捷键")
+@MainActor
+func shortcutConflictCheckerDetectsWindowPresetBinding() {
+    let preset = WindowPresetShortcut(
+        id: UUID(),
+        name: "开发",
+        shortcut: GlobalShortcut(keyCode: 21, modifiers: GlobalShortcutModifier.controlOption)
+    )
+    let checker = DefaultShortcutConflictChecker(
+        systemProvider: NoSystemShortcutProvider(),
+        externalProbe: NoExternalShortcutProbe()
+    )
+    let context = ShortcutConflictContext(
+        sceneBindings: [:],
+        windowBindings: [:],
+        appBindings: [:],
+        screenshotBindings: [:],
+        clipboardBinding: nil,
+        appVolumeBinding: nil,
+        excludingScene: nil,
+        excludingWindow: nil,
+        excludingAppPath: nil,
+        excludingScreenshotMode: nil,
+        excludingClipboard: false,
+        excludingAppVolume: false,
+        windowPresetBindings: [preset]
+    )
+
+    #expect(checker.conflict(for: preset.shortcut, context: context) == .windowPreset("开发"))
+    #expect(checker.conflict(
+        for: GlobalShortcut(keyCode: 22, modifiers: GlobalShortcutModifier.controlOption),
+        context: context
+    ) == nil)
+}
+
+@Test("窗口快捷键能匹配到预设绑定")
+func windowShortcutMatchesPresetBinding() {
+    let presetID = UUID()
+    let shortcut = GlobalShortcut(keyCode: 23, modifiers: GlobalShortcutModifier.controlOption)
+    let bindings = [WindowPresetShortcut(id: presetID, name: "开发", shortcut: shortcut)]
+
+    #expect(WindowShortcutCatalog.matchPreset(
+        keyCode: shortcut.keyCode,
+        modifiers: shortcut.modifiers,
+        bindings: bindings
+    ) == presetID)
+    #expect(WindowShortcutCatalog.matchPreset(
+        keyCode: 24,
+        modifiers: shortcut.modifiers,
+        bindings: bindings
+    ) == nil)
+    #expect(WindowShortcutCatalog.matchPreset(
+        keyCode: shortcut.keyCode,
+        modifiers: NSEvent.ModifierFlags([.control, .shift]).rawValue,
+        bindings: bindings
+    ) == nil)
+}

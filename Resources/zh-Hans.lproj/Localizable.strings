@@ -780,6 +780,7 @@
 "shortcut.error.systemConflict" = "快捷键与已启用的 macOS 系统快捷键冲突";
 "shortcut.error.otherApplicationConflict" = "快捷键可能已被其他应用注册";
 "shortcut.error.screenshotConflict" = "快捷键与截图快捷键冲突";
+"shortcut.error.windowPresetConflict" = "快捷键与窗口预设“%@”冲突";
 "focus.doNotDisturb" = "切换勿扰模式";
 "focus.doNotDisturbToggled" = "已切换勿扰模式";
 

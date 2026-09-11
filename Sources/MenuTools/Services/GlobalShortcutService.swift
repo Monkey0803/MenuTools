@@ -107,6 +107,7 @@ enum GlobalShortcutError: LocalizedError, Equatable {
     case systemConflict
     case otherApplicationConflict
     case windowConflict(WindowLayout)
+    case windowPresetConflict(String)
     case windowManagementConflict
     case appConflict(String)
     case screenshotConflict
@@ -121,6 +122,7 @@ enum GlobalShortcutError: LocalizedError, Equatable {
         case .systemConflict: return L("shortcut.error.systemConflict")
         case .otherApplicationConflict: return L("shortcut.error.otherApplicationConflict")
         case let .windowConflict(layout): return L("shortcut.error.conflict", L(layout.titleKey))
+        case let .windowPresetConflict(name): return L("shortcut.error.windowPresetConflict", name)
         case .windowManagementConflict: return L("shortcut.error.conflict", L("window.title"))
         case let .appConflict(path):
             return L(
@@ -240,6 +242,8 @@ final class GlobalShortcutService {
             throw GlobalShortcutError.otherApplicationConflict
         case let .window(layout):
             throw GlobalShortcutError.windowConflict(layout)
+        case let .windowPreset(name):
+            throw GlobalShortcutError.windowPresetConflict(name)
         case .windowManagement:
             throw GlobalShortcutError.windowManagementConflict
         case let .scene(conflict):

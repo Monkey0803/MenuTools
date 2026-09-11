@@ -780,6 +780,7 @@
 "shortcut.error.systemConflict" = "Shortcut conflicts with an enabled macOS system shortcut";
 "shortcut.error.otherApplicationConflict" = "Shortcut may already be registered by another application";
 "shortcut.error.screenshotConflict" = "Shortcut conflicts with the screenshot shortcut";
+"shortcut.error.windowPresetConflict" = "Shortcut conflicts with the window preset \"%@\"";
 "focus.doNotDisturb" = "Toggle Do Not Disturb";
 "focus.doNotDisturbToggled" = "Do Not Disturb toggled";
 

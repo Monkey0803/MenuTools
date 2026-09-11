@@ -780,6 +780,7 @@
 "shortcut.error.systemConflict" = "有効な macOS システムショートカットと競合しています";
 "shortcut.error.otherApplicationConflict" = "別のアプリケーションですでに登録されている可能性があります";
 "shortcut.error.screenshotConflict" = "スクリーンショットショートカットと競合しています";
+"shortcut.error.windowPresetConflict" = "ウィンドウプリセット「%@」とショートカットが競合しています";
 "focus.doNotDisturb" = "おやすみモードを切り替え";
 "focus.doNotDisturbToggled" = "おやすみモードを切り替えました";
 

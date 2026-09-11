@@ -89,6 +89,7 @@ enum AppVolumeShortcutError: LocalizedError, Equatable {
     case otherApplicationConflict
     case sceneConflict(ScenePreset)
     case windowConflict(WindowLayout)
+    case windowPresetConflict(String)
     case windowManagementConflict
     case appConflict(String)
     case screenshotConflict
@@ -109,6 +110,8 @@ enum AppVolumeShortcutError: LocalizedError, Equatable {
             return L("shortcut.error.conflict", L(scene.titleKey))
         case let .windowConflict(layout):
             return L("shortcut.error.conflict", L(layout.titleKey))
+        case let .windowPresetConflict(name):
+            return L("shortcut.error.windowPresetConflict", name)
         case .windowManagementConflict:
             return L("shortcut.error.conflict", L("window.title"))
         case let .appConflict(path):
@@ -267,6 +270,8 @@ final class AppVolumeShortcutService {
             throw AppVolumeShortcutError.sceneConflict(scene)
         case let .window(layout):
             throw AppVolumeShortcutError.windowConflict(layout)
+        case let .windowPreset(name):
+            throw AppVolumeShortcutError.windowPresetConflict(name)
         case .windowManagement:
             throw AppVolumeShortcutError.windowManagementConflict
         case let .app(path):

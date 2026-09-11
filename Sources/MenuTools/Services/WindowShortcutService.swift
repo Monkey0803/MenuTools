@@ -61,6 +61,7 @@ enum WindowShortcutError: LocalizedError, Equatable {
     case appVolumeConflict
     case translationConflict
     case quickAccessConflict
+    case presetConflict(String)
 
     var errorDescription: String? {
         switch self {
@@ -89,6 +90,8 @@ enum WindowShortcutError: LocalizedError, Equatable {
             return L("shortcut.error.conflict", L("settings.tab.translation"))
         case .quickAccessConflict:
             return L("shortcut.error.conflict", L("window.title"))
+        case let .presetConflict(name):
+            return L("shortcut.error.windowPresetConflict", name)
         }
     }
 }
@@ -111,6 +114,17 @@ enum WindowShortcutCatalog {
     ) -> WindowLayout? {
         bindings.first { $0.key != layout && $0.value == binding }?.key
     }
+
+    /// 匹配用户为「固定尺寸预设」绑定的全局快捷键。
+    static func matchPreset(
+        keyCode: UInt16,
+        modifiers: UInt,
+        bindings: [WindowPresetShortcut]
+    ) -> UUID? {
+        bindings.first {
+            $0.shortcut.keyCode == keyCode && $0.shortcut.modifiers == modifiers
+        }?.id
+    }
 }
 
 /// 窗口布局快捷键的持久化与全局监听服务。
@@ -121,6 +135,7 @@ final class WindowShortcutService {
 
     private(set) var bindings: [WindowLayout: GlobalShortcut]
     private(set) var quickAccessBinding: GlobalShortcut?
+    private(set) var presetShortcuts: [WindowPresetShortcut]
     private(set) var lastError: String?
     private(set) var isRunning = false
     private(set) var isAccessibilityTrusted = AXIsProcessTrusted()
@@ -153,6 +168,7 @@ final class WindowShortcutService {
     ) {
         self.defaults = defaults
         self.bindings = Self.loadBindings(from: defaults)
+        self.presetShortcuts = Self.loadPresetShortcuts(from: defaults)
         self.conflictChecker = conflictChecker
         self.sceneBindingsProvider = sceneBindingsProvider
         self.appBindingsProvider = appBindingsProvider
@@ -224,6 +240,9 @@ final class WindowShortcutService {
         if quickAccessBinding == binding {
             throw WindowShortcutError.conflict(layout)
         }
+        if let conflict = presetShortcuts.first(where: { $0.shortcut == binding }) {
+            throw WindowShortcutError.presetConflict(conflict.name)
+        }
         let context = ShortcutConflictContext(
             sceneBindings: sceneBindingsProvider(),
             windowBindings: bindings,
@@ -237,32 +256,10 @@ final class WindowShortcutService {
             excludingScreenshotMode: nil,
             excludingClipboard: false,
             excludingAppVolume: false,
-            windowQuickAccessBinding: quickAccessBinding
+            windowQuickAccessBinding: quickAccessBinding,
+            windowPresetBindings: presetShortcuts
         )
-        switch conflictChecker.conflict(for: binding, context: context) {
-        case .system:
-            throw WindowShortcutError.systemConflict
-        case .otherApplication:
-            throw WindowShortcutError.otherApplicationConflict
-        case let .scene(scene):
-            throw WindowShortcutError.sceneConflict(scene)
-        case let .window(conflict):
-            throw WindowShortcutError.conflict(conflict)
-        case .windowManagement:
-            throw WindowShortcutError.quickAccessConflict
-        case let .app(path):
-            throw WindowShortcutError.appConflict(path)
-        case .screenshot:
-            throw WindowShortcutError.screenshotConflict
-        case .clipboard:
-            throw WindowShortcutError.clipboardConflict
-        case .appVolume:
-            throw WindowShortcutError.appVolumeConflict
-        case .translation:
-            throw WindowShortcutError.translationConflict
-        case nil:
-            break
-        }
+        try validateWithSharedChecker(binding, context: context)
         bindings[layout] = binding
         lastError = nil
         saveBindings()
@@ -275,6 +272,9 @@ final class WindowShortcutService {
         }
         if let conflict = bindings.first(where: { $0.value == binding })?.key {
             throw WindowShortcutError.conflict(conflict)
+        }
+        if let conflict = presetShortcuts.first(where: { $0.shortcut == binding }) {
+            throw WindowShortcutError.presetConflict(conflict.name)
         }
         let context = ShortcutConflictContext(
             sceneBindings: sceneBindingsProvider(),
@@ -290,8 +290,89 @@ final class WindowShortcutService {
             excludingClipboard: false,
             excludingAppVolume: false,
             windowQuickAccessBinding: quickAccessBinding,
-            excludingWindowQuickAccess: true
+            excludingWindowQuickAccess: true,
+            windowPresetBindings: presetShortcuts
         )
+        try validateWithSharedChecker(binding, context: context)
+        quickAccessBinding = binding
+        lastError = nil
+        saveQuickAccessBinding()
+    }
+
+    func clearBinding(for layout: WindowLayout) {
+        bindings.removeValue(forKey: layout)
+        lastError = nil
+        saveBindings()
+    }
+
+    func presetBinding(for presetID: UUID) -> GlobalShortcut? {
+        presetShortcuts.first { $0.id == presetID }?.shortcut
+    }
+
+    /// 给固定尺寸预设绑定全局快捷键；与布局、其他预设、快速面板快捷键互斥。
+    func setPresetBinding(_ binding: GlobalShortcut, for preset: WindowLayoutPreset) throws {
+        guard binding.modifiers & GlobalShortcutModifier.relevantMask != 0 else {
+            throw WindowShortcutError.modifierRequired
+        }
+        if let conflict = bindings.first(where: { $0.value == binding })?.key {
+            throw WindowShortcutError.conflict(conflict)
+        }
+        if let conflict = presetShortcuts.first(where: { $0.id != preset.id && $0.shortcut == binding }) {
+            throw WindowShortcutError.presetConflict(conflict.name)
+        }
+        if quickAccessBinding == binding {
+            throw WindowShortcutError.quickAccessConflict
+        }
+        try validateWithSharedChecker(
+            binding,
+            context: ShortcutConflictContext(
+                sceneBindings: sceneBindingsProvider(),
+                windowBindings: bindings,
+                appBindings: appBindingsProvider(),
+                screenshotBindings: screenshotBindingsProvider(),
+                clipboardBinding: clipboardBindingProvider(),
+                appVolumeBinding: appVolumeBindingProvider(),
+                excludingScene: nil,
+                excludingWindow: nil,
+                excludingAppPath: nil,
+                excludingScreenshotMode: nil,
+                excludingClipboard: false,
+                excludingAppVolume: false,
+                windowQuickAccessBinding: quickAccessBinding,
+                windowPresetBindings: presetShortcuts,
+                excludingWindowPreset: preset.id
+            )
+        )
+
+        let record = WindowPresetShortcut(id: preset.id, name: preset.name, shortcut: binding)
+        if let index = presetShortcuts.firstIndex(where: { $0.id == preset.id }) {
+            presetShortcuts[index] = record
+        } else {
+            presetShortcuts.append(record)
+        }
+        lastError = nil
+        savePresetShortcuts()
+    }
+
+    func clearPresetBinding(for presetID: UUID) {
+        presetShortcuts.removeAll { $0.id == presetID }
+        lastError = nil
+        savePresetShortcuts()
+    }
+
+    /// 预设被删除后不再保留它的快捷键绑定。
+    func prunePresetBindings(keeping presetIDs: Set<UUID>) {
+        let kept = presetShortcuts.filter { presetIDs.contains($0.id) }
+        guard kept.count != presetShortcuts.count else { return }
+        presetShortcuts = kept
+        savePresetShortcuts()
+    }
+
+    /// 把共享冲突检测器的结果翻译成窗口模块自己的错误。
+    private func validateWithSharedChecker(
+        _ binding: GlobalShortcut,
+        context: ShortcutConflictContext
+    ) throws {
         switch conflictChecker.conflict(for: binding, context: context) {
         case .system:
             throw WindowShortcutError.systemConflict
@@ -301,6 +382,8 @@ final class WindowShortcutService {
             throw WindowShortcutError.sceneConflict(scene)
         case let .window(conflict):
             throw WindowShortcutError.conflict(conflict)
+        case let .windowPreset(name):
+            throw WindowShortcutError.presetConflict(name)
         case .windowManagement:
             throw WindowShortcutError.quickAccessConflict
         case let .app(path):
@@ -316,15 +399,6 @@ final class WindowShortcutService {
         case nil:
             break
         }
-        quickAccessBinding = binding
-        lastError = nil
-        saveQuickAccessBinding()
-    }
-
-    func clearBinding(for layout: WindowLayout) {
-        bindings.removeValue(forKey: layout)
-        lastError = nil
-        saveBindings()
     }
 
     func clearQuickAccessBinding() {
@@ -352,6 +426,25 @@ final class WindowShortcutService {
             lastError = nil
             return
         }
+        // 预设快捷键在布局快捷键之后匹配：两者已在绑定时互斥。
+        if let presetID = WindowShortcutCatalog.matchPreset(
+            keyCode: keyCode,
+            modifiers: modifiers,
+            bindings: presetShortcuts
+        ) {
+            guard let preset = WindowManagementService.shared.configuration.presets.first(where: { $0.id == presetID }) else {
+                // 预设已被删除：顺手清掉悬空的绑定，避免占着快捷键。
+                clearPresetBinding(for: presetID)
+                return
+            }
+            do {
+                try WindowManagementService.shared.apply(preset)
+                lastError = nil
+            } catch {
+                lastError = error.localizedDescription
+            }
+            return
+        }
         guard let layout = WindowShortcutCatalog.match(
             keyCode: keyCode,
             modifiers: modifiers,
@@ -368,6 +461,19 @@ final class WindowShortcutService {
         }
     }
 
+    private func savePresetShortcuts() {
+        guard let data = try? JSONEncoder().encode(presetShortcuts) else { return }
+        defaults.set(data, forKey: Self.presetShortcutsKey)
+    }
+
+    private static func loadPresetShortcuts(from defaults: UserDefaults) -> [WindowPresetShortcut] {
+        guard let data = defaults.data(forKey: presetShortcutsKey),
+              let values = try? JSONDecoder().decode([WindowPresetShortcut].self, from: data) else {
+            return []
+        }
+        return values
+    }
+
     private func saveBindings() {
         guard let data = try? JSONEncoder().encode(bindings) else { return }
         defaults.set(data, forKey: Self.bindingsKey)
@@ -375,6 +481,7 @@ final class WindowShortcutService {
 
     private static let bindingsKey = "windowManagement.shortcuts"
     private static let quickAccessBindingKey = "windowManagement.quickAccessShortcut"
+    private static let presetShortcutsKey = "windowManagement.presetShortcuts"
 
     private static func loadBindings(from defaults: UserDefaults) -> [WindowLayout: GlobalShortcut] {
         guard let data = defaults.data(forKey: bindingsKey),

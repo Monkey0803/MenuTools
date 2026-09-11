@@ -8,6 +8,7 @@ enum ShortcutConflictSource: Equatable, Sendable {
     case otherApplication
     case scene(ScenePreset)
     case window(WindowLayout)
+    case windowPreset(String)
     case windowManagement
     case app(String)
     case screenshot
@@ -33,6 +34,9 @@ struct ShortcutConflictContext: Sendable {
     let excludingTranslation: Bool
     let windowQuickAccessBinding: GlobalShortcut?
     let excludingWindowQuickAccess: Bool
+    /// 窗口预设的快捷键绑定；为 nil 时回落到 `WindowShortcutService.shared`。
+    let windowPresetBindings: [WindowPresetShortcut]?
+    let excludingWindowPreset: UUID?
 
     init(
         sceneBindings: [ScenePreset: GlobalShortcut],
@@ -50,7 +54,9 @@ struct ShortcutConflictContext: Sendable {
         translationBinding: GlobalShortcut? = nil,
         excludingTranslation: Bool = false,
         windowQuickAccessBinding: GlobalShortcut? = nil,
-        excludingWindowQuickAccess: Bool = false
+        excludingWindowQuickAccess: Bool = false,
+        windowPresetBindings: [WindowPresetShortcut]? = nil,
+        excludingWindowPreset: UUID? = nil
     ) {
         self.sceneBindings = sceneBindings
         self.windowBindings = windowBindings
@@ -68,6 +74,8 @@ struct ShortcutConflictContext: Sendable {
         self.excludingTranslation = excludingTranslation
         self.windowQuickAccessBinding = windowQuickAccessBinding
         self.excludingWindowQuickAccess = excludingWindowQuickAccess
+        self.windowPresetBindings = windowPresetBindings
+        self.excludingWindowPreset = excludingWindowPreset
     }
 }
 
@@ -183,6 +191,12 @@ struct DefaultShortcutConflictChecker: ShortcutConflictChecking {
             $0.key != context.excludingWindow && $0.value == shortcut
         })?.key {
             return .window(conflict)
+        }
+        let presetBindings = context.windowPresetBindings ?? WindowShortcutService.shared.presetShortcuts
+        if let conflict = presetBindings.first(where: {
+            $0.id != context.excludingWindowPreset && $0.shortcut == shortcut
+        }) {
+            return .windowPreset(conflict.name)
         }
         let windowQuickAccessBinding = context.windowQuickAccessBinding
             ?? WindowShortcutService.shared.quickAccessBinding

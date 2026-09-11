@@ -30,6 +30,7 @@ enum AppShortcutError: LocalizedError, Equatable {
     case otherApplicationConflict
     case sceneConflict(ScenePreset)
     case windowConflict(WindowLayout)
+    case windowPresetConflict(String)
     case windowManagementConflict
     case screenshotConflict
     case clipboardConflict
@@ -54,6 +55,8 @@ enum AppShortcutError: LocalizedError, Equatable {
             return L("shortcut.error.conflict", L(scene.titleKey))
         case let .windowConflict(layout):
             return L("shortcut.error.conflict", L(layout.titleKey))
+        case let .windowPresetConflict(name):
+            return L("shortcut.error.windowPresetConflict", name)
         case .windowManagementConflict:
             return L("shortcut.error.conflict", L("window.title"))
         case .screenshotConflict:
@@ -183,6 +186,8 @@ final class AppShortcutService {
             throw AppShortcutError.sceneConflict(scene)
         case let .window(layout):
             throw AppShortcutError.windowConflict(layout)
+        case let .windowPreset(name):
+            throw AppShortcutError.windowPresetConflict(name)
         case .windowManagement:
             throw AppShortcutError.windowManagementConflict
         case .screenshot:
