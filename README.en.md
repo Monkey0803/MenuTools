@@ -181,6 +181,7 @@ Some features request permissions the first time they are used:
 | Automation → Finder | Empties the Trash. | Quick Action Center |
 | Automation → System Events | Changes appearance, Dock, and menu bar settings. | Appearance, Dock, and menu bar toggles |
 | Bluetooth | Reads battery levels from connected Bluetooth devices. | Bluetooth battery levels |
+| Notifications | Delivers high-traffic and monthly-quota alerts. | Network Traffic |
 | Screen Recording | Allows screen capture. | Screenshot to Clipboard |
 | Screen Recording | Allows window, area, and scrolling capture. | Screenshot Tools |
 | System Audio Recording | Captures active app audio and replays it with an independent gain. | Per-app volume management |
@@ -188,7 +189,7 @@ Some features request permissions the first time they are used:
 | Accessibility | Receives global keyboard events and triggers scenes. | Global scene shortcuts, Focus |
 | Accessibility | Synthesizes ⌘V to paste back into the previous app. | Clipboard auto-paste |
 
-If permission was denied, enable it again in **System Settings → Privacy & Security**. Mute, prevent sleep, Night Shift, clipboard history recording, and cleanup features do not require these permissions (clipboard auto-paste does).
+If permission was denied, enable it again in **System Settings → Privacy & Security**. If notifications were denied, allow them again under **System Settings → Notifications → MenuTools**; the Network Traffic settings page shows the current authorization state and links straight to System Settings when it is denied. Mute, prevent sleep, Night Shift, clipboard history recording, and cleanup features do not require these permissions (clipboard auto-paste does).
 
 ## Technical Implementation
 
@@ -276,6 +277,9 @@ export SPARKLE_DOWNLOAD_URL_PREFIX="https://your-server/releases/"
 - Fixed-size presets store only a position and size, not a specific display; when applied after a display change they are clamped back into the current display's usable area.
 - Repeating a half-screen shortcut to reach the adjacent display requires at least two displays and is off by default; enable it in Settings.
 - Stashing (pushing a window mostly off-screen at an edge) relies on apps accepting off-screen positions; a few apps clamp the window back on screen, in which case stashing has no effect (`Scripts/test_window_management.swift --interactive` covers this capability).
+- Network Traffic samples processes through the system `/usr/bin/nettop`, so bytes are aggregated per process/app and cannot be split across remote destinations (connection details only cover the current connections and endpoints). Interface filtering uses nettop interface classes (external, wifi, wired, awdl, expensive, loopback), not physical device names, and VPN (utun) tunnels are not listed separately.
+- History charts, rankings, and today/month totals come from samples accumulated on this Mac: a fresh install has no history until the module has been running for a while. If a major macOS upgrade changes nettop output fields, run `Scripts/test_network_traffic.swift` to validate.
+- High-traffic and monthly-quota alerts require notification permission; when notifications are denied the alerts are silently dropped, and the Network Traffic settings page shows the state with a button that opens System Settings.
 
 ## Acknowledgements
 
