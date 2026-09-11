@@ -286,7 +286,7 @@ struct AppVolumeSettingsView: View {
                     set: { service.setBoostEnabled($0) }
                 ))
 
-                Text("macOS 媒体键由系统保留；请为音量操作设置带修饰键的自定义快捷键。")
+                Text(L("volume.shortcut.mediaKeyHint"))
                     .font(.caption)
                     .foregroundStyle(.secondary)
 
@@ -315,12 +315,12 @@ struct AppVolumeSettingsView: View {
                         }
                     }
 
-                Button("会议前一键检查") {
+                Button(L("volume.meeting.check")) {
                     _ = service.runMeetingAudioCheck()
                 }
                 if let meetingCheck = service.meetingCheck {
                     Label(
-                        meetingCheck.isReady ? "输入和输出设备已就绪" : "请检查麦克风权限、静音状态或设备连接",
+                        meetingCheck.isReady ? L("volume.meeting.ready") : L("volume.meeting.attention"),
                         systemImage: meetingCheck.isReady ? "checkmark.circle.fill" : "exclamationmark.triangle.fill"
                     )
                     .foregroundStyle(meetingCheck.isReady ? .green : .orange)
@@ -331,21 +331,21 @@ struct AppVolumeSettingsView: View {
 
             Section {
                 HStack(spacing: 10) {
-                    TextField("搜索 App", text: Binding(
+                    TextField(L("volume.search.placeholder"), text: Binding(
                         get: { service.searchQuery },
                         set: { service.setSearchQuery($0) }
                     ))
-                    Picker("分组", selection: Binding(
+                    Picker(L("volume.groupFilter"), selection: Binding(
                         get: { service.appGroupFilter },
                         set: { service.setAppGroupFilter($0) }
                     )) {
-                        Text("全部").tag(nil as AppVolumeAppGroup?)
+                        Text(L("volume.filter.all")).tag(nil as AppVolumeAppGroup?)
                         ForEach(AppVolumeAppGroup.allCases, id: \.self) { group in
                             Text(L(group.titleKey)).tag(group as AppVolumeAppGroup?)
                         }
                     }
                     .labelsHidden()
-                    Picker("排序", selection: Binding(
+                    Picker(L("volume.sort"), selection: Binding(
                         get: { service.sessionSort },
                         set: { service.setSessionSort($0) }
                     )) {
@@ -356,8 +356,8 @@ struct AppVolumeSettingsView: View {
                     .labelsHidden()
                 }
                 HStack {
-                    Button("静音当前列表", action: service.muteFilteredSessions)
-                    Button("恢复当前列表", action: service.restoreFilteredSessions)
+                    Button(L("volume.muteFiltered"), action: service.muteFilteredSessions)
+                    Button(L("volume.restoreFiltered"), action: service.restoreFilteredSessions)
                 }
                 if activeSessions.isEmpty {
                     Text(L("volume.empty"))
@@ -383,7 +383,7 @@ struct AppVolumeSettingsView: View {
 
             Section {
                 HStack {
-                    Text("最大主音量")
+                    Text(L("volume.masterLimit"))
                     Slider(value: Binding(
                         get: { service.masterVolumeLimit },
                         set: { service.setMasterVolumeLimit($0) }
@@ -392,7 +392,7 @@ struct AppVolumeSettingsView: View {
                         .font(.caption.monospacedDigit())
                         .foregroundStyle(.secondary)
                 }
-                Toggle("耳机连接时自动应用上限", isOn: Binding(
+                Toggle(L("volume.masterLimit.headphones"), isOn: Binding(
                     get: { service.limitsHeadphoneVolume },
                     set: { service.setLimitsHeadphoneVolume($0) }
                 ))
@@ -401,20 +401,20 @@ struct AppVolumeSettingsView: View {
                         Label(warning, systemImage: "ear.trianglebadge.exclamationmark")
                             .foregroundStyle(.orange)
                         Spacer()
-                        Button("知道了", action: service.dismissHearingWarning)
+                        Button(L("common.gotIt"), action: service.dismissHearingWarning)
                     }
                 }
             } header: {
-                Label("听力保护", systemImage: "ear")
+                Label(L("volume.hearing.title"), systemImage: "ear")
             }
 
             Section {
-                Toggle("会议时压低其他正在发声的 App", isOn: Binding(
+                Toggle(L("volume.meetingDucking"), isOn: Binding(
                     get: { service.meetingDuckingEnabled },
                     set: { service.setMeetingDuckingEnabled($0) }
                 ))
                 HStack {
-                    Text("保留音量")
+                    Text(L("volume.meetingDucking.keepVolume"))
                     Slider(value: Binding(
                         get: { service.meetingDuckingFactor },
                         set: { service.setMeetingDuckingFactor($0) }
@@ -424,18 +424,18 @@ struct AppVolumeSettingsView: View {
                         .foregroundStyle(.secondary)
                 }
                 if service.isMeetingDuckingActive {
-                    Label("会议音频进行中，其他 App 已临时压低", systemImage: "person.2.wave.2.fill")
+                    Label(L("volume.meetingDucking.active"), systemImage: "person.2.wave.2.fill")
                         .font(.caption)
                         .foregroundStyle(.tint)
                 }
             } header: {
-                Label("会议智能压低", systemImage: "person.2.wave.2")
+                Label(L("volume.meetingDucking.title"), systemImage: "person.2.wave.2")
             }
 
             Section {
                 HStack {
                     TextField(L("volume.preset.name"), text: $presetName)
-                    Menu("包含 \(presetAppIdentifiers.count == 0 ? service.sessions.count : presetAppIdentifiers.count) 个 App") {
+                    Menu(L("volume.preset.includesApps", presetAppIdentifiers.count == 0 ? service.sessions.count : presetAppIdentifiers.count)) {
                         ForEach(service.sessions) { session in
                             Toggle(session.displayName, isOn: Binding(
                                 get: { presetAppIdentifiers.isEmpty || presetAppIdentifiers.contains(session.id) },
@@ -460,11 +460,11 @@ struct AppVolumeSettingsView: View {
                     .disabled(presetName.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
                 }
                 HStack {
-                    Button("导入预设") {
+                    Button(L("volume.preset.import")) {
                         presetTransferMessage = nil
                         isImportingPresets = true
                     }
-                    Button("导出预设") {
+                    Button(L("volume.preset.export")) {
                         presetDocument = service.exportPresets().map(AppVolumePresetDocument.init)
                         isExportingPresets = presetDocument != nil
                     }
@@ -475,11 +475,11 @@ struct AppVolumeSettingsView: View {
                         .font(.caption)
                         .foregroundStyle(.orange)
                 }
-                Picker("当前输出设备自动预设", selection: Binding(
+                Picker(L("volume.preset.bindToOutput"), selection: Binding(
                     get: { service.boundPresetID(forOutputDeviceUID: service.output.deviceUID) },
                     set: { service.bindPreset($0, toOutputDeviceUID: service.output.deviceUID) }
                 )) {
-                    Text("不自动应用").tag(nil as UUID?)
+                    Text(L("volume.preset.none")).tag(nil as UUID?)
                     ForEach(service.presets) { preset in
                         Text(preset.name).tag(preset.id as UUID?)
                     }
@@ -488,7 +488,7 @@ struct AppVolumeSettingsView: View {
 
                 ForEach(service.presets) { preset in
                     HStack {
-                        TextField("预设名称", text: Binding(
+                        TextField(L("volume.preset.name"), text: Binding(
                             get: { service.presets.first(where: { $0.id == preset.id })?.name ?? preset.name },
                             set: { service.renamePreset(id: preset.id, to: $0) }
                         ))
@@ -503,7 +503,7 @@ struct AppVolumeSettingsView: View {
                                     outputDeviceUID: service.output.deviceUID.isEmpty ? nil : service.output.deviceUID
                                 )
                             }
-                            Button("覆盖当前配置") {
+                            Button(L("volume.preset.overwrite")) {
                                 service.overwritePreset(id: preset.id)
                             }
                             Button(L("volume.preset.delete"), role: .destructive) {
@@ -554,7 +554,7 @@ struct AppVolumeSettingsView: View {
             if !service.automationExecutions.isEmpty {
                 Section {
                     if service.canUndoLatestAutomation {
-                        Button("撤销最近一次自动化") {
+                        Button(L("volume.automation.undoLatest")) {
                             service.undoLatestAutomation()
                         }
                     }
@@ -565,16 +565,16 @@ struct AppVolumeSettingsView: View {
                                 .font(.caption)
                                 .foregroundStyle(.secondary)
                             if execution.revertedAt != nil {
-                                Text("已撤销")
+                                Text(L("volume.automation.reverted"))
                                     .font(.caption)
                                     .foregroundStyle(.orange)
                             }
                         }
                     }
                 } header: {
-                    Label("自动化执行记录", systemImage: "clock.arrow.circlepath")
+                    Label(L("volume.automation.history"), systemImage: "clock.arrow.circlepath")
                 } footer: {
-                    Text("仅保留最近 20 条记录；可撤销本次运行期间最近一次自动化。")
+                    Text(L("volume.automation.history.desc"))
                 }
             }
 
@@ -586,14 +586,14 @@ struct AppVolumeSettingsView: View {
             }
 
             Section {
-                Button(didCopyDiagnostic ? "诊断报告已复制" : "复制兼容性诊断报告") {
+                Button(didCopyDiagnostic ? L("volume.diagnostics.copied") : L("volume.diagnostics.copy")) {
                     didCopyDiagnostic = service.copyDiagnosticReport()
                 }
-                Text("报告包含权限、输入输出设备、路由失败及 DRM/Process Tap 兼容性信息。")
+                Text(L("volume.diagnostics.desc"))
                     .font(.caption)
                     .foregroundStyle(.secondary)
             } header: {
-                Label("兼容性诊断", systemImage: "stethoscope")
+                Label(L("volume.diagnostics.title"), systemImage: "stethoscope")
             }
         }
         .formStyle(.grouped)
@@ -610,19 +610,19 @@ struct AppVolumeSettingsView: View {
                 let url = try result.get()
                 let data = try Data(contentsOf: url)
                 try service.importPresets(from: data)
-                presetTransferMessage = "预设导入完成"
+                presetTransferMessage = L("volume.preset.importSuccess")
             } catch {
-                presetTransferMessage = "预设导入失败：\(error.localizedDescription)"
+                presetTransferMessage = L("volume.preset.importFailure", error.localizedDescription)
             }
         }
         .fileExporter(
             isPresented: $isExportingPresets,
             document: presetDocument,
             contentType: .json,
-            defaultFilename: "MenuTools 音量预设"
+            defaultFilename: L("volume.preset.defaultName")
         ) { result in
             if case let .failure(error) = result {
-                presetTransferMessage = "预设导出失败：\(error.localizedDescription)"
+                presetTransferMessage = L("volume.preset.exportFailure", error.localizedDescription)
             }
         }
         .sheet(item: $editingRule) { rule in
@@ -771,27 +771,27 @@ private struct AppVolumeAutomationRuleEditor: View {
 
     var body: some View {
         Form {
-            Picker("输出设备", selection: $rule.outputDeviceUID) {
-                Text("任意输出设备").tag(nil as String?)
+            Picker(L("volume.output.device"), selection: $rule.outputDeviceUID) {
+                Text(L("volume.output.any")).tag(nil as String?)
                 ForEach(outputDevices) { device in
                     Text(device.name).tag(device.uid as String?)
                 }
             }
-            Toggle("启用时间段", isOn: $useTimeRange)
+            Toggle(L("volume.automation.schedule"), isOn: $useTimeRange)
             if useTimeRange {
-                TextField("开始时间（HH:mm）", text: $startMinute)
-                TextField("结束时间（HH:mm）", text: $endMinute)
+                TextField(L("volume.automation.startTime"), text: $startMinute)
+                TextField(L("volume.automation.endTime"), text: $endMinute)
             }
-            Picker("专注模式", selection: $focusModeRequirement) {
-                Text("不限制").tag(0)
-                Text("必须开启").tag(1)
-                Text("必须关闭").tag(2)
+            Picker(L("volume.automation.focus"), selection: $focusModeRequirement) {
+                Text(L("volume.automation.focus.any")).tag(0)
+                Text(L("volume.automation.focus.required")).tag(1)
+                Text(L("volume.automation.focus.blocked")).tag(2)
             }
-            TextField("前台 App Bundle ID", text: Binding(
+            TextField(L("volume.automation.bundleID"), text: Binding(
                 get: { rule.launchBundleID ?? "" },
                 set: { rule.launchBundleID = $0 }
             ))
-            TextField("Wi-Fi 名称", text: Binding(
+            TextField(L("volume.automation.wifi"), text: Binding(
                 get: { rule.wifiName ?? "" },
                 set: { rule.wifiName = $0 }
             ))
@@ -800,10 +800,10 @@ private struct AppVolumeAutomationRuleEditor: View {
         .frame(width: 420)
         .toolbar {
             ToolbarItem(placement: .cancellationAction) {
-                Button("取消", action: dismiss.callAsFunction)
+                Button(L("common.cancel"), action: dismiss.callAsFunction)
             }
             ToolbarItem(placement: .confirmationAction) {
-                Button("保存") {
+                Button(L("common.save")) {
                     rule.requiresFocusMode = switch focusModeRequirement {
                     case 1: true
                     case 2: false
@@ -993,7 +993,7 @@ private struct SystemInputVolumeRow: View {
                     .font(.system(size: 8, design: .monospaced))
                     .foregroundStyle(.secondary)
             }
-            .accessibilityLabel("麦克风实时输入电平")
+            .accessibilityLabel(L("volume.input.levelAccessibility"))
         }
     }
 }
@@ -1047,7 +1047,7 @@ private struct AppVolumeRow: View {
                             .font(.caption2)
                     }
                     .menuStyle(.borderlessButton)
-                    .help("分组：\(L(session.appGroup.titleKey))")
+                    .help(L("volume.accessibility.group", L(session.appGroup.titleKey)))
                     Button {
                         showsEqualizer = true
                     } label: {
@@ -1107,12 +1107,12 @@ private struct AppVolumeRow: View {
                         .font(.system(size: 8, design: .monospaced))
                         .foregroundStyle(session.meter.isClipping ? .red : .secondary)
                 }
-                .accessibilityLabel("\(session.displayName) 的 Peak、RMS 与保持峰值")
+                .accessibilityLabel(L("volume.accessibility.meter", session.displayName))
 
                 Image(systemName: routeStatusSymbol)
                     .font(.caption2)
                     .foregroundStyle(routeStatusColor)
-                    .help("路由状态，CPU \(Int((session.meter.cpuLoad * 100).rounded()))%")
+                    .help(L("volume.accessibility.route", Int((session.meter.cpuLoad * 100).rounded())))
 
                 if session.errorMessage != nil {
                     Button {

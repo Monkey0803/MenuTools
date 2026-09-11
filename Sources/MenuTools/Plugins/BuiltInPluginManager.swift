@@ -108,11 +108,11 @@ enum BuiltInPluginManagerError: LocalizedError, Equatable {
     var errorDescription: String? {
         switch self {
         case .unknownPlugin(let id):
-            return "未注册插件：\(id.rawValue)"
+            return L("plugin.error.unknownPlugin", id.rawValue)
         case .dependencyCycle(let id):
-            return "插件依赖形成循环：\(id.rawValue)"
+            return L("plugin.error.dependencyCycle", id.rawValue)
         case .requiredBy(let id):
-            return "插件仍被 \(id.rawValue) 依赖"
+            return L("plugin.error.requiredBy", id.rawValue)
         }
     }
 }

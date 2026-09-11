@@ -301,6 +301,10 @@
 "screenshot.error.editor" = "Could not open the image editor";
 "screenshot.error.stitch" = "Could not stitch the scrolling screenshot";
 "screenshot.error.memoryLimit" = "The scrolling screenshot reached its memory limit; finish it before starting another one";
+"screenshot.error.displayUnknown" = "Could not determine the display";
+"screenshot.error.displayMissing" = "Could not find the target display";
+"screenshot.error.displayContentMissing" = "Could not find the screen content for the target window";
+"screenshot.error.cleanupFailed" = "%@; cleaning up the capture session failed: %@";
 
 /* Bluetooth */
 "bt.empty" = "No Bluetooth battery info";
@@ -437,6 +441,7 @@
 "settings.backup.importSuccess" = "Backup restored successfully";
 "settings.backup.invalidFile" = "The backup file is invalid or unreadable";
 "settings.backup.writeFailed" = "The backup operation could not be completed";
+"settings.backup.rollbackFailed" = "Backup restore failed: %@; rollback failed: %@";
 
 /* Menu bar icon names */
 "icon.wrench" = "Wrench";
@@ -535,6 +540,7 @@
 "clipboard.snippetGroup.rename" = "Rename Group";
 "common.cancel" = "Cancel";
 "common.save" = "Save";
+"common.gotIt" = "Got it";
 "clipboard.autoPasteDescription" = "Allow MenuTools under Privacy & Security > Accessibility to send the paste shortcut.";
 "clipboard.feedback.copied" = "Copied";
 "clipboard.feedback.pasted" = "Copied and pasted";
@@ -888,6 +894,55 @@
 "volume.section.automation" = "Automation Rules";
 "volume.automation.add" = "Apply when this output connects";
 "volume.automation.desc" = "Each preset applies automatically at most once per day to avoid overwriting recent manual changes.";
+"volume.meeting.check" = "Check before a meeting";
+"volume.meeting.ready" = "Input and output devices are ready";
+"volume.meeting.attention" = "Check microphone permission, mute state, or device connections";
+"volume.shortcut.mediaKeyHint" = "macOS keeps the media keys for the system. Assign a custom shortcut with a modifier for volume actions.";
+"volume.search.placeholder" = "Search apps";
+"volume.groupFilter" = "Group";
+"volume.sort" = "Sort";
+"volume.muteFiltered" = "Mute listed apps";
+"volume.restoreFiltered" = "Restore listed apps";
+"volume.masterLimit" = "Maximum master volume";
+"volume.masterLimit.headphones" = "Apply the limit automatically when headphones connect";
+"volume.hearing.title" = "Hearing protection";
+"volume.meetingDucking" = "Lower other playing apps during meetings";
+"volume.meetingDucking.keepVolume" = "Keep volume";
+"volume.meetingDucking.active" = "Meeting audio is active; other apps are temporarily lowered";
+"volume.meetingDucking.title" = "Smart meeting ducking";
+"volume.preset.includesApps" = "Includes %d apps";
+"volume.preset.import" = "Import presets";
+"volume.preset.export" = "Export presets";
+"volume.preset.bindToOutput" = "Automatic preset for this output device";
+"volume.preset.none" = "Do not apply automatically";
+"volume.preset.overwrite" = "Overwrite with current settings";
+"volume.preset.importSuccess" = "Presets imported";
+"volume.preset.importFailure" = "Could not import presets: %@";
+"volume.preset.exportFailure" = "Could not export presets: %@";
+"volume.preset.defaultName" = "MenuTools Volume Presets";
+"volume.automation.undoLatest" = "Undo the latest automation";
+"volume.automation.reverted" = "Reverted";
+"volume.automation.history" = "Automation history";
+"volume.automation.history.desc" = "Only the latest 20 entries are kept. You can undo the most recent automation from the current run.";
+"volume.automation.schedule" = "Limit to a time range";
+"volume.automation.startTime" = "Start time (HH:mm)";
+"volume.automation.endTime" = "End time (HH:mm)";
+"volume.automation.focus" = "Focus mode";
+"volume.automation.focus.any" = "Any";
+"volume.automation.focus.required" = "Must be on";
+"volume.automation.focus.blocked" = "Must be off";
+"volume.automation.bundleID" = "Frontmost app bundle ID";
+"volume.automation.wifi" = "Wi-Fi name";
+"volume.output.device" = "Output device";
+"volume.output.any" = "Any output device";
+"volume.diagnostics.copied" = "Diagnostic report copied";
+"volume.diagnostics.copy" = "Copy compatibility report";
+"volume.diagnostics.desc" = "The report covers permissions, input and output devices, routing failures, and DRM/Process Tap compatibility.";
+"volume.diagnostics.title" = "Compatibility diagnostics";
+"volume.input.levelAccessibility" = "Live microphone input level";
+"volume.accessibility.group" = "Group: %@";
+"volume.accessibility.meter" = "Peak, RMS, and held peak for %@";
+"volume.accessibility.route" = "Routing status, CPU %d%%";
 "volume.hearing.warning" = "Volume has stayed high for a while. Lower it to protect your hearing.";
 "volume.hud.muted" = "Muted";
 
@@ -911,6 +966,9 @@
 "plugin.openSettings" = "Open feature settings";
 "plugin.error.title" = "Couldn’t Change Feature";
 "plugin.error.dismiss" = "OK";
+"plugin.error.unknownPlugin" = "Unknown plugin: %@";
+"plugin.error.dependencyCycle" = "Plugin dependency cycle: %@";
+"plugin.error.requiredBy" = "Plugin is still required by %@";
 "plugin.state.running" = "Running";
 "plugin.state.failed" = "Failed";
 "plugin.permissions" = "Requires: %@";
@@ -995,6 +1053,12 @@
 "clipboard.archive.error.invalidFormat" = "The archive file has an invalid format.";
 "clipboard.archive.error.unsupportedVersion" = "This archive version is not supported.";
 "clipboard.archive.error.decryptionFailed" = "Could not decrypt the archive. Check the passphrase or file.";
+"clipboard.error.databaseOpen" = "Could not open the clipboard history database";
+"clipboard.error.databaseWritePrepare" = "Could not prepare the clipboard history write";
+"clipboard.error.databaseWrite" = "Could not write clipboard history";
+"clipboard.error.databaseRead" = "Could not read the clipboard history database";
+"clipboard.error.databaseSchema" = "Clipboard history database schema is invalid";
+"clipboard.error.databaseOperation" = "Clipboard history database operation failed";
 "clipboard.sequential.mode" = "Sequential Paste Mode";
 "clipboard.sequential.mode.once" = "Once";
 "clipboard.sequential.mode.loop" = "Loop";

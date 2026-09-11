@@ -70,8 +70,21 @@ enum ScreenshotCaptureCleanupError: LocalizedError {
     var errorDescription: String? {
         switch self {
         case let .combined(primary, cleanup):
-            return "\(primary.localizedDescription)；采集会话清理失败：\(cleanup.localizedDescription)"
+            return Self.combinedDescription(
+                primary: primary.localizedDescription,
+                cleanup: cleanup.localizedDescription
+            )
         }
+    }
+
+    /// 文案模板可注入：测试进程取不到 lproj 时 `L()` 只会返回 key，
+    /// 显式传入模板才能验证两个内部错误都被带进最终文案。
+    static func combinedDescription(
+        primary: String,
+        cleanup: String,
+        template: String = L("screenshot.error.cleanupFailed")
+    ) -> String {
+        String(format: template, primary, cleanup)
     }
 }
 

@@ -22,7 +22,7 @@ enum AppBackupRestoreError: Error, LocalizedError, @unchecked Sendable {
     var errorDescription: String? {
         switch self {
         case let .rollbackFailed(original, rollback):
-            return "备份恢复失败：\(original.localizedDescription)；回滚失败：\(rollback.localizedDescription)"
+            return L("settings.backup.rollbackFailed", original.localizedDescription, rollback.localizedDescription)
         }
     }
 }

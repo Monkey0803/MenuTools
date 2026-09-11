@@ -301,6 +301,10 @@
 "screenshot.error.editor" = "无法打开图片编辑器";
 "screenshot.error.stitch" = "长截图拼接失败";
 "screenshot.error.memoryLimit" = "长截图已达到内存保护上限，请先完成当前截图";
+"screenshot.error.displayUnknown" = "无法确定显示器";
+"screenshot.error.displayMissing" = "无法找到目标显示器";
+"screenshot.error.displayContentMissing" = "无法找到目标窗口的屏幕内容";
+"screenshot.error.cleanupFailed" = "%@；采集会话清理失败：%@";
 
 /* 蓝牙 */
 "bt.empty" = "未检测到蓝牙设备电量";
@@ -437,6 +441,7 @@
 "settings.backup.importSuccess" = "备份恢复成功";
 "settings.backup.invalidFile" = "备份文件无效或无法读取";
 "settings.backup.writeFailed" = "备份操作无法完成";
+"settings.backup.rollbackFailed" = "备份恢复失败：%@；回滚失败：%@";
 
 /* 菜单栏图标名 */
 "icon.wrench" = "工具";
@@ -535,6 +540,7 @@
 "clipboard.snippetGroup.rename" = "重命名分组";
 "common.cancel" = "取消";
 "common.save" = "保存";
+"common.gotIt" = "知道了";
 "clipboard.autoPasteDescription" = "需要在“隐私与安全性 > 辅助功能”中允许 MenuTools 控制键盘。";
 "clipboard.feedback.copied" = "已复制";
 "clipboard.feedback.pasted" = "已复制并粘贴";
@@ -888,6 +894,55 @@
 "volume.section.automation" = "自动化规则";
 "volume.automation.add" = "连接当前输出设备时应用";
 "volume.automation.desc" = "每个预设每天仅自动应用一次，避免覆盖刚刚手动调整的音量。";
+"volume.meeting.check" = "会议前一键检查";
+"volume.meeting.ready" = "输入和输出设备已就绪";
+"volume.meeting.attention" = "请检查麦克风权限、静音状态或设备连接";
+"volume.shortcut.mediaKeyHint" = "macOS 媒体键由系统保留；请为音量操作设置带修饰键的自定义快捷键。";
+"volume.search.placeholder" = "搜索 App";
+"volume.groupFilter" = "分组";
+"volume.sort" = "排序";
+"volume.muteFiltered" = "静音当前列表";
+"volume.restoreFiltered" = "恢复当前列表";
+"volume.masterLimit" = "最大主音量";
+"volume.masterLimit.headphones" = "耳机连接时自动应用上限";
+"volume.hearing.title" = "听力保护";
+"volume.meetingDucking" = "会议时压低其他正在发声的 App";
+"volume.meetingDucking.keepVolume" = "保留音量";
+"volume.meetingDucking.active" = "会议音频进行中，其他 App 已临时压低";
+"volume.meetingDucking.title" = "会议智能压低";
+"volume.preset.includesApps" = "包含 %d 个 App";
+"volume.preset.import" = "导入预设";
+"volume.preset.export" = "导出预设";
+"volume.preset.bindToOutput" = "当前输出设备自动预设";
+"volume.preset.none" = "不自动应用";
+"volume.preset.overwrite" = "覆盖当前配置";
+"volume.preset.importSuccess" = "预设导入完成";
+"volume.preset.importFailure" = "预设导入失败：%@";
+"volume.preset.exportFailure" = "预设导出失败：%@";
+"volume.preset.defaultName" = "MenuTools 音量预设";
+"volume.automation.undoLatest" = "撤销最近一次自动化";
+"volume.automation.reverted" = "已撤销";
+"volume.automation.history" = "自动化执行记录";
+"volume.automation.history.desc" = "仅保留最近 20 条记录；可撤销本次运行期间最近一次自动化。";
+"volume.automation.schedule" = "启用时间段";
+"volume.automation.startTime" = "开始时间（HH:mm）";
+"volume.automation.endTime" = "结束时间（HH:mm）";
+"volume.automation.focus" = "专注模式";
+"volume.automation.focus.any" = "不限制";
+"volume.automation.focus.required" = "必须开启";
+"volume.automation.focus.blocked" = "必须关闭";
+"volume.automation.bundleID" = "前台 App Bundle ID";
+"volume.automation.wifi" = "Wi-Fi 名称";
+"volume.output.device" = "输出设备";
+"volume.output.any" = "任意输出设备";
+"volume.diagnostics.copied" = "诊断报告已复制";
+"volume.diagnostics.copy" = "复制兼容性诊断报告";
+"volume.diagnostics.desc" = "报告包含权限、输入输出设备、路由失败及 DRM/Process Tap 兼容性信息。";
+"volume.diagnostics.title" = "兼容性诊断";
+"volume.input.levelAccessibility" = "麦克风实时输入电平";
+"volume.accessibility.group" = "分组：%@";
+"volume.accessibility.meter" = "%@ 的 Peak、RMS 与保持峰值";
+"volume.accessibility.route" = "路由状态，CPU %d%%";
 "volume.hearing.warning" = "音量偏高且持续时间较长，建议降低音量以保护听力";
 "volume.hud.muted" = "已静音";
 
@@ -911,6 +966,9 @@
 "plugin.openSettings" = "打开功能设置";
 "plugin.error.title" = "无法更改功能状态";
 "plugin.error.dismiss" = "好";
+"plugin.error.unknownPlugin" = "未注册插件：%@";
+"plugin.error.dependencyCycle" = "插件依赖形成循环：%@";
+"plugin.error.requiredBy" = "插件仍被 %@ 依赖";
 "plugin.state.running" = "运行中";
 "plugin.state.failed" = "启动失败";
 "plugin.permissions" = "需要：%@";
@@ -995,6 +1053,12 @@
 "clipboard.archive.error.invalidFormat" = "归档文件格式无效。";
 "clipboard.archive.error.unsupportedVersion" = "归档版本暂不支持。";
 "clipboard.archive.error.decryptionFailed" = "归档解密失败，请检查口令或文件是否损坏。";
+"clipboard.error.databaseOpen" = "无法打开剪贴板历史数据库";
+"clipboard.error.databaseWritePrepare" = "无法准备剪贴板历史写入";
+"clipboard.error.databaseWrite" = "无法写入剪贴板历史";
+"clipboard.error.databaseRead" = "无法读取剪贴板历史数据库";
+"clipboard.error.databaseSchema" = "剪贴板历史数据库结构无效";
+"clipboard.error.databaseOperation" = "剪贴板历史数据库操作失败";
 "clipboard.sequential.mode" = "顺序粘贴模式";
 "clipboard.sequential.mode.once" = "单次";
 "clipboard.sequential.mode.loop" = "循环";

@@ -385,7 +385,7 @@ final class ScreenshotScreenCaptureSession {
 
     func start() async throws {
         guard let number = screen.deviceDescription[NSDeviceDescriptionKey("NSScreenNumber")] as? NSNumber else {
-            throw ScreenshotError.captureFailed("无法确定显示器")
+            throw ScreenshotError.captureFailed(L("screenshot.error.displayUnknown"))
         }
         let displayID = CGDirectDisplayID(number.uint32Value)
         let content = try await SCShareableContent.excludingDesktopWindows(
@@ -393,7 +393,7 @@ final class ScreenshotScreenCaptureSession {
             onScreenWindowsOnly: true
         )
         guard let display = content.displays.first(where: { $0.displayID == displayID }) else {
-            throw ScreenshotError.captureFailed("无法找到目标显示器")
+            throw ScreenshotError.captureFailed(L("screenshot.error.displayMissing"))
         }
 
         let filter: SCContentFilter
@@ -411,7 +411,7 @@ final class ScreenshotScreenCaptureSession {
         case let .window(windowID):
             // 窗口模式固定使用启动采集时的窗口 ID，不能在选区层出现后重新查询前台窗口。
             guard let targetWindow = content.windows.first(where: { $0.windowID == windowID }) else {
-                throw ScreenshotError.captureFailed("无法找到目标窗口的屏幕内容")
+                throw ScreenshotError.captureFailed(L("screenshot.error.displayContentMissing"))
             }
             filter = SCContentFilter(desktopIndependentWindow: targetWindow)
         }

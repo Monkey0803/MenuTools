@@ -69,6 +69,43 @@ func localizationFilesHaveNoDuplicateKeys() throws {
     }
 }
 
+@Test("带格式符的文案在五种语言里格式符一致")
+func localizationFormatSpecifiersMatchAcrossLocales() throws {
+    let locales = try LocalizationAudit.localeFiles(repositoryRoot: LocalizationAudit.repositoryRoot)
+    let reference = try LocalizationAudit.entries(at: locales[0].url)
+    #expect(!reference.isEmpty)
+
+    for locale in locales.dropFirst() {
+        let entries = try LocalizationAudit.entries(at: locale.url)
+        var mismatched: [String] = []
+        for (key, value) in reference {
+            guard let other = entries[key] else { continue }
+            let expected = LocalizationAudit.formatSpecifiers(in: value)
+            guard !expected.isEmpty else { continue }
+            if LocalizationAudit.formatSpecifiers(in: other) != expected {
+                mismatched.append(key)
+            }
+        }
+        #expect(mismatched.isEmpty, "\(locale.name) 的格式符与 \(locales[0].name) 不一致：\(mismatched.sorted())")
+    }
+}
+
+@Test("界面文案不得硬编码中文")
+func uiCopyIsNotHardcodedChinese() throws {
+    let violations = try LocalizationAudit.hardcodedChineseViolations(
+        repositoryRoot: LocalizationAudit.repositoryRoot
+    )
+    // 按文件汇总，避免条目过多时断言消息被截断看不出全貌。
+    let summary = Dictionary(grouping: violations) { violation in
+        violation.split(separator: ":").first.map(String.init) ?? violation
+    }
+    .map { path, items in "\(path) \(items.count) 处（如 \(items[0])）" }
+    .sorted()
+    .joined(separator: "；")
+
+    #expect(violations.isEmpty, "共 \(violations.count) 处中文未走 L() → \(summary)")
+}
+
 /// 从仓库源码里收集本地化键，避免“代码新增文案但漏了某个 lproj”再次发生。
 enum LocalizationAudit {
     static let repositoryRoot = URL(fileURLWithPath: #filePath)
@@ -209,5 +246,110 @@ enum LocalizationAudit {
             }
         }
         return duplicates.sorted()
+    }
+
+    /// 允许保留中文字面量的文件：这些内容不是面向用户的界面文案，或必须保持原文。
+    private static let hardcodedChineseAllowlist: [String: String] = [
+        "Sources/MenuTools/L10n.swift": "语言菜单按业界惯例用语言自身文字展示",
+        "Sources/MenuTools/Services/TranslationService.swift": "目标语言自称与面向模型的翻译提示词",
+        "Sources/MenuTools/Services/FocusModeService.swift": "AppleScript 菜单项名必须跟随系统语言",
+        "Sources/MenuTools/Services/AppVolumeService.swift": "设备名匹配关键词与诊断报告正文",
+        "Sources/MenuTools/Services/ClipboardHistoryService.swift": "敏感内容关键词表与 debugDescription",
+        "Sources/MenuTools/Services/SparkleUpdateService.swift": "NSLog 日志",
+    ]
+
+    /// 查找没有走 `L()` 的中文字面量：这类文案在任何非中文界面里都会原样显示中文。
+    static func hardcodedChineseViolations(repositoryRoot: URL) throws -> [String] {
+        let expression = try NSRegularExpression(pattern: #""((?:[^"\\]|\\.)*)""#)
+        var violations: [String] = []
+        let roots = ["Sources", "Extension"].map { repositoryRoot.appendingPathComponent($0) }
+
+        for root in roots {
+            guard let enumerator = FileManager.default.enumerator(
+                at: root,
+                includingPropertiesForKeys: nil
+            ) else { continue }
+
+            while let url = enumerator.nextObject() as? URL {
+                guard url.pathExtension == "swift" else { continue }
+                let relativePath = url.path.replacingOccurrences(
+                    of: repositoryRoot.path + "/",
+                    with: ""
+                )
+                if hardcodedChineseAllowlist[relativePath] != nil { continue }
+
+                let lines = try String(contentsOf: url, encoding: .utf8)
+                    .split(separator: "\n", omittingEmptySubsequences: false)
+                for (index, line) in lines.enumerated() {
+                    let text = codeWithoutComment(String(line))
+                    let trimmed = text.trimmingCharacters(in: .whitespaces)
+                    guard !trimmed.hasPrefix("//"), !trimmed.hasPrefix("///") else { continue }
+                    let range = NSRange(text.startIndex ..< text.endIndex, in: text)
+                    for match in expression.matches(in: text, range: range) {
+                        guard let valueRange = Range(match.range(at: 1), in: text) else { continue }
+                        let value = String(text[valueRange])
+                        guard value.containsCJK else { continue }
+                        guard !isInsideLocalizedCall(text: text, at: match.range.location) else { continue }
+                        violations.append("\(relativePath):\(index + 1) \(value)")
+                    }
+                }
+            }
+        }
+        return violations.sorted()
+    }
+
+    /// 去掉行尾注释，避免把注释里的中文当成文案。
+    private static func codeWithoutComment(_ line: String) -> String {
+        var isInString = false
+        var isEscaped = false
+        var previous: Character?
+        for index in line.indices {
+            let character = line[index]
+            if isInString {
+                if isEscaped {
+                    isEscaped = false
+                } else if character == "\\" {
+                    isEscaped = true
+                } else if character == "\"" {
+                    isInString = false
+                }
+            } else if character == "\"" {
+                isInString = true
+            } else if character == "/", previous == "/" {
+                return String(line[line.startIndex ..< line.index(before: index)])
+            }
+            previous = character
+        }
+        return line
+    }
+
+    private static func isInsideLocalizedCall(text: String, at location: Int) -> Bool {
+        let prefix = (text as NSString).substring(to: location)
+        return prefix.range(of: #"L\(\s*$"#, options: .regularExpression) != nil
+    }
+
+    /// 提取文案里的格式符（忽略 `%%`），用于跨语言一致性校验。
+    static func formatSpecifiers(in value: String) -> [String] {
+        guard let expression = try? NSRegularExpression(
+            pattern: #"%(?:\d+\$)?[-+ #0]*[\d.]*(?:hh|h|ll|l|L|z|j|t|q)?[@dfsuxXeEgGcSp%]"#
+        ) else {
+            return []
+        }
+        let range = NSRange(value.startIndex ..< value.endIndex, in: value)
+        return expression.matches(in: value, range: range).compactMap { match in
+            guard let specifierRange = Range(match.range, in: value) else { return nil }
+            let specifier = String(value[specifierRange])
+            return specifier == "%%" ? nil : String(specifier.suffix(1))
+        }
+    }
+}
+
+private extension String {
+    var containsCJK: Bool {
+        unicodeScalars.contains { scalar in
+            (0x4E00 ... 0x9FFF).contains(scalar.value)
+                || (0x3400 ... 0x4DBF).contains(scalar.value)
+                || (0xF900 ... 0xFAFF).contains(scalar.value)
+        }
     }
 }

@@ -301,6 +301,10 @@
 "screenshot.error.editor" = "이미지 편집기를 열 수 없습니다";
 "screenshot.error.stitch" = "스크롤 캡처를 이어 붙일 수 없습니다";
 "screenshot.error.memoryLimit" = "스크롤 캡처가 메모리 한도에 도달했습니다. 현재 캡처를 먼저 완료하세요";
+"screenshot.error.displayUnknown" = "디스플레이를 확인할 수 없습니다";
+"screenshot.error.displayMissing" = "대상 디스플레이를 찾을 수 없습니다";
+"screenshot.error.displayContentMissing" = "대상 윈도우의 화면 내용을 찾을 수 없습니다";
+"screenshot.error.cleanupFailed" = "%@; 캡처 세션 정리에 실패했습니다: %@";
 
 /* 블루투스 */
 "bt.empty" = "블루투스 기기 배터리 정보 없음";
@@ -437,6 +441,7 @@
 "settings.backup.importSuccess" = "백업을 복원했습니다";
 "settings.backup.invalidFile" = "백업 파일이 올바르지 않거나 읽을 수 없습니다";
 "settings.backup.writeFailed" = "백업 작업을 완료하지 못했습니다";
+"settings.backup.rollbackFailed" = "백업 복원에 실패했습니다: %@; 롤백에도 실패했습니다: %@";
 
 /* 메뉴 막대 아이콘 이름 */
 "icon.wrench" = "도구";
@@ -535,6 +540,7 @@
 "clipboard.snippetGroup.rename" = "그룹 이름 변경";
 "common.cancel" = "취소";
 "common.save" = "저장";
+"common.gotIt" = "확인";
 "clipboard.autoPasteDescription" = "붙여넣기 단축키를 보내려면 개인정보 보호 및 보안 > 손쉬운 사용에서 MenuTools를 허용하세요.";
 "clipboard.feedback.copied" = "복사됨";
 "clipboard.feedback.pasted" = "복사 후 붙여넣기 완료";
@@ -888,6 +894,55 @@
 "volume.section.automation" = "자동화 규칙";
 "volume.automation.add" = "현재 출력 연결 시 적용";
 "volume.automation.desc" = "최근 수동 조정을 덮어쓰지 않도록 각 프리셋은 하루에 한 번만 자동 적용됩니다.";
+"volume.meeting.check" = "회의 전 한 번에 점검";
+"volume.meeting.ready" = "입력 및 출력 장치가 준비되었습니다";
+"volume.meeting.attention" = "마이크 권한, 음소거 상태 또는 장치 연결을 확인하세요";
+"volume.shortcut.mediaKeyHint" = "macOS 미디어 키는 시스템이 사용합니다. 음량 조작에는 보조 키가 포함된 사용자 지정 단축키를 설정하세요.";
+"volume.search.placeholder" = "앱 검색";
+"volume.groupFilter" = "그룹";
+"volume.sort" = "정렬";
+"volume.muteFiltered" = "현재 목록 음소거";
+"volume.restoreFiltered" = "현재 목록 복원";
+"volume.masterLimit" = "최대 마스터 음량";
+"volume.masterLimit.headphones" = "헤드폰 연결 시 상한 자동 적용";
+"volume.hearing.title" = "청력 보호";
+"volume.meetingDucking" = "회의 중 다른 재생 앱 음량 낮추기";
+"volume.meetingDucking.keepVolume" = "유지할 음량";
+"volume.meetingDucking.active" = "회의 오디오가 진행 중이며 다른 앱 음량이 일시적으로 낮아졌습니다";
+"volume.meetingDucking.title" = "회의 자동 더킹";
+"volume.preset.includesApps" = "App %d개 포함";
+"volume.preset.import" = "프리셋 가져오기";
+"volume.preset.export" = "프리셋 내보내기";
+"volume.preset.bindToOutput" = "현재 출력 장치 자동 프리셋";
+"volume.preset.none" = "자동 적용 안 함";
+"volume.preset.overwrite" = "현재 설정으로 덮어쓰기";
+"volume.preset.importSuccess" = "프리셋을 가져왔습니다";
+"volume.preset.importFailure" = "프리셋을 가져오지 못했습니다: %@";
+"volume.preset.exportFailure" = "프리셋을 내보내지 못했습니다: %@";
+"volume.preset.defaultName" = "MenuTools 음량 프리셋";
+"volume.automation.undoLatest" = "최근 자동화 실행 취소";
+"volume.automation.reverted" = "되돌림";
+"volume.automation.history" = "자동화 실행 기록";
+"volume.automation.history.desc" = "최근 20개만 보관합니다. 이번 실행 중 최근 자동화 한 건을 되돌릴 수 있습니다.";
+"volume.automation.schedule" = "시간대 사용";
+"volume.automation.startTime" = "시작 시간(HH:mm)";
+"volume.automation.endTime" = "종료 시간(HH:mm)";
+"volume.automation.focus" = "집중 모드";
+"volume.automation.focus.any" = "제한 없음";
+"volume.automation.focus.required" = "켜져 있어야 함";
+"volume.automation.focus.blocked" = "꺼져 있어야 함";
+"volume.automation.bundleID" = "전면 앱 Bundle ID";
+"volume.automation.wifi" = "Wi-Fi 이름";
+"volume.output.device" = "출력 장치";
+"volume.output.any" = "모든 출력 장치";
+"volume.diagnostics.copied" = "진단 보고서를 복사했습니다";
+"volume.diagnostics.copy" = "호환성 진단 보고서 복사";
+"volume.diagnostics.desc" = "보고서에는 권한, 입출력 장치, 라우팅 실패, DRM/Process Tap 호환성 정보가 포함됩니다.";
+"volume.diagnostics.title" = "호환성 진단";
+"volume.input.levelAccessibility" = "마이크 실시간 입력 레벨";
+"volume.accessibility.group" = "그룹: %@";
+"volume.accessibility.meter" = "%@의 Peak, RMS 및 홀드 피크";
+"volume.accessibility.route" = "라우팅 상태, CPU %d%%";
 "volume.hearing.warning" = "높은 음량이 오래 지속되었습니다. 청력을 보호하려면 음량을 낮추세요.";
 "volume.hud.muted" = "음소거됨";
 
@@ -911,6 +966,9 @@
 "plugin.openSettings" = "기능 설정 열기";
 "plugin.error.title" = "기능 상태를 변경할 수 없음";
 "plugin.error.dismiss" = "확인";
+"plugin.error.unknownPlugin" = "등록되지 않은 기능: %@";
+"plugin.error.dependencyCycle" = "기능 의존성이 순환합니다: %@";
+"plugin.error.requiredBy" = "기능이 아직 %@에 의해 필요합니다";
 "plugin.state.running" = "실행 중";
 "plugin.state.failed" = "시작 실패";
 "plugin.permissions" = "필요 권한: %@";
@@ -995,6 +1053,12 @@
 "clipboard.archive.error.invalidFormat" = "아카이브 파일 형식이 올바르지 않습니다.";
 "clipboard.archive.error.unsupportedVersion" = "지원하지 않는 아카이브 버전입니다.";
 "clipboard.archive.error.decryptionFailed" = "아카이브를 복호화할 수 없습니다. 암호나 파일을 확인하세요.";
+"clipboard.error.databaseOpen" = "클립보드 기록 데이터베이스를 열 수 없습니다";
+"clipboard.error.databaseWritePrepare" = "클립보드 기록 쓰기를 준비할 수 없습니다";
+"clipboard.error.databaseWrite" = "클립보드 기록을 쓸 수 없습니다";
+"clipboard.error.databaseRead" = "클립보드 기록 데이터베이스를 읽을 수 없습니다";
+"clipboard.error.databaseSchema" = "클립보드 기록 데이터베이스 구조가 올바르지 않습니다";
+"clipboard.error.databaseOperation" = "클립보드 기록 데이터베이스 작업에 실패했습니다";
 "clipboard.sequential.mode" = "순차 붙여넣기 모드";
 "clipboard.sequential.mode.once" = "한 번";
 "clipboard.sequential.mode.loop" = "반복";

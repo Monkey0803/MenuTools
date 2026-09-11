@@ -117,8 +117,19 @@ func screenshotCleanupFailureIsReported() {
         ])
     )
 
-    #expect(error.localizedDescription.contains("截图已取消"))
-    #expect(error.localizedDescription.contains("停止失败"))
+    #expect(error.localizedDescription == ScreenshotCaptureCleanupError.combinedDescription(
+        primary: "截图已取消",
+        cleanup: "停止失败"
+    ))
+
+    // 测试进程取不到 lproj，L() 返回 key 本身，因此用显式模板验证两个错误都被带进文案。
+    let description = ScreenshotCaptureCleanupError.combinedDescription(
+        primary: "截图已取消",
+        cleanup: "停止失败",
+        template: "%@；采集会话清理失败：%@"
+    )
+    #expect(description.contains("截图已取消"))
+    #expect(description.contains("停止失败"))
 }
 
 @Test("截图服务会保存并恢复上次选区")

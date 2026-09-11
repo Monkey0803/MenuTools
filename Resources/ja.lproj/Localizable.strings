@@ -301,6 +301,10 @@
 "screenshot.error.editor" = "画像編集アプリを開けません";
 "screenshot.error.stitch" = "スクロール撮影の結合に失敗しました";
 "screenshot.error.memoryLimit" = "スクロール撮影がメモリ上限に達しました。現在の撮影を完了してください";
+"screenshot.error.displayUnknown" = "ディスプレイを特定できません";
+"screenshot.error.displayMissing" = "対象のディスプレイが見つかりません";
+"screenshot.error.displayContentMissing" = "対象ウインドウの画面内容が見つかりません";
+"screenshot.error.cleanupFailed" = "%@；キャプチャセッションの後処理に失敗しました：%@";
 
 /* Bluetooth */
 "bt.empty" = "Bluetooth デバイスのバッテリー情報なし";
@@ -437,6 +441,7 @@
 "settings.backup.importSuccess" = "バックアップを復元しました";
 "settings.backup.invalidFile" = "バックアップファイルが無効か読み込めません";
 "settings.backup.writeFailed" = "バックアップ操作を完了できませんでした";
+"settings.backup.rollbackFailed" = "バックアップの復元に失敗しました：%@；ロールバックにも失敗しました：%@";
 
 /* メニューバーアイコン名 */
 "icon.wrench" = "ツール";
@@ -535,6 +540,7 @@
 "clipboard.snippetGroup.rename" = "グループ名を変更";
 "common.cancel" = "キャンセル";
 "common.save" = "保存";
+"common.gotIt" = "了解";
 "clipboard.autoPasteDescription" = "ペースト操作には「プライバシーとセキュリティ > アクセシビリティ」で MenuTools を許可してください。";
 "clipboard.feedback.copied" = "コピーしました";
 "clipboard.feedback.pasted" = "コピーして貼り付けました";
@@ -888,6 +894,55 @@
 "volume.section.automation" = "自動化ルール";
 "volume.automation.add" = "現在の出力接続時に適用";
 "volume.automation.desc" = "直前の手動調整を上書きしないよう、各プリセットの自動適用は1日1回までです。";
+"volume.meeting.check" = "会議前の一括チェック";
+"volume.meeting.ready" = "入力・出力デバイスの準備ができています";
+"volume.meeting.attention" = "マイクの権限、ミュート状態、デバイス接続を確認してください";
+"volume.shortcut.mediaKeyHint" = "macOS のメディアキーはシステムが使用します。音量操作には修飾キー付きのカスタムショートカットを設定してください。";
+"volume.search.placeholder" = "App を検索";
+"volume.groupFilter" = "グループ";
+"volume.sort" = "並べ替え";
+"volume.muteFiltered" = "表示中の App をミュート";
+"volume.restoreFiltered" = "表示中の App を元に戻す";
+"volume.masterLimit" = "マスター音量の上限";
+"volume.masterLimit.headphones" = "ヘッドホン接続時に上限を自動適用";
+"volume.hearing.title" = "聴力保護";
+"volume.meetingDucking" = "会議中は他の再生中 App を小さくする";
+"volume.meetingDucking.keepVolume" = "残す音量";
+"volume.meetingDucking.active" = "会議音声の再生中は他の App を一時的に小さくしています";
+"volume.meetingDucking.title" = "会議の自動ダッキング";
+"volume.preset.includesApps" = "%d 個の App を含む";
+"volume.preset.import" = "プリセットを読み込む";
+"volume.preset.export" = "プリセットを書き出す";
+"volume.preset.bindToOutput" = "現在の出力デバイスで自動適用するプリセット";
+"volume.preset.none" = "自動適用しない";
+"volume.preset.overwrite" = "現在の設定で上書き";
+"volume.preset.importSuccess" = "プリセットを読み込みました";
+"volume.preset.importFailure" = "プリセットを読み込めません：%@";
+"volume.preset.exportFailure" = "プリセットを書き出せません：%@";
+"volume.preset.defaultName" = "MenuTools 音量プリセット";
+"volume.automation.undoLatest" = "直近の自動適用を元に戻す";
+"volume.automation.reverted" = "元に戻しました";
+"volume.automation.history" = "自動適用の履歴";
+"volume.automation.history.desc" = "直近 20 件のみ保持します。今回の起動中に行った直近の自動適用は元に戻せます。";
+"volume.automation.schedule" = "時間帯を指定";
+"volume.automation.startTime" = "開始時刻（HH:mm）";
+"volume.automation.endTime" = "終了時刻（HH:mm）";
+"volume.automation.focus" = "集中モード";
+"volume.automation.focus.any" = "指定しない";
+"volume.automation.focus.required" = "オンであること";
+"volume.automation.focus.blocked" = "オフであること";
+"volume.automation.bundleID" = "前面の App の Bundle ID";
+"volume.automation.wifi" = "Wi-Fi 名";
+"volume.output.device" = "出力デバイス";
+"volume.output.any" = "すべての出力デバイス";
+"volume.diagnostics.copied" = "診断レポートをコピーしました";
+"volume.diagnostics.copy" = "互換性の診断レポートをコピー";
+"volume.diagnostics.desc" = "レポートには権限、入出力デバイス、ルーティングの失敗、DRM/Process Tap の互換性情報が含まれます。";
+"volume.diagnostics.title" = "互換性の診断";
+"volume.input.levelAccessibility" = "マイク入力のリアルタイムレベル";
+"volume.accessibility.group" = "グループ：%@";
+"volume.accessibility.meter" = "%@ の Peak、RMS、ホールドピーク";
+"volume.accessibility.route" = "ルーティング状態、CPU %d%%";
 "volume.hearing.warning" = "高い音量が長時間続いています。聴力を守るため音量を下げてください。";
 "volume.hud.muted" = "ミュート中";
 
@@ -911,6 +966,9 @@
 "plugin.openSettings" = "機能設定を開く";
 "plugin.error.title" = "機能の状態を変更できません";
 "plugin.error.dismiss" = "OK";
+"plugin.error.unknownPlugin" = "未登録の機能：%@";
+"plugin.error.dependencyCycle" = "機能の依存関係が循環しています：%@";
+"plugin.error.requiredBy" = "機能は依然として %@ から必要とされています";
 "plugin.state.running" = "実行中";
 "plugin.state.failed" = "起動失敗";
 "plugin.permissions" = "必要：%@";
@@ -995,6 +1053,12 @@
 "clipboard.archive.error.invalidFormat" = "アーカイブファイルの形式が無効です。";
 "clipboard.archive.error.unsupportedVersion" = "このアーカイブバージョンは未対応です。";
 "clipboard.archive.error.decryptionFailed" = "復号できませんでした。パスフレーズまたはファイルを確認してください。";
+"clipboard.error.databaseOpen" = "クリップボード履歴のデータベースを開けません";
+"clipboard.error.databaseWritePrepare" = "クリップボード履歴の書き込みを準備できません";
+"clipboard.error.databaseWrite" = "クリップボード履歴を書き込めません";
+"clipboard.error.databaseRead" = "クリップボード履歴のデータベースを読み取れません";
+"clipboard.error.databaseSchema" = "クリップボード履歴のデータベース構造が不正です";
+"clipboard.error.databaseOperation" = "クリップボード履歴のデータベース操作に失敗しました";
 "clipboard.sequential.mode" = "順次ペーストモード";
 "clipboard.sequential.mode.once" = "1 回";
 "clipboard.sequential.mode.loop" = "ループ";

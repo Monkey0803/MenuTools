@@ -1434,7 +1434,7 @@ enum ClipboardHistoryPersistence {
         guard sqlite3_open_v2(url.path, &database, flags, nil) == SQLITE_OK,
               let database else {
             if let database { sqlite3_close(database) }
-            throw persistenceError("无法打开剪贴板历史数据库")
+            throw persistenceError(L("clipboard.error.databaseOpen"))
         }
         defer { sqlite3_close(database) }
         try configure(database)
@@ -1449,7 +1449,7 @@ enum ClipboardHistoryPersistence {
                 &statement,
                 nil
             ) == SQLITE_OK, let statement else {
-                throw persistenceError("无法准备剪贴板历史写入")
+                throw persistenceError(L("clipboard.error.databaseWritePrepare"))
             }
             defer { sqlite3_finalize(statement) }
             for record in records {
@@ -1459,7 +1459,7 @@ enum ClipboardHistoryPersistence {
                 bind(record.1, to: statement, column: 2)
                 bind(record.2, to: statement, column: 3)
                 guard sqlite3_step(statement) == SQLITE_DONE else {
-                    throw persistenceError("无法写入剪贴板历史")
+                    throw persistenceError(L("clipboard.error.databaseWrite"))
                 }
             }
             try execute(database, "COMMIT")
@@ -1492,7 +1492,7 @@ enum ClipboardHistoryPersistence {
         guard sqlite3_open_v2(url.path, &database, SQLITE_OPEN_READONLY | SQLITE_OPEN_FULLMUTEX, nil) == SQLITE_OK,
               let database else {
             if let database { sqlite3_close(database) }
-            throw persistenceError("无法读取剪贴板历史数据库")
+            throw persistenceError(L("clipboard.error.databaseRead"))
         }
         defer { sqlite3_close(database) }
         var statement: OpaquePointer?
@@ -1503,7 +1503,7 @@ enum ClipboardHistoryPersistence {
             &statement,
             nil
         ) == SQLITE_OK, let statement else {
-            throw persistenceError("剪贴板历史数据库结构无效")
+            throw persistenceError(L("clipboard.error.databaseSchema"))
         }
         defer { sqlite3_finalize(statement) }
 
@@ -1636,7 +1636,7 @@ enum ClipboardHistoryPersistence {
 
     private static func execute(_ database: OpaquePointer, _ sql: String) throws {
         guard sqlite3_exec(database, sql, nil, nil, nil) == SQLITE_OK else {
-            throw persistenceError("剪贴板历史数据库操作失败")
+            throw persistenceError(L("clipboard.error.databaseOperation"))
         }
     }
 
