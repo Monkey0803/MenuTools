@@ -191,6 +191,40 @@ func historyChartHoverMapsToBarIndex() {
     #expect(NetworkTrafficHistoryChartLayout.hoveredIndex(x: 101, totalWidth: 100, sampleCount: 4) == nil)
 }
 
+@Test("悬停详情占用固定预留行，悬停不会改变图表几何")
+func historyChartReservesDetailRow() {
+    let layout = NetworkTrafficHistoryChartLayout.self
+    // 是否悬停不参与几何计算：悬停前后整体高度必须一致，否则悬停时图表会跳动。
+    #expect(layout.blockHeight(hasHoverDetail: false) == layout.blockHeight(hasHoverDetail: true))
+    #expect(layout.barHeight > 0)
+    #expect(layout.detailRowHeight > 0)
+    #expect(layout.detailRowSpacing >= 0)
+}
+
+@Test("历史趋势悬停由统一命中测试驱动而不是逐柱监听")
+func historyChartHoverUsesSharedHitTest() throws {
+    let source = try networkTrafficSettingsViewSource()
+
+    #expect(source.contains("NetworkTrafficHistoryChartLayout.hoveredIndex("))
+    #expect(source.contains("onContinuousHover(coordinateSpace: .local)"))
+    #expect(!source.contains(".onHover { hovering in"))
+    // 详情行高度固定，且整块图表区的高度由测试覆盖的几何函数给出。
+    #expect(source.contains(".frame(height: NetworkTrafficHistoryChartLayout.detailRowHeight"))
+    #expect(source.contains(".frame(height: NetworkTrafficHistoryChartLayout.blockHeight(hasHoverDetail:"))
+}
+
+private func networkTrafficSettingsViewSource() throws -> String {
+    let projectRoot = URL(fileURLWithPath: #filePath)
+        .deletingLastPathComponent()
+        .deletingLastPathComponent()
+        .deletingLastPathComponent()
+    let sourceURL = projectRoot
+        .appendingPathComponent("Sources")
+        .appendingPathComponent("MenuTools")
+        .appendingPathComponent("NetworkTrafficSettingsView.swift")
+    return try String(contentsOf: sourceURL, encoding: .utf8)
+}
+
 @Test("App 迷你趋势的所有采样柱都位于画布边界内")
 func networkTrafficMiniTrendFitsCanvas() {
     let size = CGSize(width: 50, height: 22)

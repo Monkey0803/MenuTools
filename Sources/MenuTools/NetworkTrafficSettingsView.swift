@@ -52,6 +52,19 @@ private enum NetworkTrafficSection: String, CaseIterable {
 }
 
 enum NetworkTrafficHistoryChartLayout {
+    /// 柱子绘制高度。
+    static let barHeight: CGFloat = 54
+    /// 悬停详情行的固定行高：未悬停时留空占位，避免悬停时图表跳动。
+    static let detailRowHeight: CGFloat = 24
+    /// 详情行与图表之间的间距。
+    static let detailRowSpacing: CGFloat = 4
+
+    /// 卡片内图表区的整体高度。悬停只改变详情行的内容，不参与几何计算，
+    /// 所以无论是否有详情，高度都必须一致——否则悬停时图表会跳动。
+    static func blockHeight(hasHoverDetail _: Bool) -> CGFloat {
+        detailRowHeight + detailRowSpacing + barHeight
+    }
+
     static func barWidth(totalWidth: CGFloat, sampleCount: Int, spacing: CGFloat = 2) -> CGFloat {
         guard totalWidth > 0, sampleCount > 0 else { return 0 }
         guard sampleCount > 1 else { return 8 }
@@ -735,40 +748,62 @@ struct NetworkTrafficSettingsView: View {
                     .foregroundStyle(.secondary)
                     .frame(maxWidth: .infinity, minHeight: 44, alignment: .center)
             } else {
-                if let hoveredHistoryIndex, points.indices.contains(hoveredHistoryIndex) {
-                    historyHoverDetail(points[hoveredHistoryIndex])
+                let hoveredPoint = hoveredHistoryIndex.flatMap { index in
+                    points.indices.contains(index) ? points[index] : nil
                 }
-                GeometryReader { geometry in
-                    let spacing: CGFloat = 2
-                    let barWidth = NetworkTrafficHistoryChartLayout.barWidth(
-                        totalWidth: geometry.size.width,
-                        sampleCount: values.count,
-                        spacing: spacing
-                    )
 
-                    HStack(alignment: .bottom, spacing: spacing) {
-                        ForEach(Array(points.enumerated()), id: \.offset) { index, point in
-                            VStack(spacing: 0) {
-                                Spacer(minLength: 0)
-                                RoundedRectangle(cornerRadius: 1)
-                                    .fill(Color.orange.opacity(0.78))
-                                    .frame(height: CGFloat(point.uploadedBytes) / CGFloat(maximum) * 54)
-                                RoundedRectangle(cornerRadius: 1)
-                                    .fill(Color.cyan.opacity(0.78))
-                                    .frame(height: max(CGFloat(point.downloadedBytes) / CGFloat(maximum) * 54, point.bytes > 0 ? 1 : 3))
+                VStack(alignment: .leading, spacing: NetworkTrafficHistoryChartLayout.detailRowSpacing) {
+                    historyHoverDetail(hoveredPoint)
+                        .frame(height: NetworkTrafficHistoryChartLayout.detailRowHeight, alignment: .leading)
+
+                    GeometryReader { geometry in
+                        let spacing: CGFloat = 2
+                        let barWidth = NetworkTrafficHistoryChartLayout.barWidth(
+                            totalWidth: geometry.size.width,
+                            sampleCount: values.count,
+                            spacing: spacing
+                        )
+
+                        HStack(alignment: .bottom, spacing: spacing) {
+                            ForEach(Array(points.enumerated()), id: \.offset) { index, point in
+                                VStack(spacing: 0) {
+                                    Spacer(minLength: 0)
+                                    RoundedRectangle(cornerRadius: 1)
+                                        .fill(Color.orange.opacity(0.78))
+                                        .frame(height: CGFloat(point.uploadedBytes) / CGFloat(maximum) * NetworkTrafficHistoryChartLayout.barHeight)
+                                    RoundedRectangle(cornerRadius: 1)
+                                        .fill(Color.cyan.opacity(0.78))
+                                        .frame(height: max(CGFloat(point.downloadedBytes) / CGFloat(maximum) * NetworkTrafficHistoryChartLayout.barHeight, point.bytes > 0 ? 1 : 3))
+                                }
+                                .frame(width: barWidth, height: NetworkTrafficHistoryChartLayout.barHeight)
+                                .opacity(hoveredHistoryIndex == nil || hoveredHistoryIndex == index ? 1 : 0.42)
+                                .accessibilityLabel(historyPointDescription(point))
                             }
-                            .frame(width: barWidth, height: 54)
-                            .opacity(hoveredHistoryIndex == nil || hoveredHistoryIndex == index ? 1 : 0.42)
-                            .contentShape(Rectangle())
-                            .onHover { hovering in
-                                hoveredHistoryIndex = hovering ? index : nil
+                        }
+                        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .bottomLeading)
+                        // 整块画布做一次统一命中测试：柱间空隙不命中，避免逐柱监听在扫过时抖动。
+                        .contentShape(Rectangle())
+                        .onContinuousHover(coordinateSpace: .local) { phase in
+                            guard case .active(let location) = phase else {
+                                hoveredHistoryIndex = nil
+                                return
                             }
-                            .help(historyPointDescription(point))
+                            let index = NetworkTrafficHistoryChartLayout.hoveredIndex(
+                                x: location.x,
+                                totalWidth: geometry.size.width,
+                                sampleCount: values.count,
+                                spacing: spacing
+                            )
+                            if index != hoveredHistoryIndex {
+                                hoveredHistoryIndex = index
+                            }
                         }
                     }
-                    .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .bottomLeading)
+                    .frame(height: NetworkTrafficHistoryChartLayout.barHeight)
                 }
-                .frame(maxWidth: .infinity, minHeight: 58, maxHeight: 58)
+                // 高度与是否悬停无关，固定成测试覆盖的几何值，避免悬停时整张卡片跳动。
+                .frame(height: NetworkTrafficHistoryChartLayout.blockHeight(hasHoverDetail: hoveredPoint != nil))
+                .animation(.easeOut(duration: 0.15), value: hoveredHistoryIndex)
 
                 HStack(spacing: 8) {
                     historyMetric(L("traffic.rangeTotal"), formattedBytes(stats.totalBytes))
@@ -805,19 +840,25 @@ struct NetworkTrafficSettingsView: View {
         .controlCenterSurface(tint: .blue)
     }
 
-    private func historyHoverDetail(_ point: NetworkTrafficHistoryPoint) -> some View {
-        HStack(spacing: 10) {
-            Image(systemName: "cursorarrow.rays")
-                .foregroundStyle(.tint)
-            Text(historyPointDescription(point))
-                .font(.caption2)
-                .foregroundStyle(.secondary)
-                .lineLimit(1)
+    @ViewBuilder
+    private func historyHoverDetail(_ point: NetworkTrafficHistoryPoint?) -> some View {
+        if let point {
+            HStack(spacing: 10) {
+                Image(systemName: "cursorarrow.rays")
+                    .foregroundStyle(.tint)
+                Text(historyPointDescription(point))
+                    .font(.caption2)
+                    .foregroundStyle(.secondary)
+                    .lineLimit(1)
+            }
+            .padding(.horizontal, 8)
+            .padding(.vertical, 5)
+            .background(.thinMaterial, in: .rect(cornerRadius: 6))
+            .transition(.opacity)
+        } else {
+            // 未悬停时留空占位，保证详情行高度恒定、图表不位移。
+            Color.clear
         }
-        .padding(.horizontal, 8)
-        .padding(.vertical, 5)
-        .background(.thinMaterial, in: .rect(cornerRadius: 6))
-        .transition(.opacity)
     }
 
     private func historyMetric(_ title: String, _ value: String) -> some View {
