@@ -731,6 +731,9 @@
 "window.manager.snapDistance" = "스냅 거리";
 "window.manager.edgeSnapping" = "드래그할 때 화면 가장자리에 스냅";
 "window.manager.autoRules" = "앱 전환 시 앱 규칙 자동 적용";
+"window.manager.nudgeStep" = "방향키 이동 폭";
+"window.manager.cycleLayouts" = "같은 단축키를 반복하면 같은 계열 레이아웃으로 순환";
+"window.manager.snapPreview" = "드래그할 때 이동할 위치 미리보기 표시";
 "window.manager.presets" = "레이아웃 프리셋";
 "window.manager.presetName" = "프리셋 이름";
 "window.manager.applicationRules" = "앱 규칙";

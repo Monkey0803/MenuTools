@@ -731,6 +731,9 @@
 "window.manager.snapDistance" = "吸附距离";
 "window.manager.edgeSnapping" = "拖动窗口到屏幕边缘时自动吸附";
 "window.manager.autoRules" = "切换应用时自动应用窗口规则";
+"window.manager.nudgeStep" = "方向键挪动步长";
+"window.manager.cycleLayouts" = "连按同一快捷键循环切换同族布局";
+"window.manager.snapPreview" = "拖动窗口到边缘时显示落点预览";
 "window.manager.presets" = "布局预设";
 "window.manager.presetName" = "预设名称";
 "window.manager.applicationRules" = "应用窗口规则";

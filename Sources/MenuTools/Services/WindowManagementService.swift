@@ -349,12 +349,20 @@ final class WindowManagementService {
     private var lastExternalApplicationPID: pid_t?
     private var activationObserver: NSObjectProtocol?
     private let defaults: UserDefaults
+    private let frameMemory: WindowFrameMemory
+    private let snapPreview = WindowSnapPreviewController()
+    private var cycleState = WindowLayoutCycleState()
     private var globalMouseMonitor: Any?
     private var localMouseMonitor: Any?
     private var mouseDownLocation: CGPoint?
+    /// 拖拽开始瞬间的目标窗口位置，用来区分「拖动窗口」和「划选文字」。
+    private var dragWindowFrameAtMouseDown: CGRect?
+    /// 拖拽预览读取 AX 的限流时间戳。
+    private var lastSnapProbeTime: TimeInterval = 0
 
     init(defaults: UserDefaults = .standard) {
         self.defaults = defaults
+        self.frameMemory = WindowFrameMemory(defaults: defaults)
         self.configuration = Self.loadConfiguration(from: defaults)
         activationObserver = NSWorkspace.shared.notificationCenter.addObserver(
             forName: NSWorkspace.didActivateApplicationNotification,
@@ -380,6 +388,9 @@ final class WindowManagementService {
         globalMouseMonitor = nil
         localMouseMonitor = nil
         mouseDownLocation = nil
+        dragWindowFrameAtMouseDown = nil
+        snapPreview.hide()
+        cycleState.reset()
     }
 
     func updateOptions(_ options: WindowManagerOptions) {
@@ -391,6 +402,19 @@ final class WindowManagementService {
         configuration.edgeSnappingEnabled = enabled
         saveConfiguration()
         refreshMouseMonitors()
+        if !enabled { snapPreview.hide() }
+    }
+
+    func setCycleLayoutsEnabled(_ enabled: Bool) {
+        configuration.cycleLayouts = enabled
+        saveConfiguration()
+        cycleState.reset()
+    }
+
+    func setSnapPreviewEnabled(_ enabled: Bool) {
+        configuration.showSnapPreview = enabled
+        saveConfiguration()
+        if !enabled { snapPreview.hide() }
     }
 
     func setAutomaticApplicationRulesEnabled(_ enabled: Bool) {
@@ -495,24 +519,26 @@ final class WindowManagementService {
             postDesktopShortcut(keyCode: 123)
             return
         case .moveLeft:
-            try nudge(window: window, dx: -20, dy: 0)
+            try nudge(window: window, dx: -nudgeDistance, dy: 0)
             return
         case .moveRight:
-            try nudge(window: window, dx: 20, dy: 0)
+            try nudge(window: window, dx: nudgeDistance, dy: 0)
             return
         case .moveUp:
-            try nudge(window: window, dx: 0, dy: 20)
+            try nudge(window: window, dx: 0, dy: nudgeDistance)
             return
         case .moveDown:
-            try nudge(window: window, dx: 0, dy: -20)
+            try nudge(window: window, dx: 0, dy: -nudgeDistance)
             return
         default:
             break
         }
         let screen = screen(for: window) ?? NSScreen.main?.visibleFrame ?? .zero
         guard !screen.isEmpty else { throw WindowManagementError.operationFailed(L("window.error.noScreen")) }
+        let target = resolvedLayout(layout, processIdentifier: processIdentifier, window: window)
+        rememberFrameBeforeLayout(of: window, processIdentifier: processIdentifier)
         let frame = WindowLayoutCalculator.frame(
-            for: layout,
+            for: target,
             in: screen,
             preferredSize: currentSize(of: window),
             options: configuration.options
@@ -541,38 +567,56 @@ final class WindowManagementService {
             throw WindowManagementError.excludedApplication
         }
         let application = AXUIElementCreateApplication(processIdentifier)
-        let windows = try windowElements(of: application)
+        let elements = try windowElements(of: application)
+        // 全屏窗口不参与网格排列，否则会被从全屏空间里拽出来；顺序按屏幕阅读顺序稳定下来。
+        let candidates = elements.map { arrangementCandidate(of: $0) }
+        let windows = WindowArrangementPolicy.orderedIndices(in: candidates).map { elements[$0] }
         guard !windows.isEmpty else { throw WindowManagementError.noFocusedWindow }
         let screen = screen(for: windows[0]) ?? NSScreen.main?.visibleFrame ?? .zero
         guard !screen.isEmpty else { throw WindowManagementError.operationFailed(L("window.error.noScreen")) }
         let frames = WindowArrangementCalculator.frames(for: windows.count, in: screen, options: configuration.options)
         for (window, frame) in zip(windows, frames) {
+            rememberFrameBeforeLayout(of: window, processIdentifier: processIdentifier)
             try setFrame(frame, of: window)
         }
         return windows.count
     }
 
+    /// 手动记住当前窗口尺寸（按应用分别保存）。
     func saveFocusedWindowFrame() throws {
         guard AXIsProcessTrusted() else { throw WindowManagementError.accessibilityPermission }
-        let window = try focusedWindow()
+        let processIdentifier = try externalProcessIdentifier()
+        let window = try focusedWindow(of: processIdentifier)
         let frame = try cocoaFrame(of: window)
         lastSavedFrame = frame
-        UserDefaults.standard.set(
-            [Double(frame.origin.x), Double(frame.origin.y), Double(frame.size.width), Double(frame.size.height)],
-            forKey: Self.savedFrameKey
-        )
+        frameMemory.saveFrame(frame, for: bundleIdentifier(for: processIdentifier))
     }
 
+    /// 还原窗口尺寸。
+    ///
+    /// 优先回到「上一次布局前」的位置（自动记录，用户无需先手动记住），其次才是手动记住的尺寸，
+    /// 最后兼容 1.1.0 之前写入的全局尺寸记录。
     func restoreFocusedWindowFrame() throws {
         guard AXIsProcessTrusted() else { throw WindowManagementError.accessibilityPermission }
-        let window = try focusedWindow()
-        guard let values = UserDefaults.standard.array(forKey: Self.savedFrameKey) as? [Double], values.count == 4 else {
+        let processIdentifier = try externalProcessIdentifier()
+        let window = try focusedWindow(of: processIdentifier)
+        let bundleIdentifier = bundleIdentifier(for: processIdentifier)
+        if let frame = frameMemory.previousFrame(for: bundleIdentifier) ?? frameMemory.savedFrame(for: bundleIdentifier) {
+            try setFrame(frame, of: window)
+            return
+        }
+        guard let legacy = legacySavedFrame() else {
             throw WindowManagementError.operationFailed(L("window.error.noSavedFrame"))
         }
-        try setFrame(
-            CGRect(x: values[0], y: values[1], width: values[2], height: values[3]),
-            of: window
-        )
+        try setFrame(legacy, of: window)
+    }
+
+    /// 1.1.0 之前的全局尺寸记录，仅作为兼容回退。
+    private func legacySavedFrame() -> CGRect? {
+        guard let values = defaults.array(forKey: Self.savedFrameKey) as? [Double], values.count == 4 else {
+            return nil
+        }
+        return CGRect(x: values[0], y: values[1], width: values[2], height: values[3])
     }
 
     private static let savedFrameKey = "windowManagement.savedFrame"
@@ -616,9 +660,12 @@ final class WindowManagementService {
         globalMouseMonitor = nil
         localMouseMonitor = nil
         mouseDownLocation = nil
+        dragWindowFrameAtMouseDown = nil
+        snapPreview.hide()
         guard configuration.edgeSnappingEnabled else { return }
 
-        let eventMask: NSEvent.EventTypeMask = [.leftMouseDown, .leftMouseUp]
+        // 需要拖动事件才能在拖拽过程中实时显示落点预览。
+        let eventMask: NSEvent.EventTypeMask = [.leftMouseDown, .leftMouseDragged, .leftMouseUp]
         globalMouseMonitor = NSEvent.addGlobalMonitorForEvents(matching: eventMask) { [weak self] event in
             let type = event.type
             Task { @MainActor [weak self] in
@@ -631,34 +678,88 @@ final class WindowManagementService {
         switch type {
         case .leftMouseDown:
             mouseDownLocation = NSEvent.mouseLocation
+            dragWindowFrameAtMouseDown = focusedWindowFrameForSnapping()
+            lastSnapProbeTime = 0
+        case .leftMouseDragged:
+            updateSnapPreview(at: NSEvent.mouseLocation)
         case .leftMouseUp:
             guard let start = mouseDownLocation else { return }
+            let frameAtMouseDown = dragWindowFrameAtMouseDown
             mouseDownLocation = nil
+            dragWindowFrameAtMouseDown = nil
+            snapPreview.hide()
             let end = NSEvent.mouseLocation
             let distance = hypot(end.x - start.x, end.y - start.y)
-            guard distance > 12 else { return }
+            guard distance > 12, windowFollowedPointer(from: frameAtMouseDown) else { return }
             snapWindow(at: end)
         default:
             break
         }
     }
 
+    /// 拖拽过程中显示落点预览。
+    ///
+    /// 只有「窗口确实跟着鼠标移动」时才显示：全局鼠标监听拿不到拖拽目标，不加这层判断的话，
+    /// 在屏幕边缘划选文字也会闪出吸附预览。
+    private func updateSnapPreview(at point: CGPoint) {
+        guard configuration.edgeSnappingEnabled, configuration.showSnapPreview else {
+            snapPreview.hide()
+            return
+        }
+        guard let start = mouseDownLocation,
+              hypot(point.x - start.x, point.y - start.y) > 8 else { return }
+
+        // 拖动过程中每个事件都读 AX 会明显增加开销，这里限流到约 12 次/秒。
+        let now = ProcessInfo.processInfo.systemUptime
+        guard now - lastSnapProbeTime > 0.08 else { return }
+        lastSnapProbeTime = now
+
+        guard windowFollowedPointer(from: dragWindowFrameAtMouseDown) else { return }
+        guard let plan = WindowSnapPreviewPlanner.plan(
+            for: point,
+            screens: snapScreens,
+            options: configuration.options
+        ) else {
+            snapPreview.hide()
+            return
+        }
+        snapPreview.show(plan)
+    }
+
+    /// 窗口是否真的跟着鼠标移动过。
+    ///
+    /// 全局鼠标监听拿不到拖拽目标：不加这层判断的话，在屏幕边缘划选文字也会弹出吸附预览、
+    /// 甚至把前台窗口挪走。
+    private func windowFollowedPointer(from frameAtMouseDown: CGRect?) -> Bool {
+        guard let frameAtMouseDown, let current = focusedWindowFrameForSnapping() else { return false }
+        return abs(current.minX - frameAtMouseDown.minX) > 2 || abs(current.minY - frameAtMouseDown.minY) > 2
+    }
+
+    /// 吸附松手：按鼠标松手位置所在的显示器计算落点，而不是窗口当前所在的显示器。
     private func snapWindow(at point: CGPoint) {
+        guard AXIsProcessTrusted(),
+              let plan = WindowSnapPreviewPlanner.plan(
+                for: point,
+                screens: snapScreens,
+                options: configuration.options
+              ),
+              let processIdentifier = try? externalProcessIdentifier(),
+              !isExcluded(processIdentifier: processIdentifier),
+              let window = try? focusedWindow(of: processIdentifier) else { return }
+        rememberFrameBeforeLayout(of: window, processIdentifier: processIdentifier)
+        try? setFrame(plan.frame, of: window)
+    }
+
+    private var snapScreens: [WindowSnapScreen] {
+        NSScreen.screens.map { WindowSnapScreen(frame: $0.frame, visibleFrame: $0.visibleFrame) }
+    }
+
+    private func focusedWindowFrameForSnapping() -> CGRect? {
         guard AXIsProcessTrusted(),
               let processIdentifier = try? externalProcessIdentifier(),
               !isExcluded(processIdentifier: processIdentifier),
-              let window = try? focusedWindow(of: processIdentifier),
-              let screen = screen(for: window),
-              let layout = WindowSnapResolver.layout(
-                for: point,
-                in: screen,
-                threshold: configuration.options.snapDistance
-              ) else { return }
-        try? apply(layout)
-    }
-
-    private func focusedWindow() throws -> AXUIElement {
-        try focusedWindow(of: externalProcessIdentifier())
+              let window = try? focusedWindow(of: processIdentifier) else { return nil }
+        return try? cocoaFrame(of: window)
     }
 
     private func externalProcessIdentifier() throws -> pid_t {
@@ -811,6 +912,63 @@ final class WindowManagementService {
         keyUp.flags = .maskControl
         keyDown.post(tap: .cghidEventTap)
         keyUp.post(tap: .cghidEventTap)
+    }
+
+    /// 方向键挪动距离；按住 Option 时精调。
+    private var nudgeDistance: CGFloat {
+        WindowNudge.offset(
+            step: configuration.options.nudgeStep,
+            isFine: NSEvent.modifierFlags.contains(.option)
+        )
+    }
+
+    /// 连按同一快捷键时，在同一分数族内循环到下一个布局。
+    private func resolvedLayout(
+        _ layout: WindowLayout,
+        processIdentifier: pid_t,
+        window: AXUIElement
+    ) -> WindowLayout {
+        guard configuration.cycleLayouts else {
+            cycleState.reset()
+            return layout
+        }
+        return cycleState.nextLayout(
+            requested: layout,
+            targetKey: "\(bundleIdentifier(for: processIdentifier))|\(windowTitle(of: window) ?? "")"
+        )
+    }
+
+    /// 应用布局前记录当前帧，让「还原」不需要用户先手动记住尺寸。
+    private func rememberFrameBeforeLayout(of window: AXUIElement, processIdentifier: pid_t) {
+        guard let frame = try? cocoaFrame(of: window) else { return }
+        frameMemory.rememberPreviousFrame(frame, for: bundleIdentifier(for: processIdentifier))
+    }
+
+    private func bundleIdentifier(for processIdentifier: pid_t) -> String {
+        NSRunningApplication(processIdentifier: processIdentifier)?.bundleIdentifier ?? "pid-\(processIdentifier)"
+    }
+
+    private func windowTitle(of window: AXUIElement) -> String? {
+        var value: CFTypeRef?
+        guard AXUIElementCopyAttributeValue(window, kAXTitleAttribute as CFString, &value) == .success else {
+            return nil
+        }
+        return value as? String
+    }
+
+    private func arrangementCandidate(of window: AXUIElement) -> WindowArrangementCandidate {
+        WindowArrangementCandidate(
+            frame: (try? cocoaFrame(of: window)) ?? .zero,
+            isFullScreen: isFullScreen(window),
+            isMinimized: false
+        )
+    }
+
+    private func isFullScreen(_ window: AXUIElement) -> Bool {
+        var value: CFTypeRef?
+        guard AXUIElementCopyAttributeValue(window, "AXFullScreen" as CFString, &value) == .success,
+              let number = value as? NSNumber else { return false }
+        return number.boolValue
     }
 
     private var desktopTop: CGFloat {

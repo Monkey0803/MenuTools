@@ -173,10 +173,24 @@ struct WindowManagementSettingsView: View {
                 value: optionBinding(\WindowManagerOptions.snapDistance),
                 range: 8...80
             )
+            optionSlider(
+                title: L("window.manager.nudgeStep"),
+                value: optionBinding(\WindowManagerOptions.nudgeStep),
+                range: 4...80
+            )
 
             Toggle(L("window.manager.edgeSnapping"), isOn: Binding(
                 get: { windowService.configuration.edgeSnappingEnabled },
                 set: { windowService.setEdgeSnappingEnabled($0) }
+            ))
+            Toggle(L("window.manager.snapPreview"), isOn: Binding(
+                get: { windowService.configuration.showSnapPreview },
+                set: { windowService.setSnapPreviewEnabled($0) }
+            ))
+            .disabled(!windowService.configuration.edgeSnappingEnabled)
+            Toggle(L("window.manager.cycleLayouts"), isOn: Binding(
+                get: { windowService.configuration.cycleLayouts },
+                set: { windowService.setCycleLayoutsEnabled($0) }
             ))
             Toggle(L("window.manager.autoRules"), isOn: Binding(
                 get: { windowService.configuration.automaticApplicationRules },

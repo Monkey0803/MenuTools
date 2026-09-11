@@ -731,6 +731,9 @@
 "window.manager.snapDistance" = "吸着距離";
 "window.manager.edgeSnapping" = "ドラッグ中に画面端へ吸着";
 "window.manager.autoRules" = "アプリ切替時にアプリルールを適用";
+"window.manager.nudgeStep" = "方向キーでの移動幅";
+"window.manager.cycleLayouts" = "同じショートカットの連続実行で同系統のレイアウトを順に切り替え";
+"window.manager.snapPreview" = "ドラッグ中に移動先のプレビューを表示";
 "window.manager.presets" = "レイアウトプリセット";
 "window.manager.presetName" = "プリセット名";
 "window.manager.applicationRules" = "アプリケーションルール";

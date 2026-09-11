@@ -731,6 +731,9 @@
 "window.manager.snapDistance" = "Snap distance";
 "window.manager.edgeSnapping" = "Snap windows to screen edges while dragging";
 "window.manager.autoRules" = "Apply application rules when switching apps";
+"window.manager.nudgeStep" = "Arrow key nudge step";
+"window.manager.cycleLayouts" = "Cycle through layouts of the same family when the shortcut is pressed again";
+"window.manager.snapPreview" = "Show a preview of the target frame while dragging to an edge";
 "window.manager.presets" = "Layout presets";
 "window.manager.presetName" = "Preset name";
 "window.manager.applicationRules" = "Application rules";

@@ -51,7 +51,7 @@ A lightweight system toolkit that lives in the macOS menu bar. MenuTools uses th
 |---|---|
 | App Launcher | Search and launch installed apps, with favorites and recent-app ordering. |
 | Scenes | Apply Work, Presentation, or Night presets manually. |
-| Window Management | Use 58 layouts, edge snapping, layout presets, app rules, multi-window tiling, cross-display movement, and saved window sizes. |
+| Window Management | Use 58 layouts with edge snapping and drop previews, repeat a shortcut to cycle through layouts of the same family, and rely on per-app window size memory; layout presets, app rules, multi-window tiling, and cross-display movement included. |
 | Focus | Toggle the system Focus state and open Focus settings. |
 | Global scene shortcuts | Record global shortcuts for Work, Presentation, and Night scenes. |
 
@@ -213,7 +213,7 @@ If permission was denied, enable it again in **System Settings → Privacy & Sec
 | Storage Analysis | Background recursive measurement of selected directories; cleanup keeps directories and never touches Downloads |
 | App Launcher | NSWorkspace app discovery, search, favorites, and launching |
 | Scenes | Composes app launching, appearance, Focus, audio, desktop icons, and prevent-sleep actions |
-| Window Management | Accessibility API for window position, size, and display movement; NSEvent edge snapping; persisted layout presets and app rules |
+| Window Management | Accessibility API for window position, size, and display movement; global NSEvent drag monitoring drives edge snapping and target-frame previews; layout cycling, per-app frame memory, presets, and app rules are persisted |
 | Focus | Control Center accessibility script with a System Settings fallback |
 | Global shortcuts | NSEvent global/local keyboard monitors, persistent bindings, and conflict detection |
 | Update checks | Sparkle standard updater with Ed25519-signed appcast |
@@ -269,6 +269,9 @@ export SPARKLE_DOWNLOAD_URL_PREFIX="https://your-server/releases/"
 - Shortcut conflict detection covers system hotkeys and exclusive Carbon hotkeys registered by other apps; apps using private event taps cannot be fully enumerated through public APIs.
 - Clipboard history works by polling the system pasteboard, so it only records what has already been copied. macOS does not expose the copy source, so "excluded apps" are judged by the frontmost app at copy time.
 - Image text recognition relies on on-device Vision and may briefly return empty results under heavy system load; failures are retried automatically and again when the clipboard panel is reopened.
+- Window Management needs Accessibility permission; without it layout shortcuts and edge snapping do nothing, and the settings pane shows a warning instead.
+- Edge snapping only previews a drop target while the window itself is following the pointer, and full-screen windows are excluded from multi-window tiling.
+- Some apps enforce a minimum window size, so very small layouts (such as a sixth of the screen) may leave the window larger than requested.
 
 ## Acknowledgements
 
