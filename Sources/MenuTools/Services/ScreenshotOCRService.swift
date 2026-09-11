@@ -36,8 +36,51 @@ enum ScreenshotOCRError: LocalizedError {
     }
 }
 
+/// 进程级 Vision 串行闸门。
+///
+/// Vision 在并发压力下可能整批返回空结果（剪贴板图片识别、标注器 OCR、区域 OCR 同时
+/// 发起请求时最容易触发），因此这些入口共用同一把闸；闸门是进程级的，不是每个服务
+/// 实例一把，否则跨功能并发依然会互相干扰。
+actor VisionRecognitionGate {
+    static let shared = VisionRecognitionGate()
+
+    private var isAvailable = true
+    private var waiters: [CheckedContinuation<Void, Never>] = []
+
+    func acquire() async {
+        if isAvailable {
+            isAvailable = false
+            return
+        }
+        await withCheckedContinuation { continuation in
+            waiters.append(continuation)
+        }
+    }
+
+    func release() {
+        if waiters.isEmpty {
+            isAvailable = true
+        } else {
+            waiters.removeFirst().resume()
+        }
+    }
+}
+
 /// 截图后的本地 OCR/二维码识别，不上传图片，也不依赖网络服务。
 enum ScreenshotOCRService {
+    /// 占用进程级闸门后再执行识别；所有后台/交互入口都应走这个版本。
+    static func recognizeExclusively(_ image: CGImage) async throws -> String {
+        await VisionRecognitionGate.shared.acquire()
+        do {
+            let result = try recognize(image)
+            await VisionRecognitionGate.shared.release()
+            return result
+        } catch {
+            await VisionRecognitionGate.shared.release()
+            throw error
+        }
+    }
+
     static func recognize(_ image: CGImage) throws -> String {
         let textRequest = VNRecognizeTextRequest()
         textRequest.recognitionLevel = .accurate

@@ -88,7 +88,7 @@ final class ScreenshotRegionOCRService {
             throw ScreenshotError.imageUnavailable
         }
         do {
-            let text = try ScreenshotOCRService.recognize(image)
+            let text = try await ScreenshotOCRService.recognizeExclusively(image)
             let pasteboard = NSPasteboard.general
             pasteboard.clearContents()
             guard pasteboard.setString(text, forType: .string) else {

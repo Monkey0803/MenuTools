@@ -925,12 +925,13 @@ func clipboardHistoryRecognizesImageTextAfterInsertion() async throws {
     let service = ClipboardHistoryService(
         persistenceURL: nil,
         pasteboard: NSPasteboard(name: NSPasteboard.Name("MenuToolsTests.\(UUID().uuidString)")),
-        imageTextRecognizer: { _ in "识别文字\nhttps://example.com/qr" }
+        imageTextRecognizer: { _ in .recognized("识别文字\nhttps://example.com/qr") }
     )
 
     #expect(service.copy(.image(imageData)))
-    for _ in 0 ..< 8 where service.items.first?.recognizedText == nil {
-        await Task.yield()
+    // 识别经过进程级闸门（actor 跳转 + 可能的排队），用有界轮询而不是固定 yield 次数等待。
+    for _ in 0 ..< 200 where service.items.first?.recognizedText == nil {
+        try await Task.sleep(for: .milliseconds(25))
     }
 
     #expect(service.items.first?.recognizedText == "识别文字\nhttps://example.com/qr")
@@ -986,6 +987,159 @@ func clipboardHistoryDefaultRecognizerHandlesRestoredBatch() async throws {
     }
 
     #expect(Set(service.items.compactMap(\.recognizedText)) == Set(payloads))
+}
+
+@Test("识别失败的图片会重试并在后续尝试写入结果")
+@MainActor
+func clipboardHistoryRetriesFailedImageRecognition() async throws {
+    let attempts = ClipboardRecognitionAttemptProbe()
+    let service = ClipboardHistoryService(
+        persistenceURL: nil,
+        pasteboard: NSPasteboard(name: NSPasteboard.Name("MenuToolsTests.\(UUID().uuidString)")),
+        imageTextRecognizer: { _ in
+            let attempt = await attempts.next()
+            return attempt >= 2 ? .recognized("重试后的识别结果") : .failed
+        }
+    )
+
+    service.importItems([makeImageHistoryItem()])
+
+    for _ in 0 ..< 120 where service.items.first?.recognizedText == nil {
+        try await Task.sleep(for: .milliseconds(25))
+    }
+
+    #expect(service.items.first?.recognizedText == "重试后的识别结果")
+    #expect(await attempts.count >= 2)
+    #expect(service.failedImageRecognitionCount == 0)
+}
+
+@Test("图上没有文字时不会重复触发识别")
+@MainActor
+func clipboardHistoryDoesNotRetryImagesWithoutContent() async throws {
+    let attempts = ClipboardRecognitionAttemptProbe()
+    let service = ClipboardHistoryService(
+        persistenceURL: nil,
+        pasteboard: NSPasteboard(name: NSPasteboard.Name("MenuToolsTests.\(UUID().uuidString)")),
+        imageTextRecognizer: { _ in
+            _ = await attempts.next()
+            return .noContent
+        }
+    )
+
+    service.importItems([makeImageHistoryItem()])
+    var waited = 0
+    while await attempts.count < 1, waited < 80 {
+        try await Task.sleep(for: .milliseconds(25))
+        waited += 1
+    }
+    try await Task.sleep(for: .milliseconds(600))
+
+    #expect(await attempts.count == 1)
+    #expect(service.items.first?.recognizedText == nil)
+    #expect(service.failedImageRecognitionCount == 0)
+}
+
+@Test("识别一直失败的图片会在面板刷新时补试")
+@MainActor
+func clipboardHistoryRetriesFailedImageRecognitionOnRefresh() async throws {
+    let attempts = ClipboardRecognitionAttemptProbe()
+    let attemptLimit = ClipboardImageRecognitionPolicy.attemptLimit
+    let service = ClipboardHistoryService(
+        persistenceURL: nil,
+        pasteboard: NSPasteboard(name: NSPasteboard.Name("MenuToolsTests.\(UUID().uuidString)")),
+        imageTextRecognizer: { _ in
+            let attempt = await attempts.next()
+            return attempt > attemptLimit ? .recognized("刷新后的识别结果") : .failed
+        }
+    )
+
+    service.importItems([makeImageHistoryItem()])
+    var waited = 0
+    while await attempts.count < attemptLimit, waited < 200 {
+        try await Task.sleep(for: .milliseconds(25))
+        waited += 1
+    }
+
+    #expect(service.items.first?.recognizedText == nil)
+    #expect(service.failedImageRecognitionCount == 1)
+
+    service.refresh()
+
+    for _ in 0 ..< 120 where service.items.first?.recognizedText == nil {
+        try await Task.sleep(for: .milliseconds(25))
+    }
+
+    #expect(service.items.first?.recognizedText == "刷新后的识别结果")
+    #expect(service.failedImageRecognitionCount == 0)
+}
+
+@Test("多个剪贴板服务实例共用进程级识别闸门")
+@MainActor
+func clipboardImageRecognitionSerializesAcrossServices() async throws {
+    let probe = ClipboardRecognitionConcurrencyProbe()
+    let recognizer: @Sendable (Data) async -> ClipboardImageRecognitionOutcome = { _ in
+        await probe.enter()
+        try? await Task.sleep(for: .milliseconds(150))
+        await probe.exit()
+        return .recognized("串行识别结果")
+    }
+    let first = ClipboardHistoryService(
+        persistenceURL: nil,
+        pasteboard: NSPasteboard(name: NSPasteboard.Name("MenuToolsTests.\(UUID().uuidString)")),
+        imageTextRecognizer: recognizer
+    )
+    let second = ClipboardHistoryService(
+        persistenceURL: nil,
+        pasteboard: NSPasteboard(name: NSPasteboard.Name("MenuToolsTests.\(UUID().uuidString)")),
+        imageTextRecognizer: recognizer
+    )
+
+    first.importItems([makeImageHistoryItem("first")])
+    second.importItems([makeImageHistoryItem("second")])
+
+    for _ in 0 ..< 200
+    where first.items.first?.recognizedText == nil || second.items.first?.recognizedText == nil {
+        try await Task.sleep(for: .milliseconds(25))
+    }
+
+    #expect(first.items.first?.recognizedText == "串行识别结果")
+    #expect(second.items.first?.recognizedText == "串行识别结果")
+    #expect(await probe.peakConcurrency == 1)
+}
+
+private func makeImageHistoryItem(_ seed: String = "image") -> ClipboardHistoryItem {
+    ClipboardHistoryItem(
+        id: UUID(),
+        content: .image(Data(seed.utf8)),
+        capturedAt: Date(),
+        expiresAt: nil,
+        isPinned: false
+    )
+}
+
+private actor ClipboardRecognitionAttemptProbe {
+    private var attempts = 0
+    var count: Int { attempts }
+
+    func next() -> Int {
+        attempts += 1
+        return attempts
+    }
+}
+
+private actor ClipboardRecognitionConcurrencyProbe {
+    private var active = 0
+    private var peak = 0
+    var peakConcurrency: Int { peak }
+
+    func enter() {
+        active += 1
+        peak = max(peak, active)
+    }
+
+    func exit() {
+        active -= 1
+    }
 }
 
 private func makeQRCodeData(payload: String) throws -> Data {

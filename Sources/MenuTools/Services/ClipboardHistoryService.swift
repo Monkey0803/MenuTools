@@ -1667,40 +1667,61 @@ enum ClipboardHistoryPersistence {
 
 }
 
+/// 图片识别结果。必须区分“图上确实没有内容”和“识别链路失败”：
+/// 前者重试没有意义，后者（Vision 在系统负载高时整批返回空结果）值得重试。
+enum ClipboardImageRecognitionOutcome: Sendable, Equatable {
+    case recognized(String)
+    case noContent
+    case failed
+}
+
+enum ClipboardImageRecognitionPolicy {
+    /// 单条记录的识别尝试次数上限。
+    static let attemptLimit = 3
+    /// 两次尝试之间的退避间隔。
+    static let retryDelay: Duration = .milliseconds(200)
+    /// 用户重新打开面板刷新时，最多补试多少条失败记录，避免集中重试压满识别链路。
+    static let refreshRetryLimit = 4
+}
+
 enum ClipboardImageTextRecognition {
-    static func recognize(_ data: Data) -> String? {
-        guard let image = NSImage(data: data) else { return nil }
+    static func outcome(for data: Data) -> ClipboardImageRecognitionOutcome {
+        guard let image = NSImage(data: data) else { return .failed }
         var proposedRect = NSRect(origin: .zero, size: image.size)
         guard let cgImage = image.cgImage(forProposedRect: &proposedRect, context: nil, hints: nil) else {
-            return nil
+            return .failed
         }
-        return try? ScreenshotOCRService.recognize(cgImage)
+        do {
+            return .recognized(try ScreenshotOCRService.recognize(cgImage))
+        } catch ScreenshotOCRError.noText {
+            return .noContent
+        } catch {
+            return .failed
+        }
     }
 }
 
-/// Vision 同时处理大量恢复图片时可能整批返回空结果；使用单许可门控顺序执行，
-/// 既避免资源争用，也让新复制和历史恢复共用同一条稳定识别链路。
-private actor ClipboardImageRecognitionGate {
-    private var isAvailable = true
-    private var waiters: [CheckedContinuation<Void, Never>] = []
-
-    func acquire() async {
-        if isAvailable {
-            isAvailable = false
-            return
+/// 识别失败时按策略重试；每次尝试单独占用闸门，退避等待期间让出给截图 OCR 等其他入口。
+private func clipboardRecognizeWithRetries(
+    _ data: Data,
+    recognizer: @Sendable (Data) async -> ClipboardImageRecognitionOutcome,
+    gate: VisionRecognitionGate
+) async -> ClipboardImageRecognitionOutcome {
+    var outcome = ClipboardImageRecognitionOutcome.failed
+    for attempt in 1 ... ClipboardImageRecognitionPolicy.attemptLimit {
+        await gate.acquire()
+        guard !Task.isCancelled else {
+            await gate.release()
+            return .failed
         }
-        await withCheckedContinuation { continuation in
-            waiters.append(continuation)
-        }
+        outcome = await recognizer(data)
+        await gate.release()
+        guard case .failed = outcome else { return outcome }
+        guard attempt < ClipboardImageRecognitionPolicy.attemptLimit else { break }
+        try? await Task.sleep(for: ClipboardImageRecognitionPolicy.retryDelay)
+        if Task.isCancelled { return .failed }
     }
-
-    func release() {
-        if waiters.isEmpty {
-            isAvailable = true
-        } else {
-            waiters.removeFirst().resume()
-        }
-    }
+    return outcome
 }
 
 /// 负责监听系统剪贴板并向界面提供可操作的历史记录。
@@ -1719,7 +1740,7 @@ final class ClipboardHistoryService {
     private let frontmostApplicationBundleIdentifierProvider: @MainActor () -> String?
     private let autoPasteAction: @MainActor () -> ClipboardAutoPasteResult
     private let feedbackPresenter: @MainActor (ClipboardCopyFeedback) -> Void
-    private let imageTextRecognizer: @Sendable (Data) async -> String?
+    private let imageTextRecognizer: @Sendable (Data) async -> ClipboardImageRecognitionOutcome
     private(set) var limit: Int
     private let sensitiveLifetime: TimeInterval
     private var lastChangeCount: Int = -1
@@ -1729,7 +1750,8 @@ final class ClipboardHistoryService {
     private var undoExpirationTask: Task<Void, Never>?
     private var feedbackExpirationTask: Task<Void, Never>?
     private var imageRecognitionTasks: [UUID: Task<Void, Never>] = [:]
-    private let imageRecognitionGate = ClipboardImageRecognitionGate()
+    private let imageRecognitionGate = VisionRecognitionGate.shared
+    private var failedImageRecognitionIDs: Set<UUID> = []
     private var sequentialPasteQueue: ClipboardSequentialPasteQueue?
     private var workspaceNotificationObservers: [NSObjectProtocol] = []
     private var lastRemovedItems: [ClipboardHistoryItem] = []
@@ -1750,6 +1772,8 @@ final class ClipboardHistoryService {
     private(set) var sequentialPasteMode: ClipboardSequentialPasteMode
     private(set) var copyFeedback: ClipboardCopyFeedback?
     private(set) var persistenceErrorMessage: String?
+    /// 识别失败、等待补试的图片条数；失败不再静默。
+    var failedImageRecognitionCount: Int { failedImageRecognitionIDs.count }
     private(set) var lastCleanupSummary: ClipboardCleanupSummary?
     var canUndoLastRemoval: Bool { !lastRemovedItems.isEmpty }
 
@@ -1761,9 +1785,9 @@ final class ClipboardHistoryService {
         userDefaults: UserDefaults = .standard,
         autoPasteAction: @escaping @MainActor () -> ClipboardAutoPasteResult = ClipboardHistoryAutoPaste.pasteIntoPreviousApplication,
         feedbackPresenter: @escaping @MainActor (ClipboardCopyFeedback) -> Void = { _ in },
-        imageTextRecognizer: @escaping @Sendable (Data) async -> String? = { data in
+        imageTextRecognizer: @escaping @Sendable (Data) async -> ClipboardImageRecognitionOutcome = { data in
             await Task.detached(priority: .utility) {
-                ClipboardImageTextRecognition.recognize(data)
+                ClipboardImageTextRecognition.outcome(for: data)
             }.value
         },
         frontmostApplicationBundleIdentifierProvider: @escaping @MainActor () -> String? = {
@@ -1882,16 +1906,19 @@ final class ClipboardHistoryService {
     }
 
     /// 检查剪贴板变化；调用方负责按合适的间隔轮询。
+    /// 面板打开等用户动作也会走到这里，顺带补试此前识别失败的图片。
     func refresh() {
         guard hasLoadedPersistedHistory else {
             Task { @MainActor [weak self] in
                 guard let self else { return }
                 await self.loadPersistedHistory()
                 self.refreshLoadedHistory()
+                self.retryFailedImageRecognitions()
             }
             return
         }
         refreshLoadedHistory()
+        retryFailedImageRecognitions()
     }
 
     private func refreshLoadedHistory(frontmostApplicationBundleIdentifier: String? = nil) {
@@ -2363,25 +2390,45 @@ final class ClipboardHistoryService {
         let recognizer = imageTextRecognizer
         let recognitionGate = imageRecognitionGate
         imageRecognitionTasks[itemID] = Task { @MainActor [weak self] in
-            await recognitionGate.acquire()
-            guard !Task.isCancelled else {
-                await recognitionGate.release()
-                return
-            }
-            let recognizedText = await recognizer(data)?
-                .trimmingCharacters(in: .whitespacesAndNewlines)
-            await recognitionGate.release()
+            let outcome = await clipboardRecognizeWithRetries(
+                data,
+                recognizer: recognizer,
+                gate: recognitionGate
+            )
             guard let self else { return }
             defer { imageRecognitionTasks[itemID] = nil }
-            guard let recognizedText, !recognizedText.isEmpty,
-                  buffer.items.contains(where: { $0.id == itemID && $0.content == item.content }) else {
+            guard buffer.items.contains(where: { $0.id == itemID && $0.content == item.content }) else {
+                failedImageRecognitionIDs.remove(itemID)
                 return
             }
-            historyMutationGeneration &+= 1
-            buffer.setRecognizedText(recognizedText, for: itemID)
-            synchronizeItems()
-            persist()
+            switch outcome {
+            case let .recognized(text):
+                let recognizedText = text.trimmingCharacters(in: .whitespacesAndNewlines)
+                guard !recognizedText.isEmpty else {
+                    failedImageRecognitionIDs.remove(itemID)
+                    return
+                }
+                failedImageRecognitionIDs.remove(itemID)
+                historyMutationGeneration &+= 1
+                buffer.setRecognizedText(recognizedText, for: itemID)
+                synchronizeItems()
+                persist()
+            case .noContent:
+                failedImageRecognitionIDs.remove(itemID)
+            case .failed:
+                // 记录失败，等用户下次打开面板刷新时再补试，避免静默丢失 OCR/二维码结果。
+                failedImageRecognitionIDs.insert(itemID)
+            }
         }
+    }
+
+    /// 识别一直失败的图片在用户重新打开面板时补试，最多补试固定条数。
+    private func retryFailedImageRecognitions() {
+        guard !failedImageRecognitionIDs.isEmpty else { return }
+        let candidates = failedImageRecognitionIDs
+            .compactMap { id in buffer.items.first { $0.id == id && $0.recognizedText == nil } }
+            .prefix(ClipboardImageRecognitionPolicy.refreshRetryLimit)
+        candidates.forEach(scheduleImageTextRecognitionIfNeeded)
     }
 
     private func readContent(from pasteboard: NSPasteboard) -> ClipboardHistoryContent? {
@@ -2391,6 +2438,7 @@ final class ClipboardHistoryService {
     private func synchronizeItems() {
         let nextItems = buffer.items
         let nextIDs = Set(nextItems.map(\.id))
+        failedImageRecognitionIDs.formIntersection(nextIDs)
         for removedID in Array(searchIndex.values.keys) where !nextIDs.contains(removedID) {
             searchIndex.remove(removedID)
         }

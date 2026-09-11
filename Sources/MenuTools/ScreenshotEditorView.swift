@@ -793,17 +793,19 @@ struct ScreenshotEditorView: View {
 
     private func recognizeText() {
         guard let sourceImage else { return }
-        do {
-            let text = try ScreenshotOCRService.recognize(sourceImage)
-            let pasteboard = NSPasteboard.general
-            pasteboard.clearContents()
-            guard pasteboard.setString(text, forType: .string) else {
-                throw ScreenshotError.clipboardFailed
+        Task { @MainActor in
+            do {
+                let text = try await ScreenshotOCRService.recognizeExclusively(sourceImage)
+                let pasteboard = NSPasteboard.general
+                pasteboard.clearContents()
+                guard pasteboard.setString(text, forType: .string) else {
+                    throw ScreenshotError.clipboardFailed
+                }
+                ClipboardHistoryService.shared.refresh()
+                errorMessage = L("screenshot.ocr.copied")
+            } catch {
+                errorMessage = error.localizedDescription
             }
-            ClipboardHistoryService.shared.refresh()
-            errorMessage = L("screenshot.ocr.copied")
-        } catch {
-            errorMessage = error.localizedDescription
         }
     }
 
