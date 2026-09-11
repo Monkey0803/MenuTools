@@ -80,6 +80,9 @@ extension WindowLayout {
         case .moveRight: return .systemSymbol("arrow.right")
         case .moveUp: return .systemSymbol("arrow.up")
         case .moveDown: return .systemSymbol("arrow.down")
+        // 收纳会把窗口推出屏幕，用符号表达比缩略图更准确（缩略图不会裁剪到图标边界内）。
+        case .stashLeft: return .systemSymbol("arrow.left.to.line")
+        case .stashRight: return .systemSymbol("arrow.right.to.line")
         }
     }
 

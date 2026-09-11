@@ -711,6 +711,8 @@
 "window.moveRight" = "오른쪽으로 이동";
 "window.moveUp" = "위로 이동";
 "window.moveDown" = "아래로 이동";
+"window.stashLeft" = "왼쪽 가장자리에 보관";
+"window.stashRight" = "오른쪽 가장자리에 보관";
 "window.save" = "크기 저장";
 "window.restore" = "크기 복원";
 "window.applied" = "적용됨: %@";

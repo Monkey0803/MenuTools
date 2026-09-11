@@ -48,7 +48,8 @@ func layoutCycleSkipsNonFractionalLayouts() {
         .centered, .centerTwoThirds, .centerThreeFourths,
         .topCenterTwoThirds, .bottomCenterTwoThirds,
         .moveLeft, .moveRight, .moveUp, .moveDown,
-        .restore, .makeLarger, .makeSmaller
+        .restore, .makeLarger, .makeSmaller,
+        .stashLeft, .stashRight
     ]
     for layout in excluded {
         #expect(WindowLayoutCycle.next(after: layout) == nil, "\(layout.rawValue) 不应参与循环")

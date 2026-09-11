@@ -711,6 +711,8 @@
 "window.moveRight" = "Move Right";
 "window.moveUp" = "Move Up";
 "window.moveDown" = "Move Down";
+"window.stashLeft" = "Stash to the left edge";
+"window.stashRight" = "Stash to the right edge";
 "window.save" = "Remember size";
 "window.restore" = "Restore";
 "window.applied" = "Applied: %@";

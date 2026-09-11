@@ -61,7 +61,7 @@ func windowLayoutCentersRequestedSize() {
 
 @Test("窗口管理目录覆盖截图中的全部固定布局")
 func windowLayoutCatalogContainsAllFixedLayouts() {
-    #expect(WindowLayout.allCases.count == 58)
+    #expect(WindowLayout.allCases.count == 60)
     #expect(WindowLayout.allCases.contains(.toggleFullscreen))
     #expect(WindowLayout.allCases.contains(.almostMaximize))
     #expect(WindowLayout.allCases.contains(.maxHeight))
@@ -75,6 +75,8 @@ func windowLayoutCatalogContainsAllFixedLayouts() {
     #expect(WindowLayout.allCases.contains(.bottomCenterTwoThirds))
     #expect(WindowLayout.allCases.contains(.movePreviousDesktop))
     #expect(WindowLayout.allCases.contains(.moveDown))
+    #expect(WindowLayout.allCases.contains(.stashLeft))
+    #expect(WindowLayout.allCases.contains(.stashRight))
 }
 
 @Test("三等分、四等分和六等分布局都落在显示器可见区域")
@@ -148,6 +150,10 @@ func windowLayoutPreviewIconsMatchTheirDescriptions() {
     #expect(WindowLayout.topThirdFourth.iconDescriptor.windowFrame == CGRect(x: 0.5, y: 0, width: 0.25, height: 0.5))
     #expect(WindowLayout.centerTwoThirds.iconDescriptor.windowFrame == CGRect(x: 1.0 / 6.0, y: 0, width: 2.0 / 3.0, height: 1))
     #expect(WindowLayout.bottomCenterTwoThirds.iconDescriptor.windowFrame == CGRect(x: 1.0 / 6.0, y: 0.5, width: 2.0 / 3.0, height: 0.5))
+
+    // 收纳会把窗口推出屏幕，用符号表达更准确，也不用担心缩略图画出边界。
+    #expect(WindowLayout.stashLeft.iconDescriptor.systemSymbol != nil)
+    #expect(WindowLayout.stashRight.iconDescriptor.systemSymbol != nil)
 }
 
 @Test("窗口管理参数控制屏幕边距和窗口间距")

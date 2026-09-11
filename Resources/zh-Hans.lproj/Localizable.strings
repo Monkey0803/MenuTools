@@ -711,6 +711,8 @@
 "window.moveRight" = "向右移动";
 "window.moveUp" = "向上移动";
 "window.moveDown" = "向下移动";
+"window.stashLeft" = "收纳到左边缘";
+"window.stashRight" = "收纳到右边缘";
 "window.save" = "记住尺寸";
 "window.restore" = "恢复";
 "window.applied" = "已应用：%@";

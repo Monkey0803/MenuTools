@@ -62,9 +62,18 @@ enum WindowLayout: String, CaseIterable, Codable, Hashable, Identifiable, Sendab
     case moveRight
     case moveUp
     case moveDown
+    case stashLeft
+    case stashRight
 
     var id: String { rawValue }
     var titleKey: String { "window.\(rawValue)" }
+    /// 收纳：把窗口推到屏幕边缘外，只留一条可见边，便于临时让出屏幕空间。
+    var isStash: Bool {
+        switch self {
+        case .stashLeft, .stashRight: return true
+        default: return false
+        }
+    }
     var symbol: String {
         switch self {
         case .leftHalf: return "rectangle.lefthalf.filled"
@@ -114,6 +123,8 @@ enum WindowLayout: String, CaseIterable, Codable, Hashable, Identifiable, Sendab
         case .moveRight: return "arrow.right"
         case .moveUp: return "arrow.up"
         case .moveDown: return "arrow.down"
+        case .stashLeft: return "arrow.left.to.line"
+        case .stashRight: return "arrow.right.to.line"
         }
     }
 }
@@ -231,7 +242,24 @@ enum WindowLayoutCalculator {
             return centeredGrid(widthFraction: 2 / 3, row: 1, rows: 2, in: safe, gap: gap)
         case .centered:
             return centered(preferredSize, in: safe)
+        case .stashLeft:
+            return stashed(preferredSize, in: safe, edgeIsLeading: true)
+        case .stashRight:
+            return stashed(preferredSize, in: safe, edgeIsLeading: false)
         }
+    }
+
+    /// 收纳后仍停留在屏幕内的可见宽度。
+    static let stashVisibleStrip: CGFloat = 16
+
+    private static func stashed(_ size: CGSize, in screen: CGRect, edgeIsLeading: Bool) -> CGRect {
+        let width = min(max(size.width, 1), screen.width)
+        let height = min(max(size.height, 1), screen.height)
+        let x = edgeIsLeading
+            ? screen.minX - width + stashVisibleStrip
+            : screen.maxX - stashVisibleStrip
+        let y = min(max(screen.midY - height / 2, screen.minY), screen.maxY - height)
+        return CGRect(x: x, y: y, width: width, height: height)
     }
 
     private static func grid(column: Int, columns: Int, row: Int, rows: Int, in screen: CGRect, gap: CGFloat) -> CGRect {
@@ -353,6 +381,7 @@ final class WindowManagementService {
     private let snapPreview = WindowSnapPreviewController()
     private var cycleState = WindowLayoutCycleState()
     private var traversalTracker = WindowRepeatTracker()
+    private var stashToggleTracker = WindowRepeatTracker()
     private var globalMouseMonitor: Any?
     private var localMouseMonitor: Any?
     private var mouseDownLocation: CGPoint?
@@ -393,6 +422,7 @@ final class WindowManagementService {
         snapPreview.hide()
         cycleState.reset()
         traversalTracker.reset()
+        stashToggleTracker.reset()
     }
 
     func updateOptions(_ options: WindowManagerOptions) {
@@ -545,6 +575,18 @@ final class WindowManagementService {
         let screen = screen(for: window) ?? NSScreen.main?.visibleFrame ?? .zero
         guard !screen.isEmpty else { throw WindowManagementError.operationFailed(L("window.error.noScreen")) }
         let targetKey = cycleTargetKey(processIdentifier: processIdentifier, window: window)
+
+        // 收纳：再次触发同一方向即收回（Loop 式的收纳／收回切换）。
+        if layout.isStash {
+            if stashToggleTracker.isRepeat(layout: layout, targetKey: targetKey),
+               frameMemory.previousFrame(for: bundleIdentifier(for: processIdentifier)) != nil {
+                try restoreFocusedWindowFrame()
+                return
+            }
+        } else {
+            stashToggleTracker.reset()
+        }
+
         let target = resolvedLayout(layout, targetKey: targetKey)
         // 连按半屏布局：把窗口带到相邻显示器再套用同一布局（对标 Rectangle 的跨显示器遍历）。
         if configuration.traverseDisplaysOnRepeat,
