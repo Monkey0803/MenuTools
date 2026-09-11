@@ -322,6 +322,8 @@
 /* クリップボード履歴 */
 "clipboard.history" = "クリップボード履歴";
 "clipboard.historyItems" = "%d 件保存";
+"clipboard.recognition.failed" = "%d 枚の画像からテキストを認識できませんでした";
+"clipboard.recognition.retry" = "再試行";
 "clipboard.search" = "クリップボードを検索";
 "clipboard.filters" = "絞り込み";
 "clipboard.filtersCount" = "絞り込み（%d）";
@@ -1059,6 +1061,7 @@
 "clipboard.error.databaseRead" = "クリップボード履歴のデータベースを読み取れません";
 "clipboard.error.databaseSchema" = "クリップボード履歴のデータベース構造が不正です";
 "clipboard.error.databaseOperation" = "クリップボード履歴のデータベース操作に失敗しました";
+"clipboard.error.databaseVersionTooNew" = "クリップボード履歴のデータベースは新しいバージョンの MenuTools で作成されています。アプリを更新してください";
 "clipboard.sequential.mode" = "順次ペーストモード";
 "clipboard.sequential.mode.once" = "1 回";
 "clipboard.sequential.mode.loop" = "ループ";
@@ -1077,6 +1080,19 @@
 "clipboard.sync.chooseFolder" = "同期フォルダを選択";
 "clipboard.sync.now" = "今すぐ同期";
 "clipboard.sync.description" = "機密でないピン留め履歴とスニペットのみ同期します。iCloud Drive や Dropbox などの共有フォルダを選択し、上のパスフレーズで暗号化します。";
+"clipboard.sync.auto" = "自動同期";
+"clipboard.sync.auto.description" = "設定した間隔で共有フォルダーとピン留め項目・スニペットを自動で統合します。";
+"clipboard.sync.auto.notReady" = "パスフレーズが未保存のため自動同期は実行されません";
+"clipboard.sync.interval" = "同期間隔";
+"clipboard.sync.intervalValue" = "%d 分";
+"clipboard.sync.savePassphrase" = "自動同期用にパスフレーズを保存";
+"clipboard.sync.passphraseSaved" = "パスフレーズをキーチェーンに保存しました";
+"clipboard.sync.clearPassphrase" = "保存したパスフレーズを削除";
+"clipboard.sync.lastSync" = "前回の同期：%@";
+"clipboard.sync.neverSynced" = "まだ同期していません";
+"clipboard.sync.failed" = "同期に失敗しました：%@";
+"clipboard.sync.error.noFolder" = "共有フォルダーが未選択です";
+"clipboard.sync.error.noPassphrase" = "同期用パスフレーズが未保存です";
 "clipboard.sync.success" = "ピン留め履歴とスニペットを同期しました。";
 "traffic.tabs" = "通信ビュー";
 "traffic.tab.overview" = "概要";

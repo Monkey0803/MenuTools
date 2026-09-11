@@ -322,6 +322,8 @@
 /* 剪貼板歷史 */
 "clipboard.history" = "剪貼板歷史";
 "clipboard.historyItems" = "%d 筆記錄";
+"clipboard.recognition.failed" = "%d 張圖片沒有辨識出文字";
+"clipboard.recognition.retry" = "重試";
 "clipboard.search" = "搜尋剪貼板";
 "clipboard.filters" = "篩選";
 "clipboard.filtersCount" = "篩選（%d）";
@@ -1059,6 +1061,7 @@
 "clipboard.error.databaseRead" = "無法讀取剪貼板歷史資料庫";
 "clipboard.error.databaseSchema" = "剪貼板歷史資料庫結構無效";
 "clipboard.error.databaseOperation" = "剪貼板歷史資料庫操作失敗";
+"clipboard.error.databaseVersionTooNew" = "剪貼板歷史資料庫由較新版本的 MenuTools 建立，請升級 App 後再試";
 "clipboard.sequential.mode" = "依序貼上模式";
 "clipboard.sequential.mode.once" = "單次";
 "clipboard.sequential.mode.loop" = "循環";
@@ -1077,6 +1080,19 @@
 "clipboard.sync.chooseFolder" = "選擇同步資料夾";
 "clipboard.sync.now" = "立即同步";
 "clipboard.sync.description" = "僅同步非敏感的置頂歷史和常用片段；可選擇 iCloud Drive、Dropbox 等共享資料夾，檔案使用上方密碼加密。";
+"clipboard.sync.auto" = "自動同步";
+"clipboard.sync.auto.description" = "開啟後會依間隔自動與共享資料夾合併置頂內容與片段。";
+"clipboard.sync.auto.notReady" = "尚未儲存口令，自動同步不會執行";
+"clipboard.sync.interval" = "同步間隔";
+"clipboard.sync.intervalValue" = "%d 分鐘";
+"clipboard.sync.savePassphrase" = "儲存口令以便自動同步";
+"clipboard.sync.passphraseSaved" = "口令已儲存到鑰匙圈";
+"clipboard.sync.clearPassphrase" = "清除已儲存口令";
+"clipboard.sync.lastSync" = "上次同步：%@";
+"clipboard.sync.neverSynced" = "尚未同步過";
+"clipboard.sync.failed" = "同步失敗：%@";
+"clipboard.sync.error.noFolder" = "尚未選擇共享資料夾";
+"clipboard.sync.error.noPassphrase" = "尚未儲存同步口令";
 "clipboard.sync.success" = "置頂歷史和常用片段已同步。";
 "traffic.tabs" = "流量檢視";
 "traffic.tab.overview" = "總覽";

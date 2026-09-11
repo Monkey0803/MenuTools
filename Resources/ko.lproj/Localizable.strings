@@ -322,6 +322,8 @@
 /* 클립보드 기록 */
 "clipboard.history" = "클립보드 기록";
 "clipboard.historyItems" = "%d개 저장됨";
+"clipboard.recognition.failed" = "%d장의 이미지에서 텍스트를 인식하지 못했습니다";
+"clipboard.recognition.retry" = "다시 시도";
 "clipboard.search" = "클립보드 검색";
 "clipboard.filters" = "필터";
 "clipboard.filtersCount" = "필터 (%d)";
@@ -1059,6 +1061,7 @@
 "clipboard.error.databaseRead" = "클립보드 기록 데이터베이스를 읽을 수 없습니다";
 "clipboard.error.databaseSchema" = "클립보드 기록 데이터베이스 구조가 올바르지 않습니다";
 "clipboard.error.databaseOperation" = "클립보드 기록 데이터베이스 작업에 실패했습니다";
+"clipboard.error.databaseVersionTooNew" = "클립보드 기록 데이터베이스가 최신 버전의 MenuTools에서 생성되었습니다. 앱을 업데이트하세요";
 "clipboard.sequential.mode" = "순차 붙여넣기 모드";
 "clipboard.sequential.mode.once" = "한 번";
 "clipboard.sequential.mode.loop" = "반복";
@@ -1077,6 +1080,19 @@
 "clipboard.sync.chooseFolder" = "동기화 폴더 선택";
 "clipboard.sync.now" = "지금 동기화";
 "clipboard.sync.description" = "민감하지 않은 고정 기록과 스니펫만 동기화합니다. iCloud Drive, Dropbox 등의 공유 폴더를 선택하면 위 암호로 파일을 보호합니다.";
+"clipboard.sync.auto" = "자동 동기화";
+"clipboard.sync.auto.description" = "지정한 간격으로 공유 폴더와 고정 항목 및 스니펫을 자동으로 병합합니다.";
+"clipboard.sync.auto.notReady" = "암호가 저장되지 않아 자동 동기화가 실행되지 않습니다";
+"clipboard.sync.interval" = "동기화 간격";
+"clipboard.sync.intervalValue" = "%d분";
+"clipboard.sync.savePassphrase" = "자동 동기화용 암호 저장";
+"clipboard.sync.passphraseSaved" = "암호를 키체인에 저장했습니다";
+"clipboard.sync.clearPassphrase" = "저장된 암호 삭제";
+"clipboard.sync.lastSync" = "마지막 동기화: %@";
+"clipboard.sync.neverSynced" = "아직 동기화하지 않았습니다";
+"clipboard.sync.failed" = "동기화 실패: %@";
+"clipboard.sync.error.noFolder" = "공유 폴더를 선택하지 않았습니다";
+"clipboard.sync.error.noPassphrase" = "동기화 암호가 저장되지 않았습니다";
 "clipboard.sync.success" = "고정 기록과 스니펫을 동기화했습니다.";
 "traffic.tabs" = "트래픽 보기";
 "traffic.tab.overview" = "개요";

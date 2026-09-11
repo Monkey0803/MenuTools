@@ -1,4 +1,5 @@
 import AppKit
+import SQLite3
 import CoreImage
 import CoreImage.CIFilterBuiltins
 import Foundation
@@ -779,6 +780,126 @@ func historyPersistenceRecoversFromBackup() throws {
     #expect(ClipboardHistoryPersistence.load(from: url) == [first])
 }
 
+@Test("新建的剪贴板数据库会写入当前结构版本")
+func historyPersistenceStampsCurrentSchemaVersion() throws {
+    let url = FileManager.default.temporaryDirectory
+        .appendingPathComponent("MenuTools-Clipboard-Schema-\(UUID().uuidString).sqlite3")
+    defer { ClipboardHistoryTemporaryDatabase.remove(url) }
+
+    try ClipboardHistoryPersistence.save([makeTextItem("版本校验")], to: url)
+
+    #expect(try ClipboardHistoryDatabaseProbe.schemaVersion(in: url) == ClipboardHistoryPersistence.currentSchemaVersion)
+}
+
+@Test("未写版本号的旧库会在写入时补齐结构与版本")
+func historyPersistenceMigratesUnversionedDatabase() throws {
+    let url = FileManager.default.temporaryDirectory
+        .appendingPathComponent("MenuTools-Clipboard-Unversioned-\(UUID().uuidString).sqlite3")
+    defer { ClipboardHistoryTemporaryDatabase.remove(url) }
+    try ClipboardHistoryDatabaseProbe.createEmptyDatabase(at: url, version: 0)
+
+    let item = makeTextItem("迁移后写入")
+    try ClipboardHistoryPersistence.save([item], to: url)
+
+    #expect(try ClipboardHistoryDatabaseProbe.schemaVersion(in: url) == ClipboardHistoryPersistence.currentSchemaVersion)
+    #expect(ClipboardHistoryPersistence.load(from: url).map(\.content) == [.text("迁移后写入")])
+}
+
+@Test("结构版本更高的数据库不会被旧版 App 覆盖")
+func historyPersistenceRefusesNewerSchemaOnSave() throws {
+    let url = FileManager.default.temporaryDirectory
+        .appendingPathComponent("MenuTools-Clipboard-NewerSchema-\(UUID().uuidString).sqlite3")
+    defer { ClipboardHistoryTemporaryDatabase.remove(url) }
+
+    try ClipboardHistoryPersistence.save([makeTextItem("新版写入")], to: url)
+    try ClipboardHistoryDatabaseProbe.setSchemaVersion(99, in: url)
+
+    #expect(throws: (any Error).self) {
+        try ClipboardHistoryPersistence.save([makeTextItem("旧版覆盖")], to: url)
+    }
+    // 版本号与数据都必须原样保留，留给升级后的 App 读取。
+    #expect(try ClipboardHistoryDatabaseProbe.schemaVersion(in: url) == 99)
+}
+
+@Test("结构版本更高的数据库不会被旧备份覆盖")
+func historyPersistenceKeepsNewerDatabaseInsteadOfOlderBackup() throws {
+    let url = FileManager.default.temporaryDirectory
+        .appendingPathComponent("MenuTools-Clipboard-NewerThanBackup-\(UUID().uuidString).sqlite3")
+    defer { ClipboardHistoryTemporaryDatabase.remove(url) }
+
+    // 先写两次，制造一份可用的旧版本备份。
+    try ClipboardHistoryPersistence.save([makeTextItem("第一版")], to: url)
+    try ClipboardHistoryPersistence.save([makeTextItem("第二版")], to: url)
+    try ClipboardHistoryDatabaseProbe.setSchemaVersion(99, in: url)
+
+    #expect(ClipboardHistoryPersistence.load(from: url).isEmpty)
+    #expect(try ClipboardHistoryDatabaseProbe.schemaVersion(in: url) == 99)
+}
+
+private func makeTextItem(_ text: String) -> ClipboardHistoryItem {
+    ClipboardHistoryItem(
+        id: UUID(),
+        content: .text(text),
+        capturedAt: Date(timeIntervalSince1970: 1_000),
+        expiresAt: nil,
+        isPinned: false
+    )
+}
+
+/// 直接读写剪贴板数据库文件，用于构造「更高结构版本」这类边界数据。
+enum ClipboardHistoryDatabaseProbe {
+    struct ProbeError: Error {}
+
+    static func schemaVersion(in url: URL) throws -> Int32 {
+        try withDatabase(at: url) { database in
+            var statement: OpaquePointer?
+            guard sqlite3_prepare_v2(database, "PRAGMA user_version", -1, &statement, nil) == SQLITE_OK,
+                  let statement else {
+                throw ProbeError()
+            }
+            defer { sqlite3_finalize(statement) }
+            guard sqlite3_step(statement) == SQLITE_ROW else { throw ProbeError() }
+            return sqlite3_column_int(statement, 0)
+        }
+    }
+
+    static func setSchemaVersion(_ version: Int32, in url: URL) throws {
+        try withDatabase(at: url) { database in
+            guard sqlite3_exec(database, "PRAGMA user_version=\(version)", nil, nil, nil) == SQLITE_OK else {
+                throw ProbeError()
+            }
+        }
+    }
+
+    /// 造一个有效的 SQLite 文件，但不建业务表、不写版本号。
+    static func createEmptyDatabase(at url: URL, version: Int32) throws {
+        try withDatabase(at: url) { database in
+            guard sqlite3_exec(database, "PRAGMA user_version=\(version)", nil, nil, nil) == SQLITE_OK else {
+                throw ProbeError()
+            }
+        }
+    }
+
+    private static func withDatabase<T>(at url: URL, _ body: (OpaquePointer) throws -> T) throws -> T {
+        var database: OpaquePointer?
+        let flags = SQLITE_OPEN_READWRITE | SQLITE_OPEN_CREATE | SQLITE_OPEN_FULLMUTEX
+        guard sqlite3_open_v2(url.path, &database, flags, nil) == SQLITE_OK, let database else {
+            if let database { sqlite3_close(database) }
+            throw ProbeError()
+        }
+        defer { sqlite3_close(database) }
+        return try body(database)
+    }
+}
+
+enum ClipboardHistoryTemporaryDatabase {
+    static func remove(_ url: URL) {
+        try? FileManager.default.removeItem(at: url)
+        try? FileManager.default.removeItem(at: ClipboardHistoryPersistence.backupURL(for: url))
+        try? FileManager.default.removeItem(at: ClipboardHistoryPersistence.blobsURL(for: url))
+    }
+}
+
 @Test("旧版 JSON 剪贴板历史会原地迁移到新数据库")
 func historyPersistenceMigratesLegacyJSON() throws {
     let url = FileManager.default.temporaryDirectory
@@ -1070,6 +1191,39 @@ func clipboardHistoryRetriesFailedImageRecognitionOnRefresh() async throws {
     }
 
     #expect(service.items.first?.recognizedText == "刷新后的识别结果")
+    #expect(service.failedImageRecognitionCount == 0)
+}
+
+@Test("失败的图片识别支持用户手动重试")
+@MainActor
+func clipboardHistoryRetriesFailedImageRecognitionOnDemand() async throws {
+    let attempts = ClipboardRecognitionAttemptProbe()
+    let attemptLimit = ClipboardImageRecognitionPolicy.attemptLimit
+    let service = ClipboardHistoryService(
+        persistenceURL: nil,
+        pasteboard: NSPasteboard(name: NSPasteboard.Name("MenuToolsTests.\(UUID().uuidString)")),
+        imageTextRecognizer: { _ in
+            let attempt = await attempts.next()
+            return attempt > attemptLimit ? .recognized("手动重试结果") : .failed
+        }
+    )
+
+    service.importItems([makeImageHistoryItem()])
+    var waited = 0
+    while await attempts.count < attemptLimit, waited < 200 {
+        try await Task.sleep(for: .milliseconds(25))
+        waited += 1
+    }
+    #expect(service.failedImageRecognitionCount == 1)
+    #expect(service.items.first?.recognizedText == nil)
+
+    service.retryFailedImageRecognitions()
+
+    for _ in 0 ..< 120 where service.items.first?.recognizedText == nil {
+        try await Task.sleep(for: .milliseconds(25))
+    }
+
+    #expect(service.items.first?.recognizedText == "手动重试结果")
     #expect(service.failedImageRecognitionCount == 0)
 }
 

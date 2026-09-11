@@ -322,6 +322,8 @@
 /* Clipboard history */
 "clipboard.history" = "Clipboard History";
 "clipboard.historyItems" = "%d saved item(s)";
+"clipboard.recognition.failed" = "%d images have no recognized text";
+"clipboard.recognition.retry" = "Retry";
 "clipboard.search" = "Search clipboard";
 "clipboard.filters" = "Filters";
 "clipboard.filtersCount" = "Filters (%d)";
@@ -1059,6 +1061,7 @@
 "clipboard.error.databaseRead" = "Could not read the clipboard history database";
 "clipboard.error.databaseSchema" = "Clipboard history database schema is invalid";
 "clipboard.error.databaseOperation" = "Clipboard history database operation failed";
+"clipboard.error.databaseVersionTooNew" = "The clipboard history database was created by a newer version of MenuTools. Update the app and try again";
 "clipboard.sequential.mode" = "Sequential Paste Mode";
 "clipboard.sequential.mode.once" = "Once";
 "clipboard.sequential.mode.loop" = "Loop";
@@ -1077,6 +1080,19 @@
 "clipboard.sync.chooseFolder" = "Choose Sync Folder";
 "clipboard.sync.now" = "Sync Now";
 "clipboard.sync.description" = "Syncs only non-sensitive pinned history and snippets. Choose an iCloud Drive, Dropbox, or other shared folder; the file uses the passphrase above.";
+"clipboard.sync.auto" = "Automatic sync";
+"clipboard.sync.auto.description" = "Merges pinned items and snippets with the shared folder at the chosen interval.";
+"clipboard.sync.auto.notReady" = "No passphrase saved, so automatic sync will not run";
+"clipboard.sync.interval" = "Sync interval";
+"clipboard.sync.intervalValue" = "%d min";
+"clipboard.sync.savePassphrase" = "Save passphrase for automatic sync";
+"clipboard.sync.passphraseSaved" = "Passphrase saved in the keychain";
+"clipboard.sync.clearPassphrase" = "Remove saved passphrase";
+"clipboard.sync.lastSync" = "Last sync: %@";
+"clipboard.sync.neverSynced" = "Not synced yet";
+"clipboard.sync.failed" = "Sync failed: %@";
+"clipboard.sync.error.noFolder" = "No shared folder selected yet";
+"clipboard.sync.error.noPassphrase" = "No sync passphrase saved yet";
 "clipboard.sync.success" = "Pinned history and snippets synchronized.";
 "traffic.tabs" = "Traffic views";
 "traffic.tab.overview" = "Overview";

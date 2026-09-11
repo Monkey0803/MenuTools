@@ -1336,6 +1336,27 @@ enum ClipboardHistoryPersistence {
     private static let fileName = "ClipboardHistory.sqlite3"
     private static let sqliteHeader = Data("SQLite format 3\0".utf8)
 
+    /// 库结构版本。新增字段或表时必须递增，并在 `migrate(_:from:)` 里补一条迁移。
+    static let currentSchemaVersion: Int32 = 1
+
+    /// 读取库文件的结构版本；打不开或不是 SQLite 文件时返回 nil。
+    static func schemaVersion(at url: URL) -> Int32? {
+        var database: OpaquePointer?
+        let flags = SQLITE_OPEN_READONLY | SQLITE_OPEN_FULLMUTEX
+        guard sqlite3_open_v2(url.path, &database, flags, nil) == SQLITE_OK, let database else {
+            if let database { sqlite3_close(database) }
+            return nil
+        }
+        defer { sqlite3_close(database) }
+        return try? schemaVersion(of: database)
+    }
+
+    /// 结构版本高于当前 App 时不能读、也不能被旧备份覆盖。
+    static func isSchemaVersionSupported(at url: URL) -> Bool {
+        guard let version = schemaVersion(at: url) else { return true }
+        return version <= currentSchemaVersion
+    }
+
     static func defaultURL(fileManager: FileManager = .default) -> URL? {
         guard let applicationSupport = try? fileManager.url(
             for: .applicationSupportDirectory,
@@ -1364,6 +1385,8 @@ enum ClipboardHistoryPersistence {
     static func load(from url: URL) -> [ClipboardHistoryItem] {
         if FileManager.default.fileExists(atPath: url.path) {
             if isSQLiteDatabase(at: url) {
+                // 结构版本高于当前 App：既不能读，也不能用旧备份覆盖，交由写入路径报错。
+                guard isSchemaVersionSupported(at: url) else { return [] }
                 if let items = try? loadDatabase(from: url) {
                     return items
                 }
@@ -1412,11 +1435,22 @@ enum ClipboardHistoryPersistence {
             try fileManager.removeItem(at: url)
         }
 
-        // 在覆盖前保留最近一次可读取的数据库；下次启动发现损坏时可回退。
+        var database: OpaquePointer?
+        let flags = SQLITE_OPEN_CREATE | SQLITE_OPEN_READWRITE | SQLITE_OPEN_FULLMUTEX
+        guard sqlite3_open_v2(url.path, &database, flags, nil) == SQLITE_OK,
+              let database else {
+            if let database { sqlite3_close(database) }
+            throw persistenceError(L("clipboard.error.databaseOpen"))
+        }
+        defer { sqlite3_close(database) }
+        // 先校验并迁移结构：结构版本高于当前 App 时在这里失败，避免覆盖新版数据。
+        try configure(database)
+
+        // 迁移成功后保留最近一次可读取的数据库；下次启动发现损坏时可回退。
         if isSQLiteDatabase(at: url) {
             let backupURL = backupURL(for: url)
             try? fileManager.removeItem(at: backupURL)
-            try fileManager.copyItem(at: url, to: backupURL)
+            try? fileManager.copyItem(at: url, to: backupURL)
         }
 
         let persistableItems = items.filter { !$0.isSensitive }
@@ -1429,15 +1463,6 @@ enum ClipboardHistoryPersistence {
             return (position, item.id.uuidString, metadata)
         }
 
-        var database: OpaquePointer?
-        let flags = SQLITE_OPEN_CREATE | SQLITE_OPEN_READWRITE | SQLITE_OPEN_FULLMUTEX
-        guard sqlite3_open_v2(url.path, &database, flags, nil) == SQLITE_OK,
-              let database else {
-            if let database { sqlite3_close(database) }
-            throw persistenceError(L("clipboard.error.databaseOpen"))
-        }
-        defer { sqlite3_close(database) }
-        try configure(database)
         try execute(database, "BEGIN IMMEDIATE TRANSACTION")
         do {
             try execute(database, "DELETE FROM clipboard_items")
@@ -1495,6 +1520,9 @@ enum ClipboardHistoryPersistence {
             throw persistenceError(L("clipboard.error.databaseRead"))
         }
         defer { sqlite3_close(database) }
+        guard try schemaVersion(of: database) <= currentSchemaVersion else {
+            throw persistenceError(L("clipboard.error.databaseVersionTooNew"))
+        }
         var statement: OpaquePointer?
         guard sqlite3_prepare_v2(
             database,
@@ -1622,16 +1650,41 @@ enum ClipboardHistoryPersistence {
     }
 
     private static func configure(_ database: OpaquePointer) throws {
+        let version = try schemaVersion(of: database)
+        guard version <= currentSchemaVersion else {
+            throw persistenceError(L("clipboard.error.databaseVersionTooNew"))
+        }
         try execute(database, "PRAGMA journal_mode=DELETE")
         try execute(database, "PRAGMA synchronous=NORMAL")
-        try execute(database, """
-            CREATE TABLE IF NOT EXISTS clipboard_items (
-                position INTEGER PRIMARY KEY,
-                id TEXT NOT NULL UNIQUE,
-                metadata BLOB NOT NULL
-            )
-            """)
-        try execute(database, "PRAGMA user_version=1")
+        try migrate(database, from: version)
+    }
+
+    /// 逐版本补齐结构；0 表示新库或早期没有写版本号的库。
+    private static func migrate(_ database: OpaquePointer, from version: Int32) throws {
+        if version < 1 {
+            try execute(database, """
+                CREATE TABLE IF NOT EXISTS clipboard_items (
+                    position INTEGER PRIMARY KEY,
+                    id TEXT NOT NULL UNIQUE,
+                    metadata BLOB NOT NULL
+                )
+                """)
+        }
+        guard version != currentSchemaVersion else { return }
+        try execute(database, "PRAGMA user_version=\(currentSchemaVersion)")
+    }
+
+    private static func schemaVersion(of database: OpaquePointer) throws -> Int32 {
+        var statement: OpaquePointer?
+        guard sqlite3_prepare_v2(database, "PRAGMA user_version", -1, &statement, nil) == SQLITE_OK,
+              let statement else {
+            throw persistenceError(L("clipboard.error.databaseOperation"))
+        }
+        defer { sqlite3_finalize(statement) }
+        guard sqlite3_step(statement) == SQLITE_ROW else {
+            throw persistenceError(L("clipboard.error.databaseOperation"))
+        }
+        return sqlite3_column_int(statement, 0)
     }
 
     private static func execute(_ database: OpaquePointer, _ sql: String) throws {
@@ -2431,8 +2484,9 @@ final class ClipboardHistoryService {
         }
     }
 
-    /// 识别一直失败的图片在用户重新打开面板时补试，最多补试固定条数。
-    private func retryFailedImageRecognitions() {
+    /// 补试识别失败的图片：面板刷新时自动调用，也供用户点「重试」手动触发。
+    /// 单次最多补试固定条数，连续点击可以继续推进。
+    func retryFailedImageRecognitions() {
         guard !failedImageRecognitionIDs.isEmpty else { return }
         let candidates = failedImageRecognitionIDs
             .compactMap { id in buffer.items.first { $0.id == id && $0.recognizedText == nil } }

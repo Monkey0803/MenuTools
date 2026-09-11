@@ -1857,6 +1857,8 @@ struct ClipboardHistoryPopover: View {
     let copyFeedback: ClipboardCopyFeedback?
     let canUndo: Bool
     let onUndo: () -> Void
+    let failedRecognitionCount: Int
+    let onRetryRecognition: () -> Void
     let snippetGroups: [ClipboardSnippetGroup]
     let snippets: [ClipboardSnippet]
     let onCopySnippet: (ClipboardSnippet) -> Void
@@ -1970,6 +1972,20 @@ struct ClipboardHistoryPopover: View {
                         .foregroundStyle(.secondary)
                     Spacer()
                     Button(L("clipboard.undo"), action: onUndo)
+                        .controlSize(.small)
+                }
+            }
+
+            if failedRecognitionCount > 0 {
+                HStack(spacing: 8) {
+                    Label(
+                        L("clipboard.recognition.failed", failedRecognitionCount),
+                        systemImage: "text.viewfinder"
+                    )
+                    .font(.caption)
+                    .foregroundStyle(.orange)
+                    Spacer()
+                    Button(L("clipboard.recognition.retry"), action: onRetryRecognition)
                         .controlSize(.small)
                 }
             }

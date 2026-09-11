@@ -188,7 +188,31 @@ struct ClipboardHistorySettingsView: View {
         VStack(alignment: .leading, spacing: 14) {
             searchField
             historyControls
+            recognitionFailureHint
             historyContent
+        }
+    }
+
+    /// 图片识别失败时不再静默：告诉用户有多少张没识别出来，并允许立刻重试。
+    @ViewBuilder
+    private var recognitionFailureHint: some View {
+        if historyService.failedImageRecognitionCount > 0 {
+            HStack(spacing: 8) {
+                Label(
+                    L("clipboard.recognition.failed", historyService.failedImageRecognitionCount),
+                    systemImage: "text.viewfinder"
+                )
+                .font(.caption)
+                .foregroundStyle(.orange)
+                Spacer()
+                Button(L("clipboard.recognition.retry")) {
+                    historyService.retryFailedImageRecognitions()
+                }
+                .controlSize(.small)
+            }
+            .padding(.horizontal, 10)
+            .padding(.vertical, 6)
+            .background(.quaternary.opacity(0.4), in: .rect(cornerRadius: 8))
         }
     }
 
@@ -1039,6 +1063,8 @@ struct ClipboardHistoryQuickAccessView: View {
             copyFeedback: historyService.copyFeedback,
             canUndo: historyService.canUndoLastRemoval,
             onUndo: { _ = historyService.undoLastRemoval() },
+            failedRecognitionCount: historyService.failedImageRecognitionCount,
+            onRetryRecognition: historyService.retryFailedImageRecognitions,
             snippetGroups: snippetService.groups,
             snippets: snippetService.snippets,
             onCopySnippet: copySnippet,
