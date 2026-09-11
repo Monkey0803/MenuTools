@@ -1,3 +1,4 @@
+import AppKit
 import Foundation
 import Testing
 @testable import MenuTools
@@ -121,6 +122,26 @@ func autoSyncBacksOffAfterFailure() async throws {
     #expect(service.consecutiveFailures == 0)
     #expect(service.nextRetryAt == nil)
     #expect(service.lastError == nil)
+}
+
+@MainActor
+private final class ClipboardSyncTriggerStub: ClipboardSyncTriggerObserving {
+    private(set) var isRunning = false
+    private var handler: (@MainActor () async -> Void)?
+
+    func start(handler: @escaping @MainActor () async -> Void) {
+        isRunning = true
+        self.handler = handler
+    }
+
+    func stop() {
+        isRunning = false
+        handler = nil
+    }
+
+    func fire() async {
+        await handler?()
+    }
 }
 
 // MARK: - 自动同步服务
@@ -276,4 +297,66 @@ private enum ClipboardSyncTestError: LocalizedError {
     case failed
 
     var errorDescription: String? { "同步失败" }
+}
+
+
+@Test("服务启动会挂上系统事件触发器，停止时摘掉")
+@MainActor
+func autoSyncArmsSystemTriggers() {
+    let (defaults, suiteName) = makeSyncDefaults()
+    defer { UserDefaults().removePersistentDomain(forName: suiteName) }
+    let triggers = ClipboardSyncTriggerStub()
+    let service = ClipboardAutoSyncService(
+        defaults: defaults,
+        passphraseStore: InMemoryPassphraseStore(passphrase: "口令"),
+        syncOperation: { _, _ in ClipboardSharedFileSyncOperation.Result(importedHistoryCount: 0, importedSnippetCount: 0) },
+        triggers: triggers
+    )
+
+    service.start()
+    #expect(triggers.isRunning)
+
+    service.stop()
+    #expect(!triggers.isRunning)
+}
+
+@Test("系统触发只在到期时补同步")
+@MainActor
+func autoSyncSystemTriggerRespectsDueCheck() async throws {
+    let (defaults, suiteName) = makeSyncDefaults()
+    defer { UserDefaults().removePersistentDomain(forName: suiteName) }
+    defaults.set("/tmp/MenuTools-Clipboard.mtclipsync", forKey: ClipboardSyncSettings.filePathKey)
+    let recorder = ClipboardSyncOperationRecorder()
+    let service = ClipboardAutoSyncService(
+        defaults: defaults,
+        passphraseStore: InMemoryPassphraseStore(passphrase: "口令"),
+        syncOperation: { url, passphrase in await recorder.record(url: url, passphrase: passphrase) },
+        triggers: ClipboardSyncTriggerStub()
+    )
+    service.setEnabled(true)
+    service.setIntervalMinutes(15)
+
+    // 唤醒时到期 → 补一次
+    await service.handleSystemTrigger(now: Date(timeIntervalSince1970: 1_000))
+    #expect(await recorder.count == 1)
+
+    // 刚同步完就唤醒 → 未到期，不动手
+    await service.handleSystemTrigger(now: Date(timeIntervalSince1970: 1_060))
+    #expect(await recorder.count == 1)
+}
+
+@Test("系统唤醒通知会转发成补同步回调")
+@MainActor
+func systemTriggerForwardsWakeNotification() async {
+    let triggers = ClipboardSystemSyncTriggers()
+    var fired = 0
+    triggers.start { fired += 1 }
+
+    NSWorkspace.shared.notificationCenter.post(name: NSWorkspace.didWakeNotification, object: nil)
+    for _ in 0 ..< 50 where fired == 0 {
+        try? await Task.sleep(for: .milliseconds(20))
+    }
+    triggers.stop()
+
+    #expect(fired == 1)
 }

@@ -1,4 +1,6 @@
+import AppKit
 import Foundation
+import Network
 import Observation
 import Security
 
@@ -124,6 +126,60 @@ enum ClipboardSharedFileSyncOperation {
     }
 }
 
+/// 系统事件触发器：把「刚唤醒」「网络刚恢复」这类时机转成一次补同步检查。
+@MainActor
+protocol ClipboardSyncTriggerObserving: AnyObject {
+    func start(handler: @escaping @MainActor () async -> Void)
+    func stop()
+}
+
+@MainActor
+final class ClipboardSystemSyncTriggers: ClipboardSyncTriggerObserving {
+    private let workspaceCenter: NSWorkspace
+    private var observers: [NSObjectProtocol] = []
+    private var pathMonitor: NWPathMonitor?
+    private var wasSatisfied = true
+
+    init(workspaceCenter: NSWorkspace = .shared) {
+        self.workspaceCenter = workspaceCenter
+    }
+
+    func start(handler: @escaping @MainActor () async -> Void) {
+        stop()
+        observers.append(workspaceCenter.notificationCenter.addObserver(
+            forName: NSWorkspace.didWakeNotification,
+            object: nil,
+            queue: .main
+        ) { _ in
+            Task { @MainActor in await handler() }
+        })
+
+        // 网络从不可用恢复时补一次；持续可用期间不重复触发。
+        let monitor = NWPathMonitor()
+        monitor.pathUpdateHandler = { [weak self] path in
+            Task { @MainActor in
+                guard let self else { return }
+                let satisfied = path.status == .satisfied
+                if satisfied, !self.wasSatisfied {
+                    await handler()
+                }
+                self.wasSatisfied = satisfied
+            }
+        }
+        monitor.start(queue: DispatchQueue(label: "com.qoder.menutools.clipboard-sync-path"))
+        pathMonitor = monitor
+    }
+
+    func stop() {
+        for observer in observers {
+            workspaceCenter.notificationCenter.removeObserver(observer)
+        }
+        observers.removeAll()
+        pathMonitor?.cancel()
+        pathMonitor = nil
+    }
+}
+
 /// 剪贴板共享文件夹的自动同步：保存开关、间隔、上次同步时间和错误，
 /// 并在开启时按间隔自动调用同步动作。
 @MainActor
@@ -137,6 +193,7 @@ final class ClipboardAutoSyncService {
     private let defaults: UserDefaults
     private let passphraseStore: any ClipboardSyncPassphraseStoring
     private let syncOperation: @MainActor (URL, String) async throws -> ClipboardSharedFileSyncOperation.Result
+    private let triggers: any ClipboardSyncTriggerObserving
     private var timerTask: Task<Void, Never>?
 
     private(set) var isEnabled: Bool
@@ -166,10 +223,12 @@ final class ClipboardAutoSyncService {
     init(
         defaults: UserDefaults = .standard,
         passphraseStore: any ClipboardSyncPassphraseStoring = ClipboardSyncKeychainPassphraseStore(),
-        syncOperation: (@MainActor (URL, String) async throws -> ClipboardSharedFileSyncOperation.Result)? = nil
+        syncOperation: (@MainActor (URL, String) async throws -> ClipboardSharedFileSyncOperation.Result)? = nil,
+        triggers: (any ClipboardSyncTriggerObserving)? = nil
     ) {
         self.defaults = defaults
         self.passphraseStore = passphraseStore
+        self.triggers = triggers ?? ClipboardSystemSyncTriggers()
         self.syncOperation = syncOperation ?? { url, passphrase in
             try await ClipboardSharedFileSyncOperation.run(
                 fileURL: url,
@@ -233,6 +292,9 @@ final class ClipboardAutoSyncService {
     // MARK: - 调度
 
     func start() {
+        triggers.start { [weak self] in
+            await self?.handleSystemTrigger()
+        }
         guard timerTask == nil else { return }
         timerTask = Task { @MainActor [weak self] in
             // 启动时先补一次到期检查，之后按周期轮询。
@@ -246,8 +308,14 @@ final class ClipboardAutoSyncService {
     }
 
     func stop() {
+        triggers.stop()
         timerTask?.cancel()
         timerTask = nil
+    }
+
+    /// 系统唤醒或网络恢复时补一次到期检查。
+    func handleSystemTrigger(now: Date = Date()) async {
+        await synchronizeIfDue(now: now)
     }
 
     /// 到期才同步；未开启、缺配置或处于失败退避窗口时直接返回。

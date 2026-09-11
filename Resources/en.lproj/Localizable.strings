@@ -1100,12 +1100,15 @@
 "clipboard.sync.passphraseSaved" = "Passphrase saved in the keychain";
 "clipboard.sync.clearPassphrase" = "Remove saved passphrase";
 "clipboard.sync.lastSync" = "Last sync: %@";
+"clipboard.sync.result" = "Merged %d pinned items and %d snippets";
+"clipboard.sync.result.none" = "Nothing new to merge";
 "clipboard.sync.neverSynced" = "Not synced yet";
 "clipboard.sync.failed" = "Sync failed: %@";
 "clipboard.sync.retryInSeconds" = "Retrying in %d seconds";
 "clipboard.sync.retryInMinutes" = "Retrying in %d minutes";
 "clipboard.sync.error.noFolder" = "No shared folder selected yet";
 "clipboard.sync.error.noPassphrase" = "No sync passphrase saved yet";
+"clipboard.sync.error.conflict" = "The shared file kept changing on another device. This device's result was saved as %@";
 "clipboard.sync.success" = "Pinned history and snippets synchronized.";
 "traffic.tabs" = "Traffic views";
 "traffic.tab.overview" = "Overview";

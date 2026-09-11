@@ -283,9 +283,18 @@ struct ClipboardPrivacySettingsSection: View {
             .foregroundStyle(autoSync.hasStoredPassphrase ? AnyShapeStyle(.secondary) : AnyShapeStyle(.orange))
 
             if let lastSyncAt = autoSync.lastSyncAt {
-                Text(L("clipboard.sync.lastSync", lastSyncAt.formatted(date: .abbreviated, time: .shortened)))
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
+                VStack(alignment: .leading, spacing: 2) {
+                    Text(L("clipboard.sync.lastSync", lastSyncAt.formatted(date: .abbreviated, time: .shortened)))
+                    Text(autoSync.lastImportedHistoryCount == 0 && autoSync.lastImportedSnippetCount == 0
+                        ? L("clipboard.sync.result.none")
+                        : L(
+                            "clipboard.sync.result",
+                            autoSync.lastImportedHistoryCount,
+                            autoSync.lastImportedSnippetCount
+                        ))
+                }
+                .font(.caption)
+                .foregroundStyle(.secondary)
             } else if autoSync.isEnabled {
                 Text(L("clipboard.sync.neverSynced"))
                     .font(.caption)

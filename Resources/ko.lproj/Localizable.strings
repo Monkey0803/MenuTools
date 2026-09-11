@@ -1100,12 +1100,15 @@
 "clipboard.sync.passphraseSaved" = "암호를 키체인에 저장했습니다";
 "clipboard.sync.clearPassphrase" = "저장된 암호 삭제";
 "clipboard.sync.lastSync" = "마지막 동기화: %@";
+"clipboard.sync.result" = "이번 병합: 고정 항목 %d개, 스니펫 %d개";
+"clipboard.sync.result.none" = "이번 병합: 새 항목 없음";
 "clipboard.sync.neverSynced" = "아직 동기화하지 않았습니다";
 "clipboard.sync.failed" = "동기화 실패: %@";
 "clipboard.sync.retryInSeconds" = "%d초 후에 다시 시도합니다";
 "clipboard.sync.retryInMinutes" = "%d분 후에 다시 시도합니다";
 "clipboard.sync.error.noFolder" = "공유 폴더를 선택하지 않았습니다";
 "clipboard.sync.error.noPassphrase" = "동기화 암호가 저장되지 않았습니다";
+"clipboard.sync.error.conflict" = "공유 파일이 다른 기기에서 계속 변경되었습니다. 이 기기의 결과는 %@(으)로 저장했습니다";
 "clipboard.sync.success" = "고정 기록과 스니펫을 동기화했습니다.";
 "traffic.tabs" = "트래픽 보기";
 "traffic.tab.overview" = "개요";

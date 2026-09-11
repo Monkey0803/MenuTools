@@ -46,17 +46,13 @@ final class ClipboardFeedbackHUDController {
 private struct ClipboardFeedbackHUDView: View {
     let feedback: ClipboardCopyFeedback
 
-    private var isSuccess: Bool {
-        feedback == .copied || feedback == .pasted
-    }
-
     var body: some View {
         Label(
             L(feedback.localizationKey),
-            systemImage: isSuccess ? "checkmark.circle.fill" : "exclamationmark.triangle.fill"
+            systemImage: feedback.isSuccess ? "checkmark.circle.fill" : "exclamationmark.triangle.fill"
         )
         .font(.callout.weight(.medium))
-        .foregroundStyle(isSuccess ? AnyShapeStyle(.primary) : AnyShapeStyle(.orange))
+        .foregroundStyle(feedback.isSuccess ? AnyShapeStyle(.primary) : AnyShapeStyle(.orange))
         .padding(.horizontal, 18)
         .frame(maxWidth: .infinity, maxHeight: .infinity)
         .background(.regularMaterial, in: RoundedRectangle(cornerRadius: 16, style: .continuous))

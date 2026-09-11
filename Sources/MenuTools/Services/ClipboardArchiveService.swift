@@ -191,23 +191,82 @@ enum ClipboardSyncMerge {
     }
 }
 
+/// 共享文件的读写抽象：默认走本地文件，测试可注入内存实现来制造并发写入时序。
+protocol ClipboardSyncFileStoring: Sendable {
+    /// 文件不存在返回 nil；存在但读不出来应当抛错（例如 iCloud 还没下载完）。
+    func read(at url: URL) throws -> Data?
+    func write(_ data: Data, to url: URL) throws
+}
+
+struct ClipboardSyncFileStore: ClipboardSyncFileStoring {
+    func read(at url: URL) throws -> Data? {
+        guard FileManager.default.fileExists(atPath: url.path) else { return nil }
+        return try Data(contentsOf: url)
+    }
+
+    func write(_ data: Data, to url: URL) throws {
+        try FileManager.default.createDirectory(at: url.deletingLastPathComponent(), withIntermediateDirectories: true)
+        try data.write(to: url, options: .atomic)
+    }
+}
+
+enum ClipboardSharedFileSyncError: LocalizedError, Equatable {
+    /// 共享文件被其他设备持续改写：已把本机合并结果写到冲突副本。
+    case conflictingWrites(conflictURL: URL)
+
+    var errorDescription: String? {
+        switch self {
+        case let .conflictingWrites(conflictURL):
+            return L("clipboard.sync.error.conflict", conflictURL.lastPathComponent)
+        }
+    }
+}
+
 /// 用户可把该文件放在 iCloud Drive、Dropbox 等同步目录；内容始终沿用口令加密格式。
 enum ClipboardSharedFileSync {
+    /// 写入冲突时的最大重试次数：每次重试都会带着对方的新内容重新合并。
+    static let maximumAttempts = 3
+
+    /// 冲突副本：反复被并发改写时保留本机合并结果，避免覆盖别人的更新。
+    static func conflictURL(for url: URL, now: Date = Date()) -> URL {
+        let formatter = DateFormatter()
+        formatter.locale = Locale(identifier: "en_US_POSIX")
+        formatter.dateFormat = "yyyyMMdd-HHmmss"
+        let stem = url.deletingPathExtension().lastPathComponent
+        let suffix = url.pathExtension.isEmpty ? "" : ".\(url.pathExtension)"
+        return url.deletingLastPathComponent()
+            .appendingPathComponent("\(stem).conflict-\(formatter.string(from: now))\(suffix)")
+    }
+
     static func synchronize(
         local: ClipboardArchiveDocument,
         at url: URL,
-        passphrase: String
+        passphrase: String,
+        store: any ClipboardSyncFileStoring = ClipboardSyncFileStore()
     ) throws -> ClipboardArchiveDocument {
-        let remote: ClipboardArchiveDocument
-        if FileManager.default.fileExists(atPath: url.path) {
-            remote = try ClipboardArchiveCrypto.decrypt(Data(contentsOf: url), passphrase: passphrase)
-        } else {
-            remote = ClipboardArchiveDocument.current(historyItems: [], snippetGroups: [], snippets: [])
+        var attempt = 0
+        while true {
+            attempt += 1
+            let remoteData = try store.read(at: url)
+            let remote = try remoteData
+                .map { try ClipboardArchiveCrypto.decrypt($0, passphrase: passphrase) }
+                ?? ClipboardArchiveDocument.current(historyItems: [], snippetGroups: [], snippets: [])
+            let merged = ClipboardSyncMerge.merge(local: local, remote: remote)
+            let encrypted = try ClipboardArchiveCrypto.encrypt(merged, passphrase: passphrase)
+
+            // 写之前再确认一次文件没有被其他设备改过；改过就带着新内容重新合并，
+            // 而不是把对方的更新直接盖掉。
+            guard try store.read(at: url) == remoteData else {
+                guard attempt < maximumAttempts else {
+                    let conflictURL = conflictURL(for: url)
+                    try store.write(encrypted, to: conflictURL)
+                    throw ClipboardSharedFileSyncError.conflictingWrites(conflictURL: conflictURL)
+                }
+                continue
+            }
+
+            try store.write(encrypted, to: url)
+            return merged
         }
-        let merged = ClipboardSyncMerge.merge(local: local, remote: remote)
-        let encrypted = try ClipboardArchiveCrypto.encrypt(merged, passphrase: passphrase)
-        try FileManager.default.createDirectory(at: url.deletingLastPathComponent(), withIntermediateDirectories: true)
-        try encrypted.write(to: url, options: .atomic)
-        return merged
     }
 }

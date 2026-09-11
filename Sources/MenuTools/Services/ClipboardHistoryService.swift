@@ -1035,6 +1035,15 @@ enum ClipboardCopyFeedback: Sendable, Equatable, CaseIterable {
         case .clipboardAlreadyEmpty: return "cleanup.clipboardEmpty"
         }
     }
+
+    /// 反馈是「成功」还是「需要留意」：HUD 与快捷面板必须用同一套判定。
+    var isSuccess: Bool {
+        switch self {
+        case .copied, .pasted, .clipboardCleared: return true
+        case .accessibilityPermissionDenied, .noEditableTarget, .pasteFailed, .clipboardAlreadyEmpty:
+            return false
+        }
+    }
 }
 
 /// 记录快捷面板弹出前的前台 App，自动粘贴时只消费一次，避免把内容发回 MenuTools。

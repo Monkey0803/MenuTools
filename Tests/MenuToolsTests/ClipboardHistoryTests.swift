@@ -1701,6 +1701,35 @@ func clipboardAutoPasteResultsExposeClearFeedback() {
     #expect(ClipboardCopyFeedback(autoPasteResult: .failed) == .pasteFailed)
 }
 
+@Test("复制反馈的成功与警告分类保持一致")
+func clipboardCopyFeedbackClassifiesSuccess() {
+    #expect(ClipboardCopyFeedback.copied.isSuccess)
+    #expect(ClipboardCopyFeedback.pasted.isSuccess)
+    #expect(ClipboardCopyFeedback.clipboardCleared.isSuccess)
+    #expect(!ClipboardCopyFeedback.accessibilityPermissionDenied.isSuccess)
+    #expect(!ClipboardCopyFeedback.noEditableTarget.isSuccess)
+    #expect(!ClipboardCopyFeedback.pasteFailed.isSuccess)
+    #expect(!ClipboardCopyFeedback.clipboardAlreadyEmpty.isSuccess)
+    #expect(ClipboardCopyFeedback.allCases.filter(\.isSuccess).count == 3)
+}
+
+@Test("默认图片识别器区分空内容与识别失败")
+func clipboardImageTextRecognitionDistinguishesOutcomes() throws {
+    #expect(ClipboardImageTextRecognition.outcome(for: Data([0x00, 0x01, 0x02])) == .failed)
+
+    // 用正常尺寸的空白图：太小的话 Vision 本身就无法处理，属于另一种结果。
+    let blank = NSImage(size: NSSize(width: 200, height: 200))
+    blank.lockFocus()
+    NSColor.white.setFill()
+    NSRect(x: 0, y: 0, width: 200, height: 200).fill()
+    blank.unlockFocus()
+    let blankData = try #require(blank.tiffRepresentation)
+    #expect(ClipboardImageTextRecognition.outcome(for: blankData) == .noContent)
+
+    let payload = "https://example.com/clipboard-outcome"
+    #expect(ClipboardImageTextRecognition.outcome(for: try makeQRCodeData(payload: payload)) == .recognized(payload))
+}
+
 @Test("清理系统剪贴板会区分已清空和本来就为空")
 @MainActor
 func clipboardClearPublishesFeedback() {

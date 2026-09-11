@@ -1100,12 +1100,15 @@
 "clipboard.sync.passphraseSaved" = "口令已儲存到鑰匙圈";
 "clipboard.sync.clearPassphrase" = "清除已儲存口令";
 "clipboard.sync.lastSync" = "上次同步：%@";
+"clipboard.sync.result" = "本次合併：置頂 %d 條、片段 %d 個";
+"clipboard.sync.result.none" = "本次合併：無新增";
 "clipboard.sync.neverSynced" = "尚未同步過";
 "clipboard.sync.failed" = "同步失敗：%@";
 "clipboard.sync.retryInSeconds" = "%d 秒後重試";
 "clipboard.sync.retryInMinutes" = "%d 分鐘後重試";
 "clipboard.sync.error.noFolder" = "尚未選擇共享資料夾";
 "clipboard.sync.error.noPassphrase" = "尚未儲存同步口令";
+"clipboard.sync.error.conflict" = "共享檔案被其他裝置持續改寫，本機結果已存為 %@";
 "clipboard.sync.success" = "置頂歷史和常用片段已同步。";
 "traffic.tabs" = "流量檢視";
 "traffic.tab.overview" = "總覽";

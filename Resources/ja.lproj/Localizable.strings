@@ -1100,12 +1100,15 @@
 "clipboard.sync.passphraseSaved" = "パスフレーズをキーチェーンに保存しました";
 "clipboard.sync.clearPassphrase" = "保存したパスフレーズを削除";
 "clipboard.sync.lastSync" = "前回の同期：%@";
+"clipboard.sync.result" = "今回の統合：ピン留め %d 件、スニペット %d 件";
+"clipboard.sync.result.none" = "今回の統合：追加なし";
 "clipboard.sync.neverSynced" = "まだ同期していません";
 "clipboard.sync.failed" = "同期に失敗しました：%@";
 "clipboard.sync.retryInSeconds" = "%d 秒後に再試行します";
 "clipboard.sync.retryInMinutes" = "%d 分後に再試行します";
 "clipboard.sync.error.noFolder" = "共有フォルダーが未選択です";
 "clipboard.sync.error.noPassphrase" = "同期用パスフレーズが未保存です";
+"clipboard.sync.error.conflict" = "共有ファイルが他のデバイスで更新され続けています。このデバイスの結果は %@ として保存しました";
 "clipboard.sync.success" = "ピン留め履歴とスニペットを同期しました。";
 "traffic.tabs" = "通信ビュー";
 "traffic.tab.overview" = "概要";
