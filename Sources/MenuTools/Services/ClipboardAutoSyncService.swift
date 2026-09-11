@@ -248,15 +248,12 @@ final class ClipboardAutoSyncService {
 
     // MARK: - 设置
 
+    /// 只切换开关本身：定时器与系统事件由 `start()` / `stop()` 管理（插件启用时调用），
+    /// 开关只决定到期检查是否真的执行，不需要在这里联动启停。
     func setEnabled(_ enabled: Bool) {
         guard isEnabled != enabled else { return }
         isEnabled = enabled
         defaults.set(enabled, forKey: ClipboardSyncSettings.autoEnabledKey)
-        if enabled {
-            start()
-        } else {
-            stop()
-        }
     }
 
     func setIntervalMinutes(_ minutes: Int) {

@@ -2065,6 +2065,19 @@ struct ClipboardHistoryPopover: View {
         .onKeyPress(.return) {
             copySelectedItem()
         }
+        .onKeyPress { press in
+            guard let character = press.characters.first,
+                  let index = ClipboardHistoryKeyboardNavigation.index(
+                      forDigit: character,
+                      itemCount: filteredItems.count
+                  ) else {
+                return .ignored
+            }
+            let item = filteredItems[index]
+            selectedItemID = item.id
+            onPerformAction(item, .paste)
+            return .handled
+        }
     }
 
     private func moveSelection(_ direction: ClipboardHistoryKeyboardNavigation.Direction) {
@@ -2107,6 +2120,7 @@ struct ClipboardHistoryRow: View {
                 .frame(maxWidth: .infinity, alignment: .leading)
                 .contentShape(.rect(cornerRadius: 8))
                 .onTapGesture(perform: onCopy)
+                .onDrag { ClipboardHistoryDragPayload.itemProvider(for: item.content) }
                 .accessibilityAddTraits(.isButton)
                 .accessibilityAction(named: Text(L("clipboard.copy")), onCopy)
 

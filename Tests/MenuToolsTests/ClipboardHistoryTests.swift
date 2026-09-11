@@ -1701,6 +1701,44 @@ func clipboardAutoPasteResultsExposeClearFeedback() {
     #expect(ClipboardCopyFeedback(autoPasteResult: .failed) == .pasteFailed)
 }
 
+@Test("数字键 1-9 映射到当前列表的前九条")
+func clipboardDigitShortcutMapsToListPosition() {
+    #expect(ClipboardHistoryKeyboardNavigation.index(forDigit: "1", itemCount: 3) == 0)
+    #expect(ClipboardHistoryKeyboardNavigation.index(forDigit: "3", itemCount: 3) == 2)
+    #expect(ClipboardHistoryKeyboardNavigation.index(forDigit: "4", itemCount: 3) == nil)
+    #expect(ClipboardHistoryKeyboardNavigation.index(forDigit: "0", itemCount: 3) == nil)
+    #expect(ClipboardHistoryKeyboardNavigation.index(forDigit: "a", itemCount: 3) == nil)
+    #expect(ClipboardHistoryKeyboardNavigation.index(forDigit: "1", itemCount: 0) == nil)
+}
+
+@Test("拖拽历史条目会提供对应类型的载荷")
+func clipboardDragPayloadMatchesContentType() throws {
+    let textProvider = ClipboardHistoryDragPayload.itemProvider(for: .text("拖拽文本"))
+    #expect(textProvider.registeredTypeIdentifiers.contains("public.utf8-plain-text"))
+
+    let urlProvider = ClipboardHistoryDragPayload.itemProvider(for: .url("https://example.com"))
+    #expect(urlProvider.registeredTypeIdentifiers.contains("public.url"))
+
+    let image = NSImage(size: NSSize(width: 4, height: 4))
+    image.lockFocus()
+    NSColor.systemBlue.setFill()
+    NSRect(x: 0, y: 0, width: 4, height: 4).fill()
+    image.unlockFocus()
+    let imageData = try #require(image.tiffRepresentation)
+    let imageProvider = ClipboardHistoryDragPayload.itemProvider(for: .image(imageData))
+    #expect(imageProvider.registeredTypeIdentifiers.contains("public.tiff"))
+
+    let fileProvider = ClipboardHistoryDragPayload.itemProvider(
+        for: .files([ClipboardHistoryFile(path: "/tmp/拖拽文件.txt")])
+    )
+    #expect(fileProvider.registeredTypeIdentifiers.contains("public.file-url"))
+
+    let richProvider = ClipboardHistoryDragPayload.itemProvider(
+        for: .richText(ClipboardRichText(plainText: "富文本", html: nil, rtf: nil))
+    )
+    #expect(richProvider.registeredTypeIdentifiers.contains("public.utf8-plain-text"))
+}
+
 @Test("复制反馈的成功与警告分类保持一致")
 func clipboardCopyFeedbackClassifiesSuccess() {
     #expect(ClipboardCopyFeedback.copied.isSuccess)

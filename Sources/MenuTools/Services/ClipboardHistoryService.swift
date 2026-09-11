@@ -547,6 +547,14 @@ enum ClipboardHistoryKeyboardNavigation {
         case down
     }
 
+    /// 数字键 1-9 对应列表前九条；越界或非数字返回 nil。
+    static func index(forDigit digit: Character, itemCount: Int) -> Int? {
+        guard let value = digit.wholeNumberValue, (1 ... 9).contains(value), value <= itemCount else {
+            return nil
+        }
+        return value - 1
+    }
+
     static func selection(
         in items: [ClipboardHistoryItem],
         from selectedID: UUID?,
@@ -707,6 +715,30 @@ struct ClipboardHistoryItem: Codable, Identifiable, Equatable, Sendable {
             .split(whereSeparator: \.isNewline)
             .compactMap { URL(string: String($0).trimmingCharacters(in: .whitespacesAndNewlines)) }
             .filter { ["http", "https"].contains($0.scheme?.lowercased() ?? "") }
+    }
+}
+
+/// 把历史条目转成拖拽载荷：拖到其他 App 时按内容类型提供最合适的表示。
+enum ClipboardHistoryDragPayload {
+    static func itemProvider(for content: ClipboardHistoryContent) -> NSItemProvider {
+        switch content {
+        case let .text(text), let .url(text):
+            return NSItemProvider(object: text as NSString)
+        case let .richText(richText):
+            return NSItemProvider(object: richText.plainText as NSString)
+        case let .image(data):
+            guard let image = NSImage(data: data) else {
+                return NSItemProvider(object: "" as NSString)
+            }
+            return NSItemProvider(object: image)
+        case let .files(files):
+            guard let first = files.first else {
+                return NSItemProvider(object: "" as NSString)
+            }
+            return NSItemProvider(object: first.url as NSURL)
+        case .pdf:
+            return NSItemProvider(object: "" as NSString)
+        }
     }
 }
 
