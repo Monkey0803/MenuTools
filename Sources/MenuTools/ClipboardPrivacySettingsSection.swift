@@ -293,9 +293,14 @@ struct ClipboardPrivacySettingsSection: View {
             }
 
             if let syncError = autoSync.lastError {
-                Label(L("clipboard.sync.failed", syncError), systemImage: "exclamationmark.triangle.fill")
-                    .font(.caption)
-                    .foregroundStyle(.red)
+                VStack(alignment: .leading, spacing: 2) {
+                    Label(L("clipboard.sync.failed", syncError), systemImage: "exclamationmark.triangle.fill")
+                    if let nextRetryAt = autoSync.nextRetryAt {
+                        Text(Self.retryCountdownText(to: nextRetryAt))
+                    }
+                }
+                .font(.caption)
+                .foregroundStyle(.red)
             }
 
             Text(L("clipboard.sync.auto.description"))
@@ -528,6 +533,15 @@ struct ClipboardPrivacySettingsSection: View {
         case let .synchronize(url):
             performSynchronizeSharedFile(at: url)
         }
+    }
+
+    /// 把下次重试时间显示成「N 秒/分钟」这类相对时长。
+    private static func retryCountdownText(to date: Date, now: Date = Date()) -> String {
+        let seconds = max(0, Int(date.timeIntervalSince(now).rounded()))
+        guard seconds >= 60 else {
+            return L("clipboard.sync.retryInSeconds", seconds)
+        }
+        return L("clipboard.sync.retryInMinutes", Int((Double(seconds) / 60).rounded(.up)))
     }
 
     private var archiveContentType: UTType {

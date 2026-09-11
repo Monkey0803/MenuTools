@@ -66,11 +66,21 @@ struct ClipboardSyncKeychainPassphraseStore: ClipboardSyncPassphraseStoring {
     }
 }
 
-/// 到期判断独立成纯函数，便于测试。
+/// 到期判断与失败退避独立成纯函数，便于测试。
 enum ClipboardSyncSchedule {
+    /// 连续失败后的重试等待：1、2、5、15 分钟，之后维持 15 分钟。
+    static let failureBackoffIntervals: [TimeInterval] = [60, 120, 300, 900]
+
     static func isDue(lastSyncAt: Date?, interval: TimeInterval, now: Date) -> Bool {
         guard let lastSyncAt else { return true }
         return now.timeIntervalSince(lastSyncAt) >= interval
+    }
+
+    /// 连续失败 `failures` 次后的退避时长；未失败时为 0。
+    static func backoff(afterFailures failures: Int) -> TimeInterval {
+        guard failures > 0 else { return 0 }
+        let index = min(failures, failureBackoffIntervals.count) - 1
+        return failureBackoffIntervals[index]
     }
 }
 
@@ -94,7 +104,7 @@ enum ClipboardSharedFileSyncOperation {
         snippetService: ClipboardSnippetService
     ) async throws -> Result {
         let local = ClipboardArchiveDocument.current(
-            historyItems: historyService.items.filter(\.isPinned),
+            historyItems: historyService.syncHistoryItems,
             snippetGroups: snippetService.groups,
             snippets: snippetService.snippets
         )
@@ -136,6 +146,9 @@ final class ClipboardAutoSyncService {
     private(set) var lastImportedHistoryCount = 0
     private(set) var lastImportedSnippetCount = 0
     private(set) var isSyncing = false
+    /// 连续失败次数与下次允许重试的时间：失败后按退避跳过轮询，避免打爆离线目录或错口令。
+    private(set) var consecutiveFailures = 0
+    private(set) var nextRetryAt: Date?
     private(set) var hasStoredPassphrase: Bool
 
     var syncFileURL: URL? {
@@ -210,9 +223,11 @@ final class ClipboardAutoSyncService {
         hasStoredPassphrase = passphraseStore.passphrase() != nil
     }
 
-    /// 用户修好配置后清掉上一次的错误提示。
+    /// 用户修好配置后清掉错误提示与退避，下一次轮询立即重试。
     func clearLastError() {
         lastError = nil
+        consecutiveFailures = 0
+        nextRetryAt = nil
     }
 
     // MARK: - 调度
@@ -235,9 +250,10 @@ final class ClipboardAutoSyncService {
         timerTask = nil
     }
 
-    /// 到期才同步；未开启或缺配置时直接返回。
+    /// 到期才同步；未开启、缺配置或处于失败退避窗口时直接返回。
     func synchronizeIfDue(now: Date = Date()) async {
         guard canAutoSync else { return }
+        if let nextRetryAt, now < nextRetryAt { return }
         guard ClipboardSyncSchedule.isDue(
             lastSyncAt: lastSyncAt,
             interval: TimeInterval(intervalMinutes * 60),
@@ -277,9 +293,15 @@ final class ClipboardAutoSyncService {
             lastImportedHistoryCount = result.importedHistoryCount
             lastImportedSnippetCount = result.importedSnippetCount
             lastError = nil
+            consecutiveFailures = 0
+            nextRetryAt = nil
             return true
         } catch {
             lastError = error.localizedDescription
+            consecutiveFailures += 1
+            nextRetryAt = now.addingTimeInterval(
+                ClipboardSyncSchedule.backoff(afterFailures: consecutiveFailures)
+            )
             return false
         }
     }

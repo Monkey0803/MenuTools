@@ -643,6 +643,8 @@ struct ClipboardHistoryItem: Codable, Identifiable, Equatable, Sendable {
     var note: String?
     var isSensitive: Bool
     var recognizedText: String?
+    /// 删除墓碑：非空表示该条目已被删除，只用于把删除动作同步给其他设备。
+    var deletedAt: Date?
 
     init(
         id: UUID,
@@ -655,7 +657,8 @@ struct ClipboardHistoryItem: Codable, Identifiable, Equatable, Sendable {
         tags: [String] = [],
         note: String? = nil,
         isSensitive: Bool = false,
-        recognizedText: String? = nil
+        recognizedText: String? = nil,
+        deletedAt: Date? = nil
     ) {
         self.id = id
         self.content = content
@@ -668,10 +671,11 @@ struct ClipboardHistoryItem: Codable, Identifiable, Equatable, Sendable {
         self.note = note
         self.isSensitive = isSensitive
         self.recognizedText = recognizedText
+        self.deletedAt = deletedAt
     }
 
     private enum CodingKeys: String, CodingKey {
-        case id, content, capturedAt, expiresAt, isPinned, sourceBundleID, title, tags, note, isSensitive, recognizedText
+        case id, content, capturedAt, expiresAt, isPinned, sourceBundleID, title, tags, note, isSensitive, recognizedText, deletedAt
     }
 
     init(from decoder: Decoder) throws {
@@ -687,6 +691,7 @@ struct ClipboardHistoryItem: Codable, Identifiable, Equatable, Sendable {
         note = try container.decodeIfPresent(String.self, forKey: .note)
         isSensitive = try container.decodeIfPresent(Bool.self, forKey: .isSensitive) ?? false
         recognizedText = try container.decodeIfPresent(String.self, forKey: .recognizedText)
+        deletedAt = try container.decodeIfPresent(Date.self, forKey: .deletedAt)
     }
 
     var searchableText: String? {
@@ -1140,7 +1145,13 @@ enum ClipboardHistoryAutoPaste {
 
 /// 不依赖系统剪贴板的历史缓冲区，负责容量和状态转换。
 struct ClipboardHistoryBuffer {
+    /// 墓碑保留时长与数量上限：够跨设备同步，又不会无限增长。
+    static let tombstoneRetention: TimeInterval = 30 * 86_400
+    static let tombstoneLimit = 200
+
     private(set) var items: [ClipboardHistoryItem] = []
+    /// 已删除置顶条目的墓碑；不参与展示、搜索与容量统计。
+    private(set) var tombstones: [ClipboardHistoryItem] = []
 
     private var limit: Int
     private let sensitiveLifetime: TimeInterval
@@ -1154,9 +1165,13 @@ struct ClipboardHistoryBuffer {
         retentionDuration: TimeInterval? = nil,
         storageLimitBytes: Int = .max,
         retentionByContentType: [ClipboardHistoryContentType: TimeInterval] = [:],
-        items: [ClipboardHistoryItem] = []
+        items: [ClipboardHistoryItem] = [],
+        tombstones: [ClipboardHistoryItem] = []
     ) {
-        self.items = items
+        self.items = items.filter { $0.deletedAt == nil }
+        self.tombstones = tombstones.isEmpty
+            ? items.filter { $0.deletedAt != nil }
+            : tombstones
         self.limit = max(1, limit)
         self.sensitiveLifetime = max(0, sensitiveLifetime)
         self.retentionDuration = retentionDuration.map { max(0, $0) }
@@ -1254,16 +1269,65 @@ struct ClipboardHistoryBuffer {
         updateMetadata(id: id, recognizedText: recognizedText)
     }
 
-    mutating func remove(id: UUID) {
-        items.removeAll { $0.id == id }
+    mutating func remove(id: UUID, now: Date = Date()) {
+        guard let index = items.firstIndex(where: { $0.id == id }) else { return }
+        recordTombstone(for: items.remove(at: index), now: now)
     }
 
     mutating func clearUnpinned() {
+        // 非置顶条目本来就不在同步集合里，不需要墓碑。
         items.removeAll { !$0.isPinned }
     }
 
-    mutating func clearAll() {
+    mutating func clearAll(now: Date = Date()) {
+        for item in items {
+            recordTombstone(for: item, now: now)
+        }
         items.removeAll()
+    }
+
+    /// 记录删除墓碑：只保留身份与删除时间，避免图片等数据跟着残留。
+    private mutating func recordTombstone(for item: ClipboardHistoryItem, now: Date) {
+        guard item.isPinned else { return }
+        tombstones.removeAll { $0.id == item.id }
+        tombstones.insert(ClipboardHistoryItem(
+            id: item.id,
+            content: .text(""),
+            capturedAt: item.capturedAt,
+            expiresAt: nil,
+            isPinned: true,
+            deletedAt: now
+        ), at: 0)
+        trimTombstones(now: now)
+    }
+
+    /// 应用其他设备传来的删除墓碑：删掉本地对应条目，并继续保留墓碑往下传。
+    mutating func applyTombstones(_ incoming: [ClipboardHistoryItem], now: Date = Date()) {
+        for tombstone in incoming {
+            guard let deletedAt = tombstone.deletedAt else { continue }
+            if let index = items.firstIndex(where: { $0.id == tombstone.id }) {
+                guard items[index].capturedAt <= deletedAt else {
+                    // 本地已在删除之后重新采集到同 ID 内容，这条墓碑已过期。
+                    continue
+                }
+                items.remove(at: index)
+            }
+            if let existing = tombstones.first(where: { $0.id == tombstone.id }),
+               (existing.deletedAt ?? .distantPast) >= deletedAt {
+                continue
+            }
+            tombstones.removeAll { $0.id == tombstone.id }
+            tombstones.insert(tombstone, at: 0)
+        }
+        trimTombstones(now: now)
+    }
+
+    private mutating func trimTombstones(now: Date) {
+        let cutoff = now.addingTimeInterval(-Self.tombstoneRetention)
+        tombstones.removeAll { ($0.deletedAt ?? .distantPast) < cutoff }
+        if tombstones.count > Self.tombstoneLimit {
+            tombstones.removeLast(tombstones.count - Self.tombstoneLimit)
+        }
     }
 
     mutating func setLimit(_ limit: Int) {
@@ -1287,12 +1351,16 @@ struct ClipboardHistoryBuffer {
     }
 
     mutating func restore(_ restoredItems: [ClipboardHistoryItem], now: Date = Date()) {
+        let restoredIDs = Set(restoredItems.map(\.id))
+        // 条目被恢复（撤销删除或远端重新导入）后，对应墓碑必须失效。
+        tombstones.removeAll { restoredIDs.contains($0.id) }
         items.append(contentsOf: restoredItems.filter { restored in !items.contains(where: { $0.id == restored.id }) })
         items.sort { $0.capturedAt > $1.capturedAt }
         applyAutomaticCleanup(now: now)
     }
 
     mutating func applyAutomaticCleanup(now: Date) {
+        trimTombstones(now: now)
         pruneExpired(now: now)
         if let retentionDuration {
             let cutoff = now.addingTimeInterval(-retentionDuration)
@@ -1584,7 +1652,8 @@ enum ClipboardHistoryPersistence {
             tags: item.tags,
             note: item.note,
             isSensitive: false,
-            recognizedText: item.recognizedText
+            recognizedText: item.recognizedText,
+            deletedAt: item.deletedAt
         )
         let encoder = JSONEncoder()
         encoder.dateEncodingStrategy = .millisecondsSince1970
@@ -1620,7 +1689,8 @@ enum ClipboardHistoryPersistence {
             tags: item.tags,
             note: item.note,
             isSensitive: false,
-            recognizedText: item.recognizedText
+            recognizedText: item.recognizedText,
+            deletedAt: item.deletedAt
         )
     }
 
@@ -2374,7 +2444,7 @@ final class ClipboardHistoryService {
         guard !ids.isEmpty else {
             // 即使异步历史尚未载入，清空动作也必须使正在读取的旧快照失效。
             historyMutationGeneration &+= 1
-            buffer.clearAll()
+            buffer.clearAll(now: Date())
             synchronizeItems()
             persist()
             return
@@ -2386,15 +2456,26 @@ final class ClipboardHistoryService {
         remove(ids: Set(buffer.items.lazy.filter { !$0.isPinned }.map(\.id)))
     }
 
+    /// 参与共享文件夹同步的条目：置顶内容 + 删除墓碑。
+    var syncHistoryItems: [ClipboardHistoryItem] {
+        buffer.items.filter(\.isPinned) + buffer.tombstones
+    }
+
     /// 归档导入采用合并语义：按记录 ID 去重，并继续受容量和保留期限约束。
+    /// 文档里的墓碑代表其他设备的删除动作，先应用再导入存活条目。
     func importItems(_ importedItems: [ClipboardHistoryItem]) {
         let safeItems = importedItems.filter { !$0.isSensitive }
         guard !safeItems.isEmpty else { return }
         historyMutationGeneration &+= 1
-        buffer.restore(safeItems)
+        let tombstones = safeItems.filter { $0.deletedAt != nil }
+        let liveItems = safeItems.filter { $0.deletedAt == nil }
+        if !tombstones.isEmpty {
+            buffer.applyTombstones(tombstones)
+        }
+        buffer.restore(liveItems)
         synchronizeItems()
         persist()
-        safeItems.forEach(scheduleImageTextRecognitionIfNeeded)
+        liveItems.forEach(scheduleImageTextRecognitionIfNeeded)
     }
 
     private func applyAutomaticCleanup(now: Date = Date()) {
@@ -2516,7 +2597,7 @@ final class ClipboardHistoryService {
     private func persist() {
         guard let persistenceURL else { return }
         do {
-            try ClipboardHistoryPersistence.save(buffer.items, to: persistenceURL)
+            try ClipboardHistoryPersistence.save(buffer.items + buffer.tombstones, to: persistenceURL)
             persistenceErrorMessage = nil
         } catch {
             persistenceErrorMessage = error.localizedDescription

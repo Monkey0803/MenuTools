@@ -1102,6 +1102,8 @@
 "clipboard.sync.lastSync" = "마지막 동기화: %@";
 "clipboard.sync.neverSynced" = "아직 동기화하지 않았습니다";
 "clipboard.sync.failed" = "동기화 실패: %@";
+"clipboard.sync.retryInSeconds" = "%d초 후에 다시 시도합니다";
+"clipboard.sync.retryInMinutes" = "%d분 후에 다시 시도합니다";
 "clipboard.sync.error.noFolder" = "공유 폴더를 선택하지 않았습니다";
 "clipboard.sync.error.noPassphrase" = "동기화 암호가 저장되지 않았습니다";
 "clipboard.sync.success" = "고정 기록과 스니펫을 동기화했습니다.";

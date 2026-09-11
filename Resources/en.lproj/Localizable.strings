@@ -1102,6 +1102,8 @@
 "clipboard.sync.lastSync" = "Last sync: %@";
 "clipboard.sync.neverSynced" = "Not synced yet";
 "clipboard.sync.failed" = "Sync failed: %@";
+"clipboard.sync.retryInSeconds" = "Retrying in %d seconds";
+"clipboard.sync.retryInMinutes" = "Retrying in %d minutes";
 "clipboard.sync.error.noFolder" = "No shared folder selected yet";
 "clipboard.sync.error.noPassphrase" = "No sync passphrase saved yet";
 "clipboard.sync.success" = "Pinned history and snippets synchronized.";

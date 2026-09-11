@@ -269,6 +269,7 @@ export SPARKLE_DOWNLOAD_URL_PREFIX="https://your-server/releases/"
 - Shortcut conflict detection covers system hotkeys and exclusive Carbon hotkeys registered by other apps; apps using private event taps cannot be fully enumerated through public APIs.
 - Clipboard history works by polling the system pasteboard, so it only records what has already been copied. macOS does not expose the copy source, so "excluded apps" are judged by the frontmost app at copy time.
 - Image text recognition relies on on-device Vision and may briefly return empty results under heavy system load; failures are retried automatically and again when the clipboard panel is reopened.
+- Shared-folder sync covers "pinned items + snippets": deleting a pinned item or clearing history propagates as a deletion to other devices (tombstones are kept for 30 days), but unpinning itself is not propagated and must be repeated on each device.
 - Window Management needs Accessibility permission; without it layout shortcuts and edge snapping do nothing, and the settings pane shows a warning instead.
 - Edge snapping only previews a drop target while the window itself is following the pointer, and full-screen windows are excluded from multi-window tiling.
 - Some apps enforce a minimum window size, so very small layouts (such as a sixth of the screen) may leave the window larger than requested.

@@ -2,8 +2,9 @@ import CryptoKit
 import Foundation
 
 struct ClipboardArchiveDocument: Codable, Equatable, Sendable {
-    static let currentFormatVersion = 2
-    private static let legacyFormatVersions: Set<Int> = [1]
+    static let currentFormatVersion = 3
+    /// v3 起 historyItems 可能包含删除墓碑（deletedAt 非空）。
+    private static let legacyFormatVersions: Set<Int> = [1, 2]
 
     var formatVersion: Int
     var createdAt: Date
@@ -144,11 +145,33 @@ enum ClipboardSyncMerge {
         remote: ClipboardArchiveDocument,
         now: Date = Date()
     ) -> ClipboardArchiveDocument {
+        // 墓碑按 ID 取删除时间较晚的一条：删除动作必须能压过其他设备上仍在的条目。
+        var tombstoneCandidates: [UUID: ClipboardHistoryItem] = [:]
+        for item in (remote.historyItems + local.historyItems) where item.deletedAt != nil {
+            let candidate = item.deletedAt ?? .distantPast
+            if let existing = tombstoneCandidates[item.id],
+               (existing.deletedAt ?? .distantPast) >= candidate {
+                continue
+            }
+            tombstoneCandidates[item.id] = item
+        }
+
         var historyByID: [UUID: ClipboardHistoryItem] = [:]
-        for item in (remote.historyItems + local.historyItems) where item.isPinned && !item.isSensitive {
+        var resurrectedIDs = Set<UUID>()
+        for item in (remote.historyItems + local.historyItems) where item.deletedAt == nil {
+            guard item.isPinned, !item.isSensitive else { continue }
+            if let tombstone = tombstoneCandidates[item.id] {
+                // 删除之后重新采集到的同 ID 条目视为复活，否则保持删除状态。
+                guard item.capturedAt > (tombstone.deletedAt ?? .distantPast) else { continue }
+                resurrectedIDs.insert(item.id)
+            }
             if let existing = historyByID[item.id], existing.capturedAt > item.capturedAt { continue }
             historyByID[item.id] = item
         }
+
+        let tombstones = tombstoneCandidates.values
+            .filter { !resurrectedIDs.contains($0.id) }
+            .sorted { ($0.deletedAt ?? .distantPast) > ($1.deletedAt ?? .distantPast) }
 
         var groupsByID = Dictionary(uniqueKeysWithValues: remote.snippetGroups.map { ($0.id, $0) })
         for group in local.snippetGroups { groupsByID[group.id] = group }
@@ -160,7 +183,7 @@ enum ClipboardSyncMerge {
         }
 
         return ClipboardArchiveDocument.current(
-            historyItems: historyByID.values.sorted { $0.capturedAt > $1.capturedAt },
+            historyItems: historyByID.values.sorted { $0.capturedAt > $1.capturedAt } + tombstones,
             snippetGroups: groupsByID.values.sorted { $0.name.localizedStandardCompare($1.name) == .orderedAscending },
             snippets: snippetsByID.values.sorted { $0.updatedAt > $1.updatedAt },
             createdAt: now

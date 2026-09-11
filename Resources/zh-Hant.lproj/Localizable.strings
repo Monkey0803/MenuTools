@@ -1102,6 +1102,8 @@
 "clipboard.sync.lastSync" = "上次同步：%@";
 "clipboard.sync.neverSynced" = "尚未同步過";
 "clipboard.sync.failed" = "同步失敗：%@";
+"clipboard.sync.retryInSeconds" = "%d 秒後重試";
+"clipboard.sync.retryInMinutes" = "%d 分鐘後重試";
 "clipboard.sync.error.noFolder" = "尚未選擇共享資料夾";
 "clipboard.sync.error.noPassphrase" = "尚未儲存同步口令";
 "clipboard.sync.success" = "置頂歷史和常用片段已同步。";

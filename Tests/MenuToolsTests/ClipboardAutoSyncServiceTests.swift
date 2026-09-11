@@ -14,6 +14,32 @@ private actor ClipboardSyncOperationRecorder {
     }
 }
 
+/// 按预先给定的结果序列返回成功/失败，用于验证退避行为。
+private actor ClipboardSyncOperationStub {
+    enum Outcome {
+        case success
+        case failure
+    }
+
+    private var outcomes: [Outcome]
+    private(set) var callCount = 0
+
+    init(outcomes: [Outcome]) {
+        self.outcomes = outcomes
+    }
+
+    func perform() throws -> ClipboardSharedFileSyncOperation.Result {
+        callCount += 1
+        let outcome = outcomes.isEmpty ? .success : outcomes.removeFirst()
+        switch outcome {
+        case .success:
+            return ClipboardSharedFileSyncOperation.Result(importedHistoryCount: 1, importedSnippetCount: 0)
+        case .failure:
+            throw ClipboardSyncTestError.failed
+        }
+    }
+}
+
 private final class InMemoryPassphraseStore: ClipboardSyncPassphraseStoring, @unchecked Sendable {
     private var value: String?
 
@@ -47,8 +73,57 @@ func syncScheduleDecidesDueByInterval() {
     #expect(ClipboardSyncSchedule.isDue(lastSyncAt: now.addingTimeInterval(-5_000), interval: 900, now: now))
 }
 
-// MARK: - 自动同步服务
+@Test("失败退避按 1/2/5/15 分钟后保持 15 分钟")
+func syncScheduleBacksOffAfterFailures() {
+    #expect(ClipboardSyncSchedule.backoff(afterFailures: 0) == 0)
+    #expect(ClipboardSyncSchedule.backoff(afterFailures: 1) == 60)
+    #expect(ClipboardSyncSchedule.backoff(afterFailures: 2) == 120)
+    #expect(ClipboardSyncSchedule.backoff(afterFailures: 3) == 300)
+    #expect(ClipboardSyncSchedule.backoff(afterFailures: 4) == 900)
+    #expect(ClipboardSyncSchedule.backoff(afterFailures: 9) == 900)
+}
 
+@Test("同步失败后按退避跳过后续轮询，成功后重置")
+@MainActor
+func autoSyncBacksOffAfterFailure() async throws {
+    let (defaults, suiteName) = makeSyncDefaults()
+    defer { UserDefaults().removePersistentDomain(forName: suiteName) }
+    defaults.set("/tmp/MenuTools-Clipboard.mtclipsync", forKey: ClipboardSyncSettings.filePathKey)
+    // 前两次失败，第三次成功。
+    let stub = ClipboardSyncOperationStub(outcomes: [.failure, .failure, .success])
+    let service = ClipboardAutoSyncService(
+        defaults: defaults,
+        passphraseStore: InMemoryPassphraseStore(passphrase: "口令"),
+        syncOperation: { _, _ in try await stub.perform() }
+    )
+    service.setEnabled(true)
+    service.setIntervalMinutes(5)
+
+    let start = Date(timeIntervalSince1970: 10_000)
+    await service.synchronizeIfDue(now: start)
+    #expect(await stub.callCount == 1)
+    #expect(service.consecutiveFailures == 1)
+    #expect(service.nextRetryAt == start.addingTimeInterval(60))
+
+    // 30 秒后仍在退避窗口内，不再打
+    await service.synchronizeIfDue(now: start.addingTimeInterval(30))
+    #expect(await stub.callCount == 1)
+
+    // 退避到期后重试，失败次数累加，退避变成 2 分钟
+    await service.synchronizeIfDue(now: start.addingTimeInterval(60))
+    #expect(await stub.callCount == 2)
+    #expect(service.consecutiveFailures == 2)
+    #expect(service.nextRetryAt == start.addingTimeInterval(60 + 120))
+
+    // 第三次成功：失败计数与退避都清空
+    await service.synchronizeIfDue(now: start.addingTimeInterval(60 + 120))
+    #expect(await stub.callCount == 3)
+    #expect(service.consecutiveFailures == 0)
+    #expect(service.nextRetryAt == nil)
+    #expect(service.lastError == nil)
+}
+
+// MARK: - 自动同步服务
 @Test("开启自动同步后按间隔触发，未到间隔不动手")
 @MainActor
 func autoSyncRunsOnlyWhenIntervalElapsed() async throws {
