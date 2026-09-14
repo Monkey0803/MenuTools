@@ -393,6 +393,11 @@ final class WindowManagementService {
     private var dragWindowLookupAttempts = 0
     private var lastDragWindowLookup: TimeInterval = 0
     private var lastDragEventLog: TimeInterval = 0
+    /// 上一次展示的落点预览，用于判断是否进入了新的吸附区域（决定要不要给触觉反馈）。
+    private var lastPreviewPlan: WindowSnapPreviewPlan?
+    /// 最近一次由 MenuTools 套用的窗口帧（按应用），用于「拖出已吸附窗口恢复原尺寸」。
+    private var lastAppliedFrames: [String: CGRect] = [:]
+    private var unsnapHandledForCurrentDrag = false
     /// 按下点是否落在标题栏/工具栏区域——只有这里才是“拖动窗口”，正文区域是划选内容。
     private var dragStartedInWindowChrome = false
     /// 拖拽预览读取 AX 的限流时间戳。
@@ -427,7 +432,7 @@ final class WindowManagementService {
         globalMouseMonitor = nil
         localMouseMonitor = nil
         resetDragState()
-        snapPreview.hide()
+        hideSnapPreview()
         cycleState.reset()
         traversalTracker.reset()
         stashToggleTracker.reset()
@@ -442,7 +447,7 @@ final class WindowManagementService {
         configuration.edgeSnappingEnabled = enabled
         saveConfiguration()
         refreshMouseMonitors()
-        if !enabled { snapPreview.hide() }
+        if !enabled { hideSnapPreview() }
     }
 
     func setCycleLayoutsEnabled(_ enabled: Bool) {
@@ -454,7 +459,17 @@ final class WindowManagementService {
     func setSnapPreviewEnabled(_ enabled: Bool) {
         configuration.showSnapPreview = enabled
         saveConfiguration()
-        if !enabled { snapPreview.hide() }
+        if !enabled { hideSnapPreview() }
+    }
+
+    func setHapticFeedbackEnabled(_ enabled: Bool) {
+        configuration.hapticFeedbackOnSnap = enabled
+        saveConfiguration()
+    }
+
+    func setRestoreSizeOnDragOutEnabled(_ enabled: Bool) {
+        configuration.restoreSizeWhenDraggingOut = enabled
+        saveConfiguration()
     }
 
     func setTraverseDisplaysEnabled(_ enabled: Bool) {
@@ -601,7 +616,7 @@ final class WindowManagementService {
            let offset = WindowDisplayTraversal.displayOffset(for: target),
            traversalTracker.isRepeat(layout: target, targetKey: targetKey) {
             rememberFrameBeforeLayout(of: window, processIdentifier: processIdentifier)
-            try applyOnAdjacentDisplay(target, window: window, offset: offset)
+            try applyOnAdjacentDisplay(target, window: window, offset: offset, processIdentifier: processIdentifier)
             return
         }
         rememberFrameBeforeLayout(of: window, processIdentifier: processIdentifier)
@@ -612,10 +627,16 @@ final class WindowManagementService {
             options: configuration.options
         )
         try setFrame(frame, of: window)
+        recordAppliedFrame(frame, processIdentifier: processIdentifier)
     }
 
     /// 把窗口移到相邻显示器，再在新显示器上套用同一布局。
-    private func applyOnAdjacentDisplay(_ layout: WindowLayout, window: AXUIElement, offset: Int) throws {
+    private func applyOnAdjacentDisplay(
+        _ layout: WindowLayout,
+        window: AXUIElement,
+        offset: Int,
+        processIdentifier: pid_t
+    ) throws {
         try move(window: window, displayOffset: offset)
         guard let screen = screen(for: window) else {
             throw WindowManagementError.operationFailed(L("window.error.noScreen"))
@@ -627,6 +648,7 @@ final class WindowManagementService {
             options: configuration.options
         )
         try setFrame(frame, of: window)
+        recordAppliedFrame(frame, processIdentifier: processIdentifier)
     }
 
     /// 应用固定尺寸预设：先把记录帧夹取回当前显示器，再写入窗口。
@@ -639,10 +661,9 @@ final class WindowManagementService {
             }
             let window = try focusedWindow(of: processIdentifier)
             rememberFrameBeforeLayout(of: window, processIdentifier: processIdentifier)
-            try setFrame(
-                WindowFrameClamper.clamp(frame, into: NSScreen.screens.map(\.visibleFrame)),
-                of: window
-            )
+            let target = WindowFrameClamper.clamp(frame, into: NSScreen.screens.map(\.visibleFrame))
+            try setFrame(target, of: window)
+            recordAppliedFrame(target, processIdentifier: processIdentifier)
         } else {
             try apply(preset.layout)
         }
@@ -766,7 +787,7 @@ final class WindowManagementService {
         globalMouseMonitor = nil
         localMouseMonitor = nil
         resetDragState()
-        snapPreview.hide()
+        hideSnapPreview()
         guard configuration.edgeSnappingEnabled else {
             SnapDebugLog.log("refreshMouseMonitors: edge snapping disabled, no monitor registered")
             return
@@ -792,6 +813,7 @@ final class WindowManagementService {
         lastDragWindowLookup = 0
         lastSnapProbeTime = 0
         dragStartedInWindowChrome = false
+        unsnapHandledForCurrentDrag = false
     }
 
     private func handleMouseEvent(_ type: NSEvent.EventType) {
@@ -805,12 +827,13 @@ final class WindowManagementService {
             SnapDebugLog.log("mouseDown: point=\(NSStringFromPoint(NSEvent.mouseLocation)) windowHit=\(dragWindow != nil) frame=\(dragWindowFrameAtMouseDown.map(NSStringFromRect) ?? "nil") titleBar=\(dragStartedInWindowChrome)")
         case .leftMouseDragged:
             if dragWindow == nil { captureDragWindow(at: NSEvent.mouseLocation) }
+            prepareUnsnapRestoreIfNeeded(at: NSEvent.mouseLocation)
             logDragEvent()
             updateSnapPreview(at: NSEvent.mouseLocation)
         case .leftMouseUp:
             let hadWindow = dragWindow != nil
             let startedInChrome = dragStartedInWindowChrome
-            snapPreview.hide()
+            hideSnapPreview()
             let end = NSEvent.mouseLocation
             let distance = mouseDownLocation.map { hypot(end.x - $0.x, end.y - $0.y) } ?? 0
             SnapDebugLog.log("mouseUp: point=\(NSStringFromPoint(end)) windowHit=\(hadWindow) startedInTitleBar=\(startedInChrome) dragDistance=\(Int(distance))")
@@ -835,11 +858,11 @@ final class WindowManagementService {
 
     /// 拖拽过程中显示落点预览。
     ///
-    /// 只有「窗口确实跟着鼠标移动」时才显示：全局鼠标监听拿不到拖拽目标，不加这层判断的话，
-    /// 在屏幕边缘划选文字也会闪出吸附预览。
+    /// 判据是「按下点位于窗口标题栏」+ 指针移动超过阈值，而不是读取 AX 的窗口位置变化：
+    /// 很多应用直到拖拽结束才更新位置，用位置变化判断会让预览永远不出现。
     private func updateSnapPreview(at point: CGPoint) {
         guard configuration.edgeSnappingEnabled, configuration.showSnapPreview else {
-            snapPreview.hide()
+            hideSnapPreview()
             return
         }
         guard let start = mouseDownLocation,
@@ -859,11 +882,66 @@ final class WindowManagementService {
             screens: snapScreens,
             options: configuration.options
         ) else {
-            snapPreview.hide()
+            hideSnapPreview()
             return
         }
         SnapDebugLog.log("preview: layout=\(plan.layout.rawValue) frame=\(NSStringFromRect(plan.frame))")
+        if configuration.hapticFeedbackOnSnap,
+           WindowSnapFeedback.shouldTriggerHaptic(previous: lastPreviewPlan, next: plan) {
+            NSHapticFeedbackManager.defaultPerformer.perform(.alignment, performanceTime: .now)
+        }
+        lastPreviewPlan = plan
         snapPreview.show(plan)
+    }
+
+    private func hideSnapPreview() {
+        guard lastPreviewPlan != nil || snapPreview.isVisible else {
+            snapPreview.hide()
+            return
+        }
+        lastPreviewPlan = nil
+        snapPreview.hide()
+    }
+
+    /// 把 MenuTools 刚套用过的窗口拖出来时，恢复吸附前的尺寸。
+    ///
+    /// 只在指针移动超过阈值后触发一次：单纯点击标题栏不应该改变窗口大小。
+    private func prepareUnsnapRestoreIfNeeded(at point: CGPoint) {
+        guard configuration.restoreSizeWhenDraggingOut,
+              !unsnapHandledForCurrentDrag,
+              let start = mouseDownLocation,
+              hypot(point.x - start.x, point.y - start.y) > 8 else { return }
+        unsnapHandledForCurrentDrag = true
+
+        guard let window = dragWindow,
+              let processIdentifier = dragWindowPID,
+              let current = dragWindowFrameAtMouseDown else { return }
+        let key = bundleIdentifier(for: processIdentifier)
+        guard let applied = lastAppliedFrames[key], framesMatch(current, applied),
+              let previous = frameMemory.previousFrame(for: key),
+              let visible = screen(for: window),
+              let target = WindowUnsnapCalculator.restoredFrame(
+                  current: current,
+                  previous: previous,
+                  cursor: point,
+                  visibleFrame: visible
+              ) else { return }
+
+        SnapDebugLog.log("unsnap: restore size from \(NSStringFromRect(current)) to \(NSStringFromRect(target))")
+        try? setFrame(target, of: window)
+        lastAppliedFrames[key] = target
+    }
+
+    /// 位置与尺寸是否与记录一致（AX 有取整误差）。
+    private func framesMatch(_ lhs: CGRect, _ rhs: CGRect) -> Bool {
+        abs(lhs.minX - rhs.minX) < 4
+            && abs(lhs.minY - rhs.minY) < 4
+            && abs(lhs.width - rhs.width) < 4
+            && abs(lhs.height - rhs.height) < 4
+    }
+
+    private func recordAppliedFrame(_ frame: CGRect, processIdentifier: pid_t) {
+        lastAppliedFrames[bundleIdentifier(for: processIdentifier)] = frame
     }
 
     /// 吸附松手：按鼠标松手位置所在的显示器计算落点，而不是窗口当前所在的显示器。
@@ -883,6 +961,7 @@ final class WindowManagementService {
         SnapDebugLog.log("snap on mouseUp: apply layout=\(plan.layout.rawValue)")
         rememberFrameBeforeLayout(of: window, processIdentifier: processIdentifier)
         try? setFrame(plan.frame, of: window)
+        recordAppliedFrame(plan.frame, processIdentifier: processIdentifier)
     }
 
     /// 被拖动窗口当前的位置（AX 在拖动过程中可能仍报旧值，松手时才是最新的）。

@@ -742,6 +742,8 @@
 "window.manager.nudgeStep" = "方向键挪动步长";
 "window.manager.cycleLayouts" = "连按同一快捷键循环切换同族布局";
 "window.manager.snapPreview" = "拖动窗口到边缘时显示落点预览";
+"window.manager.haptic" = "吸附到新的落点区域时给出触觉反馈";
+"window.manager.restoreSizeOnDragOut" = "把已吸附的窗口拖出来时恢复原尺寸";
 "window.manager.capturePreset" = "记住当前窗口";
 "window.manager.capturedPreset" = "已保存预设：%@";
 "window.manager.presetFrame" = "固定尺寸";

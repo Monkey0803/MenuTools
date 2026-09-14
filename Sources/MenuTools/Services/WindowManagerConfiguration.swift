@@ -122,6 +122,10 @@ struct WindowManagerConfiguration: Codable, Equatable, Sendable {
     var showSnapPreview: Bool
     /// 连按半屏布局时把窗口带到相邻显示器。
     var traverseDisplaysOnRepeat: Bool
+    /// 吸附到新的落点区域时给出触觉反馈。
+    var hapticFeedbackOnSnap: Bool
+    /// 把已经吸附的窗口拖出来时，恢复吸附前的尺寸。
+    var restoreSizeWhenDraggingOut: Bool
 
     init(
         options: WindowManagerOptions = WindowManagerOptions(),
@@ -132,7 +136,9 @@ struct WindowManagerConfiguration: Codable, Equatable, Sendable {
         edgeSnappingEnabled: Bool = false,
         cycleLayouts: Bool = true,
         showSnapPreview: Bool = true,
-        traverseDisplaysOnRepeat: Bool = false
+        traverseDisplaysOnRepeat: Bool = false,
+        hapticFeedbackOnSnap: Bool = true,
+        restoreSizeWhenDraggingOut: Bool = true
     ) {
         self.options = options
         self.presets = presets
@@ -143,6 +149,8 @@ struct WindowManagerConfiguration: Codable, Equatable, Sendable {
         self.cycleLayouts = cycleLayouts
         self.showSnapPreview = showSnapPreview
         self.traverseDisplaysOnRepeat = traverseDisplaysOnRepeat
+        self.hapticFeedbackOnSnap = hapticFeedbackOnSnap
+        self.restoreSizeWhenDraggingOut = restoreSizeWhenDraggingOut
     }
 
     private enum CodingKeys: String, CodingKey {
@@ -155,6 +163,8 @@ struct WindowManagerConfiguration: Codable, Equatable, Sendable {
         case cycleLayouts
         case showSnapPreview
         case traverseDisplaysOnRepeat
+        case hapticFeedbackOnSnap
+        case restoreSizeWhenDraggingOut
     }
 
     /// 顶层同样逐字段解码：新增开关不会让旧配置整份丢失。
@@ -170,7 +180,9 @@ struct WindowManagerConfiguration: Codable, Equatable, Sendable {
             edgeSnappingEnabled: try container.decodeIfPresent(Bool.self, forKey: .edgeSnappingEnabled) ?? fallback.edgeSnappingEnabled,
             cycleLayouts: try container.decodeIfPresent(Bool.self, forKey: .cycleLayouts) ?? fallback.cycleLayouts,
             showSnapPreview: try container.decodeIfPresent(Bool.self, forKey: .showSnapPreview) ?? fallback.showSnapPreview,
-            traverseDisplaysOnRepeat: try container.decodeIfPresent(Bool.self, forKey: .traverseDisplaysOnRepeat) ?? fallback.traverseDisplaysOnRepeat
+            traverseDisplaysOnRepeat: try container.decodeIfPresent(Bool.self, forKey: .traverseDisplaysOnRepeat) ?? fallback.traverseDisplaysOnRepeat,
+            hapticFeedbackOnSnap: try container.decodeIfPresent(Bool.self, forKey: .hapticFeedbackOnSnap) ?? fallback.hapticFeedbackOnSnap,
+            restoreSizeWhenDraggingOut: try container.decodeIfPresent(Bool.self, forKey: .restoreSizeWhenDraggingOut) ?? fallback.restoreSizeWhenDraggingOut
         )
     }
 
@@ -185,6 +197,8 @@ struct WindowManagerConfiguration: Codable, Equatable, Sendable {
         try container.encode(cycleLayouts, forKey: .cycleLayouts)
         try container.encode(showSnapPreview, forKey: .showSnapPreview)
         try container.encode(traverseDisplaysOnRepeat, forKey: .traverseDisplaysOnRepeat)
+        try container.encode(hapticFeedbackOnSnap, forKey: .hapticFeedbackOnSnap)
+        try container.encode(restoreSizeWhenDraggingOut, forKey: .restoreSizeWhenDraggingOut)
     }
 }
 

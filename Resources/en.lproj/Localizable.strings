@@ -742,6 +742,8 @@
 "window.manager.nudgeStep" = "Arrow key nudge step";
 "window.manager.cycleLayouts" = "Cycle through layouts of the same family when the shortcut is pressed again";
 "window.manager.snapPreview" = "Show a preview of the target frame while dragging to an edge";
+"window.manager.haptic" = "Haptic feedback when a new snap target is selected";
+"window.manager.restoreSizeOnDragOut" = "Restore the previous size when dragging a snapped window out";
 "window.manager.capturePreset" = "Remember current window";
 "window.manager.capturedPreset" = "Preset saved: %@";
 "window.manager.presetFrame" = "Fixed size";

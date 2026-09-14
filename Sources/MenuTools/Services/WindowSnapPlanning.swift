@@ -166,3 +166,50 @@ enum WindowArrangementPolicy {
         }
     }
 }
+
+/// 吸附落点变化时的触觉反馈判定。
+///
+/// 只在「进入新的落点区域」时响一次：拖动过程中同一个区域会反复命中，每个事件都震手会很烦。
+enum WindowSnapFeedback {
+    static func shouldTriggerHaptic(
+        previous: WindowSnapPreviewPlan?,
+        next: WindowSnapPreviewPlan?
+    ) -> Bool {
+        guard let next else { return false }
+        guard let previous else { return true }
+        return previous.layout != next.layout || previous.screenIndex != next.screenIndex
+    }
+}
+
+/// 把已经吸附的窗口拖出来时，恢复吸附前的尺寸。
+///
+/// 对标 Rectangle 的 unsnap restore：左半屏/最大化的窗口被拖走时不应该还保持那块大尺寸。
+enum WindowUnsnapCalculator {
+    /// 尺寸差异小于该值视为「没有变化」，不做恢复。
+    static let minimumSizeDelta: CGFloat = 2
+
+    static func restoredFrame(
+        current: CGRect,
+        previous: CGRect,
+        cursor: CGPoint,
+        visibleFrame: CGRect
+    ) -> CGRect? {
+        guard visibleFrame.width > 0, visibleFrame.height > 0 else { return nil }
+
+        let size = CGSize(
+            width: min(max(previous.width, 1), visibleFrame.width),
+            height: min(max(previous.height, 1), visibleFrame.height)
+        )
+        guard abs(size.width - current.width) > minimumSizeDelta
+            || abs(size.height - current.height) > minimumSizeDelta else { return nil }
+
+        // 顶边保持不动（标题栏仍在光标下），水平方向按光标在窗口内的相对位置换算，
+        // 这样光标不会因为窗口变窄而跑到窗口外面。
+        let ratio = current.width > 0 ? (cursor.x - current.minX) / current.width : 0.5
+        let proposedX = cursor.x - ratio * size.width
+        let x = min(max(proposedX, visibleFrame.minX), visibleFrame.maxX - size.width)
+        let top = min(max(current.maxY, visibleFrame.minY + size.height), visibleFrame.maxY)
+
+        return CGRect(x: x, y: top - size.height, width: size.width, height: size.height)
+    }
+}

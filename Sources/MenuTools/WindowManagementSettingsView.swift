@@ -210,6 +210,11 @@ struct WindowManagementSettingsView: View {
                 set: { windowService.setSnapPreviewEnabled($0) }
             ))
             .disabled(!windowService.configuration.edgeSnappingEnabled)
+            Toggle(L("window.manager.haptic"), isOn: Binding(
+                get: { windowService.configuration.hapticFeedbackOnSnap },
+                set: { windowService.setHapticFeedbackEnabled($0) }
+            ))
+            .disabled(!windowService.configuration.edgeSnappingEnabled)
             Toggle(L("window.manager.cycleLayouts"), isOn: Binding(
                 get: { windowService.configuration.cycleLayouts },
                 set: { windowService.setCycleLayoutsEnabled($0) }
@@ -219,6 +224,10 @@ struct WindowManagementSettingsView: View {
                 set: { windowService.setTraverseDisplaysEnabled($0) }
             ))
             .disabled(NSScreen.screens.count < 2)
+            Toggle(L("window.manager.restoreSizeOnDragOut"), isOn: Binding(
+                get: { windowService.configuration.restoreSizeWhenDraggingOut },
+                set: { windowService.setRestoreSizeOnDragOutEnabled($0) }
+            ))
             Toggle(L("window.manager.autoRules"), isOn: Binding(
                 get: { windowService.configuration.automaticApplicationRules },
                 set: { windowService.setAutomaticApplicationRulesEnabled($0) }
