@@ -1165,6 +1165,38 @@ enum NetworkTrafficMath {
         let result = lhs.addingReportingOverflow(rhs)
         return result.overflow ? Int64.max : result.partialValue
     }
+
+    /// PID -> 身份。nettop 去掉 `-P` 后会按连接分行输出，同一个 PID 出现多次，
+    /// 用 `Dictionary(uniqueKeysWithValues:)` 会直接触发运行时陷阱；这里保留首次出现的身份。
+    static func identitiesByPID(_ apps: [NetworkAppTrafficReading]) -> [Int32: NetworkAppIdentity] {
+        var index: [Int32: NetworkAppIdentity] = [:]
+        for app in apps where index[app.pid] == nil {
+            index[app.pid] = app.identity
+        }
+        return index
+    }
+
+    /// 同一身份的字节数需要累加；重复出现不能崩溃。
+    static func historySamples(_ deltas: [NetworkTrafficDelta]) -> [String: NetworkTrafficHistoryAppSample] {
+        var samples: [String: NetworkTrafficHistoryAppSample] = [:]
+        for delta in deltas {
+            let id = delta.identity.id
+            if let existing = samples[id] {
+                samples[id] = NetworkTrafficHistoryAppSample(
+                    identity: delta.identity,
+                    downloadedBytes: clampedAdd(existing.downloadedBytes, delta.downloadedBytes),
+                    uploadedBytes: clampedAdd(existing.uploadedBytes, delta.uploadedBytes)
+                )
+            } else {
+                samples[id] = NetworkTrafficHistoryAppSample(
+                    identity: delta.identity,
+                    downloadedBytes: delta.downloadedBytes,
+                    uploadedBytes: delta.uploadedBytes
+                )
+            }
+        }
+        return samples
+    }
 }
 
 enum NetworkTrafficParser {
@@ -1727,7 +1759,7 @@ struct DefaultNetworkTrafficProvider: NetworkTrafficProviding {
                 sentBytes: reading.sentBytes
             )
         }
-        let identitiesByPID = Dictionary(uniqueKeysWithValues: apps.map { ($0.pid, $0.identity) })
+        let identitiesByPID = NetworkTrafficMath.identitiesByPID(apps)
         let connections = parsed.connections.map { connection in
             NetworkConnectionTrafficReading(
                 identity: identitiesByPID[connection.pid]
@@ -2196,9 +2228,10 @@ final class NetworkTrafficService {
         sessionTotalsByQuery[query.storageKey] = result.sessionTotals
         previousReading = current
         appendHistory(result.deltas, timestamp: now())
-        let previousConnections = Dictionary(uniqueKeysWithValues: snapshot.apps.map {
-            ($0.id, $0.connections)
-        })
+        let previousConnections = Dictionary(
+            snapshot.apps.map { ($0.id, $0.connections) },
+            uniquingKeysWith: { $0 + $1 }
+        )
         let apps = (result.apps.isEmpty ? snapshot.apps : result.apps).map { app in
             guard !app.isHistoricalOnly,
                   let connections = previousConnections[app.id] else { return app }
@@ -2252,13 +2285,7 @@ final class NetworkTrafficService {
                 NetworkTrafficHistoryBucket(
                     timestamp: bucketDate,
                     queryKey: query.storageKey,
-                    apps: Dictionary(uniqueKeysWithValues: deltas.map {
-                        ($0.identity.id, NetworkTrafficHistoryAppSample(
-                            identity: $0.identity,
-                            downloadedBytes: $0.downloadedBytes,
-                            uploadedBytes: $0.uploadedBytes
-                        ))
-                    })
+                    apps: NetworkTrafficMath.historySamples(deltas)
                 )
             )
         }

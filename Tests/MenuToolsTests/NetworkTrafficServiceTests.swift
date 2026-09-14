@@ -1638,3 +1638,43 @@ private final class RecordingNetworkTrafficHistoryStore: NetworkTrafficHistorySt
         configuredStorageUsage
     }
 }
+
+@Test("连接模式下同一进程出现多行时身份索引不会崩溃")
+func trafficIdentityIndexToleratesRepeatedPIDs() {
+    // nettop 去掉 -P 后按连接分行输出，同一个 PID 会出现多次。
+    let output = """
+    ,bytes_in,bytes_out,
+    curl.42,100,10,
+    curl.42,200,20,
+    Safari.7,1,1,
+    """
+
+    let reading = NetworkTrafficParser.reading(from: output, timestamp: 10)
+    #expect(reading.apps.count == 3)
+
+    let index = NetworkTrafficMath.identitiesByPID(reading.apps)
+    #expect(index.count == 2)
+    #expect(index[42]?.displayName == reading.apps[0].identity.displayName)
+}
+
+@Test("同一身份的重复增量会累加字节而不是崩溃")
+func trafficHistorySamplesAggregateDuplicateIdentities() {
+    let identity = NetworkAppIdentity(
+        id: "process:curl",
+        displayName: "curl",
+        bundleIdentifier: nil,
+        bundlePath: nil,
+        executablePath: nil,
+        kind: .unknown
+    )
+    let deltas = [
+        NetworkTrafficDelta(identity: identity, downloadedBytes: 100, uploadedBytes: 10),
+        NetworkTrafficDelta(identity: identity, downloadedBytes: 250, uploadedBytes: 5)
+    ]
+
+    let samples = NetworkTrafficMath.historySamples(deltas)
+
+    #expect(samples.count == 1)
+    #expect(samples[identity.id]?.downloadedBytes == 350)
+    #expect(samples[identity.id]?.uploadedBytes == 15)
+}
