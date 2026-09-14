@@ -755,6 +755,8 @@
 "window.manager.currentApp" = "Current app: %@";
 "window.manager.noCurrentApp" = "No external application was detected";
 "window.manager.bind" = "Bind";
+"window.manager.ruleTitleFilter" = "Window title contains (empty = any)";
+"window.manager.ruleTitle" = "Title contains \"%@\"";
 "window.manager.exclusions" = "Excluded applications";
 "window.manager.excludeCurrent" = "Exclude current app: %@";
 "window.apply" = "Apply";

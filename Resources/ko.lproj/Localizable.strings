@@ -755,6 +755,8 @@
 "window.manager.currentApp" = "현재 앱: %@";
 "window.manager.noCurrentApp" = "외부 앱을 확인할 수 없습니다";
 "window.manager.bind" = "바인딩";
+"window.manager.ruleTitleFilter" = "창 제목에 포함(비우면 제한 없음)";
+"window.manager.ruleTitle" = "제목에 '%@' 포함";
 "window.manager.exclusions" = "제외된 앱";
 "window.manager.excludeCurrent" = "현재 앱 제외: %@";
 "window.apply" = "적용";

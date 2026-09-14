@@ -755,6 +755,8 @@
 "window.manager.currentApp" = "目前應用程式：%@";
 "window.manager.noCurrentApp" = "沒有可識別的外部應用程式";
 "window.manager.bind" = "綁定";
+"window.manager.ruleTitleFilter" = "視窗標題包含（留空則不限）";
+"window.manager.ruleTitle" = "標題含「%@」";
 "window.manager.exclusions" = "排除應用程式";
 "window.manager.excludeCurrent" = "排除目前應用程式：%@";
 "window.apply" = "套用";

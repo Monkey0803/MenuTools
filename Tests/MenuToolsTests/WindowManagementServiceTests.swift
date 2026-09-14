@@ -229,3 +229,100 @@ func windowManagerConfigurationRoundTrips() throws {
     let decoded = try JSONDecoder().decode(WindowManagerConfiguration.self, from: data)
     #expect(decoded == configuration)
 }
+
+@Test("应用规则可以按窗口标题过滤")
+func applicationRuleMatchesWindowTitle() {
+    let anyWindow = WindowApplicationRule(
+        bundleIdentifier: "com.example.Editor",
+        applicationName: "Editor",
+        layout: .leftHalf
+    )
+    let titled = WindowApplicationRule(
+        bundleIdentifier: "com.example.Editor",
+        applicationName: "Editor",
+        layout: .rightHalf,
+        windowTitleContains: "项目 A"
+    )
+    let rules = [titled, anyWindow]
+
+    // 带标题过滤的规则只在标题命中时生效
+    #expect(WindowApplicationRuleResolver.layout(
+        for: "com.example.Editor",
+        windowTitle: "项目 A - 编辑器",
+        rules: rules,
+        excludedBundleIdentifiers: []
+    ) == .rightHalf)
+
+    // 标题不命中时继续匹配下一条不限标题的规则
+    #expect(WindowApplicationRuleResolver.layout(
+        for: "com.example.Editor",
+        windowTitle: "项目 B",
+        rules: rules,
+        excludedBundleIdentifiers: []
+    ) == .leftHalf)
+
+    // 只能匹配到带过滤的规则、且标题不命中 → 不应用
+    #expect(WindowApplicationRuleResolver.layout(
+        for: "com.example.Editor",
+        windowTitle: "项目 B",
+        rules: [titled],
+        excludedBundleIdentifiers: []
+    ) == nil)
+
+    // 读不到标题时不应用带过滤的规则
+    #expect(WindowApplicationRuleResolver.layout(
+        for: "com.example.Editor",
+        windowTitle: nil,
+        rules: [titled],
+        excludedBundleIdentifiers: []
+    ) == nil)
+
+    // 大小写不敏感
+    #expect(WindowApplicationRuleResolver.layout(
+        for: "com.example.Editor",
+        windowTitle: "project a",
+        rules: [WindowApplicationRule(
+            bundleIdentifier: "com.example.Editor",
+            applicationName: "Editor",
+            layout: .maximize,
+            windowTitleContains: "Project A"
+        )],
+        excludedBundleIdentifiers: []
+    ) == .maximize)
+}
+
+@Test("自动应用规则会跳过弹窗、系统对话框与表单")
+func automaticRulesSkipDialogsAndSheets() {
+    #expect(!WindowApplicationRuleResolver.shouldSkipAutomaticLayout(
+        role: kAXWindowRole,
+        subrole: kAXStandardWindowSubrole
+    ))
+    #expect(!WindowApplicationRuleResolver.shouldSkipAutomaticLayout(role: kAXWindowRole, subrole: nil))
+    #expect(WindowApplicationRuleResolver.shouldSkipAutomaticLayout(role: kAXWindowRole, subrole: kAXDialogSubrole))
+    #expect(WindowApplicationRuleResolver.shouldSkipAutomaticLayout(role: kAXWindowRole, subrole: kAXSystemDialogSubrole))
+    #expect(WindowApplicationRuleResolver.shouldSkipAutomaticLayout(role: kAXSheetRole, subrole: nil))
+}
+
+@Test("旧的应用规则缺少标题过滤字段时仍能解码")
+func applicationRuleDecodesLegacyPayload() throws {
+    let legacy = Data("""
+    {"bundleIdentifier":"com.example.Editor","applicationName":"Editor","layout":"leftHalf","isEnabled":true}
+    """.utf8)
+
+    let decoded = try JSONDecoder().decode(WindowApplicationRule.self, from: legacy)
+    #expect(decoded.windowTitleContains == nil)
+    #expect(decoded.layout == .leftHalf)
+    #expect(decoded.isEnabled)
+}
+
+@Test("带标题过滤的规则可以编码解码往返")
+func applicationRuleWithTitleFilterRoundTrips() throws {
+    let rule = WindowApplicationRule(
+        bundleIdentifier: "com.example.Editor",
+        applicationName: "Editor",
+        layout: .bottomRight,
+        windowTitleContains: "项目 A"
+    )
+    let data = try JSONEncoder().encode(rule)
+    #expect(try JSONDecoder().decode(WindowApplicationRule.self, from: data) == rule)
+}

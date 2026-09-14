@@ -502,11 +502,17 @@ final class WindowManagementService {
         saveConfiguration()
     }
 
-    func addOrUpdateApplicationRule(for application: WindowApplicationInfo, layout: WindowLayout) {
+    func addOrUpdateApplicationRule(
+        for application: WindowApplicationInfo,
+        layout: WindowLayout,
+        windowTitleContains: String? = nil
+    ) {
+        let trimmedFilter = windowTitleContains?.trimmingCharacters(in: .whitespacesAndNewlines)
         let rule = WindowApplicationRule(
             bundleIdentifier: application.bundleIdentifier,
             applicationName: application.name,
-            layout: layout
+            layout: layout,
+            windowTitleContains: (trimmedFilter?.isEmpty ?? true) ? nil : trimmedFilter
         )
         if let index = configuration.applicationRules.firstIndex(where: { $0.bundleIdentifier == rule.bundleIdentifier }) {
             configuration.applicationRules[index] = rule
@@ -773,16 +779,31 @@ final class WindowManagementService {
               let processIdentifier,
               let application = NSRunningApplication(processIdentifier: processIdentifier),
               let bundleIdentifier = application.bundleIdentifier,
-              let layout = WindowApplicationRuleResolver.layout(
+              // 先按 bundle id 粗筛，避免为无关应用起一个延时任务
+              WindowApplicationRuleResolver.layout(
                 for: bundleIdentifier,
                 rules: configuration.applicationRules,
                 excludedBundleIdentifiers: configuration.excludedBundleIdentifiers
-              ) else { return }
+              ) != nil else { return }
 
         Task { @MainActor [weak self] in
             try? await Task.sleep(for: .milliseconds(150))
             guard let self,
-                  NSWorkspace.shared.frontmostApplication?.processIdentifier == processIdentifier else { return }
+                  NSWorkspace.shared.frontmostApplication?.processIdentifier == processIdentifier,
+                  let window = try? self.focusedWindow(of: processIdentifier) else { return }
+
+            // 弹窗/表单不参与自动布局
+            guard !WindowApplicationRuleResolver.shouldSkipAutomaticLayout(
+                role: self.stringAttribute(kAXRoleAttribute, of: window),
+                subrole: self.stringAttribute(kAXSubroleAttribute, of: window)
+            ) else { return }
+
+            guard let layout = WindowApplicationRuleResolver.layout(
+                for: bundleIdentifier,
+                windowTitle: self.windowTitle(of: window),
+                rules: self.configuration.applicationRules,
+                excludedBundleIdentifiers: self.configuration.excludedBundleIdentifiers
+            ) else { return }
             try? self.apply(layout)
         }
     }
@@ -1252,10 +1273,12 @@ final class WindowManagementService {
     }
 
     private func windowTitle(of window: AXUIElement) -> String? {
+        stringAttribute(kAXTitleAttribute, of: window)
+    }
+
+    private func stringAttribute(_ name: String, of window: AXUIElement) -> String? {
         var value: CFTypeRef?
-        guard AXUIElementCopyAttributeValue(window, kAXTitleAttribute as CFString, &value) == .success else {
-            return nil
-        }
+        guard AXUIElementCopyAttributeValue(window, name as CFString, &value) == .success else { return nil }
         return value as? String
     }
 

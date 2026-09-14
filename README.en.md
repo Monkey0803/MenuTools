@@ -51,7 +51,7 @@ A lightweight system toolkit that lives in the macOS menu bar. MenuTools uses th
 |---|---|
 | App Launcher | Search and launch installed apps, with favorites and recent-app ordering. |
 | Scenes | Apply Work, Presentation, or Night presets manually. |
-| Window Management | Use 60 layouts, including Loop-style edge stashing, with edge snapping, drop previews, and haptic feedback; dragging a snapped window out restores its previous size; repeat a shortcut to cycle through layouts of the same family or to send the window to the adjacent display; save named presets that store a fixed window size, bind them to global shortcuts, and apply them from the quick-access panel; app rules, multi-window tiling, and per-app size memory included. |
+| Window Management | Use 60 layouts, including Loop-style edge stashing, with edge snapping, drop previews (plus haptics and a grow-in animation), optional finer snap areas; dragging a snapped window out restores its previous size; repeat a shortcut to cycle through layouts of the same family or to send the window to the adjacent display; save named presets that store a fixed window size, bind them to global shortcuts, and apply them from the quick-access panel; app rules, multi-window tiling, and per-app size memory included. |
 | Focus | Toggle the system Focus state and open Focus settings. |
 | Global scene shortcuts | Record global shortcuts for Work, Presentation, and Night scenes. |
 
@@ -191,6 +191,18 @@ rm /tmp/menutools-snap-debug        # disable (nothing is logged by default)
 
 Note: CGEvent-synthesized mouse events are not delivered to `NSEvent` global monitors on macOS 26, so drag behaviour cannot be scripted and has to be verified by hand. A step-by-step checklist lives in [`docs/window-management-acceptance.md`](docs/window-management-acceptance.md).
 
+### Triggering Window Actions by URL
+
+The menu-bar app has no window of its own, but `menutools://` links can trigger window actions from Raycast, Shortcuts, or scripts:
+
+```bash
+open "menutools://window?layout=left-half"     # apply a layout
+open "menutools://action?name=maximize"        # matches Rectangle's execute-action naming
+open "menutools://preset?name=开发"             # apply a fixed-size preset
+```
+
+Layout names use kebab-case derived from the layout itself (`left-half`, `top-left-sixth`, `stash-left`, …); all 60 layouts are available.
+
 ## Permissions
 
 Some features request permissions the first time they are used:
@@ -293,6 +305,8 @@ export SPARKLE_DOWNLOAD_URL_PREFIX="https://your-server/releases/"
 - Shared-folder sync covers "pinned items + snippets": deleting a pinned item or clearing history propagates as a deletion to other devices (tombstones are kept for 30 days), but unpinning itself is not propagated and must be repeated on each device.
 - Window Management needs Accessibility permission; without it layout shortcuts and edge snapping do nothing, and the settings pane shows a warning instead.
 - Drag snapping triggers when the cursor enters the snap band or when the dragged window's edge is already pressed against the screen edge: when you grab the middle of a title bar the window reaches the edge long before the cursor does, and both signals count.
+- Finer snap areas (Rectangle style) are off by default: enabling them makes the top edge maximize, the bottom edge split into thirds, and moves the top/bottom halves onto the upper/lower third of the left and right edges.
+- App-rule title filters only apply to automatic rule application; dialogs, system dialogs, and sheets are skipped.
 - Full-screen windows are excluded from multi-window tiling and are never a drag-snapping target.
 - Some apps enforce a minimum window size, so very small layouts (such as a sixth of the screen) may leave the window larger than requested.
 - Fixed-size presets store only a position and size, not a specific display; when applied after a display change they are clamped back into the current display's usable area.

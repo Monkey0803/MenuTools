@@ -32,6 +32,17 @@
 	<string>1.1.0</string>
 	<key>LSMinimumSystemVersion</key>
 	<string>26.0</string>
+	<key>CFBundleURLTypes</key>
+	<array>
+		<dict>
+			<key>CFBundleURLName</key>
+			<string>com.qoder.menutools</string>
+			<key>CFBundleURLSchemes</key>
+			<array>
+				<string>menutools</string>
+			</array>
+		</dict>
+	</array>
 	<key>LSUIElement</key>
 	<true/>
 	<!-- Sparkle appcast；正式发布时由 release.sh 生成并上传到该地址。 -->

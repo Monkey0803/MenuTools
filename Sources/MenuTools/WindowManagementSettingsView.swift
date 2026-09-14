@@ -12,6 +12,7 @@ struct WindowManagementSettingsView: View {
     @State private var newPresetName = ""
     @State private var presetLayout: WindowLayout = .leftHalf
     @State private var ruleLayout: WindowLayout = .leftHalf
+    @State private var ruleTitleFilter = ""
     @State private var recordingPresetID: UUID?
 
     init(
@@ -341,8 +342,16 @@ struct WindowManagementSettingsView: View {
                         }
                     }
                     .labelsHidden()
+                    TextField(L("window.manager.ruleTitleFilter"), text: $ruleTitleFilter)
+                        .textFieldStyle(.roundedBorder)
+                        .frame(width: 130)
                     Button(L("window.manager.bind")) {
-                        windowService.addOrUpdateApplicationRule(for: application, layout: ruleLayout)
+                        windowService.addOrUpdateApplicationRule(
+                            for: application,
+                            layout: ruleLayout,
+                            windowTitleContains: ruleTitleFilter
+                        )
+                        ruleTitleFilter = ""
                     }
                 }
             } else {
@@ -357,7 +366,7 @@ struct WindowManagementSettingsView: View {
                         set: { windowService.setApplicationRuleEnabled($0, for: rule) }
                     )) {
                         Text(rule.applicationName)
-                        Text(L(rule.layout.titleKey))
+                        Text(rule.windowTitleContains.map { L("window.manager.ruleTitle", $0) } ?? L(rule.layout.titleKey))
                     }
                     Button { windowService.removeApplicationRule(rule) } label: {
                         Image(systemName: "trash")

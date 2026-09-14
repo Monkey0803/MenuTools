@@ -1,3 +1,4 @@
+import ApplicationServices
 import CoreGraphics
 import Foundation
 
@@ -87,6 +88,8 @@ struct WindowApplicationRule: Codable, Equatable, Identifiable, Sendable {
     var applicationName: String
     var layout: WindowLayout
     var isEnabled: Bool
+    /// 只在窗口标题包含该字符串时应用；nil 表示不限制标题。
+    var windowTitleContains: String?
 
     var id: String { bundleIdentifier }
 
@@ -94,18 +97,49 @@ struct WindowApplicationRule: Codable, Equatable, Identifiable, Sendable {
         bundleIdentifier: String,
         applicationName: String,
         layout: WindowLayout,
-        isEnabled: Bool = true
+        isEnabled: Bool = true,
+        windowTitleContains: String? = nil
     ) {
         self.bundleIdentifier = bundleIdentifier
         self.applicationName = applicationName
         self.layout = layout
         self.isEnabled = isEnabled
+        self.windowTitleContains = windowTitleContains
     }
 
     func settingEnabled(_ enabled: Bool) -> WindowApplicationRule {
         var copy = self
         copy.isEnabled = enabled
         return copy
+    }
+
+    private enum CodingKeys: String, CodingKey {
+        case bundleIdentifier
+        case applicationName
+        case layout
+        case isEnabled
+        case windowTitleContains
+    }
+
+    /// 逐字段解码：旧版本规则没有标题过滤字段，不能因此让整份配置失效。
+    init(from decoder: any Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        self.init(
+            bundleIdentifier: try container.decode(String.self, forKey: .bundleIdentifier),
+            applicationName: try container.decode(String.self, forKey: .applicationName),
+            layout: try container.decode(WindowLayout.self, forKey: .layout),
+            isEnabled: try container.decodeIfPresent(Bool.self, forKey: .isEnabled) ?? true,
+            windowTitleContains: try container.decodeIfPresent(String.self, forKey: .windowTitleContains)
+        )
+    }
+
+    func encode(to encoder: any Encoder) throws {
+        var container = encoder.container(keyedBy: CodingKeys.self)
+        try container.encode(bundleIdentifier, forKey: .bundleIdentifier)
+        try container.encode(applicationName, forKey: .applicationName)
+        try container.encode(layout, forKey: .layout)
+        try container.encode(isEnabled, forKey: .isEnabled)
+        try container.encodeIfPresent(windowTitleContains, forKey: .windowTitleContains)
     }
 }
 
@@ -322,10 +356,27 @@ enum WindowArrangementCalculator {
 enum WindowApplicationRuleResolver {
     static func layout(
         for bundleIdentifier: String,
+        windowTitle: String? = nil,
         rules: [WindowApplicationRule],
         excludedBundleIdentifiers: [String]
     ) -> WindowLayout? {
         guard !excludedBundleIdentifiers.contains(bundleIdentifier) else { return nil }
-        return rules.first { $0.bundleIdentifier == bundleIdentifier && $0.isEnabled }?.layout
+        return rules.first { rule in
+            guard rule.bundleIdentifier == bundleIdentifier, rule.isEnabled else { return false }
+            guard let filter = rule.windowTitleContains, !filter.isEmpty else { return true }
+            guard let windowTitle else { return false }
+            return windowTitle.localizedCaseInsensitiveContains(filter)
+        }?.layout
+    }
+
+    /// 自动应用规则时跳过弹窗、系统对话框和表单。
+    ///
+    /// 这些窗口的「窗口」语义很弱，把保存对话框拉成半屏只会碍事。
+    static func shouldSkipAutomaticLayout(role: String?, subrole: String?) -> Bool {
+        if role == kAXSheetRole { return true }
+        switch subrole {
+        case kAXDialogSubrole, kAXSystemDialogSubrole: return true
+        default: return false
+        }
     }
 }

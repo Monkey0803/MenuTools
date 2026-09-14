@@ -755,6 +755,8 @@
 "window.manager.currentApp" = "当前应用：%@";
 "window.manager.noCurrentApp" = "没有可识别的外部应用";
 "window.manager.bind" = "绑定";
+"window.manager.ruleTitleFilter" = "窗口标题包含（留空则不限）";
+"window.manager.ruleTitle" = "标题含「%@」";
 "window.manager.exclusions" = "排除应用";
 "window.manager.excludeCurrent" = "排除当前应用：%@";
 "window.apply" = "应用";

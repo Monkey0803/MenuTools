@@ -5,6 +5,14 @@ private final class MenuToolsApplicationDelegate: NSObject, NSApplicationDelegat
     func applicationWillTerminate(_ notification: Notification) {
         BuiltInPluginManager.shared.stopAllPlugins()
     }
+
+    /// 支持 `menutools://` 链接触发窗口操作，便于脚本、快捷指令与 Raycast 调用。
+    func application(_ application: NSApplication, open urls: [URL]) {
+        for url in urls {
+            guard let action = MenuToolsURL.action(for: url) else { continue }
+            MenuToolsURLActionHandler.perform(action)
+        }
+    }
 }
 
 /// 全局设置的存取 Key

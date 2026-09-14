@@ -216,3 +216,45 @@ func previewPlannerPassesDetailedFlag() throws {
     #expect(WindowSnapPreviewPlanner.plan(for: point, screens: screens, options: options)?.layout == .topHalf)
     #expect(WindowSnapPreviewPlanner.plan(for: point, screens: screens, options: options, detailedSnapAreas: true)?.layout == .maximize)
 }
+
+// MARK: - menutools:// 链接
+
+@Test("布局名与 URL 名称可以互相转换")
+func windowLayoutURLNameRoundTrips() {
+    #expect(WindowLayoutURLName.name(for: .leftHalf) == "left-half")
+    #expect(WindowLayoutURLName.name(for: .topLeftSixth) == "top-left-sixth")
+    #expect(WindowLayoutURLName.name(for: .toggleFullscreen) == "toggle-fullscreen")
+    #expect(WindowLayoutURLName.name(for: .stashLeft) == "stash-left")
+
+    #expect(WindowLayoutURLName.layout(from: "left-half") == .leftHalf)
+    #expect(WindowLayoutURLName.layout(from: "TOP-LEFT-SIXTH") == .topLeftSixth)
+    #expect(WindowLayoutURLName.layout(from: " stash-left ") == .stashLeft)
+    #expect(WindowLayoutURLName.layout(from: "nonsense") == nil)
+    #expect(WindowLayoutURLName.layout(from: "") == nil)
+
+    // 全部布局都能往返
+    for layout in WindowLayout.allCases {
+        #expect(
+            WindowLayoutURLName.layout(from: WindowLayoutURLName.name(for: layout)) == layout,
+            "\(layout.rawValue) 的 URL 名称无法往返"
+        )
+    }
+}
+
+@Test("解析 menutools:// 链接得到布局或预设")
+func urlSchemeParsesWindowActions() throws {
+    func action(_ string: String) -> MenuToolsURLAction? {
+        MenuToolsURL.action(for: URL(string: string)!)
+    }
+
+    #expect(action("menutools://window?layout=left-half") == .layout(.leftHalf))
+    // 与 Rectangle 的 execute-action 习惯一致
+    #expect(action("menutools://action?name=maximize") == .layout(.maximize))
+    #expect(action("menutools://preset?name=%E5%BC%80%E5%8F%91") == .preset("开发"))
+
+    #expect(action("menutools://window?layout=nonsense") == nil)
+    #expect(action("menutools://window") == nil)
+    #expect(action("menutools://preset?name=") == nil)
+    #expect(action("menutools://unknown?layout=left-half") == nil)
+    #expect(action("https://example.com/window?layout=left-half") == nil)
+}

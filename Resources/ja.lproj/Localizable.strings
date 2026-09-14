@@ -755,6 +755,8 @@
 "window.manager.currentApp" = "現在のアプリ：%@";
 "window.manager.noCurrentApp" = "外部アプリケーションを検出できません";
 "window.manager.bind" = "登録";
+"window.manager.ruleTitleFilter" = "ウインドウタイトルに含む（空欄で制限なし）";
+"window.manager.ruleTitle" = "タイトルに「%@」を含む";
 "window.manager.exclusions" = "除外アプリケーション";
 "window.manager.excludeCurrent" = "現在のアプリを除外：%@";
 "window.apply" = "適用";
