@@ -431,6 +431,11 @@
 "settings.autoCheck" = "Check for updates automatically";
 "settings.autoCheck.desc" = "Checks silently when the panel opens, at most once every 24 hours";
 "settings.currentVersion" = "Current Version";
+"settings.releaseDate" = "Release date";
+"settings.releaseNotes" = "Release notes";
+"settings.updateNow" = "Update now";
+"update.available" = "Version %@ is available";
+"footer.updateAvailable" = "Version %@";
 "settings.manualCheck" = "Manual Check";
 "settings.checkNow" = "Check Now";
 "settings.download" = "Download v%@";

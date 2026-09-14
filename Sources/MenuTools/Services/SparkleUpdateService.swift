@@ -72,6 +72,42 @@ private final class MenuToolsUpdateUserDriver: SPUStandardUserDriver {
     }
 }
 
+/// 温和提醒委托：后台（非用户主动）检查到的更新不再直接弹窗或静默升级，
+/// 而是记录成待处理提醒，由界面给出不打扰的入口。
+@MainActor
+private final class MenuToolsUpdateReminderDelegate: NSObject, @preconcurrency SPUStandardUserDriverDelegate {
+    var supportsGentleScheduledUpdateReminders: Bool { true }
+
+    func standardUserDriverShouldHandleShowingScheduledUpdate(
+        _ update: SUAppcastItem,
+        andInImmediateFocus immediateFocus: Bool
+    ) -> Bool {
+        // 需要立刻聚焦的更新仍交给 Sparkle 自己弹；其余由我们温和提醒。
+        // 这个回调不会在用户主动检查时触发，那条路径始终由 Sparkle 处理。
+        immediateFocus
+    }
+
+    func standardUserDriverWillHandleShowingUpdate(
+        _ handleShowingUpdate: Bool,
+        forUpdate update: SUAppcastItem,
+        state: SPUUserUpdateState
+    ) {
+        guard !handleShowingUpdate else { return }
+        AppUpdateReminder.shared.noteAvailable(
+            version: update.displayVersionString,
+            notes: update.itemDescription
+        )
+    }
+
+    func standardUserDriverDidReceiveUserAttention(forUpdate update: SUAppcastItem) {
+        AppUpdateReminder.shared.acknowledge()
+    }
+
+    func standardUserDriverWillFinishUpdateSession() {
+        AppUpdateReminder.shared.acknowledge()
+    }
+}
+
 /// Sparkle 更新入口。
 ///
 /// 更新检查、下载、签名校验、安装和重启全部交给 Sparkle，界面只负责触发
@@ -81,10 +117,14 @@ final class SparkleUpdateService {
     static let shared = SparkleUpdateService()
 
     private let userDriver: MenuToolsUpdateUserDriver
+    /// Sparkle 只弱引用 delegate，必须由这里强引用住。
+    private let reminderDelegate: MenuToolsUpdateReminderDelegate
     private let updater: SPUUpdater
 
     private init() {
-        let userDriver = MenuToolsUpdateUserDriver(hostBundle: .main, delegate: nil)
+        let reminderDelegate = MenuToolsUpdateReminderDelegate()
+        let userDriver = MenuToolsUpdateUserDriver(hostBundle: .main, delegate: reminderDelegate)
+        self.reminderDelegate = reminderDelegate
         self.userDriver = userDriver
         updater = SPUUpdater(
             hostBundle: .main,
@@ -106,6 +146,7 @@ final class SparkleUpdateService {
     }
 
     /// 手动检查时显示 Sparkle 标准更新窗口。
+    /// 界面上的「新版本可用」入口也走这里，把更新窗口带到前台。
     func checkForUpdates() {
         updater.checkForUpdates()
     }

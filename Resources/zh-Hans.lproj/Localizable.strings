@@ -431,6 +431,11 @@
 "settings.autoCheck" = "自动检查更新";
 "settings.autoCheck.desc" = "打开面板时静默检查，每 24 小时最多一次";
 "settings.currentVersion" = "当前版本";
+"settings.releaseDate" = "发布日期";
+"settings.releaseNotes" = "更新说明";
+"settings.updateNow" = "立即更新";
+"update.available" = "新版本 %@ 可用";
+"footer.updateAvailable" = "新版本 %@";
 "settings.manualCheck" = "手动检查";
 "settings.checkNow" = "立即检查";
 "settings.download" = "下载 v%@";

@@ -62,6 +62,11 @@ for lproj in Resources/*.lproj; do
     [[ -d "$lproj" ]] && cp -R "$lproj" "$APP_BUNDLE/Contents/Resources/"
 done
 
+# 应用内更新说明（设置页显示发布日期与更新内容）
+if [[ -f "Resources/ReleaseNotes.md" ]]; then
+    cp "Resources/ReleaseNotes.md" "$APP_BUNDLE/Contents/Resources/ReleaseNotes.md"
+fi
+
 # 随二进制分发第三方许可声明。Sparkle LICENSE 来自固定版本的 SPM artifact，
 # 避免手工复制后与实际嵌入版本不一致。
 if [[ -f "THIRD_PARTY_NOTICES.md" ]]; then

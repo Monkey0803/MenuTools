@@ -261,7 +261,9 @@ struct MenuPanelView: View {
 
     @ObservedObject private var caffeinate = CaffeinateService.shared
     @ObservedObject private var bleMonitor = BLEBatteryMonitor.shared
-    @State private var isDarkMode = AppearanceService.isDarkMode
+        /// 后台发现的待处理更新（温和提醒）。
+    @State private var updateReminder = AppUpdateReminder.shared
+@State private var isDarkMode = AppearanceService.isDarkMode
     @State private var btDevices: [BluetoothDeviceBattery] = []
     @State private var toggles = SystemToggleStates()
     @State private var derivedDataSize: Int64?
@@ -1564,9 +1566,20 @@ struct MenuPanelView: View {
 
     private var footer: some View {
         HStack(spacing: 10) {
-            Text("v\(AppVersionService.current)")
-                .font(.caption2)
-                .foregroundStyle(.tertiary)
+            if let pendingVersion = updateReminder.availableVersion {
+                // 后台检查到的更新只做温和提醒：点一下才让 Sparkle 弹出正式窗口。
+                Button(L("footer.updateAvailable", pendingVersion)) {
+                    checkForUpdate()
+                }
+                .buttonStyle(.plain)
+                .controlCenterHover()
+                .font(.caption2.weight(.medium))
+                .foregroundStyle(.tint)
+            } else {
+                Text("v\(AppVersionService.current)")
+                    .font(.caption2)
+                    .foregroundStyle(.tertiary)
+            }
 
             Button(L("footer.checkUpdate")) {
                 checkForUpdate()

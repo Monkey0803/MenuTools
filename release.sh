@@ -76,6 +76,12 @@ if ! security find-identity -p codesigning 2>/dev/null | grep -Fq "$SIGN_IDENTIT
     exit 1
 fi
 
+if ! grep -q "^## $VERSION" Resources/ReleaseNotes.md; then
+    echo "错误：Resources/ReleaseNotes.md 缺少版本 $VERSION 的更新说明段落。" >&2
+    echo "      应用内「更新说明」与 Release 说明都依赖它，请先补上（标题形如：## $VERSION — YYYY-MM-DD）。" >&2
+    exit 1
+fi
+
 echo "==> 发布模式：$RELEASE_MODE（签名身份：$SIGN_IDENTITY，版本：$VERSION）"
 
 echo "==> 运行测试"

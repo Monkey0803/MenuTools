@@ -396,6 +396,8 @@ struct GeneralSettingsView: View {
     @AppStorage(SettingsKey.togglesShowTitle) private var togglesShowTitle = false
     @AppStorage(SettingsKey.preferredTerminal) private var preferredTerminal = TerminalApp.systemDefault.rawValue
     @AppStorage(SettingsKey.autoCheckUpdate) private var autoCheckUpdate = true
+    /// 后台发现的待处理更新（温和提醒）。
+    @State private var updateReminder = AppUpdateReminder.shared
     @AppStorage(SettingsKey.appLanguage) private var appLanguage = AppLanguage.system.rawValue
 
     @State private var launchAtLogin = LoginItemService.isEnabled
@@ -484,6 +486,36 @@ struct GeneralSettingsView: View {
                 }
 
                 LabeledContent(L("settings.currentVersion"), value: "v\(AppVersionService.current)")
+
+                if let releaseNote = AppReleaseNotes.current() {
+                    if let dateText = releaseNote.dateText {
+                        LabeledContent(L("settings.releaseDate"), value: dateText)
+                    }
+                    if !releaseNote.bullets.isEmpty {
+                        DisclosureGroup(L("settings.releaseNotes")) {
+                            VStack(alignment: .leading, spacing: 6) {
+                                ForEach(releaseNote.bullets, id: \.self) { bullet in
+                                    Text("• \(bullet)")
+                                        .font(.caption)
+                                        .foregroundStyle(.secondary)
+                                        .fixedSize(horizontal: false, vertical: true)
+                                }
+                            }
+                            .padding(.top, 2)
+                        }
+                    }
+                }
+
+                if let pendingVersion = updateReminder.availableVersion {
+                    LabeledContent {
+                        Button(L("settings.updateNow")) {
+                            checkForUpdate()
+                        }
+                    } label: {
+                        Label(L("update.available", pendingVersion), systemImage: "arrow.down.circle.fill")
+                            .foregroundStyle(.tint)
+                    }
+                }
 
                 LabeledContent {
                     Button(L("settings.checkNow")) {
