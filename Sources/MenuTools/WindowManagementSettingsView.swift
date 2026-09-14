@@ -14,6 +14,7 @@ struct WindowManagementSettingsView: View {
     @State private var ruleLayout: WindowLayout = .leftHalf
     @State private var ruleTitleFilter = ""
     @State private var ruleFirstWindowOnly = false
+    @State private var layoutQuery = ""
     @State private var recordingPresetID: UUID?
 
     init(
@@ -37,13 +38,20 @@ struct WindowManagementSettingsView: View {
                         .foregroundStyle(.orange)
                 }
 
-                quickAccessShortcutSection
+                feedbackLine
 
-                managerOptionsSection
-                snapAreaSection
-                presetSection
-                applicationRulesSection
-                exclusionSection
+                GlassEffectContainer(spacing: 4) {
+                    VStack(alignment: .leading, spacing: 12) {
+                        quickAccessShortcutSection
+                        managerOptionsSection
+                        snapAreaSection
+                        layoutSection
+                        windowActionsCard
+                        presetSection
+                        applicationRulesSection
+                        exclusionSection
+                    }
+                }
 
                 // 必须放在滚动内容顶部，确保窗口打开时就已创建并可成为第一响应者。
                 WindowShortcutCaptureView(isRecording: recordingLayout != nil || isRecordingQuickAccessShortcut || recordingPresetID != nil) { shortcut in
@@ -82,57 +90,6 @@ struct WindowManagementSettingsView: View {
                 }
                 .frame(width: 1, height: 1)
 
-                LazyVGrid(
-                    columns: [
-                        GridItem(.flexible(), spacing: 10),
-                        GridItem(.flexible(), spacing: 10)
-                    ],
-                    spacing: 10
-                ) {
-                    ForEach(WindowLayout.allCases) { layout in
-                        layoutRow(layout)
-                    }
-                }
-
-                HStack(spacing: 10) {
-                    Button(L("window.save")) {
-                        do {
-                            try WindowManagementService.shared.saveFocusedWindowFrame()
-                            errorMessage = nil
-                        } catch {
-                            errorMessage = error.localizedDescription
-                        }
-                    }
-                    Button(L("window.restore")) {
-                        do {
-                            try WindowManagementService.shared.restoreFocusedWindowFrame()
-                            errorMessage = nil
-                        } catch {
-                            errorMessage = error.localizedDescription
-                        }
-                    }
-                    Button {
-                        arrangeWindows()
-                    } label: {
-                        Label(L("window.arrange"), systemImage: "square.grid.2x2")
-                    }
-                }
-                .buttonStyle(.bordered)
-
-                if let errorMessage {
-                    Text(errorMessage)
-                        .font(.caption)
-                        .foregroundStyle(.red)
-                } else if let statusMessage {
-                    Text(statusMessage)
-                        .font(.caption)
-                        .foregroundStyle(.secondary)
-                } else if let lastError = shortcutService.lastError {
-                    Text(lastError)
-                        .font(.caption)
-                        .foregroundStyle(.red)
-                }
-
             }
             .padding(16)
         }
@@ -146,8 +103,7 @@ struct WindowManagementSettingsView: View {
 
     private var quickAccessShortcutSection: some View {
         VStack(alignment: .leading, spacing: 8) {
-            Text(L("window.quickAccess.shortcut"))
-                .font(.headline)
+            sectionHeader("keyboard", L("window.quickAccess.shortcut"))
             Text(L("window.quickAccess.shortcutDescription"))
                 .font(.caption)
                 .foregroundStyle(.secondary)
@@ -174,14 +130,12 @@ struct WindowManagementSettingsView: View {
                 }
             }
         }
-        .padding(12)
-        .glassEffect(.regular, in: .rect(cornerRadius: 12))
+        .modifier(WindowSettingsCard())
     }
 
     private var managerOptionsSection: some View {
         VStack(alignment: .leading, spacing: 8) {
-            Text(L("window.manager.section"))
-                .font(.headline)
+            sectionHeader("slider.horizontal.3", L("window.manager.section"))
 
             optionSlider(
                 title: L("window.manager.padding"),
@@ -241,16 +195,14 @@ struct WindowManagementSettingsView: View {
                 set: { windowService.setAutomaticApplicationRulesEnabled($0) }
             ))
         }
-        .padding(12)
-        .glassEffect(.regular, in: .rect(cornerRadius: 12))
+        .modifier(WindowSettingsCard())
     }
 
     /// 吸附区域动作自定义（Rectangle Pro 那类）：每个区域触发哪个布局。
     private var snapAreaSection: some View {
         VStack(alignment: .leading, spacing: 8) {
             HStack {
-                Text(L("window.manager.snapAreas"))
-                    .font(.headline)
+                sectionHeader("rectangle.split.3x3", L("window.manager.snapAreas"))
                 Spacer()
                 Button(L("window.manager.snapAreaReset")) {
                     windowService.resetSnapAreaMapping()
@@ -288,8 +240,7 @@ struct WindowManagementSettingsView: View {
                 }
             }
         }
-        .padding(12)
-        .glassEffect(.regular, in: .rect(cornerRadius: 12))
+        .modifier(WindowSettingsCard())
     }
 
     private func snapAreaBinding(_ area: WindowSnapArea) -> Binding<WindowLayout?> {
@@ -301,8 +252,7 @@ struct WindowManagementSettingsView: View {
 
     private var presetSection: some View {
         VStack(alignment: .leading, spacing: 8) {
-            Text(L("window.manager.presets"))
-                .font(.headline)
+            sectionHeader("bookmark", L("window.manager.presets"))
             HStack {
                 TextField(L("window.manager.presetName"), text: $newPresetName)
                     .textFieldStyle(.roundedBorder)
@@ -380,14 +330,12 @@ struct WindowManagementSettingsView: View {
             }
             .disabled(newPresetName.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
         }
-        .padding(12)
-        .glassEffect(.regular, in: .rect(cornerRadius: 12))
+        .modifier(WindowSettingsCard())
     }
 
     private var applicationRulesSection: some View {
         VStack(alignment: .leading, spacing: 8) {
-            Text(L("window.manager.applicationRules"))
-                .font(.headline)
+            sectionHeader("app.badge.checkmark", L("window.manager.applicationRules"))
             if let application = windowService.focusedApplicationInfo() {
                 HStack {
                     Text(L("window.manager.currentApp", application.name))
@@ -438,14 +386,12 @@ struct WindowManagementSettingsView: View {
                 .font(.caption)
             }
         }
-        .padding(12)
-        .glassEffect(.regular, in: .rect(cornerRadius: 12))
+        .modifier(WindowSettingsCard())
     }
 
     private var exclusionSection: some View {
         VStack(alignment: .leading, spacing: 8) {
-            Text(L("window.manager.exclusions"))
-                .font(.headline)
+            sectionHeader("nosign", L("window.manager.exclusions"))
             if let application = windowService.focusedApplicationInfo(),
                !windowService.configuration.excludedBundleIdentifiers.contains(application.bundleIdentifier) {
                 Button(L("window.manager.excludeCurrent", application.name)) {
@@ -466,8 +412,7 @@ struct WindowManagementSettingsView: View {
                 .font(.caption)
             }
         }
-        .padding(12)
-        .glassEffect(.regular, in: .rect(cornerRadius: 12))
+        .modifier(WindowSettingsCard())
     }
 
     private func optionSlider(
@@ -540,7 +485,7 @@ struct WindowManagementSettingsView: View {
     }
 
     private func layoutRow(_ layout: WindowLayout) -> some View {
-        HStack(spacing: 8) {
+        HStack(spacing: 6) {
             Button {
                 apply(layout)
             } label: {
@@ -548,18 +493,19 @@ struct WindowManagementSettingsView: View {
                     WindowLayoutIcon(layout: layout)
                         .frame(width: 18, height: 14)
                     Text(L(layout.titleKey))
-                        .font(.callout)
+                        .font(.caption)
                         .lineLimit(1)
-                        .minimumScaleFactor(0.78)
+                        .minimumScaleFactor(0.75)
                     Spacer(minLength: 2)
-                    Text(recordingLayout == layout ? L("shortcut.recording") : (shortcutService.binding(for: layout)?.displayName ?? L("settings.unset")))
-                        .font(.caption2.monospaced())
-                        .lineLimit(1)
-                        .foregroundStyle(recordingLayout == layout ? AnyShapeStyle(.tint) : AnyShapeStyle(.secondary))
+                    shortcutBadge(for: layout)
                 }
-                .contentShape(.rect(cornerRadius: 9))
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .padding(.horizontal, 8)
+                .padding(.vertical, 6)
+                .contentShape(.rect(cornerRadius: 8))
             }
             .buttonStyle(.plain)
+            .controlCenterHover(shape: AnyShape(.rect(cornerRadius: 8)))
             .help(L("window.applied", L(layout.titleKey)))
 
             Button {
@@ -583,9 +529,186 @@ struct WindowManagementSettingsView: View {
                 .help(L("shortcut.clear"))
             }
         }
+    }
+
+    /// 快捷键用胶囊标签呈现：未设置时很轻，绑定后是等宽字体，录制中高亮。
+    private func shortcutBadge(for layout: WindowLayout) -> some View {
+        let binding = shortcutService.binding(for: layout)
+        let isRecording = recordingLayout == layout
+        let text = isRecording
+            ? L("shortcut.recording")
+            : (binding?.displayName ?? L("settings.unset"))
+        let fill: AnyShapeStyle = isRecording
+            ? AnyShapeStyle(Color.accentColor.opacity(0.16))
+            : AnyShapeStyle(.quaternary.opacity(binding == nil ? 0.35 : 0.75))
+
+        return Text(text)
+            .font(.caption2.monospaced())
+            .lineLimit(1)
+            .foregroundStyle(isRecording ? AnyShapeStyle(.tint) : AnyShapeStyle(binding == nil ? .tertiary : .secondary))
+            .padding(.horizontal, 5)
+            .padding(.vertical, 1)
+            .background(fill, in: .capsule)
+    }
+
+    /// 卡片标题：图标 + 标题（+ 可选副标题），全局统一。
+    private func sectionHeader(_ symbol: String, _ title: String, subtitle: String? = nil) -> some View {
+        HStack(spacing: 7) {
+            Image(systemName: symbol)
+                .font(.caption.weight(.semibold))
+                .foregroundStyle(.tint)
+                .frame(width: 15)
+            Text(title)
+                .font(.subheadline.weight(.semibold))
+            if let subtitle {
+                Text(subtitle)
+                    .font(.caption2)
+                    .foregroundStyle(.secondary)
+            }
+            Spacer(minLength: 0)
+        }
+    }
+
+    /// 顶部反馈行：错误与状态就近显示，不再沉在长页面底部。
+    @ViewBuilder
+    private var feedbackLine: some View {
+        if let errorMessage {
+            feedbackText(errorMessage, symbol: "exclamationmark.triangle.fill", tint: .red)
+        } else if let statusMessage {
+            feedbackText(statusMessage, symbol: "checkmark.circle.fill", tint: .green)
+        } else if let lastError = shortcutService.lastError {
+            feedbackText(lastError, symbol: "exclamationmark.triangle.fill", tint: .red)
+        }
+    }
+
+    private func feedbackText(_ message: String, symbol: String, tint: Color) -> some View {
+        Label(message, systemImage: symbol)
+            .font(.caption)
+            .foregroundStyle(tint)
+            .lineLimit(2)
+    }
+
+    private var matchedSections: [(group: WindowLayoutGroup, layouts: [WindowLayout])] {
+        WindowLayoutGrouping.sections(query: layoutQuery) { L($0.titleKey) }
+    }
+
+    private var matchedLayoutCount: Int {
+        matchedSections.reduce(0) { $0 + $1.layouts.count }
+    }
+
+    /// 布局与快捷键：搜索 + 按形状族分组，替代原来 60 项平铺的一整面墙。
+    private var layoutSection: some View {
+        VStack(alignment: .leading, spacing: 10) {
+            HStack(spacing: 7) {
+                Image(systemName: "rectangle.split.2x2")
+                    .font(.caption.weight(.semibold))
+                    .foregroundStyle(.tint)
+                    .frame(width: 15)
+                Text(L("window.manager.layouts"))
+                    .font(.subheadline.weight(.semibold))
+                Spacer(minLength: 0)
+                Text(L("window.manager.layoutCount", matchedLayoutCount, WindowLayout.allCases.count))
+                    .font(.caption2.monospacedDigit())
+                    .foregroundStyle(.secondary)
+            }
+
+            layoutSearchField
+
+            if matchedLayoutCount == 0 {
+                Text(L("window.manager.layoutSearchEmpty"))
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+                    .padding(.vertical, 6)
+            } else {
+                ForEach(matchedSections, id: \.group) { section in
+                    VStack(alignment: .leading, spacing: 6) {
+                        groupHeader(section.group, count: section.layouts.count)
+                        LazyVGrid(
+                            columns: [
+                                GridItem(.flexible(), spacing: 8),
+                                GridItem(.flexible(), spacing: 8)
+                            ],
+                            spacing: 6
+                        ) {
+                            ForEach(section.layouts) { layoutRow($0) }
+                        }
+                    }
+                }
+            }
+        }
+        .modifier(WindowSettingsCard())
+    }
+
+    private var layoutSearchField: some View {
+        HStack(spacing: 6) {
+            Image(systemName: "magnifyingglass")
+                .font(.caption)
+                .foregroundStyle(.secondary)
+            TextField(L("window.manager.layoutSearch"), text: $layoutQuery)
+                .textFieldStyle(.plain)
+                .font(.caption)
+            if !layoutQuery.isEmpty {
+                Button {
+                    layoutQuery = ""
+                } label: {
+                    Image(systemName: "xmark.circle.fill")
+                        .font(.caption)
+                }
+                .buttonStyle(.plain)
+                .foregroundStyle(.secondary)
+            }
+        }
         .padding(.horizontal, 9)
-        .padding(.vertical, 7)
-        .glassEffect(.regular.interactive(), in: .rect(cornerRadius: 9))
+        .padding(.vertical, 6)
+        .background(.quaternary.opacity(0.5), in: .rect(cornerRadius: 7))
+    }
+
+    private func groupHeader(_ group: WindowLayoutGroup, count: Int) -> some View {
+        HStack(spacing: 6) {
+            Image(systemName: group.symbol)
+                .font(.caption2)
+                .foregroundStyle(.secondary)
+            Text(L(group.titleKey))
+                .font(.caption.weight(.medium))
+                .foregroundStyle(.secondary)
+            Text("\(count)")
+                .font(.caption2.monospacedDigit())
+                .foregroundStyle(.tertiary)
+            Spacer(minLength: 0)
+        }
+        .padding(.top, 2)
+    }
+
+    /// 窗口级操作单独成卡，不再游离在布局网格下面。
+    private var windowActionsCard: some View {
+        VStack(alignment: .leading, spacing: 10) {
+            sectionHeader("wand.and.rays", L("window.manager.actions"))
+            HStack(spacing: 10) {
+                Button(L("window.save")) {
+                    do {
+                        try WindowManagementService.shared.saveFocusedWindowFrame()
+                        errorMessage = nil
+                    } catch {
+                        errorMessage = error.localizedDescription
+                    }
+                }
+                Button(L("window.restore")) {
+                    do {
+                        try WindowManagementService.shared.restoreFocusedWindowFrame()
+                        errorMessage = nil
+                    } catch {
+                        errorMessage = error.localizedDescription
+                    }
+                }
+                Button {
+                    arrangeWindows()
+                } label: {
+                    Label(L("window.arrange"), systemImage: "square.grid.2x2")
+                }
+            }
+            .buttonStyle(.bordered)
+        }
+        .modifier(WindowSettingsCard())
     }
 
     private func apply(_ layout: WindowLayout) {
@@ -677,5 +800,14 @@ private struct WindowShortcutCaptureView: NSViewRepresentable {
             }
             super.viewWillMove(toWindow: newWindow)
         }
+    }
+}
+
+/// 设置页卡片的统一表面：圆角、内边距与玻璃效果只在这里定义。
+private struct WindowSettingsCard: ViewModifier {
+    func body(content: Content) -> some View {
+        content
+            .padding(12)
+            .glassEffect(.regular, in: .rect(cornerRadius: 12))
     }
 }

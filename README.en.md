@@ -246,7 +246,7 @@ If permission was denied, enable it again in **System Settings → Privacy & Sec
 | Storage Analysis | Background recursive measurement of selected directories; cleanup keeps directories and never touches Downloads |
 | App Launcher | NSWorkspace app discovery, search, favorites, and launching |
 | Scenes | Composes app launching, appearance, Focus, audio, desktop icons, and prevent-sleep actions |
-| Window Management | Accessibility API for window position, size, and display movement; global NSEvent drag monitoring drives edge snapping and target-frame previews; layout cycling, per-app frame memory, presets, and app rules are persisted |
+| Window Management | Accessibility API for window position, size, and display movement; global NSEvent drag monitoring drives edge snapping and target-frame previews; layout cycling, per-app frame memory, presets, and app rules are persisted; the settings pane and quick-access panel group layouts by family and offer search |
 | Focus | Control Center accessibility script with a System Settings fallback |
 | Global shortcuts | NSEvent global/local keyboard monitors, persistent bindings, and conflict detection |
 | Update checks | Sparkle standard updater with Ed25519-signed appcast |

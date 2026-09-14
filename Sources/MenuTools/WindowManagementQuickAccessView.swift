@@ -41,36 +41,30 @@ struct WindowManagementQuickAccessView: View {
                     .padding(.bottom, 6)
                 }
 
-                LazyVGrid(
-                    columns: [
-                        GridItem(.flexible(), spacing: 8),
-                        GridItem(.flexible(), spacing: 8)
-                    ],
-                    spacing: 8
-                ) {
-                    ForEach(WindowLayout.allCases) { layout in
-                        Button {
-                            apply(layout)
-                        } label: {
-                            HStack(spacing: 6) {
-                                WindowLayoutIcon(layout: layout)
-                                    .frame(width: 16, height: 12)
-                                Text(L(layout.titleKey))
-                                    .font(.caption)
-                                    .lineLimit(1)
-                                Spacer(minLength: 0)
-                            }
-                            .frame(maxWidth: .infinity, alignment: .leading)
-                            .padding(.horizontal, 8)
-                            .padding(.vertical, 7)
-                            .contentShape(.rect(cornerRadius: 8))
+                ForEach(WindowLayoutGrouping.sections { L($0.titleKey) }, id: \.group) { section in
+                    VStack(alignment: .leading, spacing: 5) {
+                        HStack(spacing: 5) {
+                            Image(systemName: section.group.symbol)
+                                .font(.caption2)
+                            Text(L(section.group.titleKey))
+                                .font(.caption2.weight(.semibold))
                         }
-                        .buttonStyle(.plain)
-                        .controlCenterHover(shape: AnyShape(.rect(cornerRadius: 8)))
-                        .accessibilityLabel(L(layout.titleKey))
+                        .foregroundStyle(.secondary)
+
+                        LazyVGrid(
+                            columns: [
+                                GridItem(.flexible(), spacing: 8),
+                                GridItem(.flexible(), spacing: 8)
+                            ],
+                            spacing: 6
+                        ) {
+                            ForEach(section.layouts) { layout in
+                                layoutButton(layout)
+                            }
+                        }
                     }
+                    .padding(.bottom, 6)
                 }
-                .padding(.vertical, 2)
             }
 
             if let errorMessage {
@@ -82,6 +76,28 @@ struct WindowManagementQuickAccessView: View {
         }
         .padding(14)
         .frame(width: 340, height: 430, alignment: .top)
+    }
+
+    private func layoutButton(_ layout: WindowLayout) -> some View {
+        Button {
+            apply(layout)
+        } label: {
+            HStack(spacing: 6) {
+                WindowLayoutIcon(layout: layout)
+                    .frame(width: 16, height: 12)
+                Text(L(layout.titleKey))
+                    .font(.caption)
+                    .lineLimit(1)
+                Spacer(minLength: 0)
+            }
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .padding(.horizontal, 8)
+            .padding(.vertical, 7)
+            .contentShape(.rect(cornerRadius: 8))
+        }
+        .buttonStyle(.plain)
+        .controlCenterHover(shape: AnyShape(.rect(cornerRadius: 8)))
+        .accessibilityLabel(L(layout.titleKey))
     }
 
     /// 固定尺寸预设排在布局网格之前：它们是用户自己命名的高频动作。
