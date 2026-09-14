@@ -77,8 +77,19 @@ cp "$SPARKLE_LICENSE" "$APP_BUNDLE/Contents/Resources/Sparkle-LICENSE.txt"
 # ===== 编译并嵌入 Finder 右键扩展（.appex）=====
 EXT_NAME="RightClickTools"
 APPEX="$APP_BUNDLE/Contents/PlugIns/$EXT_NAME.appex"
-SDK=$(xcrun --show-sdk-path)
-echo "==> 编译 Finder 扩展"
+# 必须用 `--sdk macosx` 指定 SDK：裸 `xcrun --show-sdk-path` 返回的是
+# CommandLineTools 的 SDK，它可能由另一套工具链的编译器构建。一旦 macOS 大版本
+# 升级后 CLT 与当前活动 Xcode 不同套，扩展编译会报 “SDK is not supported by
+# the compiler”，而主程序走 SwiftPM（解析出一致的 SDK）却能正常编译，
+# 表现为「主程序编译成功、扩展编译失败」的迷惑现象。
+SDK=$(xcrun --sdk macosx --show-sdk-path)
+if [[ ! -d "$SDK" ]]; then
+    echo "错误：未找到 macOS SDK：$SDK" >&2
+    echo "      可用 DEVELOPER_DIR 指定完整工具链，例如：" >&2
+    echo "      DEVELOPER_DIR=/Applications/Xcode.app/Contents/Developer $0" >&2
+    exit 1
+fi
+echo "==> 编译 Finder 扩展（SDK: $SDK）"
 mkdir -p "$APPEX/Contents/MacOS" "$APPEX/Contents/Resources"
 # 扩展源 + 与主 App 共享的配置模型一起编译；入口 NSExtensionMain
 swiftc Extension/*.swift Sources/MenuTools/RightClickConfig.swift \
