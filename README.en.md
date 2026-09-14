@@ -171,6 +171,24 @@ swift Scripts/test_clipboard_autopaste.swift --interactive   # adds the end-to-e
 
 `--interactive` requires Accessibility permission and a focused editable field within 5 seconds of the prompt. The default non-interactive mode uses a private pasteboard only and leaves the system clipboard untouched.
 
+### Window Management Verification
+
+Window layouts, drag snapping, and stashing all depend on Accessibility APIs, so a standalone script covers them:
+
+```bash
+swift Scripts/test_window_management.swift                # read-only: permission, multi-display geometry, coordinate round-trip, AX attributes
+swift Scripts/test_window_management.swift --interactive   # adds writes: move the focused window to the left half and restore it, and confirm AX accepts off-screen coordinates (stashing)
+```
+
+Drag snapping and the drop preview only run during a real drag, so turn on the diagnostic log when investigating:
+
+```bash
+touch /tmp/menutools-snap-debug     # from the next launch, writes /tmp/menutools-snap.log: hit test, title-bar check, preview target, snap on release
+rm /tmp/menutools-snap-debug        # disable (nothing is logged by default)
+```
+
+Note: CGEvent-synthesized mouse events are not delivered to `NSEvent` global monitors on macOS 26, so drag behaviour cannot be scripted and has to be verified by hand. A step-by-step checklist lives in [`docs/window-management-acceptance.md`](docs/window-management-acceptance.md).
+
 ## Permissions
 
 Some features request permissions the first time they are used:
@@ -272,7 +290,8 @@ export SPARKLE_DOWNLOAD_URL_PREFIX="https://your-server/releases/"
 - Image text recognition relies on on-device Vision and may briefly return empty results under heavy system load; failures are retried automatically and again when the clipboard panel is reopened.
 - Shared-folder sync covers "pinned items + snippets": deleting a pinned item or clearing history propagates as a deletion to other devices (tombstones are kept for 30 days), but unpinning itself is not propagated and must be repeated on each device.
 - Window Management needs Accessibility permission; without it layout shortcuts and edge snapping do nothing, and the settings pane shows a warning instead.
-- Edge snapping only previews a drop target while the window itself is following the pointer, and full-screen windows are excluded from multi-window tiling.
+- Drag snapping triggers when the cursor enters the snap band or when the dragged window's edge is already pressed against the screen edge: when you grab the middle of a title bar the window reaches the edge long before the cursor does, and both signals count.
+- Full-screen windows are excluded from multi-window tiling and are never a drag-snapping target.
 - Some apps enforce a minimum window size, so very small layouts (such as a sixth of the screen) may leave the window larger than requested.
 - Fixed-size presets store only a position and size, not a specific display; when applied after a display change they are clamped back into the current display's usable area.
 - Repeating a half-screen shortcut to reach the adjacent display requires at least two displays and is off by default; enable it in Settings.

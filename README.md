@@ -225,6 +225,24 @@ swift Scripts/test_clipboard_autopaste.swift --interactive   # 追加合成 ⌘V
 
 `--interactive` 需要先授予辅助功能权限，并在提示后 5 秒内点击任意可编辑输入框；默认非交互模式只使用私有粘贴板，不会改动系统剪贴板。
 
+### 窗口管理验证
+
+窗口布局、拖动吸附与收纳依赖辅助功能 API，可用独立脚本回归：
+
+```bash
+swift Scripts/test_window_management.swift                # 只读检查：权限、多显示器几何、坐标往返、AX 属性可读性
+swift Scripts/test_window_management.swift --interactive   # 追加写入验证：移动前台窗口到左半屏并还原，同时验证 AX 接受越界坐标（收纳能力）
+```
+
+拖动吸附与落点预览只在真实拖拽时才会走到，排查时打开诊断日志：
+
+```bash
+touch /tmp/menutools-snap-debug     # 下次启动后写 /tmp/menutools-snap.log：命中测试结果、标题栏判定、预览落点、松手吸附
+rm /tmp/menutools-snap-debug        # 关闭（默认不写任何日志）
+```
+
+注意：CGEvent 合成的鼠标事件在 macOS 26 上不会投递给 `NSEvent` 全局监听，拖拽行为无法脚本化验证，只能手动拖一次。逐项验收步骤见 [`docs/window-management-acceptance.md`](docs/window-management-acceptance.md)。
+
 ## 🔄 发布更新
 
 更新功能使用 **[Sparkle](https://github.com/sparkle-project/Sparkle)**，由 Sparkle 负责 appcast 检查、下载、Ed25519 签名校验、安装和重启：
@@ -262,7 +280,8 @@ export SPARKLE_DOWNLOAD_URL_PREFIX="https://your-server/releases/"
 - 图片文字识别依赖本地 Vision，系统负载很高时可能短暂返回空结果；失败会自动重试，并在下次打开剪贴板面板时补试
 - 剪贴板共享同步的集合是「置顶内容 + 常用片段」：删除置顶条目或清空历史会作为删除动作同步到其他设备（墓碑保留 30 天），但取消置顶本身不会传播，需要在其他设备上同样取消
 - 窗口管理依赖「辅助功能」权限；未授权时布局快捷键和边缘吸附不会生效，设置页会给出提示
-- 边缘吸附只在窗口确实跟随鼠标移动时显示落点预览；全屏窗口不参与多窗口网格排列
+- 拖动吸附在「光标进入吸附带」或「窗口边缘已贴住屏幕边缘」时触发：抓标题栏中部拖动时窗口先到边、光标往往还离屏幕边缘很远，两种判据都会生效
+- 全屏窗口不参与多窗口网格排列，也不会出现在拖动吸附的目标里
 - 部分应用会限制窗口最小尺寸，设置过小的布局（例如六分之一）时窗口可能保持较大尺寸
 - 固定尺寸预设只记录窗口的位置与尺寸，不绑定具体显示器；更换显示器后套用时会被夹取回当前显示器的可用区域
 - 连按半屏跨显示器需要至少两台显示器且默认关闭，可在设置里开启
