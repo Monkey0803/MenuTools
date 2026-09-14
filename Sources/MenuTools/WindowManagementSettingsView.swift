@@ -13,6 +13,7 @@ struct WindowManagementSettingsView: View {
     @State private var presetLayout: WindowLayout = .leftHalf
     @State private var ruleLayout: WindowLayout = .leftHalf
     @State private var ruleTitleFilter = ""
+    @State private var ruleFirstWindowOnly = false
     @State private var recordingPresetID: UUID?
 
     init(
@@ -39,6 +40,7 @@ struct WindowManagementSettingsView: View {
                 quickAccessShortcutSection
 
                 managerOptionsSection
+                snapAreaSection
                 presetSection
                 applicationRulesSection
                 exclusionSection
@@ -243,6 +245,60 @@ struct WindowManagementSettingsView: View {
         .glassEffect(.regular, in: .rect(cornerRadius: 12))
     }
 
+    /// 吸附区域动作自定义（Rectangle Pro 那类）：每个区域触发哪个布局。
+    private var snapAreaSection: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            HStack {
+                Text(L("window.manager.snapAreas"))
+                    .font(.headline)
+                Spacer()
+                Button(L("window.manager.snapAreaReset")) {
+                    windowService.resetSnapAreaMapping()
+                }
+                .font(.caption)
+                .disabled(windowService.configuration.snapAreaMapping.isEmpty)
+            }
+            Text(L("window.manager.snapAreasHint"))
+                .font(.caption)
+                .foregroundStyle(.secondary)
+
+            LazyVGrid(
+                columns: [
+                    GridItem(.flexible(), spacing: 10),
+                    GridItem(.flexible(), spacing: 10)
+                ],
+                spacing: 6
+            ) {
+                ForEach(WindowSnapArea.customizable, id: \.self) { area in
+                    HStack(spacing: 6) {
+                        Text(L(area.titleKey))
+                            .font(.caption)
+                            .lineLimit(1)
+                        Spacer(minLength: 4)
+                        Picker("", selection: snapAreaBinding(area)) {
+                            Text(L("window.manager.snapAreaDefault"))
+                                .tag(WindowLayout?.none)
+                            ForEach(WindowLayout.allCases) { layout in
+                                Text(L(layout.titleKey)).tag(WindowLayout?.some(layout))
+                            }
+                        }
+                        .labelsHidden()
+                        .font(.caption)
+                    }
+                }
+            }
+        }
+        .padding(12)
+        .glassEffect(.regular, in: .rect(cornerRadius: 12))
+    }
+
+    private func snapAreaBinding(_ area: WindowSnapArea) -> Binding<WindowLayout?> {
+        Binding(
+            get: { windowService.configuration.snapAreaMapping.override(for: area) },
+            set: { windowService.setSnapAreaAction($0, for: area) }
+        )
+    }
+
     private var presetSection: some View {
         VStack(alignment: .leading, spacing: 8) {
             Text(L("window.manager.presets"))
@@ -345,13 +401,18 @@ struct WindowManagementSettingsView: View {
                     TextField(L("window.manager.ruleTitleFilter"), text: $ruleTitleFilter)
                         .textFieldStyle(.roundedBorder)
                         .frame(width: 130)
+                    Toggle(L("window.manager.ruleFirstWindowOnly"), isOn: $ruleFirstWindowOnly)
+                        .toggleStyle(.checkbox)
+                        .font(.caption)
                     Button(L("window.manager.bind")) {
                         windowService.addOrUpdateApplicationRule(
                             for: application,
                             layout: ruleLayout,
-                            windowTitleContains: ruleTitleFilter
+                            windowTitleContains: ruleTitleFilter,
+                            firstWindowOnly: ruleFirstWindowOnly
                         )
                         ruleTitleFilter = ""
+                        ruleFirstWindowOnly = false
                     }
                 }
             } else {
@@ -366,7 +427,7 @@ struct WindowManagementSettingsView: View {
                         set: { windowService.setApplicationRuleEnabled($0, for: rule) }
                     )) {
                         Text(rule.applicationName)
-                        Text(rule.windowTitleContains.map { L("window.manager.ruleTitle", $0) } ?? L(rule.layout.titleKey))
+                        Text(ruleSummary(rule))
                     }
                     Button { windowService.removeApplicationRule(rule) } label: {
                         Image(systemName: "trash")
@@ -433,6 +494,18 @@ struct WindowManagementSettingsView: View {
                 windowService.updateOptions(options)
             }
         )
+    }
+
+    /// 规则列表里的摘要：布局名 + 可选的标题过滤与主窗口限定。
+    private func ruleSummary(_ rule: WindowApplicationRule) -> String {
+        var parts = [L(rule.layout.titleKey)]
+        if let filter = rule.windowTitleContains {
+            parts.append(L("window.manager.ruleTitle", filter))
+        }
+        if rule.firstWindowOnly {
+            parts.append(L("window.manager.ruleFirstWindowOnly"))
+        }
+        return parts.joined(separator: " · ")
     }
 
     private func apply(_ preset: WindowLayoutPreset) {

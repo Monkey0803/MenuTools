@@ -467,6 +467,19 @@ final class WindowManagementService {
         saveConfiguration()
     }
 
+    /// 自定义某个吸附区域触发的布局；传 nil 表示恢复该区域的内置动作。
+    func setSnapAreaAction(_ layout: WindowLayout?, for area: WindowSnapArea) {
+        configuration.snapAreaMapping.setOverride(layout, for: area)
+        saveConfiguration()
+        hideSnapPreview()
+    }
+
+    func resetSnapAreaMapping() {
+        configuration.snapAreaMapping.removeAll()
+        saveConfiguration()
+        hideSnapPreview()
+    }
+
     func setDetailedSnapAreasEnabled(_ enabled: Bool) {
         configuration.detailedSnapAreas = enabled
         saveConfiguration()
@@ -505,14 +518,16 @@ final class WindowManagementService {
     func addOrUpdateApplicationRule(
         for application: WindowApplicationInfo,
         layout: WindowLayout,
-        windowTitleContains: String? = nil
+        windowTitleContains: String? = nil,
+        firstWindowOnly: Bool = false
     ) {
         let trimmedFilter = windowTitleContains?.trimmingCharacters(in: .whitespacesAndNewlines)
         let rule = WindowApplicationRule(
             bundleIdentifier: application.bundleIdentifier,
             applicationName: application.name,
             layout: layout,
-            windowTitleContains: (trimmedFilter?.isEmpty ?? true) ? nil : trimmedFilter
+            windowTitleContains: (trimmedFilter?.isEmpty ?? true) ? nil : trimmedFilter,
+            firstWindowOnly: firstWindowOnly
         )
         if let index = configuration.applicationRules.firstIndex(where: { $0.bundleIdentifier == rule.bundleIdentifier }) {
             configuration.applicationRules[index] = rule
@@ -804,6 +819,18 @@ final class WindowManagementService {
                 rules: self.configuration.applicationRules,
                 excludedBundleIdentifiers: self.configuration.excludedBundleIdentifiers
             ) else { return }
+
+            // 「只作用于首个（主）窗口」：焦点在工具面板或次窗口上时不动它
+            let firstWindowOnly = self.configuration.applicationRules.first {
+                $0.bundleIdentifier == bundleIdentifier && $0.isEnabled
+            }?.firstWindowOnly ?? false
+            guard WindowApplicationRuleResolver.shouldApplyToFocusedWindow(
+                isMainWindow: self.isMainWindow(window, of: processIdentifier),
+                firstWindowOnly: firstWindowOnly
+            ) else {
+                SnapDebugLog.log("auto rule: skipped, focused window is not the main window")
+                return
+            }
             try? self.apply(layout)
         }
     }
@@ -908,7 +935,8 @@ final class WindowManagementService {
             windowFrame: dragWindowFrame,
             screens: snapScreens,
             options: configuration.options,
-            detailedSnapAreas: configuration.detailedSnapAreas
+            detailedSnapAreas: configuration.detailedSnapAreas,
+            snapAreaMapping: configuration.snapAreaMapping
         ) else {
             hideSnapPreview()
             return
@@ -987,7 +1015,8 @@ final class WindowManagementService {
                 windowFrame: dragWindowFrame,
                 screens: snapScreens,
                 options: configuration.options,
-                detailedSnapAreas: configuration.detailedSnapAreas
+                detailedSnapAreas: configuration.detailedSnapAreas,
+                snapAreaMapping: configuration.snapAreaMapping
               ) else {
             SnapDebugLog.log("snap on mouseUp: skipped (window=\(dragWindow != nil) pid=\(dragWindowPID != nil) point=\(NSStringFromPoint(NSEvent.mouseLocation)) windowFrame=\(dragWindowFrame.map(NSStringFromRect) ?? "nil"))")
             return
@@ -1274,6 +1303,15 @@ final class WindowManagementService {
 
     private func windowTitle(of window: AXUIElement) -> String? {
         stringAttribute(kAXTitleAttribute, of: window)
+    }
+
+    /// 焦点窗口是不是该应用的主窗口。
+    private func isMainWindow(_ window: AXUIElement, of processIdentifier: pid_t) -> Bool {
+        let application = AXUIElementCreateApplication(processIdentifier)
+        var value: CFTypeRef?
+        guard AXUIElementCopyAttributeValue(application, kAXMainWindowAttribute as CFString, &value) == .success,
+              let value else { return true }
+        return CFEqual(window, unsafeDowncast(value, to: AXUIElement.self))
     }
 
     private func stringAttribute(_ name: String, of window: AXUIElement) -> String? {

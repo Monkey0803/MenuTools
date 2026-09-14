@@ -744,6 +744,18 @@
 "window.manager.snapPreview" = "拖曳視窗到邊緣時顯示落點預覽";
 "window.manager.haptic" = "吸附到新的落點區域時給出觸覺回饋";
 "window.manager.detailedSnapAreas" = "使用更細的吸附區域（Rectangle 風格：上緣最大化、下緣三分區）";
+"window.manager.snapAreas" = "吸附區域動作";
+"window.manager.snapAreaDefault" = "使用預設";
+"window.manager.snapAreaReset" = "恢復預設";
+"window.manager.snapAreasHint" = "選擇每條邊、每個角觸發哪個佈局；精細模型獨有的分區沿用內建動作。";
+"window.snapArea.left" = "螢幕左邊緣";
+"window.snapArea.right" = "螢幕右邊緣";
+"window.snapArea.top" = "螢幕上邊緣";
+"window.snapArea.bottom" = "螢幕下邊緣";
+"window.snapArea.topLeft" = "左上角";
+"window.snapArea.topRight" = "右上角";
+"window.snapArea.bottomLeft" = "左下角";
+"window.snapArea.bottomRight" = "右下角";
 "window.manager.restoreSizeOnDragOut" = "把已吸附的視窗拖出來時恢復原尺寸";
 "window.manager.capturePreset" = "記住目前視窗";
 "window.manager.capturedPreset" = "已儲存預設：%@";
@@ -757,6 +769,7 @@
 "window.manager.bind" = "綁定";
 "window.manager.ruleTitleFilter" = "視窗標題包含（留空則不限）";
 "window.manager.ruleTitle" = "標題含「%@」";
+"window.manager.ruleFirstWindowOnly" = "只作用於首個（主）視窗";
 "window.manager.exclusions" = "排除應用程式";
 "window.manager.excludeCurrent" = "排除目前應用程式：%@";
 "window.apply" = "套用";

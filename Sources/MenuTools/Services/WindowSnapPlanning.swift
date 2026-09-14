@@ -87,14 +87,16 @@ enum WindowSnapPreviewPlanner {
         windowFrame: CGRect? = nil,
         screens: [WindowSnapScreen],
         options: WindowManagerOptions,
-        detailedSnapAreas: Bool = false
+        detailedSnapAreas: Bool = false,
+        snapAreaMapping: WindowSnapAreaMapping = WindowSnapAreaMapping()
     ) -> WindowSnapPreviewPlan? {
         if let index = WindowSnapResolver.screenIndex(for: point, screens: screens.map(\.frame)),
            let layout = WindowSnapResolver.layout(
                for: point,
                in: screens[index].frame,
                threshold: options.snapDistance,
-               detailed: detailedSnapAreas
+               detailed: detailedSnapAreas,
+               mapping: snapAreaMapping
            ) {
             return WindowSnapPreviewPlan(
                 layout: layout,
@@ -113,7 +115,8 @@ enum WindowSnapPreviewPlanner {
                   pressedWindowFrame: windowFrame,
                   in: screens[index].frame,
                   threshold: options.snapDistance,
-                  detailed: detailedSnapAreas
+                  detailed: detailedSnapAreas,
+                  mapping: snapAreaMapping
               ) else { return nil }
 
         return WindowSnapPreviewPlan(

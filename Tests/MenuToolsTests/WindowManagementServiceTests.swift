@@ -326,3 +326,32 @@ func applicationRuleWithTitleFilterRoundTrips() throws {
     let data = try JSONEncoder().encode(rule)
     #expect(try JSONDecoder().decode(WindowApplicationRule.self, from: data) == rule)
 }
+
+@Test("「只作用于首个（主）窗口」的判定")
+func automaticRuleCanBeLimitedToMainWindow() {
+    // 未开启时不做限制
+    #expect(WindowApplicationRuleResolver.shouldApplyToFocusedWindow(isMainWindow: false, firstWindowOnly: false))
+    #expect(WindowApplicationRuleResolver.shouldApplyToFocusedWindow(isMainWindow: true, firstWindowOnly: false))
+    // 开启后焦点在次窗口/工具面板上就不套用
+    #expect(WindowApplicationRuleResolver.shouldApplyToFocusedWindow(isMainWindow: true, firstWindowOnly: true))
+    #expect(!WindowApplicationRuleResolver.shouldApplyToFocusedWindow(isMainWindow: false, firstWindowOnly: true))
+}
+
+@Test("旧的应用规则缺少主窗口限定时默认为不限制")
+func applicationRuleDecodesFirstWindowOnlyDefault() throws {
+    let legacy = Data("""
+    {"bundleIdentifier":"com.example.Editor","applicationName":"Editor","layout":"leftHalf","isEnabled":true}
+    """.utf8)
+    let decoded = try JSONDecoder().decode(WindowApplicationRule.self, from: legacy)
+    #expect(!decoded.firstWindowOnly)
+
+    let rule = WindowApplicationRule(
+        bundleIdentifier: "com.example.Editor",
+        applicationName: "Editor",
+        layout: .leftHalf,
+        windowTitleContains: "项目 A",
+        firstWindowOnly: true
+    )
+    let data = try JSONEncoder().encode(rule)
+    #expect(try JSONDecoder().decode(WindowApplicationRule.self, from: data) == rule)
+}

@@ -258,3 +258,120 @@ func urlSchemeParsesWindowActions() throws {
     #expect(action("menutools://unknown?layout=left-half") == nil)
     #expect(action("https://example.com/window?layout=left-half") == nil)
 }
+
+// MARK: - 自定义吸附区域
+
+@Test("吸附区域判定与内置默认动作保持一致")
+func snapAreaResolutionKeepsBuiltInDefaults() {
+    let screen = CGRect(x: 0, y: 0, width: 1200, height: 800)
+    let threshold: CGFloat = 24
+    let mapping = WindowSnapAreaMapping()
+
+    #expect(WindowSnapResolver.area(for: CGPoint(x: 2, y: 400), in: screen, threshold: threshold) == .left)
+    #expect(WindowSnapResolver.area(for: CGPoint(x: 1198, y: 400), in: screen, threshold: threshold) == .right)
+    #expect(WindowSnapResolver.area(for: CGPoint(x: 600, y: 799), in: screen, threshold: threshold) == .top)
+    #expect(WindowSnapResolver.area(for: CGPoint(x: 600, y: 2), in: screen, threshold: threshold) == .bottom)
+    #expect(WindowSnapResolver.area(for: CGPoint(x: 2, y: 798), in: screen, threshold: threshold) == .topLeft)
+    #expect(WindowSnapResolver.area(for: CGPoint(x: 1198, y: 2), in: screen, threshold: threshold) == .bottomRight)
+    #expect(WindowSnapResolver.area(for: CGPoint(x: 600, y: 400), in: screen, threshold: threshold) == nil)
+
+    // 默认映射 == 原行为
+    #expect(mapping.action(for: .left, detailed: false) == .leftHalf)
+    #expect(mapping.action(for: .top, detailed: false) == .topHalf)
+    #expect(mapping.action(for: .top, detailed: true) == .maximize)
+    #expect(mapping.action(for: .topLeft, detailed: false) == .topLeft)
+    #expect(mapping.action(for: .bottomCenterThird, detailed: true) == .bottomHalf)
+    #expect(mapping.action(for: .bottomLeftThird, detailed: true) == .firstThird)
+    #expect(mapping.action(for: .leftUpperThird, detailed: true) == .topHalf)
+    #expect(mapping.isEmpty)
+}
+
+@Test("用户可以把任意吸附区域改成任意布局")
+func snapAreaOverridesReplaceBuiltInActions() {
+    let screen = CGRect(x: 0, y: 0, width: 1200, height: 800)
+    let threshold: CGFloat = 24
+    var mapping = WindowSnapAreaMapping()
+    mapping.setOverride(.firstThird, for: .left)
+    mapping.setOverride(.maximize, for: .topLeft)
+    mapping.setOverride(.topHalf, for: .top)   // 覆盖精细模型的内置最大化
+
+    #expect(WindowSnapResolver.layout(for: CGPoint(x: 2, y: 400), in: screen, threshold: threshold, mapping: mapping) == .firstThird)
+    #expect(WindowSnapResolver.layout(for: CGPoint(x: 2, y: 798), in: screen, threshold: threshold, mapping: mapping) == .maximize)
+    #expect(WindowSnapResolver.layout(for: CGPoint(x: 600, y: 799), in: screen, threshold: threshold, detailed: true, mapping: mapping) == .topHalf)
+
+    // 没有覆盖的区域仍是内置动作
+    #expect(WindowSnapResolver.layout(for: CGPoint(x: 600, y: 2), in: screen, threshold: threshold, mapping: mapping) == .bottomHalf)
+
+    // 清掉覆盖后回到内置动作
+    mapping.setOverride(nil, for: .left)
+    #expect(mapping.override(for: .left) == nil)
+    #expect(WindowSnapResolver.layout(for: CGPoint(x: 2, y: 400), in: screen, threshold: threshold, mapping: mapping) == .leftHalf)
+
+    mapping.removeAll()
+    #expect(mapping.isEmpty)
+}
+
+@Test("窗口贴边判定同样遵循自定义映射")
+func pressedWindowSnapHonorsOverrides() {
+    let screen = CGRect(x: 0, y: 0, width: 1200, height: 800)
+    var mapping = WindowSnapAreaMapping()
+    mapping.setOverride(.rightHalf, for: .top)
+
+    let frame = CGRect(x: 400, y: 500, width: 400, height: 300)   // 顶部贴边
+    #expect(WindowSnapResolver.layout(pressedWindowFrame: frame, in: screen, threshold: 24, mapping: mapping) == .rightHalf)
+    #expect(WindowSnapResolver.layout(pressedWindowFrame: frame, in: screen, threshold: 24) == .topHalf)
+}
+
+@Test("吸附区域映射只保存覆盖项，且宽容解码")
+func snapAreaMappingCodableIsLenient() throws {
+    var mapping = WindowSnapAreaMapping()
+    mapping.setOverride(.firstThird, for: .left)
+    let data = try JSONEncoder().encode(mapping)
+    #expect(try JSONDecoder().decode(WindowSnapAreaMapping.self, from: data) == mapping)
+
+    // 未知区域/未知布局被忽略
+    let garbage = Data(#"{"left":"firstThird","notAnArea":"leftHalf","top":"notALayout"}"#.utf8)
+    let decoded = try JSONDecoder().decode(WindowSnapAreaMapping.self, from: garbage)
+    #expect(decoded.override(for: .left) == .firstThird)
+    #expect(decoded.override(for: .top) == nil)
+    #expect(decoded.overrides.count == 1)
+
+    // 完全不是字典时回落到空映射
+    let broken = Data("[1,2,3]".utf8)
+    #expect(try JSONDecoder().decode(WindowSnapAreaMapping.self, from: broken).isEmpty)
+}
+
+@Test("预览规划器会把自定义映射透传给吸附判定")
+func previewPlannerPassesSnapAreaMapping() throws {
+    let screens = [
+        WindowSnapScreen(frame: CGRect(x: 0, y: 0, width: 1200, height: 800), visibleFrame: CGRect(x: 0, y: 0, width: 1200, height: 800))
+    ]
+    let options = WindowManagerOptions(screenPadding: 0, windowGap: 0, snapDistance: 24)
+    var mapping = WindowSnapAreaMapping()
+    mapping.setOverride(.lastTwoThirds, for: .right)
+
+    let plan = try #require(WindowSnapPreviewPlanner.plan(
+        for: CGPoint(x: 1198, y: 400),
+        screens: screens,
+        options: options,
+        snapAreaMapping: mapping
+    ))
+    #expect(plan.layout == .lastTwoThirds)
+}
+
+@Test("旧配置缺少吸附区域映射时回落到全部内置动作")
+func windowManagerConfigurationDecodesSnapAreaDefault() throws {
+    let legacy = """
+    {
+      "options": {"screenPadding": 8, "windowGap": 8, "snapDistance": 24, "defaultWindowWidth": 900, "defaultWindowHeight": 650},
+      "presets": [],
+      "applicationRules": [],
+      "excludedBundleIdentifiers": [],
+      "automaticApplicationRules": false,
+      "edgeSnappingEnabled": true
+    }
+    """
+    let decoded = try JSONDecoder().decode(WindowManagerConfiguration.self, from: Data(legacy.utf8))
+    #expect(decoded.snapAreaMapping.isEmpty)
+    #expect(decoded.snapAreaMapping.action(for: .left, detailed: false) == .leftHalf)
+}

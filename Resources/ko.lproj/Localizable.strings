@@ -744,6 +744,18 @@
 "window.manager.snapPreview" = "드래그할 때 이동할 위치 미리보기 표시";
 "window.manager.haptic" = "새 스냅 영역으로 이동할 때 햅틱 피드백";
 "window.manager.detailedSnapAreas" = "더 세밀한 스냅 영역 사용(Rectangle 스타일: 위 가장자리는 최대화, 아래 가장자리는 3분할)";
+"window.manager.snapAreas" = "스냅 영역 동작";
+"window.manager.snapAreaDefault" = "기본값";
+"window.manager.snapAreaReset" = "초기화";
+"window.manager.snapAreasHint" = "각 가장자리와 모서리가 실행할 레이아웃을 선택합니다. 세밀 모델 전용 영역은 기본 동작을 유지합니다.";
+"window.snapArea.left" = "화면 왼쪽 가장자리";
+"window.snapArea.right" = "화면 오른쪽 가장자리";
+"window.snapArea.top" = "화면 위쪽 가장자리";
+"window.snapArea.bottom" = "화면 아래쪽 가장자리";
+"window.snapArea.topLeft" = "왼쪽 위 모서리";
+"window.snapArea.topRight" = "오른쪽 위 모서리";
+"window.snapArea.bottomLeft" = "왼쪽 아래 모서리";
+"window.snapArea.bottomRight" = "오른쪽 아래 모서리";
 "window.manager.restoreSizeOnDragOut" = "스냅된 창을 끌어내면 이전 크기로 복원";
 "window.manager.capturePreset" = "현재 창 기억";
 "window.manager.capturedPreset" = "프리셋을 저장했습니다: %@";
@@ -757,6 +769,7 @@
 "window.manager.bind" = "바인딩";
 "window.manager.ruleTitleFilter" = "창 제목에 포함(비우면 제한 없음)";
 "window.manager.ruleTitle" = "제목에 '%@' 포함";
+"window.manager.ruleFirstWindowOnly" = "첫 번째(메인) 창에만 적용";
 "window.manager.exclusions" = "제외된 앱";
 "window.manager.excludeCurrent" = "현재 앱 제외: %@";
 "window.apply" = "적용";

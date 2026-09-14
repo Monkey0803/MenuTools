@@ -51,7 +51,7 @@ A lightweight system toolkit that lives in the macOS menu bar. MenuTools uses th
 |---|---|
 | App Launcher | Search and launch installed apps, with favorites and recent-app ordering. |
 | Scenes | Apply Work, Presentation, or Night presets manually. |
-| Window Management | Use 60 layouts, including Loop-style edge stashing, with edge snapping, drop previews (plus haptics and a grow-in animation), optional finer snap areas; dragging a snapped window out restores its previous size; repeat a shortcut to cycle through layouts of the same family or to send the window to the adjacent display; save named presets that store a fixed window size, bind them to global shortcuts, and apply them from the quick-access panel; app rules, multi-window tiling, and per-app size memory included. |
+| Window Management | Use 60 layouts, including Loop-style edge stashing, with edge snapping, drop previews (plus haptics and a grow-in animation), optional finer snap areas with per-area custom actions; dragging a snapped window out restores its previous size; repeat a shortcut to cycle through layouts of the same family or to send the window to the adjacent display; save named presets that store a fixed window size, bind them to global shortcuts, and apply them from the quick-access panel; app rules with a window-title filter and a first/main-window limit, multi-window tiling, and per-app size memory included. |
 | Focus | Toggle the system Focus state and open Focus settings. |
 | Global scene shortcuts | Record global shortcuts for Work, Presentation, and Night scenes. |
 
@@ -308,6 +308,8 @@ export SPARKLE_DOWNLOAD_URL_PREFIX="https://your-server/releases/"
 - Drag snapping triggers when the cursor enters the snap band or when the dragged window's edge is already pressed against the screen edge: when you grab the middle of a title bar the window reaches the edge long before the cursor does, and both signals count.
 - Finer snap areas (Rectangle style) are off by default: enabling them makes the top edge maximize, the bottom edge split into thirds, and moves the top/bottom halves onto the upper/lower third of the left and right edges.
 - App-rule title filters only apply to automatic rule application; dialogs, system dialogs, and sheets are skipped.
+- Each snap area's action can be remapped to any layout (Settings → Snap area actions); resetting restores the built-in actions for every area. Zones unique to the detailed model (bottom thirds, upper/lower thirds of the side edges) keep their built-in actions.
+- The "first/main window only" app-rule limit falls back to "is the main window" when the main window cannot be read, so the rule never silently stops working.
 - Full-screen windows are excluded from multi-window tiling and are never a drag-snapping target.
 - Some apps enforce a minimum window size, so very small layouts (such as a sixth of the screen) may leave the window larger than requested.
 - Fixed-size presets store only a position and size, not a specific display; when applied after a display change they are clamped back into the current display's usable area.

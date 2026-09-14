@@ -744,6 +744,18 @@
 "window.manager.snapPreview" = "Show a preview of the target frame while dragging to an edge";
 "window.manager.haptic" = "Haptic feedback when a new snap target is selected";
 "window.manager.detailedSnapAreas" = "Finer snap areas (Rectangle style: the top edge maximizes, the bottom edge splits into thirds)";
+"window.manager.snapAreas" = "Snap area actions";
+"window.manager.snapAreaDefault" = "Default";
+"window.manager.snapAreaReset" = "Reset";
+"window.manager.snapAreasHint" = "Choose which layout each edge or corner triggers. Detailed-model zones keep their built-in actions.";
+"window.snapArea.left" = "Left edge";
+"window.snapArea.right" = "Right edge";
+"window.snapArea.top" = "Top edge";
+"window.snapArea.bottom" = "Bottom edge";
+"window.snapArea.topLeft" = "Top-left corner";
+"window.snapArea.topRight" = "Top-right corner";
+"window.snapArea.bottomLeft" = "Bottom-left corner";
+"window.snapArea.bottomRight" = "Bottom-right corner";
 "window.manager.restoreSizeOnDragOut" = "Restore the previous size when dragging a snapped window out";
 "window.manager.capturePreset" = "Remember current window";
 "window.manager.capturedPreset" = "Preset saved: %@";
@@ -757,6 +769,7 @@
 "window.manager.bind" = "Bind";
 "window.manager.ruleTitleFilter" = "Window title contains (empty = any)";
 "window.manager.ruleTitle" = "Title contains \"%@\"";
+"window.manager.ruleFirstWindowOnly" = "First/main window only";
 "window.manager.exclusions" = "Excluded applications";
 "window.manager.excludeCurrent" = "Exclude current app: %@";
 "window.apply" = "Apply";

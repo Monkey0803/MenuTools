@@ -744,6 +744,18 @@
 "window.manager.snapPreview" = "ドラッグ中に移動先のプレビューを表示";
 "window.manager.haptic" = "新しい吸着先に切り替わったとき触覚フィードバックを返す";
 "window.manager.detailedSnapAreas" = "より細かい吸着領域を使う（Rectangle 風：上端は最大化、下端は三分割）";
+"window.manager.snapAreas" = "吸着領域の動作";
+"window.manager.snapAreaDefault" = "既定";
+"window.manager.snapAreaReset" = "リセット";
+"window.manager.snapAreasHint" = "各辺・各コーナーで実行するレイアウトを選べます。詳細モデル独自の領域は組み込み動作のままです。";
+"window.snapArea.left" = "画面左端";
+"window.snapArea.right" = "画面右端";
+"window.snapArea.top" = "画面上端";
+"window.snapArea.bottom" = "画面下端";
+"window.snapArea.topLeft" = "左上隅";
+"window.snapArea.topRight" = "右上隅";
+"window.snapArea.bottomLeft" = "左下隅";
+"window.snapArea.bottomRight" = "右下隅";
 "window.manager.restoreSizeOnDragOut" = "吸着済みのウインドウをドラッグで外すと元のサイズに戻す";
 "window.manager.capturePreset" = "現在のウインドウを記憶";
 "window.manager.capturedPreset" = "プリセットを保存しました：%@";
@@ -757,6 +769,7 @@
 "window.manager.bind" = "登録";
 "window.manager.ruleTitleFilter" = "ウインドウタイトルに含む（空欄で制限なし）";
 "window.manager.ruleTitle" = "タイトルに「%@」を含む";
+"window.manager.ruleFirstWindowOnly" = "最初（メイン）ウインドウのみ";
 "window.manager.exclusions" = "除外アプリケーション";
 "window.manager.excludeCurrent" = "現在のアプリを除外：%@";
 "window.apply" = "適用";

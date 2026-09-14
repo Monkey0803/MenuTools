@@ -90,6 +90,8 @@ struct WindowApplicationRule: Codable, Equatable, Identifiable, Sendable {
     var isEnabled: Bool
     /// 只在窗口标题包含该字符串时应用；nil 表示不限制标题。
     var windowTitleContains: String?
+    /// 只作用于该应用的首个（主）窗口：焦点在工具面板/次窗口上时不套用。
+    var firstWindowOnly: Bool
 
     var id: String { bundleIdentifier }
 
@@ -98,13 +100,15 @@ struct WindowApplicationRule: Codable, Equatable, Identifiable, Sendable {
         applicationName: String,
         layout: WindowLayout,
         isEnabled: Bool = true,
-        windowTitleContains: String? = nil
+        windowTitleContains: String? = nil,
+        firstWindowOnly: Bool = false
     ) {
         self.bundleIdentifier = bundleIdentifier
         self.applicationName = applicationName
         self.layout = layout
         self.isEnabled = isEnabled
         self.windowTitleContains = windowTitleContains
+        self.firstWindowOnly = firstWindowOnly
     }
 
     func settingEnabled(_ enabled: Bool) -> WindowApplicationRule {
@@ -119,6 +123,7 @@ struct WindowApplicationRule: Codable, Equatable, Identifiable, Sendable {
         case layout
         case isEnabled
         case windowTitleContains
+        case firstWindowOnly
     }
 
     /// 逐字段解码：旧版本规则没有标题过滤字段，不能因此让整份配置失效。
@@ -129,7 +134,8 @@ struct WindowApplicationRule: Codable, Equatable, Identifiable, Sendable {
             applicationName: try container.decode(String.self, forKey: .applicationName),
             layout: try container.decode(WindowLayout.self, forKey: .layout),
             isEnabled: try container.decodeIfPresent(Bool.self, forKey: .isEnabled) ?? true,
-            windowTitleContains: try container.decodeIfPresent(String.self, forKey: .windowTitleContains)
+            windowTitleContains: try container.decodeIfPresent(String.self, forKey: .windowTitleContains),
+            firstWindowOnly: try container.decodeIfPresent(Bool.self, forKey: .firstWindowOnly) ?? false
         )
     }
 
@@ -140,6 +146,7 @@ struct WindowApplicationRule: Codable, Equatable, Identifiable, Sendable {
         try container.encode(layout, forKey: .layout)
         try container.encode(isEnabled, forKey: .isEnabled)
         try container.encodeIfPresent(windowTitleContains, forKey: .windowTitleContains)
+        try container.encode(firstWindowOnly, forKey: .firstWindowOnly)
     }
 }
 
@@ -162,6 +169,8 @@ struct WindowManagerConfiguration: Codable, Equatable, Sendable {
     var restoreSizeWhenDraggingOut: Bool
     /// 使用更细的吸附区域（Rectangle 风格）：顶边→最大化、底边三分区、边缘靠上下角→上下半屏。
     var detailedSnapAreas: Bool
+    /// 用户自定义的吸附区域动作：只保存与内置默认不同的部分。
+    var snapAreaMapping: WindowSnapAreaMapping
 
     init(
         options: WindowManagerOptions = WindowManagerOptions(),
@@ -175,7 +184,8 @@ struct WindowManagerConfiguration: Codable, Equatable, Sendable {
         traverseDisplaysOnRepeat: Bool = false,
         hapticFeedbackOnSnap: Bool = true,
         restoreSizeWhenDraggingOut: Bool = true,
-        detailedSnapAreas: Bool = false
+        detailedSnapAreas: Bool = false,
+        snapAreaMapping: WindowSnapAreaMapping = WindowSnapAreaMapping()
     ) {
         self.options = options
         self.presets = presets
@@ -189,6 +199,7 @@ struct WindowManagerConfiguration: Codable, Equatable, Sendable {
         self.hapticFeedbackOnSnap = hapticFeedbackOnSnap
         self.restoreSizeWhenDraggingOut = restoreSizeWhenDraggingOut
         self.detailedSnapAreas = detailedSnapAreas
+        self.snapAreaMapping = snapAreaMapping
     }
 
     private enum CodingKeys: String, CodingKey {
@@ -204,6 +215,7 @@ struct WindowManagerConfiguration: Codable, Equatable, Sendable {
         case hapticFeedbackOnSnap
         case restoreSizeWhenDraggingOut
         case detailedSnapAreas
+        case snapAreaMapping
     }
 
     /// 顶层同样逐字段解码：新增开关不会让旧配置整份丢失。
@@ -222,7 +234,8 @@ struct WindowManagerConfiguration: Codable, Equatable, Sendable {
             traverseDisplaysOnRepeat: try container.decodeIfPresent(Bool.self, forKey: .traverseDisplaysOnRepeat) ?? fallback.traverseDisplaysOnRepeat,
             hapticFeedbackOnSnap: try container.decodeIfPresent(Bool.self, forKey: .hapticFeedbackOnSnap) ?? fallback.hapticFeedbackOnSnap,
             restoreSizeWhenDraggingOut: try container.decodeIfPresent(Bool.self, forKey: .restoreSizeWhenDraggingOut) ?? fallback.restoreSizeWhenDraggingOut,
-            detailedSnapAreas: try container.decodeIfPresent(Bool.self, forKey: .detailedSnapAreas) ?? fallback.detailedSnapAreas
+            detailedSnapAreas: try container.decodeIfPresent(Bool.self, forKey: .detailedSnapAreas) ?? fallback.detailedSnapAreas,
+            snapAreaMapping: try container.decodeIfPresent(WindowSnapAreaMapping.self, forKey: .snapAreaMapping) ?? fallback.snapAreaMapping
         )
     }
 
@@ -240,16 +253,18 @@ struct WindowManagerConfiguration: Codable, Equatable, Sendable {
         try container.encode(hapticFeedbackOnSnap, forKey: .hapticFeedbackOnSnap)
         try container.encode(restoreSizeWhenDraggingOut, forKey: .restoreSizeWhenDraggingOut)
         try container.encode(detailedSnapAreas, forKey: .detailedSnapAreas)
+        try container.encode(snapAreaMapping, forKey: .snapAreaMapping)
     }
 }
 
 enum WindowSnapResolver {
-    static func layout(
+    /// 光标落在哪个吸附区域；不在任何吸附区域内时返回 nil。
+    static func area(
         for point: CGPoint,
         in screen: CGRect,
         threshold: CGFloat,
         detailed: Bool = false
-    ) -> WindowLayout? {
+    ) -> WindowSnapArea? {
         guard screen.contains(point) || expanded(screen, by: threshold).contains(point) else { return nil }
 
         let nearLeft = point.x <= screen.minX + threshold
@@ -263,29 +278,102 @@ enum WindowSnapResolver {
         if nearBottom && nearRight { return .bottomRight }
 
         guard detailed else {
-            if nearTop { return .topHalf }
-            if nearBottom { return .bottomHalf }
-            if nearLeft { return .leftHalf }
-            if nearRight { return .rightHalf }
+            if nearTop { return .top }
+            if nearBottom { return .bottom }
+            if nearLeft { return .left }
+            if nearRight { return .right }
             return nil
         }
 
         // 精细模型（Rectangle 风格）：顶边给最大化，底边按左/中/右三分区，
         // 上下半屏改由左右边缘的上/下三分之一区域提供。
-        if nearTop { return .maximize }
+        if nearTop { return .top }
         if nearBottom {
             let third = screen.width / 3
-            if point.x <= screen.minX + third { return .firstThird }
-            if point.x >= screen.maxX - third { return .lastThird }
-            return .bottomHalf
+            if point.x <= screen.minX + third { return .bottomLeftThird }
+            if point.x >= screen.maxX - third { return .bottomRightThird }
+            return .bottomCenterThird
         }
         if nearLeft || nearRight {
             let band = screen.height / 3
-            if point.y >= screen.maxY - band { return .topHalf }
-            if point.y <= screen.minY + band { return .bottomHalf }
-            return nearLeft ? .leftHalf : .rightHalf
+            if point.y >= screen.maxY - band { return nearLeft ? .leftUpperThird : .rightUpperThird }
+            if point.y <= screen.minY + band { return nearLeft ? .leftLowerThird : .rightLowerThird }
+            return nearLeft ? .left : .right
         }
         return nil
+    }
+
+    /// 窗口边缘贴住屏幕时落在哪个吸附区域。
+    static func area(
+        pressedWindowFrame frame: CGRect,
+        in screen: CGRect,
+        threshold: CGFloat,
+        detailed: Bool = false
+    ) -> WindowSnapArea? {
+        guard screen.width > 0, screen.height > 0 else { return nil }
+
+        // 用 2 倍阈值判断“几乎占满某个轴”：半屏窗口的高度其实已经接近屏幕高度
+        //（只差屏幕边距），如果不排除，它的下边缘会被误判成“贴住屏幕下边缘”。
+        let spansWidth = frame.width >= screen.width - threshold * 2
+        let spansHeight = frame.height >= screen.height - threshold * 2
+        guard !(spansWidth && spansHeight) else { return nil }
+
+        let nearLeft = !spansWidth && frame.minX <= screen.minX + threshold
+        let nearRight = !spansWidth && frame.maxX >= screen.maxX - threshold
+        let nearTop = !spansHeight && frame.maxY >= screen.maxY - threshold
+        let nearBottom = !spansHeight && frame.minY <= screen.minY + threshold
+
+        if nearTop && nearLeft { return .topLeft }
+        if nearTop && nearRight { return .topRight }
+        if nearBottom && nearLeft { return .bottomLeft }
+        if nearBottom && nearRight { return .bottomRight }
+
+        guard detailed else {
+            if nearTop { return .top }
+            if nearBottom { return .bottom }
+            if nearLeft { return .left }
+            if nearRight { return .right }
+            return nil
+        }
+
+        // 与光标版同一套精细模型，只是用窗口中心判断落在哪一列/哪一行。
+        if nearTop { return .top }
+        if nearBottom {
+            let third = screen.width / 3
+            if frame.midX <= screen.minX + third { return .bottomLeftThird }
+            if frame.midX >= screen.maxX - third { return .bottomRightThird }
+            return .bottomCenterThird
+        }
+        if nearLeft || nearRight {
+            let band = screen.height / 3
+            if frame.midY >= screen.maxY - band { return nearLeft ? .leftUpperThird : .rightUpperThird }
+            if frame.midY <= screen.minY + band { return nearLeft ? .leftLowerThird : .rightLowerThird }
+            return nearLeft ? .left : .right
+        }
+        return nil
+    }
+
+    /// 按吸附区域对应的布局动作求解；用户可以自定义每个区域的动作用的是哪个布局。
+    static func layout(
+        for point: CGPoint,
+        in screen: CGRect,
+        threshold: CGFloat,
+        detailed: Bool = false,
+        mapping: WindowSnapAreaMapping = WindowSnapAreaMapping()
+    ) -> WindowLayout? {
+        area(for: point, in: screen, threshold: threshold, detailed: detailed)
+            .map { mapping.action(for: $0, detailed: detailed) }
+    }
+
+    static func layout(
+        pressedWindowFrame frame: CGRect,
+        in screen: CGRect,
+        threshold: CGFloat,
+        detailed: Bool = false,
+        mapping: WindowSnapAreaMapping = WindowSnapAreaMapping()
+    ) -> WindowLayout? {
+        area(pressedWindowFrame: frame, in: screen, threshold: threshold, detailed: detailed)
+            .map { mapping.action(for: $0, detailed: detailed) }
     }
 
     /// 按鼠标位置定位显示器。
@@ -320,6 +408,105 @@ enum WindowSnapResolver {
 
     private static func expanded(_ rect: CGRect, by amount: CGFloat) -> CGRect {
         rect.insetBy(dx: -amount, dy: -amount)
+    }
+}
+
+/// 吸附区域方向。与具体布局解耦：用户可以把任意区域改成任意布局。
+enum WindowSnapArea: String, CaseIterable, Codable, Sendable {
+    case left
+    case right
+    case top
+    case bottom
+    case topLeft
+    case topRight
+    case bottomLeft
+    case bottomRight
+    case bottomLeftThird
+    case bottomCenterThird
+    case bottomRightThird
+    case leftUpperThird
+    case leftLowerThird
+    case rightUpperThird
+    case rightLowerThird
+
+    /// 设置页里可自定义的区域。精细模型独有的分区沿用内置动作，避免设置页过长。
+    static let customizable: [WindowSnapArea] = [
+        .left, .right, .top, .bottom,
+        .topLeft, .topRight, .bottomLeft, .bottomRight
+    ]
+
+    var titleKey: String { "window.snapArea.\(rawValue)" }
+
+    /// 默认模型下该区域的内置动作。
+    var builtInLayout: WindowLayout {
+        switch self {
+        case .left: return .leftHalf
+        case .right: return .rightHalf
+        case .top: return .topHalf
+        case .bottom, .bottomCenterThird: return .bottomHalf
+        case .topLeft: return .topLeft
+        case .topRight: return .topRight
+        case .bottomLeft: return .bottomLeft
+        case .bottomRight: return .bottomRight
+        case .bottomLeftThird: return .firstThird
+        case .bottomRightThird: return .lastThird
+        case .leftUpperThird, .rightUpperThird: return .topHalf
+        case .leftLowerThird, .rightLowerThird: return .bottomHalf
+        }
+    }
+
+    /// 精细模型下该区域的内置动作（只有顶边与默认模型不同）。
+    var detailedBuiltInLayout: WindowLayout {
+        self == .top ? .maximize : builtInLayout
+    }
+}
+
+/// 用户对吸附区域的覆盖：只保存与内置默认不同的部分。
+struct WindowSnapAreaMapping: Equatable, Sendable {
+    private(set) var overrides: [WindowSnapArea: WindowLayout]
+
+    init(overrides: [WindowSnapArea: WindowLayout] = [:]) {
+        self.overrides = overrides
+    }
+
+    var isEmpty: Bool { overrides.isEmpty }
+
+    func override(for area: WindowSnapArea) -> WindowLayout? { overrides[area] }
+
+    func action(for area: WindowSnapArea, detailed: Bool) -> WindowLayout {
+        if let override = overrides[area] { return override }
+        return detailed ? area.detailedBuiltInLayout : area.builtInLayout
+    }
+
+    mutating func setOverride(_ layout: WindowLayout?, for area: WindowSnapArea) {
+        if let layout {
+            overrides[area] = layout
+        } else {
+            overrides[area] = nil
+        }
+    }
+
+    mutating func removeAll() { overrides.removeAll() }
+}
+
+extension WindowSnapAreaMapping: Codable {
+    /// 宽容解码：认不出的区域或布局直接忽略，不让整份配置失效。
+    init(from decoder: any Decoder) throws {
+        let container = try decoder.singleValueContainer()
+        let raw = (try? container.decode([String: String].self)) ?? [:]
+        var overrides: [WindowSnapArea: WindowLayout] = [:]
+        for (areaName, layoutName) in raw {
+            guard let area = WindowSnapArea(rawValue: areaName),
+                  let layout = WindowLayout(rawValue: layoutName) else { continue }
+            overrides[area] = layout
+        }
+        self.init(overrides: overrides)
+    }
+
+    func encode(to encoder: any Encoder) throws {
+        var container = encoder.singleValueContainer()
+        let raw = Dictionary(uniqueKeysWithValues: overrides.map { ($0.key.rawValue, $0.value.rawValue) })
+        try container.encode(raw)
     }
 }
 
@@ -367,6 +554,13 @@ enum WindowApplicationRuleResolver {
             guard let windowTitle else { return false }
             return windowTitle.localizedCaseInsensitiveContains(filter)
         }?.layout
+    }
+
+    /// 「只作用于首个（主）窗口」的判定。
+    ///
+    /// 取不到主窗口信息时按「是主窗口」处理：宁可多套用一次，也不要让规则静默失效。
+    static func shouldApplyToFocusedWindow(isMainWindow: Bool, firstWindowOnly: Bool) -> Bool {
+        !firstWindowOnly || isMainWindow
     }
 
     /// 自动应用规则时跳过弹窗、系统对话框和表单。
