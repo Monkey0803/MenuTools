@@ -2,9 +2,10 @@ import CryptoKit
 import Foundation
 
 struct ClipboardArchiveDocument: Codable, Equatable, Sendable {
-    static let currentFormatVersion = 4
-    /// v3 起 historyItems 可能包含删除墓碑；v4 起片段与分组也有墓碑、分组带 updatedAt。
-    private static let legacyFormatVersions: Set<Int> = [1, 2, 3]
+    static let currentFormatVersion = 5
+    /// v3 起 historyItems 可能包含删除墓碑；v4 起片段与分组也有墓碑、分组带 updatedAt；
+    /// v5 起历史条目带 updatedAt，取消置顶靠状态载体传播。
+    private static let legacyFormatVersions: Set<Int> = [1, 2, 3, 4]
 
     var formatVersion: Int
     var createdAt: Date
@@ -159,19 +160,28 @@ enum ClipboardSyncMerge {
         var historyByID: [UUID: ClipboardHistoryItem] = [:]
         var resurrectedIDs = Set<UUID>()
         for item in (remote.historyItems + local.historyItems) where item.deletedAt == nil {
-            guard item.isPinned, !item.isSensitive else { continue }
+            // 取消置顶的条目也要参与比较，否则它的状态会被远端的置顶副本压回去。
+            guard !item.isSensitive else { continue }
             if let tombstone = tombstoneCandidates[item.id] {
                 // 删除之后重新采集到的同 ID 条目视为复活，否则保持删除状态。
                 guard item.capturedAt > (tombstone.deletedAt ?? .distantPast) else { continue }
                 resurrectedIDs.insert(item.id)
             }
-            if let existing = historyByID[item.id], existing.capturedAt > item.capturedAt { continue }
+            // 置顶状态与用户编辑都看状态时间；采集时间只在没有编辑时才起作用。
+            if let existing = historyByID[item.id], existing.stateTimestamp > item.stateTimestamp { continue }
             historyByID[item.id] = item
         }
 
         let tombstones = tombstoneCandidates.values
             .filter { !resurrectedIDs.contains($0.id) }
             .sorted { ($0.deletedAt ?? .distantPast) > ($1.deletedAt ?? .distantPast) }
+
+        // 取消置顶的条目本身不在置顶集合里，必须作为状态载体一起合并与传递。
+        let unpinCarriers = historyByID.values
+            .filter { !$0.isPinned && $0.updatedAt != nil }
+            .sorted { $0.stateTimestamp > $1.stateTimestamp }
+            .prefix(ClipboardHistoryBuffer.tombstoneLimit)
+            .map { $0 }
 
         // 分组墓碑：删掉的分组不能被远端带回来。
         var groupTombstones: [UUID: ClipboardSnippetGroup] = [:]
@@ -233,7 +243,11 @@ enum ClipboardSyncMerge {
             .sorted { ($0.deletedAt ?? .distantPast) > ($1.deletedAt ?? .distantPast) }
 
         return ClipboardArchiveDocument.current(
-            historyItems: historyByID.values.sorted { $0.capturedAt > $1.capturedAt } + tombstones,
+            historyItems: historyByID.values
+                .filter(\.isPinned)
+                .sorted { $0.capturedAt > $1.capturedAt }
+                + tombstones
+                + unpinCarriers,
             snippetGroups: groupsByID.values
                 .sorted { $0.name.localizedStandardCompare($1.name) == .orderedAscending }
                 + groupTombstoneValues,

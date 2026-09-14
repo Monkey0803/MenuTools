@@ -234,6 +234,14 @@ enum ClipboardHistoryEncryption {
     }
 }
 
+/// 内存里的时间戳统一截到毫秒：数据库与归档都按毫秒存，
+/// 不截的话回读后会与内存值差出微秒，导致相等比较与「是否变化」判断失真。
+enum ClipboardTimestamp {
+    static func normalized(_ date: Date) -> Date {
+        Date(timeIntervalSince1970: (date.timeIntervalSince1970 * 1_000).rounded() / 1_000)
+    }
+}
+
 enum ClipboardHistoryPersistenceError: Error {
     case encryptionKeyUnavailable
     case encryptionFailed
@@ -653,6 +661,12 @@ struct ClipboardHistoryItem: Codable, Identifiable, Equatable, Sendable {
     var recognizedText: String?
     /// 删除墓碑：非空表示该条目已被删除，只用于把删除动作同步给其他设备。
     var deletedAt: Date?
+    /// 用户主动修改（置顶状态、标题、标签、备注、敏感标记）的时间。
+    /// 自动识别等派生更新不刷新它，避免把远端的用户编辑压掉。
+    var updatedAt: Date?
+
+    /// 参与同步比较的状态时间：没有用户修改时退回采集时间。
+    var stateTimestamp: Date { updatedAt ?? capturedAt }
 
     init(
         id: UUID,
@@ -666,7 +680,8 @@ struct ClipboardHistoryItem: Codable, Identifiable, Equatable, Sendable {
         note: String? = nil,
         isSensitive: Bool = false,
         recognizedText: String? = nil,
-        deletedAt: Date? = nil
+        deletedAt: Date? = nil,
+        updatedAt: Date? = nil
     ) {
         self.id = id
         self.content = content
@@ -680,10 +695,11 @@ struct ClipboardHistoryItem: Codable, Identifiable, Equatable, Sendable {
         self.isSensitive = isSensitive
         self.recognizedText = recognizedText
         self.deletedAt = deletedAt
+        self.updatedAt = updatedAt
     }
 
     private enum CodingKeys: String, CodingKey {
-        case id, content, capturedAt, expiresAt, isPinned, sourceBundleID, title, tags, note, isSensitive, recognizedText, deletedAt
+        case id, content, capturedAt, expiresAt, isPinned, sourceBundleID, title, tags, note, isSensitive, recognizedText, deletedAt, updatedAt
     }
 
     init(from decoder: Decoder) throws {
@@ -700,6 +716,7 @@ struct ClipboardHistoryItem: Codable, Identifiable, Equatable, Sendable {
         isSensitive = try container.decodeIfPresent(Bool.self, forKey: .isSensitive) ?? false
         recognizedText = try container.decodeIfPresent(String.self, forKey: .recognizedText)
         deletedAt = try container.decodeIfPresent(Date.self, forKey: .deletedAt)
+        updatedAt = try container.decodeIfPresent(Date.self, forKey: .updatedAt)
     }
 
     var searchableText: String? {
@@ -1279,9 +1296,10 @@ struct ClipboardHistoryBuffer {
         return items.first(where: { $0.id == id })
     }
 
-    mutating func togglePinned(id: UUID) {
+    mutating func togglePinned(id: UUID, now: Date = Date()) {
         guard let index = items.firstIndex(where: { $0.id == id }) else { return }
         items[index].isPinned.toggle()
+        items[index].updatedAt = ClipboardTimestamp.normalized(now)
     }
 
     mutating func updateMetadata(
@@ -1290,20 +1308,37 @@ struct ClipboardHistoryBuffer {
         tags: [String]? = nil,
         note: String?? = nil,
         isSensitive: Bool? = nil,
-        recognizedText: String?? = nil
+        recognizedText: String?? = nil,
+        now: Date = Date()
     ) {
         guard let index = items.firstIndex(where: { $0.id == id }) else { return }
-        if let title { items[index].title = title }
-        if let tags { items[index].tags = tags }
-        if let note { items[index].note = note }
-        if let isSensitive { items[index].isSensitive = isSensitive }
+        // 只有用户能改的字段才算「状态变化」；recognizedText 是派生结果，不刷新时间。
+        var didChangeUserState = false
+        if let title {
+            items[index].title = title
+            didChangeUserState = true
+        }
+        if let tags {
+            items[index].tags = tags
+            didChangeUserState = true
+        }
+        if let note {
+            items[index].note = note
+            didChangeUserState = true
+        }
+        if let isSensitive {
+            items[index].isSensitive = isSensitive
+            didChangeUserState = true
+        }
         if let recognizedText { items[index].recognizedText = recognizedText }
+        if didChangeUserState { items[index].updatedAt = ClipboardTimestamp.normalized(now) }
     }
 
     mutating func setSensitive(id: UUID, isSensitive: Bool, now: Date = Date()) {
         guard let index = items.firstIndex(where: { $0.id == id }) else { return }
         items[index].isSensitive = isSensitive
         items[index].expiresAt = isSensitive ? now.addingTimeInterval(sensitiveLifetime) : nil
+        items[index].updatedAt = ClipboardTimestamp.normalized(now)
     }
 
     mutating func setRecognizedText(_ recognizedText: String?, for id: UUID) {
@@ -1337,9 +1372,32 @@ struct ClipboardHistoryBuffer {
             capturedAt: item.capturedAt,
             expiresAt: nil,
             isPinned: true,
-            deletedAt: now
+            deletedAt: ClipboardTimestamp.normalized(now)
         ), at: 0)
         trimTombstones(now: now)
+    }
+
+    /// 需要跟随同步的状态载体：已取消置顶、但状态时间仍在保留期内的条目。
+    /// 置顶集合本身不带「取消置顶」这个信息，必须靠这些条目把状态传出去。
+    func unpinCarriers(now: Date = Date()) -> [ClipboardHistoryItem] {
+        let cutoff = now.addingTimeInterval(-Self.tombstoneRetention)
+        return items
+            .filter { !$0.isPinned && ($0.updatedAt ?? .distantPast) > cutoff }
+            .prefix(Self.tombstoneLimit)
+            .map { $0 }
+    }
+
+    /// 应用远端状态：仅当远端状态更新时，才覆盖本机的置顶与用户可编辑字段。
+    mutating func applyIncomingState(_ incoming: [ClipboardHistoryItem]) {
+        for item in incoming {
+            guard let index = items.firstIndex(where: { $0.id == item.id }) else { continue }
+            guard item.stateTimestamp > items[index].stateTimestamp else { continue }
+            items[index].isPinned = item.isPinned
+            items[index].updatedAt = item.updatedAt
+            items[index].title = item.title
+            items[index].tags = item.tags
+            items[index].note = item.note
+        }
     }
 
     /// 应用其他设备传来的删除墓碑：删掉本地对应条目，并继续保留墓碑往下传。
@@ -1694,7 +1752,8 @@ enum ClipboardHistoryPersistence {
             note: item.note,
             isSensitive: false,
             recognizedText: item.recognizedText,
-            deletedAt: item.deletedAt
+            deletedAt: item.deletedAt,
+            updatedAt: item.updatedAt
         )
         let encoder = JSONEncoder()
         encoder.dateEncodingStrategy = .millisecondsSince1970
@@ -1731,7 +1790,8 @@ enum ClipboardHistoryPersistence {
             note: item.note,
             isSensitive: false,
             recognizedText: item.recognizedText,
-            deletedAt: item.deletedAt
+            deletedAt: item.deletedAt,
+            updatedAt: item.updatedAt
         )
     }
 
@@ -2499,7 +2559,7 @@ final class ClipboardHistoryService {
 
     /// 参与共享文件夹同步的条目：置顶内容 + 删除墓碑。
     var syncHistoryItems: [ClipboardHistoryItem] {
-        buffer.items.filter(\.isPinned) + buffer.tombstones
+        buffer.items.filter(\.isPinned) + buffer.tombstones + buffer.unpinCarriers()
     }
 
     /// 归档导入采用合并语义：按记录 ID 去重，并继续受容量和保留期限约束。
@@ -2513,6 +2573,8 @@ final class ClipboardHistoryService {
         if !tombstones.isEmpty {
             buffer.applyTombstones(tombstones)
         }
+        // 已存在的条目按状态时间决定是否跟着远端改（例如远端取消置顶）。
+        buffer.applyIncomingState(liveItems)
         buffer.restore(liveItems)
         synchronizeItems()
         persist()

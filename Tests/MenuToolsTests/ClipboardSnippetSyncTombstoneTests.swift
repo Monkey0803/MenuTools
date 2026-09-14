@@ -208,10 +208,8 @@ func snippetServiceAppliesRemoteTombstones() throws {
 
 // MARK: - 归档格式
 
-@Test("归档格式升到 v4 且 v3 文档仍可解码")
+@Test("v3 文档仍可解码并迁移到当前格式")
 func snippetArchiveFormatVersionAcceptsLegacy() throws {
-    #expect(ClipboardArchiveDocument.currentFormatVersion == 4)
-
     let legacyV3 = ClipboardArchiveDocument(
         formatVersion: 3,
         createdAt: snippetTestDate(100),
@@ -219,7 +217,7 @@ func snippetArchiveFormatVersionAcceptsLegacy() throws {
         snippetGroups: [snippetTestGroup("工作")],
         snippets: []
     )
-    #expect(try legacyV3.validated().formatVersion == 4)
+    #expect(try legacyV3.validated().formatVersion == ClipboardArchiveDocument.currentFormatVersion)
 
     // v3 写出的 JSON 里没有 deletedAt 字段，解码后必须为 nil。
     let encoder = JSONEncoder()

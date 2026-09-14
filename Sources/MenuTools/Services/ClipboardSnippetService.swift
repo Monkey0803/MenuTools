@@ -218,8 +218,8 @@ struct ClipboardSnippetStore {
             groupID: Self.defaultGroupID,
             title: "",
             content: "",
-            updatedAt: now,
-            deletedAt: now
+            updatedAt: ClipboardTimestamp.normalized(now),
+            deletedAt: ClipboardTimestamp.normalized(now)
         ), at: 0)
         trimTombstones(now: now)
     }
@@ -229,8 +229,8 @@ struct ClipboardSnippetStore {
         groupTombstones.insert(ClipboardSnippetGroup(
             id: group.id,
             name: "",
-            updatedAt: now,
-            deletedAt: now
+            updatedAt: ClipboardTimestamp.normalized(now),
+            deletedAt: ClipboardTimestamp.normalized(now)
         ), at: 0)
         trimTombstones(now: now)
     }
@@ -314,7 +314,7 @@ struct ClipboardSnippetStore {
             return false
         }
         groups[index].name = normalizedName
-        groups[index].updatedAt = now
+        groups[index].updatedAt = ClipboardTimestamp.normalized(now)
         groups.sort { lhs, rhs in
             if lhs.id == Self.defaultGroupID { return true }
             if rhs.id == Self.defaultGroupID { return false }
@@ -398,7 +398,7 @@ struct ClipboardSnippetStore {
         guard let index = allSnippets.firstIndex(where: { $0.id == id }) else { return }
         allSnippets[index].isFavorite.toggle()
         // 收藏也是一种编辑：不刷新时间戳的话，其他设备上的旧副本会在合并时把它改回去。
-        allSnippets[index].updatedAt = now
+        allSnippets[index].updatedAt = ClipboardTimestamp.normalized(now)
     }
 
     private static func normalizedTags(_ tags: [String]) -> [String] {
