@@ -1,15 +1,17 @@
 # 网络流量运行时验收清单
 
-> **验收记录**：本文档建立于 2026-09-14，除第 4 组的悬停详情（2026-09-11 由用户真机确认）外，其余条目**尚未在真机逐项核对**。
+> **验收记录**：本文档建立于 2026-09-14。第 4 组的悬停详情已于 2026-09-11 由用户真机确认；
+> 采样能力、真实流量归属、历史写入、存储上限与维度隔离已于 2026-09-14 用脚本与数据库核对（见下方「自动化验证记录」）；
+> **界面交互与视觉判断类条目仍未逐项核对**。
 > 后续 macOS 大版本升级、或改动 `NetworkTrafficService` / 通知与额度逻辑后，建议按本清单重跑一遍。
 
 网络流量的行为大量依赖系统侧能力，单元测试覆盖不到：`nettop` 的真实输出字段、系统通知授权弹窗、菜单栏标题刷新、以及「关掉某个插件会不会顺手停掉别的插件的采样」。这份清单用于在真机上逐项验收。
 
 前置条件：
 
-- [ ] 应用已重启到最新构建（`pkill -f MenuTools.app/Contents/MacOS/MenuTools; ./build.sh`）
-- [ ] 功能中心里「网络流量」和「系统信息」两个插件都已启用
-- [ ] 有可复现的流量来源（浏览器播放视频 / 下载大文件），并准备一个长时间空闲的对照 App
+- [x] 应用已重启到最新构建（`pkill -f MenuTools.app/Contents/MacOS/MenuTools; ./build.sh`）— 2026-09-14，1.1.1 构建
+- [x] 功能中心里「网络流量」和「系统信息」两个插件都已启用 — 「系统信息」显式启用；「网络流量」未写入 `plugins.state.v1`，按 `defaultEnabled` 兜底为启用
+- [x] 有可复现的流量来源（浏览器播放视频 / 下载大文件），并准备一个长时间空闲的对照 App — `speed.cloudflare.com` / `ash-speed.hetzner.com` 实测可用
 
 > 若 `./build.sh` 报 `SDK is not supported by the compiler`：说明当前活动 Xcode 与 CommandLineTools 的 SDK 不是同一套工具链。用 `DEVELOPER_DIR=/Applications/Xcode.app/Contents/Developer ./build.sh` 指定完整工具链，或用 Xcode Switcher 把活动 Xcode 切回 27.0 那一套。
 
@@ -21,6 +23,19 @@ swift Scripts/test_network_traffic.swift --duration 28800 --interval 10 --no-dow
 ```
 
 脚本输出每次采样耗时、进程行数和汇总结果。**已知基线**：2026-09-11 的 8 小时回归为 2857/2857 次采样成功、0 失败、平均 72ms、最大 133ms（日志 `/tmp/menutools-traffic-soak-20260911-170448.log`）。
+
+### 自动化验证记录（2026-09-14，1.1.1 构建）
+
+| 项 | 结果 | 证据 |
+|---|---|---|
+| 采样冒烟 | **15/15 次成功**，nettop 可用，观察到非零流量，平均 69ms / 最大 70ms | `swift Scripts/test_network_traffic.swift --duration 30 --connections --strict`（脚本输出） |
+| 真实流量归属 | 5 分钟持续下载期间，`curl`（systemService，`/usr/bin/curl`）被记录 **1.39 GB** | `traffic_samples` 联表查询 |
+| 历史写入 | 16:33–16:54 共 **22 个一分钟桶、252 行**；全库 15,464 桶、跨度 10.92 天（覆盖 1 小时/1 天/1 周/1 月范围） | `traffic_samples` 聚合 |
+| 存储上限 | 主库 **25.2 MB**（上限 64 MB）、WAL ≈ 0（上限 8 MB） | `network-traffic-history.sqlite3` 体积 |
+| 维度隔离 | `external:tcp` 170,694 行（持续写入）、`external:all` 1,118 行、`all:all` 8 行，三套互不干扰；**只有当前筛选维度在累计**，与设计文档一致 | `GROUP BY query_key` |
+| 诊断数据来源 | 采样耗时、失败次数由同一套采样链路产生；本次 15 次采样 0 失败 | 脚本汇总 |
+
+> 未覆盖的部分：以下带 `- [ ]` 的条目都需要在真机界面上逐项核对。本次没能自动化是因为运行环境**没有屏幕录制权限**，且 SwiftUI `MenuBarExtra` 面板不通过辅助功能暴露控件——既无法截图也无法读取界面数值。
 
 ---
 
