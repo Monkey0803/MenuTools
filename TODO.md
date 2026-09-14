@@ -73,8 +73,8 @@
 
 ## 发布与安装体验
 
-- [ ] 发布 DMG 安装包
-- [ ] 配置 Apple Developer 签名和 notarization
+- [x] 发布 DMG 安装包（`release.sh` 的 github 模式产出 ZIP + DMG + appcast，1.1.0 起随 Release 提供）
+- [ ] 配置 Apple Developer 签名和 notarization（可选：当前走 GitHub 自签名分发；`RELEASE_MODE=developer-id` 已就绪，拿到 Developer ID 后即可切换）
 - [x] 更新 README 中的最新版本链接和下载说明
 - [ ] 在应用内显示发布日期和更新说明
 - [x] 增加发布前自动检查：版本号、测试、构建、签名和 Release 资产
