@@ -146,12 +146,14 @@ Run: `swift Scripts/test_network_traffic.swift --duration 30 --connections --str
 
 Expected: 15/15 采样成功，nettop 可用。（已跑：15/15，平均 69ms）
 
-- [ ] **Step 5: 跑 8 小时稳定性回归**
+- [x] **Step 5: 跑 8 小时稳定性回归**
 
 Run: `swift Scripts/test_network_traffic.swift --duration 28800 --interval 10 --no-download --strict`
 
-Expected: 全程无超时、无失败采样；日志路径记录在 `/tmp/menutools-traffic-soak-latest.txt` 指向的文件，并在发版说明里记录结论。
-（已启动，未完成：`/tmp/menutools-traffic-soak-20260911-170448.log`）
+Expected: 全程无超时、无失败采样；日志保留并在发版说明里记录结论。
+
+结果（2026-09-11 17:04 → 2026-09-12 01:04，日志 `/tmp/menutools-traffic-soak-20260911-170448.log`）：
+**2857/2857 次采样成功，0 次超时或失败，平均 72ms、最大 133ms**，输出稳定在 1.1–1.2KB/次，无内存或句柄增长迹象。
 
 ### Task 5: 发布前打包验证
 
@@ -161,9 +163,16 @@ Run: `./build.sh`
 
 Expected: `dist/MenuTools.app` 组装成功。
 
-- [ ] **Step 2: 实机核对**
+注意：`build.sh` 的 Finder 扩展编译步骤已改为 `xcrun --sdk macosx --show-sdk-path`。
+若仍报 `SDK is not supported by the compiler`，说明活动 Xcode 与 CommandLineTools
+的 SDK 不是同一套，改用 `DEVELOPER_DIR=/Applications/Xcode.app/Contents/Developer ./build.sh`。
 
-在设置页核对 App 速率、连接明细、历史趋势、提醒状态与导出结果是否与 nettop 输出一致。
+- [ ] **Step 2: 按验收清单实机核对**
+
+Run: 打开设置页并逐项走 `docs/network-traffic-acceptance.md`
+
+Expected: 清单中 11 组全部勾选；重点是第 7 组（通知权限状态行与系统设置跳转，本次新增、尚未真机核对）
+与第 11 组（插件开关不会互相停掉采样）。
 
 - [ ] **Step 3: 确认工作区**
 

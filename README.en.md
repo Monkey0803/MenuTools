@@ -158,7 +158,9 @@ For an 8-hour stability run without generating extra download traffic:
 swift Scripts/test_network_traffic.swift --duration 28800 --interval 10 --no-download --strict
 ```
 
-The script reports sample duration, process-row counts, non-zero traffic rows, and a final summary. Then cross-check the matching app, rate, and connection details in MenuTools Settings.
+The script reports sample duration, process-row counts, non-zero traffic rows, and a final summary. Then cross-check the matching app, rate, and connection details in MenuTools Settings. For item-by-item manual verification use the [Network Traffic runtime acceptance checklist](docs/network-traffic-acceptance.md) (live rates, connection details, filters, history hover, menu bar speed, notification permission, quota alerts, redacted export, data clearing, and plugin ownership).
+
+> Archived baseline: the 8-hour run on 2026-09-11 completed 2857/2857 samples with 0 failures, 72ms average and 133ms worst case.
 
 ### Clipboard Verification
 

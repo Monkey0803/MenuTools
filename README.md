@@ -212,7 +212,9 @@ swift Scripts/test_network_traffic.swift --duration 30 --connections --strict
 swift Scripts/test_network_traffic.swift --duration 28800 --interval 10 --no-download --strict
 ```
 
-脚本会输出每次采样耗时、进程行数、非零流量行和汇总结果；之后在 MenuTools 设置页核对 App、速率和连接明细。
+脚本会输出每次采样耗时、进程行数、非零流量行和汇总结果；之后在 MenuTools 设置页核对 App、速率和连接明细。需要逐项人工验收时用 [网络流量运行时验收清单](docs/network-traffic-acceptance.md)（覆盖实时速率、连接明细、筛选、历史悬停、菜单栏网速、通知权限、额度提醒、导出脱敏、数据清除与插件归属）。
+
+> 已归档的参考基线：2026-09-11 的 8 小时回归为 2857/2857 次采样成功、0 失败、平均 72ms、最大 133ms。
 
 ### 剪贴板验证
 
