@@ -92,9 +92,14 @@
 
 ### 下载
 
-当前目标版本：[MenuTools v1.0.4](https://github.com/Monkey0803/MenuTools/releases/tag/v1.0.4)
+当前目标版本：[MenuTools v1.1.0](https://github.com/Monkey0803/MenuTools/releases/tag/v1.1.0)
 
-下载 `MenuTools-1.0.4.zip`，解压后将 `MenuTools.app` 拖入「应用程序」文件夹。
+两种安装包任选其一：
+
+- `MenuTools-1.1.0.dmg`：打开后把 `MenuTools.app` 拖入「应用程序」
+- `MenuTools-1.1.0.zip`：解压后将 `MenuTools.app` 拖入「应用程序」
+
+源码由 GitHub 按 tag 自动提供（Source code zip / tar.gz）。每个 Release 说明里会附上下载文件的 SHA-256，便于校验。
 
 > GitHub Release 的实际签名类型以对应版本说明为准。没有 Developer ID 与 notarization 凭据时，发布包使用项目自签名证书或 ad-hoc 签名，不会宣称已经 notarize。
 
@@ -188,7 +193,7 @@ open dist/MenuTools.app
 MenuTools/
 ├── Package.swift               # SPM 工程
 ├── build.sh                    # 一键打包脚本
-├── release.sh                  # 正式发布预检、notarization 和安装包生成
+├── release.sh                  # 发布预检与打包（github 自签名 / developer-id 公证）
 ├── appcast.xml                 # Sparkle 更新源模板
 ├── Resources/                  # Info.plist / 图标
 ├── Scripts/                    # 图标生成与 API 验证脚本
@@ -261,20 +266,29 @@ open "menutools://preset?name=开发"             # 套用固定尺寸预设
 
 更新功能使用 **[Sparkle](https://github.com/sparkle-project/Sparkle)**，由 Sparkle 负责 appcast 检查、下载、Ed25519 签名校验、安装和重启：
 
-1. 修改 `Resources/Info.plist` 中的 `CFBundleShortVersionString` 和 `CFBundleVersion`。
-2. 配置 Developer ID 证书和 notarization profile：
+1. 修改 `Resources/Info.plist` 中的 `CFBundleShortVersionString` 和 `CFBundleVersion`，然后提交，确保工作区干净（脚本会校验）。
+2. 选择发布模式：
+
+   **GitHub 开源分发（默认，自签名）**
+   ```bash
+   ./release.sh          # 等价于 RELEASE_MODE=github
+   ```
+   脚本会跑测试、Release 构建、用 `MenuTools Self-Signed` 签名、打包 ZIP 与 DMG、生成带 Ed25519 签名的 `dist/appcast.xml`，并打印三个资产的 SHA-256。私钥默认取 `.cert/sparkle_ed25519_private_key`（该目录已被 gitignore）。
+
+   **Developer ID 正式分发（需要 Apple 开发者凭据）**
    ```bash
    export CODESIGN_IDENTITY="Developer ID Application: ..."
    export NOTARY_PROFILE="menutools-notary"
-   ```
-3. 生成 Sparkle Ed25519 密钥，并将公钥写入环境变量；私钥只保存在本机或 CI 密钥存储中：
-   ```bash
    export SPARKLE_PUBLIC_ED_KEY="..."
    export SPARKLE_PRIVATE_ED_KEY_FILE="/secure/path/sparkle_ed25519_private_key"
+   RELEASE_MODE=developer-id ./release.sh
    ```
-4. 运行 `./release.sh`，脚本会执行测试、Release 构建、Sparkle Framework 嵌入与签名、ZIP/DMG 打包、notarization、stapling 和 `generate_appcast`。
-5. 在 GitHub 上发布 Release：tag 使用 `v1.0.4` 或 `1.0.4`，附件上传脚本生成的 `.zip` 和 `.dmg`。
-6. 将 `dist/appcast.xml` 以 `appcast.xml` 文件名上传到 GitHub Release（当前 `SUFeedURL` 指向 `releases/latest/download/appcast.xml`）。
+   这条路径额外做 notarization、stapling 与 `spctl` 校验；没有 Developer ID 时无法使用。
+3. 在 GitHub 上创建 Release：tag 使用 `v1.1.0`（或 `1.1.0`），上传
+   - `dist/MenuTools-<版本>.zip`
+   - `dist/MenuTools-<版本>.dmg`
+   - `dist/appcast.xml`（必须以这个文件名上传，`SUFeedURL` 指向 `releases/latest/download/appcast.xml`；否则客户端收不到自动更新）
+4. 把脚本输出的 SHA-256 与「签名说明」写进 Release 说明（可参考 v1.0.4 的结构）。
 
 Sparkle 更新默认使用 `Resources/Info.plist` 中的 `SUFeedURL`。如果更新源不在 GitHub，可在发布时覆盖下载地址前缀：
 
