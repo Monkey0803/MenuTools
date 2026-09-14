@@ -668,6 +668,12 @@ struct ClipboardHistoryItem: Codable, Identifiable, Equatable, Sendable {
     /// 参与同步比较的状态时间：没有用户修改时退回采集时间。
     var stateTimestamp: Date { updatedAt ?? capturedAt }
 
+    /// 状态载体：只用于同步置顶状态、不带内容的条目。
+    /// 空内容的普通条目不可能存在（插入时会拒绝空文本），所以这个判断是可靠的。
+    var isStateCarrier: Bool {
+        deletedAt == nil && !isPinned && content.storageSize == 0
+    }
+
     init(
         id: UUID,
         content: ClipboardHistoryContent,
@@ -1378,13 +1384,27 @@ struct ClipboardHistoryBuffer {
     }
 
     /// 需要跟随同步的状态载体：已取消置顶、但状态时间仍在保留期内的条目。
-    /// 置顶集合本身不带「取消置顶」这个信息，必须靠这些条目把状态传出去。
+    /// 置顶集合本身表达不了「取消置顶」，必须靠这些条目把状态传出去。
+    ///
+    /// 载体只保留身份与状态，**不带内容**：用户取消置顶后，内容不应该继续留在共享文件里。
     func unpinCarriers(now: Date = Date()) -> [ClipboardHistoryItem] {
         let cutoff = now.addingTimeInterval(-Self.tombstoneRetention)
         return items
             .filter { !$0.isPinned && ($0.updatedAt ?? .distantPast) > cutoff }
             .prefix(Self.tombstoneLimit)
-            .map { $0 }
+            .map { item in
+                ClipboardHistoryItem(
+                    id: item.id,
+                    content: .text(""),
+                    capturedAt: item.capturedAt,
+                    expiresAt: nil,
+                    isPinned: false,
+                    title: item.title,
+                    tags: item.tags,
+                    note: item.note,
+                    updatedAt: item.updatedAt
+                )
+            }
     }
 
     /// 应用远端状态：仅当远端状态更新时，才覆盖本机的置顶与用户可编辑字段。
@@ -2573,9 +2593,10 @@ final class ClipboardHistoryService {
         if !tombstones.isEmpty {
             buffer.applyTombstones(tombstones)
         }
-        // 已存在的条目按状态时间决定是否跟着远端改（例如远端取消置顶）。
+        // 已存在的条目按状态时间决定是否跟着远端改（例如远端取消置顶）；
+        // 状态载体正是用来做这件事的，所以它参与状态对齐，但不补进历史。
         buffer.applyIncomingState(liveItems)
-        buffer.restore(liveItems)
+        buffer.restore(liveItems.filter { !$0.isStateCarrier })
         synchronizeItems()
         persist()
         liveItems.forEach(scheduleImageTextRecognitionIfNeeded)

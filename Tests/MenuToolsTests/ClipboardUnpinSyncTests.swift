@@ -193,3 +193,58 @@ func stateTimestampPersistsAcrossReload() async throws {
     let reloaded = try #require(second.items.first?.updatedAt)
     #expect(abs(reloaded.timeIntervalSince(unpinnedAt)) < 0.001)
 }
+
+
+@Test("状态载体不带内容，取消置顶后内容不会留在共享文件里")
+@MainActor
+func unpinCarrierDropsContent() {
+    let service = ClipboardHistoryService(
+        persistenceURL: nil,
+        pasteboard: NSPasteboard(name: NSPasteboard.Name("MenuToolsTests.\(UUID().uuidString)"))
+    )
+    let item = unpinTestItem(text: "不该留在共享文件里的内容", isPinned: true)
+    service.importItems([item])
+    service.togglePinned(id: item.id)
+
+    let carrier = service.syncHistoryItems.first { $0.id == item.id }
+    #expect(carrier?.deletedAt == nil)
+    #expect(carrier?.content.storageSize == 0)
+    #expect(carrier?.updatedAt != nil)
+}
+
+@Test("导入状态载体不会清空本机内容，也不会新增历史条目")
+@MainActor
+func importingCarrierKeepsLocalContent() throws {
+    let id = UUID()
+    let service = ClipboardHistoryService(
+        persistenceURL: nil,
+        pasteboard: NSPasteboard(name: NSPasteboard.Name("MenuToolsTests.\(UUID().uuidString)"))
+    )
+    service.importItems([unpinTestItem(id: id, text: "本机内容", isPinned: true)])
+
+    // 载体：只有状态，没有内容。
+    service.importItems([ClipboardHistoryItem(
+        id: id,
+        content: .text(""),
+        capturedAt: unpinTestDate(100),
+        expiresAt: nil,
+        isPinned: false,
+        updatedAt: unpinTestDate(500)
+    )])
+
+    let item = try #require(service.items.first { $0.id == id })
+    #expect(item.isPinned == false)
+    #expect(item.content.searchableText == "本机内容")
+    #expect(service.items.count == 1)
+
+    // 载体不应被当成新条目补进历史。
+    service.importItems([ClipboardHistoryItem(
+        id: UUID(),
+        content: .text(""),
+        capturedAt: unpinTestDate(100),
+        expiresAt: nil,
+        isPinned: false,
+        updatedAt: unpinTestDate(600)
+    )])
+    #expect(service.items.count == 1)
+}
