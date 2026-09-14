@@ -242,10 +242,8 @@ func tombstonesPersistAcrossReload() async throws {
 
 // MARK: - 归档格式
 
-@Test("归档格式升到 v3 且旧版本仍可解码")
+@Test("旧版本归档仍可解码并迁移到当前格式")
 func archiveFormatVersionAcceptsLegacy() throws {
-    #expect(ClipboardArchiveDocument.currentFormatVersion == 3)
-
     let legacyV2 = ClipboardArchiveDocument(
         formatVersion: 2,
         createdAt: tombstoneTestDate(100),
@@ -253,7 +251,7 @@ func archiveFormatVersionAcceptsLegacy() throws {
         snippetGroups: [],
         snippets: []
     )
-    #expect(try legacyV2.validated().formatVersion == 3)
+    #expect(try legacyV2.validated().formatVersion == ClipboardArchiveDocument.currentFormatVersion)
 
     // v2 写出的 JSON 里没有 deletedAt 字段（nil 不参与编码），解码后必须是 nil。
     let encoder = JSONEncoder()

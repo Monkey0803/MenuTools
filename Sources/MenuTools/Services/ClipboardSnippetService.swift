@@ -21,6 +21,10 @@ enum ClipboardSnippetTemplate {
 struct ClipboardSnippetGroup: Codable, Identifiable, Equatable, Sendable {
     let id: UUID
     var name: String
+    /// 名称最后修改时间：重命名冲突时较新的一方胜出；旧数据为 nil。
+    var updatedAt: Date?
+    /// 删除墓碑：非空表示分组已删除，只用于把删除动作同步给其他设备。
+    var deletedAt: Date?
 }
 
 struct ClipboardSnippet: Codable, Identifiable, Equatable, Sendable {
@@ -31,9 +35,11 @@ struct ClipboardSnippet: Codable, Identifiable, Equatable, Sendable {
     var updatedAt: Date
     var tags: [String] = []
     var isFavorite = false
+    /// 删除墓碑：非空表示片段已删除，只用于把删除动作同步给其他设备。
+    var deletedAt: Date?
 
     private enum CodingKeys: String, CodingKey {
-        case id, groupID, title, content, updatedAt, tags, isFavorite
+        case id, groupID, title, content, updatedAt, tags, isFavorite, deletedAt
     }
 
     init(
@@ -43,7 +49,8 @@ struct ClipboardSnippet: Codable, Identifiable, Equatable, Sendable {
         content: String,
         updatedAt: Date,
         tags: [String] = [],
-        isFavorite: Bool = false
+        isFavorite: Bool = false,
+        deletedAt: Date? = nil
     ) {
         self.id = id
         self.groupID = groupID
@@ -52,6 +59,7 @@ struct ClipboardSnippet: Codable, Identifiable, Equatable, Sendable {
         self.updatedAt = updatedAt
         self.tags = tags
         self.isFavorite = isFavorite
+        self.deletedAt = deletedAt
     }
 
     init(from decoder: Decoder) throws {
@@ -63,6 +71,7 @@ struct ClipboardSnippet: Codable, Identifiable, Equatable, Sendable {
         updatedAt = try container.decode(Date.self, forKey: .updatedAt)
         tags = try container.decodeIfPresent([String].self, forKey: .tags) ?? []
         isFavorite = try container.decodeIfPresent(Bool.self, forKey: .isFavorite) ?? false
+        deletedAt = try container.decodeIfPresent(Date.self, forKey: .deletedAt)
     }
 
     func encode(to encoder: Encoder) throws {
@@ -74,6 +83,7 @@ struct ClipboardSnippet: Codable, Identifiable, Equatable, Sendable {
         try container.encode(updatedAt, forKey: .updatedAt)
         try container.encode(tags, forKey: .tags)
         try container.encode(isFavorite, forKey: .isFavorite)
+        try container.encodeIfPresent(deletedAt, forKey: .deletedAt)
     }
 }
 
@@ -86,13 +96,29 @@ struct ClipboardSnippetStore {
     static let defaultGroupID = UUID(uuidString: "C6BEEFE8-690F-45F3-9E91-154E5F163A38")!
     static var defaultGroupName: String { L("clipboard.snippet.defaultGroup") }
 
+    /// 墓碑保留时长与数量上限，与剪贴板历史一致。
+    static let tombstoneRetention: TimeInterval = 30 * 86_400
+    static let tombstoneLimit = 200
+
     private(set) var groups: [ClipboardSnippetGroup]
     private(set) var allSnippets: [ClipboardSnippet]
+    private(set) var groupTombstones: [ClipboardSnippetGroup]
+    private(set) var snippetTombstones: [ClipboardSnippet]
 
     init(
         groups: [ClipboardSnippetGroup] = [],
-        snippets: [ClipboardSnippet] = []
+        snippets: [ClipboardSnippet] = [],
+        groupTombstones: [ClipboardSnippetGroup] = [],
+        snippetTombstones: [ClipboardSnippet] = []
     ) {
+        self.groupTombstones = groupTombstones.isEmpty
+            ? groups.filter { $0.deletedAt != nil }
+            : groupTombstones
+        self.snippetTombstones = snippetTombstones.isEmpty
+            ? snippets.filter { $0.deletedAt != nil }
+            : snippetTombstones
+        let groups = groups.filter { $0.deletedAt == nil }
+        let snippets = snippets.filter { $0.deletedAt == nil }
         var normalizedGroups = groups
         if !normalizedGroups.contains(where: { $0.id == Self.defaultGroupID }) {
             normalizedGroups.insert(
@@ -147,19 +173,134 @@ struct ClipboardSnippetStore {
         return group
     }
 
-    mutating func removeGroup(id: UUID) {
+    mutating func removeGroup(id: UUID, now: Date = Date()) {
         guard id != Self.defaultGroupID,
-              groups.contains(where: { $0.id == id }) else {
+              let removedGroup = groups.first(where: { $0.id == id }) else {
             return
         }
+        groups.removeAll { $0.id == id }
+        recordGroupTombstone(removedGroup, now: now)
+        // 与本地语义一致：组内片段回到默认分组。
+        // 「片段指向了已删除分组」这件事由合并的孤儿重分配统一处理，不在这里改时间戳。
+        for index in allSnippets.indices where allSnippets[index].groupID == id {
+            allSnippets[index].groupID = Self.defaultGroupID
+        }
+    }
+
+    /// 按 ID 覆盖或追加分组（同步导入用），保持默认分组在前的排序。
+    mutating func replaceGroup(_ group: ClipboardSnippetGroup) {
+        guard group.id != Self.defaultGroupID else { return }
+        groups.removeAll { $0.id == group.id }
+        groups.append(group)
+        groups.sort { lhs, rhs in
+            if lhs.id == Self.defaultGroupID { return true }
+            if rhs.id == Self.defaultGroupID { return false }
+            return lhs.name.localizedStandardCompare(rhs.name) == .orderedAscending
+        }
+    }
+
+    /// 按 ID 覆盖或追加片段（同步导入用）。
+    mutating func replaceSnippet(_ snippet: ClipboardSnippet) {
+        allSnippets.removeAll { $0.id == snippet.id }
+        allSnippets.append(snippet)
+    }
+
+    mutating func removeSnippet(id: UUID, now: Date = Date()) {
+        guard let index = allSnippets.firstIndex(where: { $0.id == id }) else { return }
+        recordSnippetTombstone(allSnippets.remove(at: index), now: now)
+    }
+
+    /// 墓碑只保留身份与删除时间，避免正文跟着残留。
+    private mutating func recordSnippetTombstone(_ snippet: ClipboardSnippet, now: Date) {
+        snippetTombstones.removeAll { $0.id == snippet.id }
+        snippetTombstones.insert(ClipboardSnippet(
+            id: snippet.id,
+            groupID: Self.defaultGroupID,
+            title: "",
+            content: "",
+            updatedAt: now,
+            deletedAt: now
+        ), at: 0)
+        trimTombstones(now: now)
+    }
+
+    private mutating func recordGroupTombstone(_ group: ClipboardSnippetGroup, now: Date) {
+        groupTombstones.removeAll { $0.id == group.id }
+        groupTombstones.insert(ClipboardSnippetGroup(
+            id: group.id,
+            name: "",
+            updatedAt: now,
+            deletedAt: now
+        ), at: 0)
+        trimTombstones(now: now)
+    }
+
+    /// 应用远端墓碑：删除本地对应条目并继续保留墓碑往下传。
+    mutating func applyTombstones(
+        groups incomingGroups: [ClipboardSnippetGroup],
+        snippets incomingSnippets: [ClipboardSnippet],
+        now: Date = Date()
+    ) {
+        for incoming in incomingGroups {
+            guard let deletedAt = incoming.deletedAt else { continue }
+            if let existing = groupTombstones.first(where: { $0.id == incoming.id }),
+               (existing.deletedAt ?? .distantPast) >= deletedAt {
+                continue
+            }
+            groupTombstones.removeAll { $0.id == incoming.id }
+            groupTombstones.insert(incoming, at: 0)
+            removeGroupLocally(id: incoming.id, now: now)
+        }
+        for incoming in incomingSnippets {
+            guard let deletedAt = incoming.deletedAt else { continue }
+            if let index = allSnippets.firstIndex(where: { $0.id == incoming.id }) {
+                guard allSnippets[index].updatedAt <= deletedAt else { continue }
+                allSnippets.remove(at: index)
+            }
+            if let existing = snippetTombstones.first(where: { $0.id == incoming.id }),
+               (existing.deletedAt ?? .distantPast) >= deletedAt {
+                continue
+            }
+            snippetTombstones.removeAll { $0.id == incoming.id }
+            snippetTombstones.insert(incoming, at: 0)
+        }
+        trimTombstones(now: now)
+    }
+
+    /// 应用墓碑时删除本地分组：组内片段移回默认分组，但不再产生新墓碑。
+    private mutating func removeGroupLocally(id: UUID, now: Date) {
+        guard id != Self.defaultGroupID, groups.contains(where: { $0.id == id }) else { return }
         groups.removeAll { $0.id == id }
         for index in allSnippets.indices where allSnippets[index].groupID == id {
             allSnippets[index].groupID = Self.defaultGroupID
         }
     }
 
+    private mutating func trimTombstones(now: Date) {
+        let cutoff = now.addingTimeInterval(-Self.tombstoneRetention)
+        groupTombstones.removeAll { ($0.deletedAt ?? .distantPast) < cutoff }
+        snippetTombstones.removeAll { ($0.deletedAt ?? .distantPast) < cutoff }
+        if groupTombstones.count > Self.tombstoneLimit {
+            groupTombstones.removeLast(groupTombstones.count - Self.tombstoneLimit)
+        }
+        if snippetTombstones.count > Self.tombstoneLimit {
+            snippetTombstones.removeLast(snippetTombstones.count - Self.tombstoneLimit)
+        }
+    }
+
+    /// 导入（同步或归档）存活条目：清掉对应墓碑，避免刚导入就被自己的墓碑删掉。
+    mutating func restoreImported(
+        groups importedGroups: [ClipboardSnippetGroup],
+        snippets importedSnippets: [ClipboardSnippet]
+    ) {
+        let groupIDs = Set(importedGroups.map(\.id))
+        let snippetIDs = Set(importedSnippets.map(\.id))
+        groupTombstones.removeAll { groupIDs.contains($0.id) }
+        snippetTombstones.removeAll { snippetIDs.contains($0.id) }
+    }
+
     @discardableResult
-    mutating func updateGroup(id: UUID, name: String) -> Bool {
+    mutating func updateGroup(id: UUID, name: String, now: Date = Date()) -> Bool {
         let normalizedName = name.trimmingCharacters(in: .whitespacesAndNewlines)
         guard id != Self.defaultGroupID,
               !normalizedName.isEmpty,
@@ -173,6 +314,7 @@ struct ClipboardSnippetStore {
             return false
         }
         groups[index].name = normalizedName
+        groups[index].updatedAt = now
         groups.sort { lhs, rhs in
             if lhs.id == Self.defaultGroupID { return true }
             if rhs.id == Self.defaultGroupID { return false }
@@ -250,13 +392,13 @@ struct ClipboardSnippetStore {
         return true
     }
 
-    mutating func removeSnippet(id: UUID) {
-        allSnippets.removeAll { $0.id == id }
-    }
+    // 删除走带墓碑的 removeSnippet(id:now:)，这里不再保留无墓碑版本。
 
-    mutating func toggleFavorite(id: UUID) {
+    mutating func toggleFavorite(id: UUID, now: Date = Date()) {
         guard let index = allSnippets.firstIndex(where: { $0.id == id }) else { return }
         allSnippets[index].isFavorite.toggle()
+        // 收藏也是一种编辑：不刷新时间戳的话，其他设备上的旧副本会在合并时把它改回去。
+        allSnippets[index].updatedAt = now
     }
 
     private static func normalizedTags(_ tags: [String]) -> [String] {
@@ -317,7 +459,11 @@ enum ClipboardSnippetPersistence {
     static func save(_ store: ClipboardSnippetStore, to url: URL) throws {
         let encoder = JSONEncoder()
         encoder.dateEncodingStrategy = .millisecondsSince1970
-        let document = ClipboardSnippetDocument(groups: store.groups, snippets: store.allSnippets)
+        // 墓碑跟随同一份文档持久化，重启后仍能参与同步。
+        let document = ClipboardSnippetDocument(
+            groups: store.groups + store.groupTombstones,
+            snippets: store.allSnippets + store.snippetTombstones
+        )
         try encoder.encode(document).write(to: url, options: .atomic)
     }
 }
@@ -411,8 +557,36 @@ final class ClipboardSnippetService {
         return didMove
     }
 
+    /// 参与共享文件夹同步的条目：存活的分组/片段 + 删除墓碑。
+    var syncGroups: [ClipboardSnippetGroup] { store.groups + store.groupTombstones }
+    var syncSnippets: [ClipboardSnippet] { store.allSnippets + store.snippetTombstones }
+
     func replaceImported(groups: [ClipboardSnippetGroup], snippets: [ClipboardSnippet]) {
-        store = ClipboardSnippetStore(groups: groups, snippets: snippets)
+        // 归档导入是「恢复」动作：保留本机墓碑，避免导入后删除过的条目又被同步回来。
+        store = ClipboardSnippetStore(
+            groups: groups,
+            snippets: snippets,
+            groupTombstones: store.groupTombstones,
+            snippetTombstones: store.snippetTombstones
+        )
+        synchronizeAndPersist()
+    }
+
+    /// 同步导入：先应用远端墓碑，再导入存活条目。
+    func importSynced(groups: [ClipboardSnippetGroup], snippets: [ClipboardSnippet]) {
+        let liveGroups = groups.filter { $0.deletedAt == nil }
+        let liveSnippets = snippets.filter { $0.deletedAt == nil }
+        let hasTombstones = groups.contains { $0.deletedAt != nil } || snippets.contains { $0.deletedAt != nil }
+        guard hasTombstones || !liveGroups.isEmpty || !liveSnippets.isEmpty else { return }
+
+        store.applyTombstones(groups: groups, snippets: snippets)
+        store.restoreImported(groups: liveGroups, snippets: liveSnippets)
+        for group in liveGroups {
+            store.replaceGroup(group)
+        }
+        for snippet in liveSnippets {
+            store.replaceSnippet(snippet)
+        }
         synchronizeAndPersist()
     }
 

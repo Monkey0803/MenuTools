@@ -13,6 +13,7 @@ struct ClipboardPrivacySettingsSection: View {
     @State private var isArchiveOperationInProgress = false
     @State private var syncFilePath = UserDefaults.standard.string(forKey: ClipboardSyncSettings.filePathKey)
     @State private var pendingArchiveAction: ClipboardArchivePendingAction?
+    @State private var conflictCopies: [URL] = []
     @State private var applicationPolicyBundleID = ""
     @State private var applicationPolicyRecord = true
     @State private var applicationPolicyAutoPaste = false
@@ -226,7 +227,12 @@ struct ClipboardPrivacySettingsSection: View {
             HStack(spacing: 8) {
                 Button(L("clipboard.sync.chooseFolder"), action: chooseSyncFolder)
                 Button(L("clipboard.sync.now"), action: requestSynchronizeSharedFile)
-                    .disabled(syncFilePath == nil || archivePassphrase.isEmpty || isArchiveOperationInProgress)
+                    .disabled(
+                        syncFilePath == nil
+                            || archivePassphrase.isEmpty
+                            || isArchiveOperationInProgress
+                            || autoSync.isSyncing
+                    )
                 if let syncFilePath {
                     Text(URL(fileURLWithPath: syncFilePath).deletingLastPathComponent().lastPathComponent)
                         .font(.caption)
@@ -299,6 +305,25 @@ struct ClipboardPrivacySettingsSection: View {
                 Text(L("clipboard.sync.neverSynced"))
                     .font(.caption)
                     .foregroundStyle(.secondary)
+            }
+
+            if autoSync.isSyncing {
+                Label(L("clipboard.sync.syncing"), systemImage: "arrow.triangle.2.circlepath")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+            }
+
+            if !conflictCopies.isEmpty {
+                HStack(spacing: 8) {
+                    Label(L("clipboard.sync.conflicts", conflictCopies.count), systemImage: "doc.on.doc")
+                        .font(.caption)
+                        .foregroundStyle(.orange)
+                    Spacer()
+                    Button(L("clipboard.sync.conflicts.reveal")) {
+                        NSWorkspace.shared.activateFileViewerSelecting(conflictCopies)
+                    }
+                    .controlSize(.small)
+                }
             }
 
             if let syncError = autoSync.lastError {
@@ -503,6 +528,16 @@ struct ClipboardPrivacySettingsSection: View {
         UserDefaults.standard.set(fileURL.path, forKey: ClipboardSyncSettings.filePathKey)
         autoSync.refreshStoredPassphraseState()
         autoSync.clearLastError()
+        refreshConflictCopies()
+    }
+
+    /// 共享文件旁的冲突副本：出现后要能被用户发现和处理。
+    private func refreshConflictCopies() {
+        guard let syncFilePath else {
+            conflictCopies = []
+            return
+        }
+        conflictCopies = ClipboardSharedFileSync.conflictCopies(for: URL(fileURLWithPath: syncFilePath))
     }
 
     private func requestSynchronizeSharedFile() {
@@ -530,6 +565,7 @@ struct ClipboardPrivacySettingsSection: View {
             } else {
                 archiveStatus = .failure(autoSync.lastError ?? L("clipboard.sync.failed", ""))
             }
+            refreshConflictCopies()
         }
     }
 

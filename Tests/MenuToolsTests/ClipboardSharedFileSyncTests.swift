@@ -163,3 +163,24 @@ func conflictCopyURLKeepsDirectoryAndTimestamp() {
     #expect(conflictURL.lastPathComponent.hasPrefix("MenuTools-Clipboard.conflict-"))
     #expect(conflictURL.pathExtension == "mtclipsync")
 }
+
+
+@Test("能找出共享文件旁的冲突副本，忽略无关文件")
+func conflictCopiesListsOnlyMatchingFiles() throws {
+    let directory = FileManager.default.temporaryDirectory
+        .appendingPathComponent("MenuTools-ConflictProbe-\(UUID().uuidString)")
+    try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
+    defer { try? FileManager.default.removeItem(at: directory) }
+
+    let syncURL = directory.appendingPathComponent("MenuTools-Clipboard.mtclipsync")
+    let first = directory.appendingPathComponent("MenuTools-Clipboard.conflict-20260911-153000.mtclipsync")
+    let second = directory.appendingPathComponent("MenuTools-Clipboard.conflict-20260912-090000.mtclipsync")
+    try Data("a".utf8).write(to: syncURL)
+    try Data("b".utf8).write(to: first)
+    try Data("c".utf8).write(to: second)
+    try Data("d".utf8).write(to: directory.appendingPathComponent("其他文件.txt"))
+
+    let copies = ClipboardSharedFileSync.conflictCopies(for: syncURL)
+
+    #expect(copies.map(\.lastPathComponent) == [first.lastPathComponent, second.lastPathComponent])
+}

@@ -2,9 +2,9 @@ import CryptoKit
 import Foundation
 
 struct ClipboardArchiveDocument: Codable, Equatable, Sendable {
-    static let currentFormatVersion = 3
-    /// v3 起 historyItems 可能包含删除墓碑（deletedAt 非空）。
-    private static let legacyFormatVersions: Set<Int> = [1, 2]
+    static let currentFormatVersion = 4
+    /// v3 起 historyItems 可能包含删除墓碑；v4 起片段与分组也有墓碑、分组带 updatedAt。
+    private static let legacyFormatVersions: Set<Int> = [1, 2, 3]
 
     var formatVersion: Int
     var createdAt: Date
@@ -173,19 +173,71 @@ enum ClipboardSyncMerge {
             .filter { !resurrectedIDs.contains($0.id) }
             .sorted { ($0.deletedAt ?? .distantPast) > ($1.deletedAt ?? .distantPast) }
 
-        var groupsByID = Dictionary(uniqueKeysWithValues: remote.snippetGroups.map { ($0.id, $0) })
-        for group in local.snippetGroups { groupsByID[group.id] = group }
+        // 分组墓碑：删掉的分组不能被远端带回来。
+        var groupTombstones: [UUID: ClipboardSnippetGroup] = [:]
+        for group in remote.snippetGroups + local.snippetGroups where group.deletedAt != nil {
+            let candidate = group.deletedAt ?? .distantPast
+            if let existing = groupTombstones[group.id],
+               (existing.deletedAt ?? .distantPast) >= candidate {
+                continue
+            }
+            groupTombstones[group.id] = group
+        }
+
+        // 分组本体：名称按 updatedAt 较新者胜出（旧数据没有时间则视为最早）。
+        var groupsByID: [UUID: ClipboardSnippetGroup] = [:]
+        for group in remote.snippetGroups + local.snippetGroups where group.deletedAt == nil {
+            guard groupTombstones[group.id] == nil else { continue }
+            if let existing = groupsByID[group.id],
+               (existing.updatedAt ?? .distantPast) > (group.updatedAt ?? .distantPast) {
+                continue
+            }
+            groupsByID[group.id] = group
+        }
+
+        // 片段墓碑与片段本体，规则与剪贴板历史一致。
+        var snippetTombstones: [UUID: ClipboardSnippet] = [:]
+        for snippet in remote.snippets + local.snippets where snippet.deletedAt != nil {
+            let candidate = snippet.deletedAt ?? .distantPast
+            if let existing = snippetTombstones[snippet.id],
+               (existing.deletedAt ?? .distantPast) >= candidate {
+                continue
+            }
+            snippetTombstones[snippet.id] = snippet
+        }
 
         var snippetsByID: [UUID: ClipboardSnippet] = [:]
-        for snippet in remote.snippets + local.snippets {
+        var revivedSnippetIDs = Set<UUID>()
+        for snippet in remote.snippets + local.snippets where snippet.deletedAt == nil {
+            if let tombstone = snippetTombstones[snippet.id] {
+                guard snippet.updatedAt > (tombstone.deletedAt ?? .distantPast) else { continue }
+                revivedSnippetIDs.insert(snippet.id)
+            }
             if let existing = snippetsByID[snippet.id], existing.updatedAt > snippet.updatedAt { continue }
             snippetsByID[snippet.id] = snippet
         }
 
+        // 分组被删除后，其片段回到默认分组，保证共享文件本身自洽。
+        let liveGroupIDs = Set(groupsByID.keys)
+        let snippets = snippetsByID.values.map { snippet in
+            guard !liveGroupIDs.contains(snippet.groupID) else { return snippet }
+            var moved = snippet
+            moved.groupID = ClipboardSnippetStore.defaultGroupID
+            return moved
+        }
+        let groupTombstoneValues = groupTombstones.values
+            .filter { groupsByID[$0.id] == nil }
+            .sorted { ($0.deletedAt ?? .distantPast) > ($1.deletedAt ?? .distantPast) }
+        let snippetTombstoneValues = snippetTombstones.values
+            .filter { !revivedSnippetIDs.contains($0.id) }
+            .sorted { ($0.deletedAt ?? .distantPast) > ($1.deletedAt ?? .distantPast) }
+
         return ClipboardArchiveDocument.current(
             historyItems: historyByID.values.sorted { $0.capturedAt > $1.capturedAt } + tombstones,
-            snippetGroups: groupsByID.values.sorted { $0.name.localizedStandardCompare($1.name) == .orderedAscending },
-            snippets: snippetsByID.values.sorted { $0.updatedAt > $1.updatedAt },
+            snippetGroups: groupsByID.values
+                .sorted { $0.name.localizedStandardCompare($1.name) == .orderedAscending }
+                + groupTombstoneValues,
+            snippets: snippets.sorted { $0.updatedAt > $1.updatedAt } + snippetTombstoneValues,
             createdAt: now
         )
     }
@@ -226,6 +278,17 @@ enum ClipboardSharedFileSyncError: LocalizedError, Equatable {
 enum ClipboardSharedFileSync {
     /// 写入冲突时的最大重试次数：每次重试都会带着对方的新内容重新合并。
     static let maximumAttempts = 3
+
+    /// 找出与共享文件同目录的冲突副本，供设置页提示用户处理。
+    static func conflictCopies(for url: URL) -> [URL] {
+        let directory = url.deletingLastPathComponent()
+        let prefix = "\(url.deletingPathExtension().lastPathComponent).conflict-"
+        let names = (try? FileManager.default.contentsOfDirectory(atPath: directory.path)) ?? []
+        return names
+            .filter { $0.hasPrefix(prefix) }
+            .sorted()
+            .map { directory.appendingPathComponent($0) }
+    }
 
     /// 冲突副本：反复被并发改写时保留本机合并结果，避免覆盖别人的更新。
     static func conflictURL(for url: URL, now: Date = Date()) -> URL {

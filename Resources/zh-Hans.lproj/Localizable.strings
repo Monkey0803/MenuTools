@@ -1111,6 +1111,9 @@
 "clipboard.sync.passphraseSaved" = "口令已保存到钥匙串";
 "clipboard.sync.clearPassphrase" = "清除已保存口令";
 "clipboard.sync.lastSync" = "上次同步：%@";
+"clipboard.sync.conflicts" = "发现 %d 个同步冲突副本";
+"clipboard.sync.conflicts.reveal" = "在 Finder 中显示";
+"clipboard.sync.syncing" = "同步中…";
 "clipboard.sync.result" = "本次合并：置顶 %d 条、片段 %d 个";
 "clipboard.sync.result.none" = "本次合并：无新增";
 "clipboard.sync.neverSynced" = "尚未同步过";

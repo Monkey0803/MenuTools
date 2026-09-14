@@ -107,8 +107,8 @@ enum ClipboardSharedFileSyncOperation {
     ) async throws -> Result {
         let local = ClipboardArchiveDocument.current(
             historyItems: historyService.syncHistoryItems,
-            snippetGroups: snippetService.groups,
-            snippets: snippetService.snippets
+            snippetGroups: snippetService.syncGroups,
+            snippets: snippetService.syncSnippets
         )
         let merged = try await Task.detached(priority: .utility) {
             try ClipboardSharedFileSync.synchronize(
@@ -118,7 +118,7 @@ enum ClipboardSharedFileSyncOperation {
             )
         }.value
         historyService.importItems(merged.historyItems)
-        snippetService.replaceImported(groups: merged.snippetGroups, snippets: merged.snippets)
+        snippetService.importSynced(groups: merged.snippetGroups, snippets: merged.snippets)
         return Result(
             importedHistoryCount: merged.historyItems.count,
             importedSnippetCount: merged.snippets.count

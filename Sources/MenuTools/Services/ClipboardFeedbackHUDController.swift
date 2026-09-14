@@ -6,8 +6,20 @@ import SwiftUI
 final class ClipboardFeedbackHUDController {
     static let shared = ClipboardFeedbackHUDController()
 
+    /// 展示时长：默认 1.8 秒，测试可注入更短的值。
+    static let defaultDismissInterval: TimeInterval = 1.8
+
+    private let dismissInterval: TimeInterval
     private var panel: NSPanel?
-    private var dismissTimer: Timer?
+    private var dismissTask: Task<Void, Never>?
+
+    /// 当前展示的反馈；nil 表示已隐藏。界面与测试都以它为准。
+    private(set) var presentedFeedback: ClipboardCopyFeedback?
+    var isPresenting: Bool { presentedFeedback != nil }
+
+    init(dismissInterval: TimeInterval = ClipboardFeedbackHUDController.defaultDismissInterval) {
+        self.dismissInterval = dismissInterval
+    }
 
     func show(_ feedback: ClipboardCopyFeedback) {
         let panel = panel ?? makePanel()
@@ -17,12 +29,16 @@ final class ClipboardFeedbackHUDController {
             panel.setFrameOrigin(NSPoint(x: frame.midX - 150, y: frame.minY + 96))
         }
         panel.orderFrontRegardless()
+        presentedFeedback = feedback
 
-        dismissTimer?.invalidate()
-        dismissTimer = Timer.scheduledTimer(withTimeInterval: 1.8, repeats: false) { [weak self] _ in
-            Task { @MainActor [weak self] in
-                self?.panel?.orderOut(nil)
-            }
+        // 用 Task 而不是 Timer：不依赖 run loop，连续展示时重新计时也更直观。
+        dismissTask?.cancel()
+        dismissTask = Task { @MainActor [weak self] in
+            guard let self else { return }
+            try? await Task.sleep(for: .seconds(dismissInterval))
+            guard !Task.isCancelled else { return }
+            self.panel?.orderOut(nil)
+            self.presentedFeedback = nil
         }
     }
 

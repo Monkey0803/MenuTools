@@ -1111,6 +1111,9 @@
 "clipboard.sync.passphraseSaved" = "Passphrase saved in the keychain";
 "clipboard.sync.clearPassphrase" = "Remove saved passphrase";
 "clipboard.sync.lastSync" = "Last sync: %@";
+"clipboard.sync.conflicts" = "%d sync conflict copies found";
+"clipboard.sync.conflicts.reveal" = "Show in Finder";
+"clipboard.sync.syncing" = "Syncing…";
 "clipboard.sync.result" = "Merged %d pinned items and %d snippets";
 "clipboard.sync.result.none" = "Nothing new to merge";
 "clipboard.sync.neverSynced" = "Not synced yet";
