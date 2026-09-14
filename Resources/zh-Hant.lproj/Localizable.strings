@@ -743,6 +743,7 @@
 "window.manager.cycleLayouts" = "連按同一快速鍵循環切換同族佈局";
 "window.manager.snapPreview" = "拖曳視窗到邊緣時顯示落點預覽";
 "window.manager.haptic" = "吸附到新的落點區域時給出觸覺回饋";
+"window.manager.detailedSnapAreas" = "使用更細的吸附區域（Rectangle 風格：上緣最大化、下緣三分區）";
 "window.manager.restoreSizeOnDragOut" = "把已吸附的視窗拖出來時恢復原尺寸";
 "window.manager.capturePreset" = "記住目前視窗";
 "window.manager.capturedPreset" = "已儲存預設：%@";

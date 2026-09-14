@@ -467,6 +467,12 @@ final class WindowManagementService {
         saveConfiguration()
     }
 
+    func setDetailedSnapAreasEnabled(_ enabled: Bool) {
+        configuration.detailedSnapAreas = enabled
+        saveConfiguration()
+        hideSnapPreview()
+    }
+
     func setRestoreSizeOnDragOutEnabled(_ enabled: Bool) {
         configuration.restoreSizeWhenDraggingOut = enabled
         saveConfiguration()
@@ -880,18 +886,24 @@ final class WindowManagementService {
             for: point,
             windowFrame: dragWindowFrame,
             screens: snapScreens,
-            options: configuration.options
+            options: configuration.options,
+            detailedSnapAreas: configuration.detailedSnapAreas
         ) else {
             hideSnapPreview()
             return
         }
         SnapDebugLog.log("preview: layout=\(plan.layout.rawValue) frame=\(NSStringFromRect(plan.frame))")
-        if configuration.hapticFeedbackOnSnap,
-           WindowSnapFeedback.shouldTriggerHaptic(previous: lastPreviewPlan, next: plan) {
+        let enteredNewZone = WindowSnapFeedback.shouldTriggerHaptic(previous: lastPreviewPlan, next: plan)
+        if enteredNewZone, configuration.hapticFeedbackOnSnap {
             NSHapticFeedbackManager.defaultPerformer.perform(.alignment, performanceTime: .now)
         }
         lastPreviewPlan = plan
-        snapPreview.show(plan)
+        snapPreview.show(
+            plan,
+            initialFrame: enteredNewZone
+                ? WindowSnapPreviewAnimation.initialFrame(for: plan, screens: snapScreens)
+                : nil
+        )
     }
 
     private func hideSnapPreview() {
@@ -953,7 +965,8 @@ final class WindowManagementService {
                 for: point,
                 windowFrame: dragWindowFrame,
                 screens: snapScreens,
-                options: configuration.options
+                options: configuration.options,
+                detailedSnapAreas: configuration.detailedSnapAreas
               ) else {
             SnapDebugLog.log("snap on mouseUp: skipped (window=\(dragWindow != nil) pid=\(dragWindowPID != nil) point=\(NSStringFromPoint(NSEvent.mouseLocation)) windowFrame=\(dragWindowFrame.map(NSStringFromRect) ?? "nil"))")
             return

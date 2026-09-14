@@ -126,6 +126,8 @@ struct WindowManagerConfiguration: Codable, Equatable, Sendable {
     var hapticFeedbackOnSnap: Bool
     /// 把已经吸附的窗口拖出来时，恢复吸附前的尺寸。
     var restoreSizeWhenDraggingOut: Bool
+    /// 使用更细的吸附区域（Rectangle 风格）：顶边→最大化、底边三分区、边缘靠上下角→上下半屏。
+    var detailedSnapAreas: Bool
 
     init(
         options: WindowManagerOptions = WindowManagerOptions(),
@@ -138,7 +140,8 @@ struct WindowManagerConfiguration: Codable, Equatable, Sendable {
         showSnapPreview: Bool = true,
         traverseDisplaysOnRepeat: Bool = false,
         hapticFeedbackOnSnap: Bool = true,
-        restoreSizeWhenDraggingOut: Bool = true
+        restoreSizeWhenDraggingOut: Bool = true,
+        detailedSnapAreas: Bool = false
     ) {
         self.options = options
         self.presets = presets
@@ -151,6 +154,7 @@ struct WindowManagerConfiguration: Codable, Equatable, Sendable {
         self.traverseDisplaysOnRepeat = traverseDisplaysOnRepeat
         self.hapticFeedbackOnSnap = hapticFeedbackOnSnap
         self.restoreSizeWhenDraggingOut = restoreSizeWhenDraggingOut
+        self.detailedSnapAreas = detailedSnapAreas
     }
 
     private enum CodingKeys: String, CodingKey {
@@ -165,6 +169,7 @@ struct WindowManagerConfiguration: Codable, Equatable, Sendable {
         case traverseDisplaysOnRepeat
         case hapticFeedbackOnSnap
         case restoreSizeWhenDraggingOut
+        case detailedSnapAreas
     }
 
     /// 顶层同样逐字段解码：新增开关不会让旧配置整份丢失。
@@ -182,7 +187,8 @@ struct WindowManagerConfiguration: Codable, Equatable, Sendable {
             showSnapPreview: try container.decodeIfPresent(Bool.self, forKey: .showSnapPreview) ?? fallback.showSnapPreview,
             traverseDisplaysOnRepeat: try container.decodeIfPresent(Bool.self, forKey: .traverseDisplaysOnRepeat) ?? fallback.traverseDisplaysOnRepeat,
             hapticFeedbackOnSnap: try container.decodeIfPresent(Bool.self, forKey: .hapticFeedbackOnSnap) ?? fallback.hapticFeedbackOnSnap,
-            restoreSizeWhenDraggingOut: try container.decodeIfPresent(Bool.self, forKey: .restoreSizeWhenDraggingOut) ?? fallback.restoreSizeWhenDraggingOut
+            restoreSizeWhenDraggingOut: try container.decodeIfPresent(Bool.self, forKey: .restoreSizeWhenDraggingOut) ?? fallback.restoreSizeWhenDraggingOut,
+            detailedSnapAreas: try container.decodeIfPresent(Bool.self, forKey: .detailedSnapAreas) ?? fallback.detailedSnapAreas
         )
     }
 
@@ -199,11 +205,17 @@ struct WindowManagerConfiguration: Codable, Equatable, Sendable {
         try container.encode(traverseDisplaysOnRepeat, forKey: .traverseDisplaysOnRepeat)
         try container.encode(hapticFeedbackOnSnap, forKey: .hapticFeedbackOnSnap)
         try container.encode(restoreSizeWhenDraggingOut, forKey: .restoreSizeWhenDraggingOut)
+        try container.encode(detailedSnapAreas, forKey: .detailedSnapAreas)
     }
 }
 
 enum WindowSnapResolver {
-    static func layout(for point: CGPoint, in screen: CGRect, threshold: CGFloat) -> WindowLayout? {
+    static func layout(
+        for point: CGPoint,
+        in screen: CGRect,
+        threshold: CGFloat,
+        detailed: Bool = false
+    ) -> WindowLayout? {
         guard screen.contains(point) || expanded(screen, by: threshold).contains(point) else { return nil }
 
         let nearLeft = point.x <= screen.minX + threshold
@@ -215,10 +227,30 @@ enum WindowSnapResolver {
         if nearTop && nearRight { return .topRight }
         if nearBottom && nearLeft { return .bottomLeft }
         if nearBottom && nearRight { return .bottomRight }
-        if nearTop { return .topHalf }
-        if nearBottom { return .bottomHalf }
-        if nearLeft { return .leftHalf }
-        if nearRight { return .rightHalf }
+
+        guard detailed else {
+            if nearTop { return .topHalf }
+            if nearBottom { return .bottomHalf }
+            if nearLeft { return .leftHalf }
+            if nearRight { return .rightHalf }
+            return nil
+        }
+
+        // 精细模型（Rectangle 风格）：顶边给最大化，底边按左/中/右三分区，
+        // 上下半屏改由左右边缘的上/下三分之一区域提供。
+        if nearTop { return .maximize }
+        if nearBottom {
+            let third = screen.width / 3
+            if point.x <= screen.minX + third { return .firstThird }
+            if point.x >= screen.maxX - third { return .lastThird }
+            return .bottomHalf
+        }
+        if nearLeft || nearRight {
+            let band = screen.height / 3
+            if point.y >= screen.maxY - band { return .topHalf }
+            if point.y <= screen.minY + band { return .bottomHalf }
+            return nearLeft ? .leftHalf : .rightHalf
+        }
         return nil
     }
 

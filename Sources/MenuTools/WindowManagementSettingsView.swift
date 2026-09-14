@@ -215,6 +215,11 @@ struct WindowManagementSettingsView: View {
                 set: { windowService.setHapticFeedbackEnabled($0) }
             ))
             .disabled(!windowService.configuration.edgeSnappingEnabled)
+            Toggle(L("window.manager.detailedSnapAreas"), isOn: Binding(
+                get: { windowService.configuration.detailedSnapAreas },
+                set: { windowService.setDetailedSnapAreasEnabled($0) }
+            ))
+            .disabled(!windowService.configuration.edgeSnappingEnabled)
             Toggle(L("window.manager.cycleLayouts"), isOn: Binding(
                 get: { windowService.configuration.cycleLayouts },
                 set: { windowService.setCycleLayoutsEnabled($0) }

@@ -743,6 +743,7 @@
 "window.manager.cycleLayouts" = "连按同一快捷键循环切换同族布局";
 "window.manager.snapPreview" = "拖动窗口到边缘时显示落点预览";
 "window.manager.haptic" = "吸附到新的落点区域时给出触觉反馈";
+"window.manager.detailedSnapAreas" = "使用更细的吸附区域（Rectangle 风格：顶边最大化、底边三分区）";
 "window.manager.restoreSizeOnDragOut" = "把已吸附的窗口拖出来时恢复原尺寸";
 "window.manager.capturePreset" = "记住当前窗口";
 "window.manager.capturedPreset" = "已保存预设：%@";

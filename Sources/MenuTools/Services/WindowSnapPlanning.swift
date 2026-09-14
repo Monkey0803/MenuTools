@@ -29,7 +29,8 @@ extension WindowSnapResolver {
     static func layout(
         pressedWindowFrame frame: CGRect,
         in screen: CGRect,
-        threshold: CGFloat
+        threshold: CGFloat,
+        detailed: Bool = false
     ) -> WindowLayout? {
         guard screen.width > 0, screen.height > 0 else { return nil }
 
@@ -49,10 +50,29 @@ extension WindowSnapResolver {
         if nearTop && nearRight { return .topRight }
         if nearBottom && nearLeft { return .bottomLeft }
         if nearBottom && nearRight { return .bottomRight }
-        if nearTop { return .topHalf }
-        if nearBottom { return .bottomHalf }
-        if nearLeft { return .leftHalf }
-        if nearRight { return .rightHalf }
+
+        guard detailed else {
+            if nearTop { return .topHalf }
+            if nearBottom { return .bottomHalf }
+            if nearLeft { return .leftHalf }
+            if nearRight { return .rightHalf }
+            return nil
+        }
+
+        // 与光标版同一套精细模型，只是用窗口中心判断落在哪一列/哪一行。
+        if nearTop { return .maximize }
+        if nearBottom {
+            let third = screen.width / 3
+            if frame.midX <= screen.minX + third { return .firstThird }
+            if frame.midX >= screen.maxX - third { return .lastThird }
+            return .bottomHalf
+        }
+        if nearLeft || nearRight {
+            let band = screen.height / 3
+            if frame.midY >= screen.maxY - band { return .topHalf }
+            if frame.midY <= screen.minY + band { return .bottomHalf }
+            return nearLeft ? .leftHalf : .rightHalf
+        }
         return nil
     }
 }
@@ -66,13 +86,15 @@ enum WindowSnapPreviewPlanner {
         for point: CGPoint,
         windowFrame: CGRect? = nil,
         screens: [WindowSnapScreen],
-        options: WindowManagerOptions
+        options: WindowManagerOptions,
+        detailedSnapAreas: Bool = false
     ) -> WindowSnapPreviewPlan? {
         if let index = WindowSnapResolver.screenIndex(for: point, screens: screens.map(\.frame)),
            let layout = WindowSnapResolver.layout(
                for: point,
                in: screens[index].frame,
-               threshold: options.snapDistance
+               threshold: options.snapDistance,
+               detailed: detailedSnapAreas
            ) {
             return WindowSnapPreviewPlan(
                 layout: layout,
@@ -90,7 +112,8 @@ enum WindowSnapPreviewPlanner {
               let layout = WindowSnapResolver.layout(
                   pressedWindowFrame: windowFrame,
                   in: screens[index].frame,
-                  threshold: options.snapDistance
+                  threshold: options.snapDistance,
+                  detailed: detailedSnapAreas
               ) else { return nil }
 
         return WindowSnapPreviewPlan(
@@ -211,5 +234,60 @@ enum WindowUnsnapCalculator {
         let top = min(max(current.maxY, visibleFrame.minY + size.height), visibleFrame.maxY)
 
         return CGRect(x: x, y: top - size.height, width: size.width, height: size.height)
+    }
+}
+
+/// 落点预览的「生长」动画几何：从落点矩形所贴的那条边/角上长出来。
+enum WindowSnapPreviewAnimation {
+    static let initialSize = CGSize(width: 12, height: 12)
+
+    /// 动画起点：落点矩形贴住屏幕的哪条边（或哪个角），就从那里长出来。
+    static func origin(for plan: WindowSnapPreviewPlan, screens: [WindowSnapScreen]) -> CGPoint {
+        guard screens.indices.contains(plan.screenIndex) else {
+            return CGPoint(x: plan.frame.midX, y: plan.frame.midY)
+        }
+        let screen = screens[plan.screenIndex].visibleFrame
+        let frame = plan.frame
+        let tolerance: CGFloat = 2
+
+        // 整屏宽/高的落点会同时贴住两条平行边（例如左半屏同时贴顶和贴底），
+        // 这时该轴取中点，否则预览会从角落而不是从边缘长出来。
+        let spansWidth = frame.width >= screen.width - tolerance * 2
+        let spansHeight = frame.height >= screen.height - tolerance * 2
+
+        let x: CGFloat
+        if spansWidth {
+            x = frame.midX
+        } else if abs(frame.minX - screen.minX) <= tolerance {
+            x = frame.minX
+        } else if abs(frame.maxX - screen.maxX) <= tolerance {
+            x = frame.maxX
+        } else {
+            x = frame.midX
+        }
+
+        let y: CGFloat
+        if spansHeight {
+            y = frame.midY
+        } else if abs(frame.maxY - screen.maxY) <= tolerance {
+            y = frame.maxY
+        } else if abs(frame.minY - screen.minY) <= tolerance {
+            y = frame.minY
+        } else {
+            y = frame.midY
+        }
+
+        return CGPoint(x: x, y: y)
+    }
+
+    /// 动画起始帧：以起点为中心的一个小方块。
+    static func initialFrame(for plan: WindowSnapPreviewPlan, screens: [WindowSnapScreen]) -> CGRect {
+        let point = origin(for: plan, screens: screens)
+        return CGRect(
+            x: point.x - initialSize.width / 2,
+            y: point.y - initialSize.height / 2,
+            width: initialSize.width,
+            height: initialSize.height
+        )
     }
 }

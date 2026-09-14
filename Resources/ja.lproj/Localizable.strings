@@ -743,6 +743,7 @@
 "window.manager.cycleLayouts" = "同じショートカットの連続実行で同系統のレイアウトを順に切り替え";
 "window.manager.snapPreview" = "ドラッグ中に移動先のプレビューを表示";
 "window.manager.haptic" = "新しい吸着先に切り替わったとき触覚フィードバックを返す";
+"window.manager.detailedSnapAreas" = "より細かい吸着領域を使う（Rectangle 風：上端は最大化、下端は三分割）";
 "window.manager.restoreSizeOnDragOut" = "吸着済みのウインドウをドラッグで外すと元のサイズに戻す";
 "window.manager.capturePreset" = "現在のウインドウを記憶";
 "window.manager.capturedPreset" = "プリセットを保存しました：%@";

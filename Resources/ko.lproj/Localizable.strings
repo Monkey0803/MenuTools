@@ -743,6 +743,7 @@
 "window.manager.cycleLayouts" = "같은 단축키를 반복하면 같은 계열 레이아웃으로 순환";
 "window.manager.snapPreview" = "드래그할 때 이동할 위치 미리보기 표시";
 "window.manager.haptic" = "새 스냅 영역으로 이동할 때 햅틱 피드백";
+"window.manager.detailedSnapAreas" = "더 세밀한 스냅 영역 사용(Rectangle 스타일: 위 가장자리는 최대화, 아래 가장자리는 3분할)";
 "window.manager.restoreSizeOnDragOut" = "스냅된 창을 끌어내면 이전 크기로 복원";
 "window.manager.capturePreset" = "현재 창 기억";
 "window.manager.capturedPreset" = "프리셋을 저장했습니다: %@";

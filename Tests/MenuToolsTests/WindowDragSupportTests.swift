@@ -115,5 +115,104 @@ func windowManagerConfigurationDecodesDragEnhancementDefaults() throws {
     let decoded = try JSONDecoder().decode(WindowManagerConfiguration.self, from: Data(legacy.utf8))
     #expect(decoded.hapticFeedbackOnSnap)
     #expect(decoded.restoreSizeWhenDraggingOut)
+    #expect(!decoded.detailedSnapAreas)
     #expect(decoded.edgeSnappingEnabled)
+}
+
+// MARK: - 落点预览的生长动画
+
+@Test("预览从落点所贴的屏幕边缘长出来")
+func previewAnimationGrowsFromSnappedEdge() {
+    let screens = [
+        WindowSnapScreen(
+            frame: CGRect(x: 0, y: 0, width: 1200, height: 800),
+            visibleFrame: CGRect(x: 0, y: 0, width: 1200, height: 800)
+        )
+    ]
+
+    // 左半屏整屏高：从左边中点长出来，而不是从角落
+    let leftHalf = WindowSnapPreviewPlan(layout: .leftHalf, screenIndex: 0, frame: CGRect(x: 0, y: 0, width: 600, height: 800))
+    #expect(WindowSnapPreviewAnimation.origin(for: leftHalf, screens: screens) == CGPoint(x: 0, y: 400))
+
+    // 上半屏整屏宽：从上边中点
+    let topHalf = WindowSnapPreviewPlan(layout: .topHalf, screenIndex: 0, frame: CGRect(x: 0, y: 400, width: 1200, height: 400))
+    #expect(WindowSnapPreviewAnimation.origin(for: topHalf, screens: screens) == CGPoint(x: 600, y: 800))
+
+    // 左上四分之一：从左上角
+    let topLeft = WindowSnapPreviewPlan(layout: .topLeft, screenIndex: 0, frame: CGRect(x: 0, y: 400, width: 600, height: 400))
+    #expect(WindowSnapPreviewAnimation.origin(for: topLeft, screens: screens) == CGPoint(x: 0, y: 800))
+
+    // 不贴任何边（居中类）：用中心
+    let centered = WindowSnapPreviewPlan(layout: .centered, screenIndex: 0, frame: CGRect(x: 300, y: 200, width: 600, height: 400))
+    #expect(WindowSnapPreviewAnimation.origin(for: centered, screens: screens) == CGPoint(x: 600, y: 400))
+
+    let initial = WindowSnapPreviewAnimation.initialFrame(for: leftHalf, screens: screens)
+    #expect(initial.midX == 0)
+    #expect(initial.size == WindowSnapPreviewAnimation.initialSize)
+    #expect(initial.midY == 400)
+}
+
+// MARK: - 精细吸附区域（可开关）
+
+@Test("精细吸附区域把顶边给最大化、底边给三分区")
+func detailedSnapAreasExtendEdgeZones() {
+    let screen = CGRect(x: 0, y: 0, width: 1200, height: 800)
+    let threshold: CGFloat = 24
+
+    // 默认模型不变
+    #expect(WindowSnapResolver.layout(for: CGPoint(x: 600, y: 799), in: screen, threshold: threshold) == .topHalf)
+    #expect(WindowSnapResolver.layout(for: CGPoint(x: 600, y: 2), in: screen, threshold: threshold) == .bottomHalf)
+
+    // 精细模型
+    #expect(WindowSnapResolver.layout(for: CGPoint(x: 600, y: 799), in: screen, threshold: threshold, detailed: true) == .maximize)
+    #expect(WindowSnapResolver.layout(for: CGPoint(x: 100, y: 2), in: screen, threshold: threshold, detailed: true) == .firstThird)
+    #expect(WindowSnapResolver.layout(for: CGPoint(x: 600, y: 2), in: screen, threshold: threshold, detailed: true) == .bottomHalf)
+    #expect(WindowSnapResolver.layout(for: CGPoint(x: 1100, y: 2), in: screen, threshold: threshold, detailed: true) == .lastThird)
+
+    // 上下半屏改由左右边缘的上/下三分之一区域提供
+    #expect(WindowSnapResolver.layout(for: CGPoint(x: 2, y: 400), in: screen, threshold: threshold, detailed: true) == .leftHalf)
+    #expect(WindowSnapResolver.layout(for: CGPoint(x: 2, y: 700), in: screen, threshold: threshold, detailed: true) == .topHalf)
+    #expect(WindowSnapResolver.layout(for: CGPoint(x: 2, y: 100), in: screen, threshold: threshold, detailed: true) == .bottomHalf)
+    #expect(WindowSnapResolver.layout(for: CGPoint(x: 1198, y: 400), in: screen, threshold: threshold, detailed: true) == .rightHalf)
+
+    // 四角两种模型一致
+    #expect(WindowSnapResolver.layout(for: CGPoint(x: 2, y: 798), in: screen, threshold: threshold, detailed: true) == .topLeft)
+    #expect(WindowSnapResolver.layout(for: CGPoint(x: 1198, y: 2), in: screen, threshold: threshold, detailed: true) == .bottomRight)
+}
+
+@Test("精细模型同样作用于窗口贴边判定")
+func detailedSnapAreasApplyToPressedWindow() {
+    let screen = CGRect(x: 0, y: 0, width: 1200, height: 800)
+    let size = CGSize(width: 400, height: 300)
+    let threshold: CGFloat = 24
+
+    #expect(WindowSnapResolver.layout(
+        pressedWindowFrame: CGRect(origin: CGPoint(x: 400, y: 500), size: size),
+        in: screen,
+        threshold: threshold
+    ) == .topHalf)
+    #expect(WindowSnapResolver.layout(
+        pressedWindowFrame: CGRect(origin: CGPoint(x: 400, y: 500), size: size),
+        in: screen,
+        threshold: threshold,
+        detailed: true
+    ) == .maximize)
+    #expect(WindowSnapResolver.layout(
+        pressedWindowFrame: CGRect(origin: CGPoint(x: 100, y: 0), size: size),
+        in: screen,
+        threshold: threshold,
+        detailed: true
+    ) == .firstThird)
+}
+
+@Test("预览规划器会把精细开关透传给吸附判定")
+func previewPlannerPassesDetailedFlag() throws {
+    let screens = [
+        WindowSnapScreen(frame: CGRect(x: 0, y: 0, width: 1200, height: 800), visibleFrame: CGRect(x: 0, y: 0, width: 1200, height: 800))
+    ]
+    let options = WindowManagerOptions(screenPadding: 0, windowGap: 0, snapDistance: 24)
+    let point = CGPoint(x: 600, y: 799)
+
+    #expect(WindowSnapPreviewPlanner.plan(for: point, screens: screens, options: options)?.layout == .topHalf)
+    #expect(WindowSnapPreviewPlanner.plan(for: point, screens: screens, options: options, detailedSnapAreas: true)?.layout == .maximize)
 }

@@ -9,13 +9,32 @@ final class WindowSnapPreviewController {
 
     var isVisible: Bool { panel?.isVisible ?? false }
 
-    func show(_ plan: WindowSnapPreviewPlan) {
+    /// 显示落点预览。
+    ///
+    /// - Parameter initialFrame: 进入新的落点区域时传入起始小方框，面板会从那里「生长」到目标矩形；
+    ///   同一区域内的持续更新传 nil，直接更新位置。
+    func show(_ plan: WindowSnapPreviewPlan, initialFrame: CGRect? = nil) {
         let panel = panel ?? makePanel()
         self.panel = panel
+
+        if let initialFrame, !panel.isVisible {
+            panel.setFrame(initialFrame, display: false)
+            panel.alphaValue = 0
+            panel.orderFrontRegardless()
+            NSAnimationContext.runAnimationGroup { context in
+                context.duration = 0.12
+                context.timingFunction = CAMediaTimingFunction(name: .easeOut)
+                panel.animator().setFrame(plan.frame, display: true)
+                panel.animator().alphaValue = 1
+            }
+            return
+        }
+
         if panel.frame != plan.frame {
             panel.setFrame(plan.frame, display: true)
         }
         if !panel.isVisible {
+            panel.alphaValue = 1
             panel.orderFrontRegardless()
         }
     }
