@@ -266,8 +266,9 @@ open "menutools://preset?name=开发"             # 套用固定尺寸预设
 
 更新功能使用 **[Sparkle](https://github.com/sparkle-project/Sparkle)**，由 Sparkle 负责 appcast 检查、下载、Ed25519 签名校验、安装和重启：
 
-1. 修改 `Resources/Info.plist` 中的 `CFBundleShortVersionString` 和 `CFBundleVersion`，然后提交，确保工作区干净（脚本会校验）。
-2. 选择发布模式：
+1. 把这一版的更新内容写进 `Resources/ReleaseNotes.md`（新增一段，标题形如 `## 1.1.2 — 2026-09-20`）——它同时用于应用内「设置 → 更新说明」；`release.sh` 会校验当前版本是否存在这一段。
+2. 修改 `Resources/Info.plist` 中的 `CFBundleShortVersionString` 和 `CFBundleVersion`，然后提交，确保工作区干净（脚本会校验）。
+3. 选择发布模式：
 
    **GitHub 开源分发（默认，自签名）**
    ```bash
@@ -284,11 +285,20 @@ open "menutools://preset?name=开发"             # 套用固定尺寸预设
    RELEASE_MODE=developer-id ./release.sh
    ```
    这条路径额外做 notarization、stapling 与 `spctl` 校验；没有 Developer ID 时无法使用。
-3. 在 GitHub 上创建 Release：tag 使用 `v1.1.0`（或 `1.1.0`），上传
-   - `dist/MenuTools-<版本>.zip`
-   - `dist/MenuTools-<版本>.dmg`
-   - `dist/appcast.xml`（必须以这个文件名上传，`SUFeedURL` 指向 `releases/latest/download/appcast.xml`；否则客户端收不到自动更新）
-4. 把脚本输出的 SHA-256 与「签名说明」写进 Release 说明（可参考 v1.0.4 的结构）。
+4. 脚本会自动生成 `docs/release-notes-<版本>.md`：更新内容从 `Resources/ReleaseNotes.md` 派生，三个资产的 SHA-256 自动填入。需要补充额外验证条目时写进 `docs/release-verification-<版本>.md`，它会并入「验证」章节。只改文案想重新生成时：
+   ```bash
+   RELEASE_NOTES_ONLY=1 ./release.sh                    # 沿用上次记录的测试数量
+   RELEASE_NOTES_ONLY=1 RELEASE_TEST_COUNT=582 ./release.sh   # 显式指定测试数量
+   ```
+5. 用生成好的说明创建 Release：
+   ```bash
+   gh release create v1.1.2 \
+     dist/MenuTools-1.1.2.zip dist/MenuTools-1.1.2.dmg dist/appcast.xml \
+     --title "MenuTools 1.1.2" \
+     --notes-file docs/release-notes-1.1.2.md \
+     --target main
+   ```
+   `appcast.xml` 必须以这个文件名上传（`SUFeedURL` 指向 `releases/latest/download/appcast.xml`），否则客户端收不到自动更新；源码压缩包由 GitHub 按 tag 自动提供。
 
 Sparkle 更新默认使用 `Resources/Info.plist` 中的 `SUFeedURL`。如果更新源不在 GitHub，可在发布时覆盖下载地址前缀：
 
