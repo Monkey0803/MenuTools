@@ -28,29 +28,34 @@ func appVolumeProfileNormalizesValues() {
     #expect(profile.lastNonzeroVolume == 1)
 }
 
-@Test("DSP 在一个缓冲区内平滑变化到目标增益")
-func appVolumeDSPAppliesSmoothRamp() {
-    var samples: [Float] = [1, 1, 1, 1]
+@Test("增益渐变在一个缓冲区内平滑推进到目标值")
+func gainRampReachesTargetWithinBuffer() {
+    let step = AppVolumeGainRamp.step(from: 1, to: 0, frames: 4)
+    #expect(step == -0.25)
 
-    let finalGain = AppVolumeDSP.applyGain(to: &samples, from: 1, to: 0)
+    var gain: Float = 1
+    var applied: [Float] = []
+    for _ in 0..<4 {
+        gain = AppVolumeGainRamp.advanced(gain, by: step)
+        applied.append(gain)
+    }
 
-    #expect(samples == [0.75, 0.5, 0.25, 0])
-    #expect(finalGain == 0)
+    #expect(applied == [0.75, 0.5, 0.25, 0])
+    #expect(abs(gain) < 0.0001)
 }
 
-@Test("DSP 支持任意增益、静音并限制输出范围")
-func appVolumeDSPSupportsArbitraryGainMuteAndClipping() {
-    var attenuated: [Float] = [1, -1]
-    _ = AppVolumeDSP.applyGain(to: &attenuated, from: 0.37, to: 0.37)
-    #expect(attenuated == [0.37, -0.37])
+@Test("增益渐变处理零帧与相同起止值，输出限幅夹住在 ±1")
+func gainRampHandlesEdgeCasesAndClamping() {
+    // 帧数为 0 不能除零
+    #expect(AppVolumeGainRamp.step(from: 1, to: 0, frames: 0) == 0)
+    // 起止相同则步长为 0（例如常态增益或静音）
+    #expect(AppVolumeGainRamp.step(from: 0.37, to: 0.37, frames: 128) == 0)
+    #expect(AppVolumeGainRamp.step(from: 0, to: 0, frames: 128) == 0)
 
-    var muted: [Float] = [0.8, -0.8]
-    _ = AppVolumeDSP.applyGain(to: &muted, from: 0, to: 0)
-    #expect(muted == [0, 0])
-
-    var clipped: [Float] = [2, -2]
-    _ = AppVolumeDSP.applyGain(to: &clipped, from: 1, to: 1)
-    #expect(clipped == [1, -1])
+    #expect(AppVolumeGainRamp.clamped(0.37) == 0.37)
+    #expect(AppVolumeGainRamp.clamped(-0.37) == -0.37)
+    #expect(AppVolumeGainRamp.clamped(1.5) == 1)
+    #expect(AppVolumeGainRamp.clamped(-2) == -1)
 }
 
 @Test("音频 Helper 会按主 App 合并为一个会话")

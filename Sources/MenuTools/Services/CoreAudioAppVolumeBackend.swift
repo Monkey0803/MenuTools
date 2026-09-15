@@ -966,7 +966,7 @@ private final class CoreAudioAppVolumeRoute: @unchecked Sendable {
         }
         if frames == Int.max { frames = 0 }
         guard frames > 0 else { return false }
-        let step = (target - current) / Float(frames)
+        let step = AppVolumeGainRamp.step(from: current, to: target, frames: frames)
 
         for index in inputs.indices {
             let inputBuffer = inputs[index]
@@ -979,7 +979,7 @@ private final class CoreAudioAppVolumeRoute: @unchecked Sendable {
             var gain = current
             let count = Int(outputBuffer.mDataByteSize) / MemoryLayout<Float>.size
             for sample in 0..<count {
-                gain += step
+                gain = AppVolumeGainRamp.advanced(gain, by: step)
                 var value = source[sample]
                 if mono, channelCount > 1 {
                     // 单声道下混：把各声道同一采样点取平均（不分配内存）。
@@ -1007,7 +1007,7 @@ private final class CoreAudioAppVolumeRoute: @unchecked Sendable {
                 sumSquares += Double(processed * processed)
                 sampleCount += 1
                 isClipping = isClipping || abs(processed) > 1
-                destination[sample] = min(max(processed, -1), 1)
+                destination[sample] = AppVolumeGainRamp.clamped(processed)
             }
         }
         current = target

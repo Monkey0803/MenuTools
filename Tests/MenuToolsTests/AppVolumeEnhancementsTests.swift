@@ -117,9 +117,9 @@ func boostModeAndLimiterWork() throws {
     #expect(service.session(id: "com.apple.Music")?.volume == 1.5)
     #expect(backend.applied.last?.volume == 1.5)
     #expect(AppVolumeSafetyPolicy.maximumGain(boostEnabled: true) == 1.5)
-    var samples: [Float] = [1, -1]
-    _ = AppVolumeDSP.applyGain(to: &samples, from: 1.5, to: 1.5)
-    #expect(samples == [1, -1])
+    // 1.5 倍增强会限幅在 ±1
+    #expect(AppVolumeGainRamp.clamped(1.5) == 1)
+    #expect(AppVolumeGainRamp.clamped(-1.5) == -1)
 }
 
 @Test("输入设备音量与静音可由服务层控制")

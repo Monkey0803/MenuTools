@@ -789,17 +789,24 @@ extension AppVolumeRoutingBackend {
     }
 }
 
-enum AppVolumeDSP {
-    @discardableResult
-    static func applyGain(to samples: inout [Float], from start: Float, to target: Float) -> Float {
-        guard !samples.isEmpty else { return target }
-        let step = (target - start) / Float(samples.count)
-        var gain = start
-        for index in samples.indices {
-            gain += step
-            samples[index] = min(max(samples[index] * gain, -1), 1)
-        }
-        return target
+/// 增益渐变与限幅：IOProc 每个缓冲区用这里的步长把增益平滑推进到目标值。
+enum AppVolumeGainRamp {
+    /// 每个采样点的增益步长；帧数为 0 时返回 0（避免除零）。
+    @inline(__always)
+    static func step(from current: Float, to target: Float, frames: Int) -> Float {
+        frames > 0 ? (target - current) / Float(frames) : 0
+    }
+
+    /// 按步长推进一个采样点的增益。
+    @inline(__always)
+    static func advanced(_ gain: Float, by step: Float) -> Float {
+        gain + step
+    }
+
+    /// 输出限幅，避免越界样本进入下游。
+    @inline(__always)
+    static func clamped(_ sample: Float) -> Float {
+        min(max(sample, -1), 1)
     }
 }
 

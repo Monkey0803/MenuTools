@@ -41,9 +41,18 @@ A lightweight system toolkit that lives in the macOS menu bar. MenuTools uses th
 
 | Feature | Description |
 |---|---|
-| System output volume | Controls the current default output device and stays synchronized with system mute. |
-| Per-app volume | Independently adjusts active apps from 0–100% with continuous sliders. |
-| Volume profiles | Remembers levels by root app bundle ID and groups helper processes into their parent app. |
+| System output volume | Controls the current default output device, stays synchronized with system mute, supports a volume cap and automatic headphone limiting. |
+| Per-app volume | Independently adjusts active apps from 0–150% (with boost); muting remembers the last non-zero level. |
+| Per-app EQ | 9-band equalizer (±12 dB), 10 built-in presets, plus a reusable custom-curve preset library. |
+| Balance and mono | Per-app left/right balance (unity at the center) and multi-channel mono downmix. |
+| Output device | Routes a single app to a specific output device and remembers master volume per device. |
+| Presets and profiles | Remembers levels by root app bundle ID (helpers merged into the parent app); presets capture EQ, output device, group, favorites and channel settings together. |
+| Automation | Applies presets by output device, time range, Focus mode, frontmost app or Wi-Fi name, with a one-step undo. |
+| Meeting ducking | Lowers other apps while meeting audio plays and restores them afterwards. |
+| Input volume | Microphone level and mute, live metering, and a pre-meeting audio check. |
+| Session management | Search, groups (browser/meeting/game/other), sorting, favorites, and bulk mute or restore for the current list. |
+| Shortcuts and HUD | Panel shortcut, master volume ±, system mute, a volume HUD, and a menu bar title showing master volume or the loudest app. |
+| Diagnostics | Sampling cost, routing failure reasons and DRM / Process Tap notes, copyable as a report. |
 
 ### Productivity Tools
 
