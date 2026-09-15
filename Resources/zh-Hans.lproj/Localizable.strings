@@ -907,6 +907,15 @@
 "volume.group.meeting" = "会议";
 "volume.group.game" = "游戏";
 "volume.group.other" = "其他";
+"volume.groupVolume.title" = "分组音量";
+"volume.groupVolume.empty" = "该分组暂无 App";
+"volume.groupVolume.mixed" = "混合";
+"volume.channelTest.title" = "声道测试";
+"volume.channelTest.left" = "左";
+"volume.channelTest.right" = "右";
+"volume.channelTest.both" = "双声道";
+"volume.channelTest.stop" = "停止";
+"volume.channelTest.desc" = "测试音走系统输出，用来确认音箱左右接线；单个 App 的平衡请在播放它时调整";
 "volume.step" = "音量步长";
 "volume.boost" = "允许 App 增强到 150%（带限幅保护）";
 "volume.output.select" = "选择输出设备";

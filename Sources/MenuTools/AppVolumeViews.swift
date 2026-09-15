@@ -199,6 +199,7 @@ struct AppVolumeSettingsView: View {
     @State private var editingRule: AppVolumeAutomationRule?
     @State private var didCopyDiagnostic = false
     @State private var isInputLevelMonitoring = false
+    @State private var channelTester = AppVolumeChannelTester.shared
     @State private var presetSync = AppVolumePresetSyncService.shared
     @State private var presetSyncPassphrase = ""
     @State private var presetSyncConflictCopies: [URL] = []
@@ -313,6 +314,35 @@ struct AppVolumeSettingsView: View {
 
             Section {
                 SystemOutputVolumeRow(service: service, compact: false)
+
+                HStack(spacing: 8) {
+                    Label(L("volume.channelTest.title"), systemImage: "waveform")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                    Spacer()
+                    ForEach(AppVolumeChannelTester.Channel.allCases, id: \.self) { channel in
+                        Button(L(channel.titleKey)) {
+                            channelTester.play(channel)
+                        }
+                        .buttonStyle(.bordered)
+                        .controlSize(.small)
+                        .focusable(false)
+                        .focusEffectDisabled()
+                    }
+                    if channelTester.isPlaying {
+                        Button(L("volume.channelTest.stop")) {
+                            channelTester.stop()
+                        }
+                        .buttonStyle(.bordered)
+                        .controlSize(.small)
+                        .focusable(false)
+                        .focusEffectDisabled()
+                    }
+                }
+
+                Text(L("volume.channelTest.desc"))
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
             } header: {
                 Label(L("volume.section.output"), systemImage: "speaker.wave.2")
             }
@@ -422,6 +452,14 @@ struct AppVolumeSettingsView: View {
                         Button(L("common.gotIt"), action: service.dismissHearingWarning)
                     }
                 }
+            Section {
+                ForEach(AppVolumeAppGroup.allCases, id: \.self) { group in
+                    AppVolumeGroupVolumeRow(service: service, group: group)
+                }
+            } header: {
+                Label(L("volume.groupVolume.title"), systemImage: "dial.medium")
+            }
+
             } header: {
                 Label(L("volume.hearing.title"), systemImage: "ear")
             }
@@ -1405,6 +1443,75 @@ private struct AppVolumeRow: View {
                 .resizable()
                 .scaledToFit()
                 .foregroundStyle(.secondary)
+        }
+    }
+}
+
+/// 分组音量推子：一次调整该分组下的所有 App。
+private struct AppVolumeGroupVolumeRow: View {
+    @Bindable var service: AppVolumeService
+    let group: AppVolumeAppGroup
+
+    private var groupSessions: [AppAudioSession] {
+        service.sessions(in: group)
+    }
+
+    private var displayedVolume: Double {
+        service.groupVolume(group) ?? service.groupAverageVolume(group) ?? 1
+    }
+
+    private var isMixed: Bool {
+        service.groupVolume(group) == nil && !groupSessions.isEmpty
+    }
+
+    var body: some View {
+        HStack(spacing: 10) {
+            Button {
+                if service.isGroupMuted(group) {
+                    service.restoreGroup(group)
+                } else {
+                    service.muteGroup(group)
+                }
+            } label: {
+                Image(systemName: service.isGroupMuted(group) ? "speaker.slash.fill" : "speaker.wave.2.fill")
+                    .frame(width: 20)
+            }
+            .buttonStyle(.plain)
+            .foregroundStyle(service.isGroupMuted(group) ? Color.orange : Color.accentColor)
+            .disabled(groupSessions.isEmpty)
+            .accessibilityLabel(L("volume.groupVolume.title"))
+
+            VStack(alignment: .leading, spacing: 1) {
+                Text(L(group.titleKey))
+                    .font(.caption)
+                Text(
+                    groupSessions.isEmpty
+                        ? L("volume.groupVolume.empty")
+                        : "\(groupSessions.count)"
+                )
+                .font(.caption2)
+                .foregroundStyle(.tertiary)
+            }
+            .frame(width: 78, alignment: .leading)
+
+            Slider(
+                value: Binding(
+                    get: { displayedVolume },
+                    set: { service.setGroupVolume($0, for: group) }
+                ),
+                in: 0 ... service.maximumAppGain
+            )
+            .disabled(groupSessions.isEmpty)
+            .accessibilityLabel(L(group.titleKey))
+
+            Text(
+                isMixed
+                    ? L("volume.groupVolume.mixed")
+                    : "\(Int((displayedVolume * 100).rounded()))%"
+            )
+            .font(.caption2.monospacedDigit())
+            .foregroundStyle(.secondary)
+            .frame(width: 44, alignment: .trailing)
         }
     }
 }

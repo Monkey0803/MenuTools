@@ -907,6 +907,15 @@
 "volume.group.meeting" = "会議";
 "volume.group.game" = "ゲーム";
 "volume.group.other" = "その他";
+"volume.groupVolume.title" = "グループ音量";
+"volume.groupVolume.empty" = "このグループに App はありません";
+"volume.groupVolume.mixed" = "混在";
+"volume.channelTest.title" = "チャンネルテスト";
+"volume.channelTest.left" = "左";
+"volume.channelTest.right" = "右";
+"volume.channelTest.both" = "両方";
+"volume.channelTest.stop" = "停止";
+"volume.channelTest.desc" = "テスト音はシステム出力から再生され、スピーカーの左右配線を確認できます。App ごとのバランスはその App の再生中に調整してください";
 "volume.step" = "音量ステップ";
 "volume.boost" = "Appゲインを150%まで許可（リミッター保護）";
 "volume.output.select" = "出力デバイスを選択";

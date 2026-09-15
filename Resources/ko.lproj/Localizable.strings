@@ -907,6 +907,15 @@
 "volume.group.meeting" = "회의";
 "volume.group.game" = "게임";
 "volume.group.other" = "기타";
+"volume.groupVolume.title" = "그룹 볼륨";
+"volume.groupVolume.empty" = "이 그룹에 App이 없습니다";
+"volume.groupVolume.mixed" = "혼합";
+"volume.channelTest.title" = "채널 테스트";
+"volume.channelTest.left" = "왼쪽";
+"volume.channelTest.right" = "오른쪽";
+"volume.channelTest.both" = "양쪽";
+"volume.channelTest.stop" = "정지";
+"volume.channelTest.desc" = "테스트 음은 시스템 출력으로 재생되어 스피커 좌우 연결을 확인합니다. App별 밸런스는 해당 App 재생 중에 조정하세요";
 "volume.step" = "음량 단계";
 "volume.boost" = "앱 게인을 최대 150% 허용(리미터 보호)";
 "volume.output.select" = "출력 장치 선택";

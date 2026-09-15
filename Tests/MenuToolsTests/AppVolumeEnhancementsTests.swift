@@ -1245,3 +1245,126 @@ func presetTombstonesPruneAfterRetention() {
     #expect(pruned[fresh] != nil)
     #expect(pruned[stale] == nil)
 }
+
+@Test("分组推子会统一组内音量，且不影响其他分组")
+@MainActor
+func groupVolumeAppliesToWholeGroupOnly() throws {
+    let defaults = try makeEnhancementDefaults("groupVolume")
+    let backend = EnhancedFakeAppVolumeBackend()
+    let service = AppVolumeService(backend: backend, userDefaults: defaults)
+    service.start()
+    backend.send(candidates: [.music, .podcasts, .zoom], output: .fixture())
+    service.setEnabled(true)
+    // Zoom 是会议 App，开着压低会把其他 App 音量改小，这里只验证分组推子
+    service.setMeetingDuckingEnabled(false)
+
+    // 音乐与播客属于不同分组：音乐归 meeting，播客保持默认
+    service.setAppGroup(.meeting, for: "com.apple.Music")
+    service.setAppGroup(.meeting, for: "us.zoom.xos")
+
+    #expect(service.sessions(in: .meeting).count == 2)
+
+    service.setGroupVolume(0.42, for: .meeting)
+
+    #expect(abs((service.session(id: "com.apple.Music")?.volume ?? 0) - 0.42) < 0.001)
+    #expect(abs((service.session(id: "us.zoom.xos")?.volume ?? 0) - 0.42) < 0.001)
+    // 其他分组不受影响
+    #expect(abs((service.session(id: "com.apple.podcasts")?.volume ?? 0) - 1) < 0.001)
+
+    // 组内一致时返回该值，混用返回 nil
+    #expect(service.groupVolume(.meeting) == 0.42)
+    service.setVolume(0.8, for: "us.zoom.xos")
+    #expect(service.groupVolume(.meeting) == nil)
+    #expect(abs((service.groupAverageVolume(.meeting) ?? 0) - 0.61) < 0.01)
+}
+
+@Test("分组静音与恢复使用各自上次的音量")
+@MainActor
+func groupMuteAndRestoreUseLastNonzeroVolume() throws {
+    let defaults = try makeEnhancementDefaults("groupMute")
+    let backend = EnhancedFakeAppVolumeBackend()
+    let service = AppVolumeService(backend: backend, userDefaults: defaults)
+    service.start()
+    backend.send(candidates: [.music, .zoom], output: .fixture())
+    service.setEnabled(true)
+    service.setMeetingDuckingEnabled(false)
+    service.setAppGroup(.meeting, for: "com.apple.Music")
+    service.setAppGroup(.meeting, for: "us.zoom.xos")
+
+    service.setVolume(0.3, for: "com.apple.Music")
+    service.setVolume(0.7, for: "us.zoom.xos")
+    service.muteGroup(.meeting)
+
+    #expect(service.isGroupMuted(.meeting))
+    #expect(service.session(id: "com.apple.Music")?.volume == 0)
+
+    service.restoreGroup(.meeting)
+
+    #expect(!service.isGroupMuted(.meeting))
+    #expect(abs((service.session(id: "com.apple.Music")?.volume ?? 0) - 0.3) < 0.001)
+    #expect(abs((service.session(id: "us.zoom.xos")?.volume ?? 0) - 0.7) < 0.001)
+}
+
+@Test("空分组的推子状态为空且不会写入")
+@MainActor
+func emptyGroupHasNoVolumeState() throws {
+    let defaults = try makeEnhancementDefaults("groupEmpty")
+    let backend = EnhancedFakeAppVolumeBackend()
+    let service = AppVolumeService(backend: backend, userDefaults: defaults)
+    service.start()
+    backend.send(candidates: [.music], output: .fixture())
+    service.setEnabled(true)
+
+    #expect(service.sessions(in: .game).isEmpty)
+    #expect(service.groupVolume(.game) == nil)
+    #expect(service.groupAverageVolume(.game) == nil)
+    #expect(!service.isGroupMuted(.game))
+
+    service.setGroupVolume(0.5, for: .game)
+    #expect(abs((service.session(id: "com.apple.Music")?.volume ?? 0) - 1) < 0.001)
+}
+
+@Test("声道测试音长度、峰值与淡入淡出符合预期")
+func channelTestToneShape() {
+    let samples = AppVolumeTestTone.samples(frequency: 440, duration: 0.5, sampleRate: 48_000, amplitude: 0.25)
+
+    #expect(samples.count == 24_000)
+    let peak = samples.map { abs($0) }.max() ?? 0
+    #expect(abs(peak - 0.25) < 0.01)
+    // 首尾淡入淡出，避免爆音
+    #expect(abs(samples[0]) < 0.001)
+    #expect(abs(samples[samples.count - 1]) < 0.001)
+
+    // 440Hz 在 0.5 秒内应有约 440 次过零
+    var crossings = 0
+    for index in 1 ..< samples.count where (samples[index - 1] < 0) != (samples[index] < 0) {
+        crossings += 1
+    }
+    #expect(abs(crossings - 440) <= 2)
+}
+
+@Test("声道测试音会限制幅度上限并处理非法参数")
+func channelTestToneClampsAmplitude() {
+    // 超过上限会被夹住
+    let loud = AppVolumeTestTone.samples(duration: 0.1, sampleRate: 8_000, amplitude: 99)
+    let loudPeak = Double(loud.map { abs($0) }.max() ?? 0)
+    #expect(loudPeak <= AppVolumeTestTone.maximumAmplitude + 0.001)
+
+    #expect(AppVolumeTestTone.normalizedAmplitude(.nan) == AppVolumeTestTone.defaultAmplitude)
+    #expect(AppVolumeTestTone.normalizedAmplitude(-1) == 0.01)
+
+    // 非法时长/采样率不会产生空数组或崩溃
+    #expect(AppVolumeTestTone.samples(duration: 0, sampleRate: 48_000).isEmpty == false)
+    #expect(AppVolumeTestTone.samples(frequency: .nan, duration: 0.1, sampleRate: 8_000).isEmpty == false)
+}
+
+@Test("声道测试的三个声道各自映射到正确声像与文案键")
+func channelTestChannelsMapToPan() {
+    #expect(AppVolumeChannelTester.Channel.allCases.count == 3)
+    #expect(AppVolumeChannelTester.Channel.left.pan == -1)
+    #expect(AppVolumeChannelTester.Channel.right.pan == 1)
+    #expect(AppVolumeChannelTester.Channel.both.pan == 0)
+    for channel in AppVolumeChannelTester.Channel.allCases {
+        #expect(!channel.titleKey.isEmpty)
+    }
+}

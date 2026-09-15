@@ -1233,6 +1233,56 @@ final class AppVolumeService {
         identifiers.forEach { setVolume(0, for: $0) }
     }
 
+    // MARK: - 分组音量
+
+    /// 某个分组里的全部 App（含当前没在发声、但有配置的）。
+    func sessions(in group: AppVolumeAppGroup) -> [AppAudioSession] {
+        sessions.filter { $0.appGroup == group }
+    }
+
+    /// 分组统一音量：组内音量一致时返回该值，混用时返回 nil。
+    func groupVolume(_ group: AppVolumeAppGroup) -> Double? {
+        let volumes = sessions(in: group).map(\.volume)
+        guard let first = volumes.first else { return nil }
+        guard volumes.allSatisfy({ abs($0 - first) < 0.001 }) else { return nil }
+        return first
+    }
+
+    /// 分组平均音量：混用时给推子一个合理起点。
+    func groupAverageVolume(_ group: AppVolumeAppGroup) -> Double? {
+        let volumes = sessions(in: group).map(\.volume)
+        guard !volumes.isEmpty else { return nil }
+        return volumes.reduce(0, +) / Double(volumes.count)
+    }
+
+    /// 把整个分组调到同一音量。
+    func setGroupVolume(_ requestedVolume: Double, for group: AppVolumeAppGroup) {
+        let volume = AppVolumeSafetyPolicy.clamp(requestedVolume, boostEnabled: isBoostEnabled)
+        for session in sessions(in: group) {
+            setVolume(volume, for: session.rootBundleID)
+        }
+    }
+
+    /// 整个分组静音（记住各自的上次非零音量）。
+    func muteGroup(_ group: AppVolumeAppGroup) {
+        for session in sessions(in: group) {
+            setVolume(0, for: session.rootBundleID)
+        }
+    }
+
+    /// 恢复整个分组的音量。
+    func restoreGroup(_ group: AppVolumeAppGroup) {
+        for session in sessions(in: group) where session.volume == 0 {
+            setVolume(profiles[session.rootBundleID]?.lastNonzeroVolume ?? 1, for: session.rootBundleID)
+        }
+    }
+
+    func isGroupMuted(_ group: AppVolumeAppGroup) -> Bool {
+        let groupSessions = sessions(in: group)
+        guard !groupSessions.isEmpty else { return false }
+        return groupSessions.allSatisfy { $0.volume <= 0.0001 }
+    }
+
     private func updateAudioProcessingProfile(
         for rootBundleID: String,
         update: (inout AppVolumeProfile) -> Void

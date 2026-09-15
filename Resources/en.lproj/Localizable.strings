@@ -907,6 +907,15 @@
 "volume.group.meeting" = "Meeting";
 "volume.group.game" = "Game";
 "volume.group.other" = "Other";
+"volume.groupVolume.title" = "Group volume";
+"volume.groupVolume.empty" = "No apps in this group yet";
+"volume.groupVolume.mixed" = "Mixed";
+"volume.channelTest.title" = "Channel test";
+"volume.channelTest.left" = "Left";
+"volume.channelTest.right" = "Right";
+"volume.channelTest.both" = "Both";
+"volume.channelTest.stop" = "Stop";
+"volume.channelTest.desc" = "The test tone plays through the system output to check speaker wiring; adjust per-app balance while that app is playing";
 "volume.step" = "Volume Step";
 "volume.boost" = "Allow up to 150% app gain (limiter protected)";
 "volume.output.select" = "Choose Output Device";
