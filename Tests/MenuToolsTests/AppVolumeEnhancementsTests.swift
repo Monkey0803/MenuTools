@@ -1084,3 +1084,28 @@ func inputLevelRestorePolicy() {
     let missingCapture = AppVolumeInputLevelRestore(deviceUID: "", volume: 1, isMuted: false)
     #expect(missingCapture.restoration(for: .inputFixture(deviceUID: "wh-1000xm3", volume: 0.2, isMuted: false)) == nil)
 }
+
+@Test("蓝牙切回档位后改写音量时，补校验会再恢复一次")
+@MainActor
+func inputLevelRestoreVerificationReappliesValue() throws {
+    let defaults = try makeEnhancementDefaults("inputLevelVerify")
+    let backend = EnhancedFakeAppVolumeBackend()
+    let service = AppVolumeService(backend: backend, userDefaults: defaults)
+    service.start()
+    backend.send(candidates: [.music], output: .fixture(), input: .fixture)
+    service.setEnabled(true)
+
+    let captured = AppVolumeInputLevelRestore(deviceUID: "built-in-mic", volume: 0.4, isMuted: false)
+    // 系统在切档位时又改了一次音量
+    backend.send(candidates: [.music], output: .fixture(), input: .fixture(volume: 0.85))
+
+    let didWrite = service.applyInputRestore(captured)
+
+    #expect(didWrite)
+    #expect(backend.inputVolumes.last == 0.4)
+    #expect(abs(service.input.volume - 0.4) < 0.001)
+
+    // 已经一致时不再写入
+    let secondWrite = service.applyInputRestore(captured)
+    #expect(!secondWrite)
+}

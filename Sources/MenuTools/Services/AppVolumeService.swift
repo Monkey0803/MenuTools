@@ -1027,19 +1027,39 @@ final class AppVolumeService {
 
     /// 停止监控后把输入音量与静音恢复到开启前的值（仅当设备未变且值被改动）。
     private func restoreInputStateAfterMonitoring() {
-        defer {
-            inputLevelRestore = nil
-            input.peakLevel = 0
-            notifySnapshotChanged()
+        let captured = inputLevelRestore
+        inputLevelRestore = nil
+        input.peakLevel = 0
+        if let captured, applyInputRestore(captured) {
+            // 蓝牙耳机切回档位是异步的，稍后再校验一次，避免系统又改回去。
+            scheduleInputRestoreVerification(captured)
         }
-        guard let captured = inputLevelRestore,
-              let restoration = captured.restoration(for: input) else { return }
+        notifySnapshotChanged()
+    }
+
+    /// 补一次校验：设备一致且值又被改动时再写回一次。
+    private func scheduleInputRestoreVerification(_ captured: AppVolumeInputLevelRestore) {
+        Task { [weak self] in
+            try? await Task.sleep(for: .seconds(2))
+            guard let self, self.inputLevelRestore == nil else { return }
+            _ = self.applyInputRestore(captured)
+        }
+    }
+
+    /// 按记录的输入状态恢复；返回是否真的写了值。
+    @discardableResult
+    func applyInputRestore(_ captured: AppVolumeInputLevelRestore) -> Bool {
+        guard let restoration = captured.restoration(for: input) else { return false }
+        var didWrite = false
         if abs(restoration.volume - input.volume) > 0.001 {
             setInputVolume(restoration.volume)
+            didWrite = true
         }
         if restoration.isMuted != input.isMuted {
             setInputMuted(restoration.isMuted)
+            didWrite = true
         }
+        return didWrite
     }
 
     func stop() {
