@@ -347,10 +347,8 @@ final class CoreAudioAppVolumeBackend: AppVolumeRoutingBackend {
                     selector: kAudioDevicePropertyDeviceUID
                 )) == uid
         }) else {
-            throw AppVolumeRoutingError.operationFailed(
-                L("volume.output.unavailable"),
-                kAudioHardwareBadDeviceError
-            )
+            // 抛出可识别的错误：上层会清掉失效指定并回退到系统默认设备。
+            throw AppVolumeRoutingError.outputDeviceMissing(uid: uid)
         }
         return (device, uid)
     }

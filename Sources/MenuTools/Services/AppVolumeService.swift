@@ -775,6 +775,9 @@ enum AppVolumePermissionState: Equatable, Sendable {
 enum AppVolumeRoutingError: LocalizedError, Equatable, Sendable {
     case permissionDenied
     case unsupportedFormat
+    /// 这台 App 指定的输出设备已经不在了（例如蓝牙耳机换档后 UID 变了）。
+    /// 上层会清掉失效指定并回退到系统默认设备，而不是让这台 App 一直失败。
+    case outputDeviceMissing(uid: String)
     case operationFailed(String, OSStatus)
 
     var errorDescription: String? {
@@ -783,6 +786,8 @@ enum AppVolumeRoutingError: LocalizedError, Equatable, Sendable {
             return L("volume.error.permission")
         case .unsupportedFormat:
             return L("volume.error.format")
+        case .outputDeviceMissing:
+            return L("volume.error.outputDeviceMissing")
         case .operationFailed(let operation, let status):
             return L("volume.error.operation", operation, status)
         }
@@ -960,6 +965,8 @@ final class AppVolumeService {
     private var notificationTracker = AppVolumeNotificationTracker()
     /// 输入电平监控开始前的输入状态，用于停止后恢复。
     private var inputLevelRestore: AppVolumeInputLevelRestore?
+    /// 正在处理「设备已失效」的自愈重试，避免无限递归。
+    private var isRecoveringStaleOutputDevice = false
     /// 睡眠定时（含最后 30 秒淡出）。
     private(set) var sleepTimer: AppVolumeSleepTimer?
     private var sleepTimerTask: Task<Void, Never>?
@@ -2396,6 +2403,10 @@ final class AppVolumeService {
             refreshErrorMessageFromSessions()
             return .applied
         } catch {
+            // 指定的输出设备已失效：清掉它并回退到系统默认设备重试一次，避免这台 App 永久失败。
+            if case let AppVolumeRoutingError.outputDeviceMissing(uid) = error, !isRecoveringStaleOutputDevice {
+                return recoverFromStaleOutputDevice(uid: uid, for: rootBundleID)
+            }
             if case AppVolumeRoutingError.permissionDenied = error {
                 permissionState = .denied
                 userDefaults.set(false, forKey: StorageKey.permissionGranted)
@@ -2409,6 +2420,33 @@ final class AppVolumeService {
             refreshErrorMessageFromSessions()
             return .failed
         }
+    }
+
+    /// 指定的输出设备已失效：清掉这台 App 的设备指定，回退到系统默认设备后重试一次。
+    ///
+    /// 蓝牙耳机换档会改变设备 UID，旧指定会一直让这台 App 路由失败；这里自愈并给出提示。
+    @discardableResult
+    private func recoverFromStaleOutputDevice(uid: String, for rootBundleID: String) -> RouteApplicationResult {
+        isRecoveringStaleOutputDevice = true
+        defer { isRecoveringStaleOutputDevice = false }
+
+        if var profile = profiles[rootBundleID], profile.outputDeviceUID != nil {
+            profile.outputDeviceUID = nil
+            profiles[rootBundleID] = profile
+            persistProfiles()
+            rebuildSessions()
+        }
+
+        let result = applyCurrentProfile(for: rootBundleID)
+        switch result {
+        case .applied where session(id: rootBundleID)?.routeStatus == .active:
+            // 已回退到默认设备并接管成功：留一条温和提示，让用户知道设备变了。
+            setSessionError(L("volume.warning.outputDeviceRecovered"), id: rootBundleID)
+        default:
+            setSessionError(L("volume.error.outputDeviceMissing"), id: rootBundleID)
+        }
+        refreshErrorMessageFromSessions()
+        return result
     }
 
     private func setSessionError(_ message: String?, id: String) {

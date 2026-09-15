@@ -942,6 +942,8 @@
 "volume.output.system" = "系统音频";
 "volume.output.forApp" = "为此应用选择输出设备";
 "volume.output.unavailable" = "已选设备不可用";
+"volume.error.outputDeviceMissing" = "指定的输出设备已不可用";
+"volume.warning.outputDeviceRecovered" = "原指定的输出设备已不可用，已改用系统默认设备";
 "volume.section.input" = "麦克风输入";
 "volume.input" = "麦克风音量";
 "volume.input.liveLevel" = "显示麦克风实时电平";

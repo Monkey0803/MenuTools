@@ -942,6 +942,8 @@
 "volume.output.system" = "System Audio";
 "volume.output.forApp" = "Choose output for this app";
 "volume.output.unavailable" = "Selected device unavailable";
+"volume.error.outputDeviceMissing" = "The chosen output device is unavailable";
+"volume.warning.outputDeviceRecovered" = "The chosen output device is gone; switched to the system default";
 "volume.section.input" = "Microphone Input";
 "volume.input" = "Microphone Volume";
 "volume.input.liveLevel" = "Show Live Microphone Level";

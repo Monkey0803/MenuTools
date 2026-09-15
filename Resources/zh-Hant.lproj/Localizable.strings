@@ -942,6 +942,8 @@
 "volume.output.system" = "系統音訊";
 "volume.output.forApp" = "為此應用程式選擇輸出裝置";
 "volume.output.unavailable" = "已選裝置無法使用";
+"volume.error.outputDeviceMissing" = "指定的輸出裝置已無法使用";
+"volume.warning.outputDeviceRecovered" = "原指定的輸出裝置已無法使用，已改用系統預設裝置";
 "volume.section.input" = "麥克風輸入";
 "volume.input" = "麥克風音量";
 "volume.input.liveLevel" = "顯示麥克風即時電平";

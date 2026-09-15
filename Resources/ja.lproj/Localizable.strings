@@ -942,6 +942,8 @@
 "volume.output.system" = "システムオーディオ";
 "volume.output.forApp" = "このアプリの出力先を選択";
 "volume.output.unavailable" = "選択したデバイスを利用できません";
+"volume.error.outputDeviceMissing" = "指定した出力デバイスは利用できません";
+"volume.warning.outputDeviceRecovered" = "指定した出力デバイスが使えないため、システム既定のデバイスに切り替えました";
 "volume.section.input" = "マイク入力";
 "volume.input" = "マイク音量";
 "volume.input.liveLevel" = "マイク入力レベルを表示";

@@ -942,6 +942,8 @@
 "volume.output.system" = "시스템 오디오";
 "volume.output.forApp" = "이 앱의 출력 장치 선택";
 "volume.output.unavailable" = "선택한 장치를 사용할 수 없음";
+"volume.error.outputDeviceMissing" = "지정한 출력 기기를 사용할 수 없습니다";
+"volume.warning.outputDeviceRecovered" = "지정한 출력 기기가 없어져 시스템 기본 기기로 전환했습니다";
 "volume.section.input" = "마이크 입력";
 "volume.input" = "마이크 음량";
 "volume.input.liveLevel" = "실시간 마이크 레벨 표시";

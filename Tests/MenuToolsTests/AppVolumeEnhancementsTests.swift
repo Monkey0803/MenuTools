@@ -460,6 +460,8 @@ private final class EnhancedFakeAppVolumeBackend: AppVolumeRoutingBackend {
     var inputVolumes: [Double] = []
     var inputMutedStates: [Bool] = []
     var applyError: AppVolumeRoutingError?
+    /// 第一次调用 apply 时抛出的错误，用来模拟"设备已不可用、清掉后重试成功"。
+    var applyErrorOnce: AppVolumeRoutingError?
     var applied: [(id: String, volume: Double)] = []
     var appliedTargets: [AppVolumeTarget] = []
     var onApply: ((String, Double) -> Void)?
@@ -471,6 +473,10 @@ private final class EnhancedFakeAppVolumeBackend: AppVolumeRoutingBackend {
     func stop() {}
     func apply(volume: Double, to target: AppVolumeTarget) throws {
         if let applyError { throw applyError }
+        if let applyErrorOnce {
+            self.applyErrorOnce = nil
+            throw applyErrorOnce
+        }
         applied.append((target.rootBundleID, volume))
         appliedTargets.append(target)
         onApply?(target.rootBundleID, volume)
@@ -1661,4 +1667,61 @@ func profileCodingKeepsChannelMixAndSkipRouting() throws {
     #expect(legacyProfile.pan == 0)
     #expect(!legacyProfile.isMono)
     #expect(!legacyProfile.skipRouting)
+}
+
+@Test("指定的输出设备已不可用时会自动清掉并回退到系统默认设备")
+@MainActor
+func staleOutputDeviceSelfHeals() throws {
+    let defaults = try makeEnhancementDefaults("staleDevice")
+    let backend = EnhancedFakeAppVolumeBackend()
+    let speaker = AudioOutputDevice(id: 11, uid: "speaker", name: "Mac 扬声器", isDefault: true)
+    let gone = AudioOutputDevice(id: 12, uid: "gone-headset", name: "旧耳机", isDefault: false)
+    backend.outputDevices = [speaker]
+    let service = AppVolumeService(backend: backend, userDefaults: defaults)
+    service.start()
+    backend.send(candidates: [.music], output: .fixture(deviceID: speaker.id, deviceUID: speaker.uid))
+    service.setEnabled(true)
+
+    // 这台 App 之前被指定到一台现在已不存在的设备
+    service.setVolume(0.5, for: "com.apple.Music")
+    service.setOutputDevice(gone, for: "com.apple.Music")
+    #expect(service.session(id: "com.apple.Music")?.outputDeviceUID == "gone-headset")
+
+    // 真实后端会抛「设备不可用」；这里模拟一次，之后应回退默认设备并成功建路由
+    backend.applyErrorOnce = .outputDeviceMissing(uid: "gone-headset")
+    service.setVolume(0.4, for: "com.apple.Music")
+
+    let session = try #require(service.session(id: "com.apple.Music"))
+    #expect(session.outputDeviceUID == nil)          // 失效的指定被清掉
+    #expect(session.routeStatus == .active)          // 回退到默认设备后接管成功
+    #expect(backend.applied.last?.volume == 0.4)
+    #expect(service.errorMessage != nil)             // 仍然提示用户设备已失效
+
+    // 设置会持久化：新实例里不再保留失效设备
+    let restored = AppVolumeService(backend: EnhancedFakeAppVolumeBackend(), userDefaults: defaults)
+    restored.start()
+    #expect(restored.session(id: "com.apple.Music")?.outputDeviceUID == nil)
+}
+
+@Test("回退后仍然失败才会进入失败状态")
+@MainActor
+func staleOutputDeviceFallbackCanStillFail() throws {
+    let defaults = try makeEnhancementDefaults("staleDeviceFail")
+    let backend = EnhancedFakeAppVolumeBackend()
+    let speaker = AudioOutputDevice(id: 11, uid: "speaker", name: "Mac 扬声器", isDefault: true)
+    let gone = AudioOutputDevice(id: 12, uid: "gone-headset", name: "旧耳机", isDefault: false)
+    backend.outputDevices = [speaker]
+    let service = AppVolumeService(backend: backend, userDefaults: defaults)
+    service.start()
+    backend.send(candidates: [.music], output: .fixture(deviceID: speaker.id, deviceUID: speaker.uid))
+    service.setEnabled(true)
+    service.setOutputDevice(gone, for: "com.apple.Music")
+
+    // 清掉失效设备后的重试也失败（例如权限或格式问题）
+    backend.applyError = .unsupportedFormat
+    service.setVolume(0.4, for: "com.apple.Music")
+
+    let session = try #require(service.session(id: "com.apple.Music"))
+    #expect(session.routeStatus == .failed)
+    #expect(service.errorMessage != nil)
 }
