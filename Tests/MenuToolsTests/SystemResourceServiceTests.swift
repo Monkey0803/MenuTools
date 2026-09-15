@@ -1085,3 +1085,101 @@ func resourceMenuBarPresenterFormatsTitle() {
     #expect(MenuBarMetric.automatic.footerKey != nil)
     #expect(MenuBarMetric.cpu.footerKey == nil)
 }
+
+@Test("资源自检逐步给出结论：数据源齐全时全绿")
+func selfCheckReportsHealthySources() {
+    let snapshot = SystemResourceSnapshot(
+        cpuUsage: 0.25,
+        memoryUsedBytes: 400,
+        memoryTotalBytes: 1_000,
+        memoryPressure: .normal,
+        diskAvailableBytes: 500,
+        diskTotalBytes: 1_000,
+        networkDownloadBytesPerSecond: 0,
+        networkUploadBytesPerSecond: 0,
+        coreUsages: [SystemResourceCoreUsage(index: 0, usage: 0.2), SystemResourceCoreUsage(index: 1, usage: 0.3)]
+    )
+
+    let steps = SystemResourceSelfCheck.steps(
+        snapshot: snapshot,
+        isMonitoring: true,
+        samplingInterval: 2,
+        processCount: 42,
+        historyCount: 12,
+        historyStorageBytes: 4_096,
+        alertsEnabled: true,
+        notificationPermission: .authorized
+    )
+
+    #expect(steps.count == 6)
+    #expect(steps.map(\.id) == ["cpu", "disk", "process", "history", "sampling", "notification"])
+    #expect(steps.allSatisfy { $0.status == .ok })
+    #expect(steps.allSatisfy { $0.adviceKey == nil })
+    // 测试进程里 L() 返回原始键，所以这里只断言核心数与百分比这两项与语言无关的信息
+    #expect(steps[0].detail?.contains("2") == true)
+    #expect(steps[0].detail?.contains("25%") == true)
+    #expect(steps[4].detail == "2s")
+}
+
+@Test("资源自检能指出取数失败、无历史、未采样与通知被拒")
+func selfCheckReportsProblems() {
+    let steps = SystemResourceSelfCheck.steps(
+        snapshot: nil,
+        isMonitoring: false,
+        samplingInterval: nil,
+        processCount: 0,
+        historyCount: 0,
+        historyStorageBytes: 0,
+        alertsEnabled: true,
+        notificationPermission: .denied
+    )
+
+    #expect(steps.count == 6)
+    #expect(steps[0].status == .failed && steps[0].adviceKey != nil)   // CPU/内存取不到
+    #expect(steps[1].status == .failed && steps[1].adviceKey != nil)   // 磁盘取不到
+    #expect(steps[2].status == .warning)                               // 进程列表为空
+    #expect(steps[3].status == .warning)                               // 还没有历史
+    #expect(steps[4].status == .warning)                               // 未采样
+    #expect(steps[5].status == .failed)                                // 通知被系统拒绝
+
+    // 只有单核数据源时给警告而不是失败
+    let singleCore = SystemResourceSelfCheck.steps(
+        snapshot: SystemResourceSnapshot(
+            cpuUsage: 0.1,
+            memoryUsedBytes: 1,
+            memoryTotalBytes: 2,
+            memoryPressure: .normal,
+            diskAvailableBytes: 1,
+            diskTotalBytes: 2,
+            networkDownloadBytesPerSecond: 0,
+            networkUploadBytesPerSecond: 0,
+            coreUsages: []
+        ),
+        isMonitoring: true,
+        samplingInterval: 10,
+        processCount: 1,
+        historyCount: 1,
+        historyStorageBytes: 1,
+        alertsEnabled: false,
+        notificationPermission: .notRequested
+    )
+    #expect(singleCore[0].status == .warning)
+    // 未开启告警时授权状态不参与判定
+    #expect(singleCore[5].status == .ok)
+
+    // 未请求授权（开着告警）→ 警告
+    let pending = SystemResourceSelfCheck.steps(
+        snapshot: nil, isMonitoring: false, samplingInterval: nil, processCount: 0,
+        historyCount: 0, historyStorageBytes: 0,
+        alertsEnabled: true, notificationPermission: .notRequested
+    )
+    #expect(pending[5].status == .warning)
+}
+
+@Test("自检状态有文案与图标")
+func selfCheckStatusHasPresentation() {
+    for status in [SystemResourceSelfCheckStatus.ok, .warning, .failed] {
+        #expect(!status.titleKey.isEmpty)
+        #expect(!status.symbol.isEmpty)
+    }
+}

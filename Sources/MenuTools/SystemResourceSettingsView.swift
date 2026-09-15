@@ -49,6 +49,7 @@ struct SystemResourceSettingsView: View {
             case .overview:
                 overviewSections
                 alertSection
+                selfCheckSection
             case .processes:
                 processSections
             case .history:
@@ -240,6 +241,58 @@ struct SystemResourceSettingsView: View {
             }
         } header: {
             Label(L("resource.process.title"), systemImage: "list.bullet.rectangle")
+        }
+    }
+
+    // MARK: - 自检
+
+    private var selfCheckSteps: [SystemResourceSelfCheckStep] {
+        SystemResourceSelfCheck.steps(
+            snapshot: resource.snapshot,
+            isMonitoring: resource.isMonitoring,
+            samplingInterval: resource.currentSamplingInterval,
+            processCount: processes.usages.count,
+            historyCount: resource.historyBuckets.count,
+            historyStorageBytes: resource.historyStorageUsage.totalBytes,
+            alertsEnabled: resource.alertsEnabled,
+            notificationPermission: resource.notificationPermission
+        )
+    }
+
+    @ViewBuilder
+    private var selfCheckSection: some View {
+        Section {
+            ForEach(selfCheckSteps) { step in
+                HStack(alignment: .top, spacing: 8) {
+                    Image(systemName: step.status.symbol)
+                        .foregroundStyle(statusColor(step.status))
+                    VStack(alignment: .leading, spacing: 1) {
+                        Text(L(step.titleKey))
+                        if let adviceKey = step.adviceKey {
+                            Text(L(adviceKey))
+                                .font(.caption)
+                                .foregroundStyle(.secondary)
+                                .fixedSize(horizontal: false, vertical: true)
+                        }
+                    }
+                    Spacer(minLength: 8)
+                    if let detail = step.detail {
+                        Text(detail)
+                            .font(.caption.monospacedDigit())
+                            .foregroundStyle(.secondary)
+                    }
+                }
+            }
+        } header: {
+            Label(L("resource.selfCheck.title"), systemImage: "stethoscope")
+        }
+    }
+
+    private func statusColor(_ status: SystemResourceSelfCheckStatus) -> Color {
+        switch status {
+        case .ok: return .green
+        case .warning: return .orange
+        case .failed: return .red
         }
     }
 
