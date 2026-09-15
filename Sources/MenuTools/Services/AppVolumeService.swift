@@ -1637,7 +1637,11 @@ final class AppVolumeService {
             guard appliedAutomationKeys.insert(applicationKey).inserted else { continue }
             guard let preset = presets.first(where: { $0.id == rule.presetID }) else { continue }
             let snapshot = currentConfigurationSnapshot()
-            applyConfiguration(AppVolumeConfigurationSnapshot(masterVolume: preset.masterVolume, appVolumes: preset.appVolumes))
+            applyConfiguration(AppVolumeConfigurationSnapshot(
+                masterVolume: preset.masterVolume,
+                appVolumes: preset.appVolumes,
+                appSettings: preset.appSettings
+            ))
             let execution = AppVolumeAutomationExecution(
                 id: UUID(), ruleID: rule.id, presetID: preset.id, presetName: preset.name,
                 outputDeviceName: output.deviceName, outputDeviceUID: context.outputDeviceUID, executedAt: now
@@ -1858,9 +1862,13 @@ final class AppVolumeService {
     }
 
     private func currentConfigurationSnapshot() -> AppVolumeConfigurationSnapshot {
-        AppVolumeConfigurationSnapshot(
+        let volumes = Dictionary(uniqueKeysWithValues: sessions.map { ($0.rootBundleID, $0.volume) })
+        return AppVolumeConfigurationSnapshot(
             masterVolume: output.volume,
-            appVolumes: Dictionary(uniqueKeysWithValues: sessions.map { ($0.rootBundleID, $0.volume) })
+            appVolumes: volumes,
+            appSettings: Dictionary(uniqueKeysWithValues: volumes.keys.compactMap { identifier in
+                presetAppSettings(for: identifier).map { (identifier, $0) }
+            })
         )
     }
 

@@ -839,3 +839,32 @@ func menuBarDisplayModePersistsAndPicksLoudestApp() throws {
     let idleLoudest = service.loudestActiveApp
     #expect(idleLoudest == nil)
 }
+
+@Test("自动化套用预设会一并恢复 EQ，撤销能回到执行前的曲线")
+@MainActor
+func automationAppliesPresetCoverageAndUndoRestoresIt() throws {
+    let defaults = try makeEnhancementDefaults("automationCoverage")
+    let backend = EnhancedFakeAppVolumeBackend()
+    let headphones = AudioOutputDevice(id: 12, uid: "headphones", name: "AirPods", isDefault: true)
+    backend.outputDevices = [headphones]
+    let service = AppVolumeService(backend: backend, userDefaults: defaults)
+    backend.send(candidates: [.music], output: .fixture(deviceID: headphones.id, deviceUID: headphones.uid))
+    service.setEnabled(true)
+
+    // 预设里记录 EQ，然后切回另一条曲线
+    service.setEqualizerPreset(.vocalClarity, for: "com.apple.Music")
+    let preset = service.savePreset(named: "通勤", masterVolume: 0.3, appVolumes: ["com.apple.Music": 0.5])
+    service.setEqualizerPreset(.bassBoost, for: "com.apple.Music")
+
+    service.addAutomationRule(presetID: preset.id, outputDeviceUID: headphones.uid)
+    service.evaluateAutomation(now: Date(timeIntervalSince1970: 1_800_000_000))
+
+    var session = try #require(service.session(id: "com.apple.Music"))
+    #expect(session.equalizer.gains == AppVolumeEqualizerPreset.vocalClarity.gains)
+    #expect(abs(session.volume - 0.5) < 0.001)
+
+    // 撤销回到自动化执行前的曲线
+    service.undoLatestAutomation()
+    session = try #require(service.session(id: "com.apple.Music"))
+    #expect(session.equalizer.gains == AppVolumeEqualizerPreset.bassBoost.gains)
+}
