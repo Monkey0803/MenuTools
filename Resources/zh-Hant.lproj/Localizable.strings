@@ -1149,7 +1149,9 @@
 "plugin.system-controls.title" = "系統控制";
 "plugin.system-controls.description" = "外觀、隱藏檔案、Dock、選單列、防止睡眠和系統快捷操作。";
 "plugin.system-insights.title" = "系統資訊";
-"plugin.system-insights.description" = "系統資源、網路、電池、顯示器、儲存空間和藍牙裝置電量。";
+"plugin.system-insights.description" = "網路、電池、顯示器、儲存空間和藍牙裝置電量。";
+"plugin.system-resources.title" = "系統資源";
+"plugin.system-resources.description" = "CPU、記憶體壓力與釋放、磁碟容量與讀寫、佔用最高的程序。";
 "plugin.network-traffic.title" = "網路流量";
 "plugin.network-traffic.description" = "即時查看上傳、下載速度和本次執行的累計流量。";
 "plugin.clipboard.title" = "剪貼簿";

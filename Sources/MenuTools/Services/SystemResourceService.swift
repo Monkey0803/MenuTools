@@ -207,18 +207,40 @@ struct DefaultSystemResourceProvider: SystemResourceProviding {
     }
 }
 
+/// 资源采样节奏：面板可见时才按秒刷新；没有观察者且没开告警时不采样（省电）。
+enum SystemResourceSamplingPolicy {
+    /// 面板可见时的采样间隔。
+    static let panelInterval: TimeInterval = 2
+    /// 仅开启告警（面板关闭）时的采样间隔。
+    static let alertInterval: TimeInterval = 10
+
+    static func interval(liveObserverCount: Int, alertEnabled: Bool = false) -> TimeInterval? {
+        if liveObserverCount > 0 { return panelInterval }
+        if alertEnabled { return alertInterval }
+        return nil
+    }
+}
+
 /// 负责定时采样并向 SwiftUI 提供最新资源快照。
+///
+/// 用单例保活：面板每次打开都会重建视图，`@State` 新建实例会丢掉上一次读数，
+/// 导致 CPU 速率首帧恒为 0。
 @MainActor
 @Observable
 final class SystemResourceService {
+    static let shared = SystemResourceService()
+
     private let provider: any SystemResourceProviding
     private let memoryReleaser: any SystemMemoryReleasing
     private var previousReading: SystemResourceReading?
+    private var samplingTask: Task<Void, Never>?
 
     private(set) var snapshot: SystemResourceSnapshot?
     private(set) var isReleasingMemory = false
     private(set) var lastReleasedMemoryBytes: Int64?
     private(set) var lastMemoryReleaseResult: MemoryReleaseResult?
+
+    var isMonitoring: Bool { samplingTask != nil }
 
     init(
         provider: any SystemResourceProviding = DefaultSystemResourceProvider(),
@@ -226,6 +248,29 @@ final class SystemResourceService {
     ) {
         self.provider = provider
         self.memoryReleaser = memoryReleaser
+    }
+
+    /// 开始按节奏采样（面板可见时调用；插件关闭时不应调用）。
+    func beginMonitoring(
+        interval: TimeInterval = SystemResourceSamplingPolicy.panelInterval
+    ) {
+        guard samplingTask == nil else { return }
+        refresh()
+        samplingTask = Task { @MainActor [weak self] in
+            while !Task.isCancelled {
+                try? await Task.sleep(for: .seconds(interval))
+                guard !Task.isCancelled else { return }
+                self?.refresh()
+            }
+        }
+    }
+
+    /// 停止采样并清掉快照：插件关闭或面板关闭后不应残留读数。
+    func endMonitoring() {
+        samplingTask?.cancel()
+        samplingTask = nil
+        snapshot = nil
+        previousReading = nil
     }
 
     func refresh() {

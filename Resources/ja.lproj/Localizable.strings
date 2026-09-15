@@ -1149,7 +1149,9 @@
 "plugin.system-controls.title" = "システムコントロール";
 "plugin.system-controls.description" = "外観、隠しファイル、Dock、メニューバー、スリープ防止、システム操作。";
 "plugin.system-insights.title" = "システム情報";
-"plugin.system-insights.description" = "リソース、ネットワーク、バッテリー、ディスプレイ、ストレージ、Bluetooth 機器の電池残量。";
+"plugin.system-insights.description" = "ネットワーク、バッテリー、ディスプレイ、ストレージ、Bluetooth 機器の電池残量。";
+"plugin.system-resources.title" = "システムリソース";
+"plugin.system-resources.description" = "CPU、メモリのプレッシャーと解放、ディスク容量と読み書き、負荷の高いプロセス。";
 "plugin.network-traffic.title" = "ネットワーク通信量";
 "plugin.network-traffic.description" = "アップロードとダウンロードの速度、今回の累計通信量を表示します。";
 "plugin.clipboard.title" = "クリップボード";

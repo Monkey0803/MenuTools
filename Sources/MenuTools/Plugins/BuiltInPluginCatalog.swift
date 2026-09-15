@@ -49,6 +49,15 @@ enum BuiltInPluginCatalog {
                     BLEBatteryMonitor.shared.stop()
                 }
             ),
+            // 本机资源（CPU / 内存 / 磁盘 / 进程）独立成插件：
+            // 「系统信息」只管网络、电池、显示器、存储与蓝牙设备电量。
+            registration(
+                id: .systemResources,
+                category: .system,
+                symbol: "cpu",
+                start: { SystemResourceService.shared.beginMonitoring() },
+                stop: { SystemResourceService.shared.endMonitoring() }
+            ),
             registration(
                 id: .networkTraffic,
                 category: .system,

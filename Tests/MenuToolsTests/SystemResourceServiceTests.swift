@@ -166,3 +166,56 @@ private final class StubSystemResourceProvider: SystemResourceProviding, @unchec
         return readings[min(index, readings.count - 1)]
     }
 }
+
+/// 可控的假提供者，用来验证采样节奏与生命周期。
+private final class CountingResourceProvider: SystemResourceProviding, @unchecked Sendable {
+    private(set) var readCount = 0
+
+    func read() -> SystemResourceReading {
+        readCount += 1
+        return SystemResourceReading(
+            timestamp: 0,
+            cpuTicks: SystemResourceCPUTicks(user: 1, system: 1, idle: 1, nice: 0),
+            memoryUsedBytes: 1,
+            memoryTotalBytes: 2,
+            diskAvailableBytes: 3,
+            diskTotalBytes: 4,
+            networkReceivedBytes: 0,
+            networkSentBytes: 0
+        )
+    }
+}
+
+@Test("资源采样分级：有观察者按面板间隔，仅告警按告警间隔，否则不采样")
+func resourceSamplingPolicyIntervals() {
+    #expect(SystemResourceSamplingPolicy.interval(liveObserverCount: 1) == 2)
+    #expect(SystemResourceSamplingPolicy.interval(liveObserverCount: 3) == 2)
+    #expect(SystemResourceSamplingPolicy.interval(liveObserverCount: 0, alertEnabled: true) == 10)
+    #expect(SystemResourceSamplingPolicy.interval(liveObserverCount: 0) == nil)
+}
+
+@Test("开始监控会立刻采样，结束监控会停止并清掉快照")
+@MainActor
+func resourceMonitoringLifecycle() async throws {
+    let provider = CountingResourceProvider()
+    let service = SystemResourceService(provider: provider, memoryReleaser: NoopMemoryReleaser())
+
+    #expect(!service.isMonitoring)
+    #expect(service.snapshot == nil)
+
+    service.beginMonitoring(interval: 60)
+    #expect(service.isMonitoring)
+    #expect(provider.readCount == 1)
+    #expect(service.snapshot != nil)
+
+    service.endMonitoring()
+    #expect(!service.isMonitoring)
+    // 结束时清掉快照，插件关闭后不应残留读数
+    #expect(service.snapshot == nil)
+}
+
+private struct NoopMemoryReleaser: SystemMemoryReleasing {
+    func releaseMemory() -> MemoryReleaseResult {
+        MemoryReleaseResult(systemCachePurged: false, processReleasedBytes: 0)
+    }
+}

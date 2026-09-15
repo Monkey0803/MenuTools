@@ -268,9 +268,9 @@ struct MenuPanelView: View {
     @State private var toggles = SystemToggleStates()
     @State private var derivedDataSize: Int64?
     @State private var isCleaningDerivedData = false
-    @State private var systemResourceService = SystemResourceService()
+    @State private var systemResourceService = SystemResourceService.shared
     @State private var networkService = NetworkStatusService.shared
-    @State private var batteryHealthService = BatteryHealthService()
+    @State private var batteryHealthService = BatteryHealthService.shared
     @State private var displayService = DisplayService()
     @State private var storageAnalysisService = StorageAnalysisService()
     @State private var storageCategoryToConfirm: StorageCategory?
@@ -347,9 +347,11 @@ struct MenuPanelView: View {
                         )
                         .entrance(5, appeared: appeared)
                     }
-                    if pluginManager.isEnabled(.systemInsights) {
+                    if pluginManager.isEnabled(.systemResources) {
                         systemResourceCard
                             .entrance(6, appeared: appeared)
+                    }
+                    if pluginManager.isEnabled(.systemInsights) {
                         networkCard
                             .entrance(7, appeared: appeared)
                         batteryHealthCard
@@ -479,11 +481,13 @@ struct MenuPanelView: View {
             }
         }
         .task {
-            guard pluginManager.isEnabled(.systemInsights) else { return }
+            guard pluginManager.isEnabled(.systemResources) else { return }
+            systemResourceService.beginMonitoring()
+            // 面板存续期间保持采样；task 被取消（面板关闭）后立即停止，不留后台采样。
             while !Task.isCancelled {
-                systemResourceService.refresh()
-                try? await Task.sleep(for: .seconds(2))
+                try? await Task.sleep(for: .seconds(30))
             }
+            systemResourceService.endMonitoring()
         }
         .task {
             guard pluginManager.isEnabled(.systemInsights) else { return }

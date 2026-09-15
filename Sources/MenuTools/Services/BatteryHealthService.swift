@@ -102,6 +102,9 @@ struct DefaultBatteryHealthProvider: BatteryHealthProviding {
 @MainActor
 @Observable
 final class BatteryHealthService {
+    /// 面板每次打开都会重建视图，用单例保活已读到的快照，避免重复启动 system_profiler。
+    static let shared = BatteryHealthService()
+
     private let provider: any BatteryHealthProviding
     private(set) var snapshot: BatteryHealthSnapshot?
     private(set) var isLoading = false

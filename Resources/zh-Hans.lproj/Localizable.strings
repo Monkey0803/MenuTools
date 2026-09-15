@@ -1149,7 +1149,9 @@
 "plugin.system-controls.title" = "系统控制";
 "plugin.system-controls.description" = "外观、隐藏文件、Dock、菜单栏、防休眠和系统快捷操作。";
 "plugin.system-insights.title" = "系统信息";
-"plugin.system-insights.description" = "系统资源、网络、电池、显示器、存储和蓝牙设备电量。";
+"plugin.system-insights.description" = "网络、电池、显示器、存储和蓝牙设备电量。";
+"plugin.system-resources.title" = "系统资源";
+"plugin.system-resources.description" = "CPU、内存压力与释放、磁盘容量与读写、占用最高的进程。";
 "plugin.network-traffic.title" = "网络流量";
 "plugin.network-traffic.description" = "实时查看上传、下载速度和本次运行的累计流量。";
 "plugin.clipboard.title" = "剪贴板";

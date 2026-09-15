@@ -1149,7 +1149,9 @@
 "plugin.system-controls.title" = "System Controls";
 "plugin.system-controls.description" = "Appearance, hidden files, Dock, menu bar, sleep prevention, and system actions.";
 "plugin.system-insights.title" = "System Insights";
-"plugin.system-insights.description" = "Resources, network, battery, displays, storage, and Bluetooth battery levels.";
+"plugin.system-insights.description" = "Network, battery, displays, storage, and Bluetooth battery levels.";
+"plugin.system-resources.title" = "System Resources";
+"plugin.system-resources.description" = "CPU, memory pressure and release, disk capacity and throughput, and the busiest processes.";
 "plugin.network-traffic.title" = "Network Traffic";
 "plugin.network-traffic.description" = "View live upload and download speeds plus session totals.";
 "plugin.clipboard.title" = "Clipboard";

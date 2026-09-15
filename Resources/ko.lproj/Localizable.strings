@@ -1149,7 +1149,9 @@
 "plugin.system-controls.title" = "시스템 제어";
 "plugin.system-controls.description" = "화면 모드, 숨김 파일, Dock, 메뉴 막대, 잠자기 방지 및 시스템 동작.";
 "plugin.system-insights.title" = "시스템 정보";
-"plugin.system-insights.description" = "리소스, 네트워크, 배터리, 디스플레이, 저장 공간 및 Bluetooth 기기 배터리.";
+"plugin.system-insights.description" = "네트워크, 배터리, 디스플레이, 저장 공간 및 Bluetooth 기기 배터리.";
+"plugin.system-resources.title" = "시스템 리소스";
+"plugin.system-resources.description" = "CPU, 메모리 압력 및 해제, 디스크 용량과 읽기/쓰기, 부하가 큰 프로세스.";
 "plugin.network-traffic.title" = "네트워크 트래픽";
 "plugin.network-traffic.description" = "실시간 업로드 및 다운로드 속도와 세션 누계를 확인합니다.";
 "plugin.clipboard.title" = "클립보드";
