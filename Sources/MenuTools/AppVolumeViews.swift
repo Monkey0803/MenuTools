@@ -608,6 +608,36 @@ struct AppVolumeSettingsView: View {
             }
 
             Section {
+                LabeledContent(L("volume.notification.permission.title")) {
+                    HStack(spacing: 8) {
+                        Text(L(service.notificationPermission.titleKey))
+                            .foregroundStyle(service.notificationPermission == .denied ? .orange : .secondary)
+                        if service.notificationPermission != .authorized {
+                            Button(L("volume.notification.openSettings"), action: openSystemSettings)
+                        }
+                    }
+                }
+                ForEach(AppVolumeNotificationKind.allCases, id: \.self) { kind in
+                    Toggle(isOn: Binding(
+                        get: { service.notificationPolicy.isEnabled(kind) },
+                        set: { service.setNotificationEnabled($0, for: kind) }
+                    )) {
+                        VStack(alignment: .leading, spacing: 2) {
+                            Text(L(kind.titleKey))
+                            Text(L(kind.detailKey))
+                                .font(.caption)
+                                .foregroundStyle(.secondary)
+                        }
+                    }
+                }
+            } header: {
+                Label(L("volume.notification.title"), systemImage: "bell.badge")
+            }
+            .onAppear {
+                Task { await service.refreshNotificationPermission() }
+            }
+
+            Section {
                 Button(didCopyDiagnostic ? L("volume.diagnostics.copied") : L("volume.diagnostics.copy")) {
                     didCopyDiagnostic = service.copyDiagnosticReport()
                 }

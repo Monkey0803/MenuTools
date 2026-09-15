@@ -501,12 +501,18 @@ private final class EnhancedFakeAppVolumeBackend: AppVolumeRoutingBackend {
     func send(
         candidates: [AppAudioProcessCandidate] = [],
         output: SystemOutputVolumeState = .fixture(),
-        input: SystemInputVolumeState = .unavailable
+        input: SystemInputVolumeState = .unavailable,
+        levels: [String: AppVolumeMeter] = [:]
     ) {
         currentCandidates = candidates
         currentOutput = output
         currentInput = input
-        onSnapshot?(AppVolumeBackendSnapshot(candidates: candidates, output: output, input: input))
+        onSnapshot?(AppVolumeBackendSnapshot(
+            candidates: candidates,
+            output: output,
+            input: input,
+            levels: levels
+        ))
     }
 }
 
@@ -586,6 +592,25 @@ private struct InterruptedDuckingState: Codable, Equatable {
     var originalVolume: Double
     var duckedVolume: Double
     var needsDucking: Bool
+}
+
+@MainActor
+private final class FakeAppVolumeAlerter: AppVolumeAlerting {
+    var events: [AppVolumeNotificationEvent] = []
+    var requestedPermission = false
+    var permission: AppVolumeNotificationPermission = .authorized
+
+    func requestPermission() {
+        requestedPermission = true
+    }
+
+    func currentPermission() async -> AppVolumeNotificationPermission {
+        permission
+    }
+
+    func send(_ event: AppVolumeNotificationEvent) {
+        events.append(event)
+    }
 }
 
 private func makeEnhancementDefaults(_ name: String) throws -> UserDefaults {
@@ -867,4 +892,89 @@ func automationAppliesPresetCoverageAndUndoRestoresIt() throws {
     service.undoLatestAutomation()
     session = try #require(service.session(id: "com.apple.Music"))
     #expect(session.equalizer.gains == AppVolumeEqualizerPreset.bassBoost.gains)
+}
+
+@Test("削波按开关推送并遵守冷却，首次启用会申请权限")
+@MainActor
+func clippingNotificationsRespectSwitchAndCooldown() throws {
+    let defaults = try makeEnhancementDefaults("clippingNotification")
+    let backend = EnhancedFakeAppVolumeBackend()
+    let alerter = FakeAppVolumeAlerter()
+    let service = AppVolumeService(backend: backend, userDefaults: defaults, alerter: alerter)
+    backend.send(candidates: [.music], output: .fixture())
+    service.setEnabled(true)
+    service.setVolume(0.5, for: "com.apple.Music")
+
+    let clippingLevels = [
+        "com.apple.Music": AppVolumeMeter(peak: 1, rms: 1, heldPeak: 1, isClipping: true, cpuLoad: 0.1)
+    ]
+
+    // 关闭时不推送
+    service.setNotificationEnabled(false, for: .clipping)
+    backend.send(candidates: [.music], output: .fixture(), levels: clippingLevels)
+    #expect(alerter.events.isEmpty)
+
+    // 重新打开会申请权限并推送一次
+    service.setNotificationEnabled(true, for: .clipping)
+    #expect(alerter.requestedPermission)
+    backend.send(candidates: [.music], output: .fixture(), levels: clippingLevels)
+    #expect(alerter.events.count == 1)
+    guard case let .clipping(appName, appID) = alerter.events.first else {
+        Issue.record("期望收到削波通知")
+        return
+    }
+    #expect(appName == "音乐")
+    #expect(appID == "com.apple.Music")
+
+    // 冷却期内重复削波不再推送
+    backend.send(candidates: [.music], output: .fixture(), levels: clippingLevels)
+    #expect(alerter.events.count == 1)
+}
+
+@Test("自动化提醒默认关闭，打开后套用预设会推送一次")
+@MainActor
+func automationNotificationFollowsSwitch() throws {
+    let defaults = try makeEnhancementDefaults("automationNotification")
+    let backend = EnhancedFakeAppVolumeBackend()
+    let headphones = AudioOutputDevice(id: 12, uid: "headphones", name: "AirPods", isDefault: true)
+    backend.outputDevices = [headphones]
+    let alerter = FakeAppVolumeAlerter()
+    let service = AppVolumeService(backend: backend, userDefaults: defaults, alerter: alerter)
+    backend.send(candidates: [.music], output: .fixture(deviceID: headphones.id, deviceUID: headphones.uid))
+
+    let preset = service.savePreset(named: "通勤", masterVolume: 0.3, appVolumes: ["com.apple.Music": 0.5])
+    service.addAutomationRule(presetID: preset.id, outputDeviceUID: headphones.uid)
+
+    service.evaluateAutomation(now: Date(timeIntervalSince1970: 1_800_000_000))
+    #expect(alerter.events.isEmpty)  // 默认关闭
+
+    service.setNotificationEnabled(true, for: .automation)
+    service.evaluateAutomation(now: Date(timeIntervalSince1970: 1_800_100_000))
+    #expect(alerter.events.count == 1)
+    guard case let .automation(presetName) = alerter.events.first else {
+        Issue.record("期望收到自动化通知")
+        return
+    }
+    #expect(presetName == "通勤")
+}
+
+@Test("长时间高音量会推送听力保护通知")
+@MainActor
+func hearingProtectionNotificationFires() throws {
+    let defaults = try makeEnhancementDefaults("hearingNotification")
+    let backend = EnhancedFakeAppVolumeBackend()
+    let alerter = FakeAppVolumeAlerter()
+    let service = AppVolumeService(backend: backend, userDefaults: defaults, alerter: alerter)
+    backend.send(candidates: [.music], output: .fixture(volume: 0.9))
+    service.setNotificationEnabled(true, for: .hearingProtection)
+
+    var now = Date(timeIntervalSince1970: 1_800_000_000)
+    service.recordHearingExposure(now: now)
+    for _ in 0..<800 {
+        now = now.addingTimeInterval(5)
+        service.recordHearingExposure(now: now)
+    }
+
+    #expect(service.hearingWarningMessage != nil)
+    #expect(alerter.events.contains { $0.kind == .hearingProtection })
 }

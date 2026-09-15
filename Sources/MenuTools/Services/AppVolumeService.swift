@@ -854,6 +854,9 @@ final class AppVolumeService {
     private(set) var isAdjustingVolume = false
     private(set) var devicePresetBindings: [String: UUID]
     private(set) var menuBarDisplayMode: AppVolumeMenuBarDisplayMode
+    /// 事件通知开关与冷却策略。
+    private(set) var notificationPolicy: AppVolumeNotificationPolicy
+    private(set) var notificationPermission: AppVolumeNotificationPermission = .notRequested
 
     var canUndoLatestAutomation: Bool { latestAutomationUndo != nil }
 
@@ -905,10 +908,17 @@ final class AppVolumeService {
     private var latestAutomationUndo: (executionID: UUID, snapshot: AppVolumeConfigurationSnapshot)?
     private var duckedVolumes: [String: AppVolumeDuckingState] = [:]
     private var isApplyingMeetingDucking = false
+    private let alerter: AppVolumeAlerting
+    private var notificationTracker = AppVolumeNotificationTracker()
 
-    init(backend: AppVolumeRoutingBackend, userDefaults: UserDefaults) {
+    init(
+        backend: AppVolumeRoutingBackend,
+        userDefaults: UserDefaults,
+        alerter: AppVolumeAlerting = UserNotificationAppVolumeAlerter()
+    ) {
         self.backend = backend
         self.userDefaults = userDefaults
+        self.alerter = alerter
         networkStatusService = NetworkStatusService()
         isEnabled = userDefaults.bool(forKey: StorageKey.enabled)
         let boostEnabled = userDefaults.bool(forKey: StorageKey.boostEnabled)
@@ -942,6 +952,23 @@ final class AppVolumeService {
         devicePresetBindings = Self.loadDevicePresetBindings(from: userDefaults)
         menuBarDisplayMode = userDefaults.string(forKey: StorageKey.menuBarDisplayMode)
             .flatMap(AppVolumeMenuBarDisplayMode.init(rawValue:)) ?? .off
+        notificationPolicy = AppVolumeNotificationPolicy(
+            clippingEnabled: Self.notificationDefault(
+                forKey: StorageKey.notificationClipping,
+                fallback: true,
+                userDefaults: userDefaults
+            ),
+            automationEnabled: Self.notificationDefault(
+                forKey: StorageKey.notificationAutomation,
+                fallback: false,
+                userDefaults: userDefaults
+            ),
+            hearingEnabled: Self.notificationDefault(
+                forKey: StorageKey.notificationHearing,
+                fallback: true,
+                userDefaults: userDefaults
+            )
+        )
         permissionState = userDefaults.bool(forKey: StorageKey.permissionGranted)
             ? .authorized
             : .notRequested
@@ -1325,6 +1352,7 @@ final class AppVolumeService {
         highVolumeExposure += min(max(now.timeIntervalSince(lastExposureDate), 0), 5)
         if highVolumeExposure >= 60 * 60 {
             hearingWarningMessage = L("volume.hearing.warning")
+            notify(.hearingProtection(deviceName: output.deviceName), now: now)
         }
     }
 
@@ -1650,7 +1678,69 @@ final class AppVolumeService {
             automationExecutions = Array(automationExecutions.prefix(20))
             latestAutomationUndo = (execution.id, snapshot)
             persistAutomationExecutions()
+            notify(.automation(presetName: preset.name), now: now)
         }
+    }
+
+    // MARK: - 事件通知
+
+    /// 首次启用某类提醒时向系统申请通知权限。
+    func setNotificationEnabled(_ enabled: Bool, for kind: AppVolumeNotificationKind) {
+        switch kind {
+        case .clipping: notificationPolicy.clippingEnabled = enabled
+        case .automation: notificationPolicy.automationEnabled = enabled
+        case .hearingProtection: notificationPolicy.hearingEnabled = enabled
+        }
+        userDefaults.set(enabled, forKey: Self.notificationKey(for: kind))
+        if enabled, notificationPermission == .notRequested {
+            requestNotificationPermission()
+        }
+        notifySnapshotChanged()
+    }
+
+    func requestNotificationPermission() {
+        alerter.requestPermission()
+        Task { [weak self] in
+            await self?.refreshNotificationPermission()
+        }
+    }
+
+    func refreshNotificationPermission() async {
+        let permission = await alerter.currentPermission()
+        guard notificationPermission != permission else { return }
+        notificationPermission = permission
+        notifySnapshotChanged()
+    }
+
+    /// 按策略推送一条事情；冷却期内的重复事件会被忽略。
+    func notify(_ event: AppVolumeNotificationEvent, now: Date = .now) {
+        guard notificationPolicy.isEnabled(event.kind) else { return }
+        guard notificationTracker.shouldSend(event, policy: notificationPolicy, now: now) else { return }
+        alerter.send(event)
+    }
+
+    /// 检查已建立路由的 App 是否削波；由后端快照驱动。
+    private func evaluateClippingNotifications(now: Date = .now) {
+        guard notificationPolicy.clippingEnabled else { return }
+        for session in sessions where session.meter.isClipping {
+            notify(.clipping(appName: session.displayName, appID: session.rootBundleID), now: now)
+        }
+    }
+
+    private static func notificationKey(for kind: AppVolumeNotificationKind) -> String {
+        switch kind {
+        case .clipping: return StorageKey.notificationClipping
+        case .automation: return StorageKey.notificationAutomation
+        case .hearingProtection: return StorageKey.notificationHearing
+        }
+    }
+
+    private static func notificationDefault(
+        forKey key: String,
+        fallback: Bool,
+        userDefaults: UserDefaults
+    ) -> Bool {
+        userDefaults.object(forKey: key) as? Bool ?? fallback
     }
 
     /// 菜单栏显示模式；改动会立即刷新菜单栏标题。
@@ -1799,7 +1889,10 @@ final class AppVolumeService {
     }
 
     private func receive(_ snapshot: AppVolumeBackendSnapshot) {
-        defer { notifySnapshotChanged() }
+        defer {
+            evaluateClippingNotifications()
+            notifySnapshotChanged()
+        }
         let previousOutputUID = output.deviceUID
         candidates = snapshot.candidates
         output = snapshot.output
@@ -2279,5 +2372,8 @@ final class AppVolumeService {
         static let devicePresetBindings = "appVolume.devicePresetBindings.v1"
         static let customEqualizers = "appVolume.customEqualizers.v1"
         static let menuBarDisplayMode = "appVolume.menuBarDisplayMode.v1"
+        static let notificationClipping = "appVolume.notificationClipping.v1"
+        static let notificationAutomation = "appVolume.notificationAutomation.v1"
+        static let notificationHearing = "appVolume.notificationHearing.v1"
     }
 }
