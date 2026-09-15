@@ -425,14 +425,45 @@ func channelMixDownmixesToMono() {
 @Test("菜单栏音量标题按模式给出主音量或最响 App，并夹住百分比")
 func menuBarVolumeTitlesFollowMode() {
     #expect(AppVolumeMenuBarPresenter.title(mode: .off, masterVolume: 0.42, isMuted: false, loudest: nil) == nil)
-    #expect(AppVolumeMenuBarPresenter.title(mode: .master, masterVolume: 0.42, isMuted: false, loudest: nil) == "🔊 42%")
-    #expect(AppVolumeMenuBarPresenter.title(mode: .master, masterVolume: 0.42, isMuted: true, loudest: nil) == "🔇")
+    // 百分比固定三位宽，避免调音量时标题宽度变化
+    #expect(AppVolumeMenuBarPresenter.title(mode: .master, masterVolume: 0.42, isMuted: false, loudest: nil) == "🔊  42%")
     #expect(
         AppVolumeMenuBarPresenter.title(mode: .loudest, masterVolume: 0.1, isMuted: false, loudest: ("音乐", 0.8))
-            == "🔊 音乐 80%"
+            == "🔊 音乐  80%"
     )
     // 没有正在发声的 App 时退回主音量
-    #expect(AppVolumeMenuBarPresenter.title(mode: .loudest, masterVolume: 0.5, isMuted: false, loudest: nil) == "🔊 50%")
+    #expect(AppVolumeMenuBarPresenter.title(mode: .loudest, masterVolume: 0.5, isMuted: false, loudest: nil) == "🔊  50%")
     #expect(AppVolumeMenuBarPresenter.percent(2) == "100%")
-    #expect(AppVolumeMenuBarPresenter.percent(-1) == "0%")
+    #expect(AppVolumeMenuBarPresenter.percent(-1) == "  0%")
+    #expect(AppVolumeMenuBarPresenter.percent(0.05) == "  5%")
+}
+
+@Test("菜单栏音量标题宽度稳定：位数、静音与长名字都不会改变宽度")
+func menuBarVolumeTitleWidthIsStable() {
+    // 同一模式下不同音量长度一致（弹窗锚在状态项上，宽度变化会带着弹窗抖）
+    let lengths = [0.0, 0.05, 0.42, 0.999, 1.0].map {
+        AppVolumeMenuBarPresenter.title(mode: .master, masterVolume: $0, isMuted: false, loudest: nil)?.count
+    }
+    #expect(Set(lengths.compactMap { $0 }).count == 1)
+
+    // 静音与正常状态等宽
+    let muted = AppVolumeMenuBarPresenter.title(mode: .master, masterVolume: 0.5, isMuted: true, loudest: nil)
+    let normal = AppVolumeMenuBarPresenter.title(mode: .master, masterVolume: 0.5, isMuted: false, loudest: nil)
+    #expect(muted?.count == normal?.count)
+
+    // 最响 App：同一 App 调音量长度不变
+    let quiet = AppVolumeMenuBarPresenter.title(mode: .loudest, masterVolume: 0.1, isMuted: false, loudest: ("Chrome", 0.09))
+    let loud = AppVolumeMenuBarPresenter.title(mode: .loudest, masterVolume: 0.1, isMuted: false, loudest: ("Chrome", 1.0))
+    #expect(quiet?.count == loud?.count)
+
+    // 超长 App 名会被截断，宽度有上界
+    let longName = String(repeating: "超长名字", count: 6)
+    let truncated = try? #require(
+        AppVolumeMenuBarPresenter.title(mode: .loudest, masterVolume: 0.5, isMuted: false, loudest: (longName, 0.8))
+    )
+    #expect(truncated?.contains("…") == true)
+
+    // 长名字与截断后的上限一致，不会无限变宽
+    let bounded = "🔊 ".count + AppVolumeMenuBarPresenter.maximumAppNameLength + 1 + 4
+    #expect((truncated?.count ?? 0) <= bounded)
 }

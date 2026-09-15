@@ -114,7 +114,20 @@ enum AppVolumeMenuBarDisplayMode: String, CaseIterable, Sendable {
 }
 
 /// 菜单栏音量标题：关闭 / 主音量 / 音量最高的 App。
+/// 菜单栏音量标题。
+///
+/// 标题宽度必须稳定：状态项用可变宽度，音量弹窗锚在它上面，
+/// 一旦百分比位数或 App 名长度变化，按钮宽度就会变，弹窗随之抖动。
 enum AppVolumeMenuBarPresenter {
+    /// 百分比固定三位宽（`  5%` / ` 47%` / `100%`）。
+    static let percentWidth = 3
+    /// App 名截断上限，保证「音量最高的 App」模式下宽度有上界。
+    static let maximumAppNameLength = 10
+    /// 静音时使用的等宽占位（图空格，宽度与数字相同，不会被布局裁掉）。
+    private static var mutedPlaceholder: String {
+        String(repeating: "\u{2007}", count: percentWidth + 1)
+    }
+
     static func title(
         mode: AppVolumeMenuBarDisplayMode,
         masterVolume: Double,
@@ -127,19 +140,30 @@ enum AppVolumeMenuBarPresenter {
         case .master:
             return masterTitle(volume: masterVolume, isMuted: isMuted)
         case .loudest:
-            guard let loudest, !loudest.name.isEmpty else {
+            guard let loudest, !loudest.name.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else {
                 return masterTitle(volume: masterVolume, isMuted: isMuted)
             }
-            return "🔊 \(loudest.name) \(percent(loudest.volume))"
+            return "🔊 \(displayName(loudest.name)) \(percent(loudest.volume))"
         }
     }
 
     static func masterTitle(volume: Double, isMuted: Bool) -> String {
-        isMuted ? "🔇" : "🔊 \(percent(volume))"
+        // 静音也用等宽占位，切换静音时标题宽度不变
+        isMuted ? "🔇 \(mutedPlaceholder)" : "🔊 \(percent(volume))"
     }
 
+    /// 固定宽度百分比。
     static func percent(_ value: Double) -> String {
-        "\(Int((min(max(value.isFinite ? value : 0, 0), 1) * 100).rounded()))%"
+        let clamped = min(max(value.isFinite ? value : 0, 0), 1)
+        let rounded = Int((clamped * 100).rounded())
+        return String(format: "%\(percentWidth)d%%", rounded)
+    }
+
+    /// 截断过长的 App 名，保证标题宽度有上界。
+    static func displayName(_ name: String) -> String {
+        let trimmed = name.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard trimmed.count > maximumAppNameLength else { return trimmed }
+        return String(trimmed.prefix(maximumAppNameLength - 1)) + "…"
     }
 }
 
