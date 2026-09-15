@@ -917,6 +917,7 @@
 "volume.section.input" = "マイク入力";
 "volume.input" = "マイク音量";
 "volume.input.liveLevel" = "マイク入力レベルを表示";
+"volume.input.liveLevel.desc" = "モニタリング中は Bluetooth ヘッドセットが通話モードに切り替わり、入力音量が一時的に変わることがあります。オフにすると元の値に戻ります。";
 "volume.muteInput" = "マイクを消音";
 "volume.input.unknown" = "現在の入力デバイス";
 "volume.input.fixed" = "この入力デバイスは音量調整に対応していません。";

@@ -917,6 +917,7 @@
 "volume.section.input" = "마이크 입력";
 "volume.input" = "마이크 음량";
 "volume.input.liveLevel" = "실시간 마이크 레벨 표시";
+"volume.input.liveLevel.desc" = "모니터링 중에는 Bluetooth 헤드셋이 통화 모드로 전환되어 입력 볼륨이 일시적으로 바뀔 수 있습니다. 끄면 이전 값으로 복원됩니다.";
 "volume.muteInput" = "마이크 음소거";
 "volume.input.unknown" = "현재 입력 장치";
 "volume.input.fixed" = "이 입력 장치는 음량 조절을 지원하지 않습니다.";

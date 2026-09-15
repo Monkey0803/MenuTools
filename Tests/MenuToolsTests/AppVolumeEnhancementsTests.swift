@@ -568,14 +568,36 @@ private extension SystemOutputVolumeState {
 }
 
 private extension SystemInputVolumeState {
-    static let fixture = Self(
-        deviceID: 88,
-        deviceName: "Mac 麦克风",
-        volume: 0.4,
-        isMuted: false,
-        canSetVolume: true,
-        canSetMute: true
-    )
+    static let fixture = fixture()
+
+    static func fixture(
+        deviceID: AudioDeviceID = 88,
+        deviceUID: String = "built-in-mic",
+        deviceName: String = "Mac 麦克风",
+        volume: Double = 0.4,
+        isMuted: Bool = false
+    ) -> Self {
+        Self(
+            deviceID: deviceID,
+            deviceUID: deviceUID,
+            deviceName: deviceName,
+            volume: volume,
+            isMuted: isMuted,
+            canSetVolume: true,
+            canSetMute: true
+        )
+    }
+}
+
+extension SystemInputVolumeState {
+    /// 纯函数测试用的构造入口（只关心设备与值）。
+    fileprivate static func inputFixture(
+        deviceUID: String,
+        volume: Double,
+        isMuted: Bool
+    ) -> Self {
+        fixture(deviceUID: deviceUID, volume: volume, isMuted: isMuted)
+    }
 }
 
 private struct LegacyAppVolumeProfile: Codable {
@@ -977,4 +999,88 @@ func hearingProtectionNotificationFires() throws {
 
     #expect(service.hearingWarningMessage != nil)
     #expect(alerter.events.contains { $0.kind == .hearingProtection })
+}
+
+@Test("输入电平监控停止后会恢复监控前的输入音量与静音")
+@MainActor
+func inputLevelMonitoringRestoresInputState() throws {
+    let defaults = try makeEnhancementDefaults("inputLevelRestore")
+    let backend = EnhancedFakeAppVolumeBackend()
+    let service = AppVolumeService(backend: backend, userDefaults: defaults)
+    service.start()
+    backend.send(candidates: [.music], output: .fixture(), input: .fixture)
+    service.setEnabled(true)
+
+    service.startInputLevelMonitoring()
+    // 监控期间蓝牙耳机切到通话档位：音量被系统改成 0.9、静音被解除
+    backend.send(
+        candidates: [.music],
+        output: .fixture(),
+        input: .fixture(volume: 0.9, isMuted: false)
+    )
+    #expect(abs(service.input.volume - 0.9) < 0.001)
+
+    service.stopInputLevelMonitoring()
+
+    #expect(backend.inputVolumes.last == 0.4)
+    #expect(abs(service.input.volume - 0.4) < 0.001)
+    #expect(service.input.peakLevel == 0)
+}
+
+@Test("监控期间输入音量没变就不会多余写入")
+@MainActor
+func inputLevelMonitoringSkipsRestoreWhenUnchanged() throws {
+    let defaults = try makeEnhancementDefaults("inputLevelUnchanged")
+    let backend = EnhancedFakeAppVolumeBackend()
+    let service = AppVolumeService(backend: backend, userDefaults: defaults)
+    service.start()
+    backend.send(candidates: [.music], output: .fixture(), input: .fixture)
+    service.setEnabled(true)
+
+    service.startInputLevelMonitoring()
+    service.stopInputLevelMonitoring()
+
+    #expect(backend.inputVolumes.isEmpty)
+    #expect(backend.inputMutedStates.isEmpty)
+}
+
+@Test("监控期间换到别的输入设备时不会把音量写到新设备")
+@MainActor
+func inputLevelMonitoringDoesNotTouchOtherDevice() throws {
+    let defaults = try makeEnhancementDefaults("inputLevelOtherDevice")
+    let backend = EnhancedFakeAppVolumeBackend()
+    let service = AppVolumeService(backend: backend, userDefaults: defaults)
+    service.start()
+    backend.send(candidates: [.music], output: .fixture(), input: .fixture)
+    service.setEnabled(true)
+
+    service.startInputLevelMonitoring()
+    // 设备被拔掉，系统改用另一台麦克风（音量不同）
+    backend.send(
+        candidates: [.music],
+        output: .fixture(),
+        input: .fixture(deviceUID: "other-mic", deviceName: "Mac 麦克风", volume: 0.7)
+    )
+    service.stopInputLevelMonitoring()
+
+    #expect(backend.inputVolumes.isEmpty)
+    #expect(abs(service.input.volume - 0.7) < 0.001)
+}
+
+@Test("输入监控恢复策略：设备一致且值有变化才恢复")
+func inputLevelRestorePolicy() {
+    let captured = AppVolumeInputLevelRestore(deviceUID: "wh-1000xm3", volume: 0.553, isMuted: false)
+
+    let changed = captured.restoration(for: .inputFixture(deviceUID: "wh-1000xm3", volume: 0.9, isMuted: true))
+    #expect(changed?.volume == 0.553)
+    #expect(changed?.isMuted == false)
+
+    let unchanged = captured.restoration(for: .inputFixture(deviceUID: "wh-1000xm3", volume: 0.553, isMuted: false))
+    #expect(unchanged == nil)
+
+    let otherDevice = captured.restoration(for: .inputFixture(deviceUID: "other-mic", volume: 0.9, isMuted: false))
+    #expect(otherDevice == nil)
+
+    let missingCapture = AppVolumeInputLevelRestore(deviceUID: "", volume: 1, isMuted: false)
+    #expect(missingCapture.restoration(for: .inputFixture(deviceUID: "wh-1000xm3", volume: 0.2, isMuted: false)) == nil)
 }

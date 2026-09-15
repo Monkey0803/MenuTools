@@ -66,6 +66,23 @@ extension AppVolumeProfile {
     }
 }
 
+/// 输入电平监控期间会改变输入设备状态：蓝牙耳机会从 A2DP 切到通话档位，
+/// 系统随之改写输入音量。这里记录监控前的状态，停止后恢复回去。
+struct AppVolumeInputLevelRestore: Equatable, Sendable {
+    var deviceUID: String
+    var volume: Double
+    var isMuted: Bool
+
+    /// 只有同一台设备且值确实被改动时才需要恢复，避免覆盖用户或系统的其它改动。
+    func restoration(for current: SystemInputVolumeState) -> (volume: Double, isMuted: Bool)? {
+        guard !deviceUID.isEmpty, current.deviceUID == deviceUID else { return nil }
+        let volumeChanged = abs(current.volume - volume) > 0.001
+        let muteChanged = current.isMuted != isMuted
+        guard volumeChanged || muteChanged else { return nil }
+        return (volume, isMuted)
+    }
+}
+
 /// 菜单栏标题显示的音量内容。
 enum AppVolumeMenuBarDisplayMode: String, CaseIterable, Sendable {
     case off
@@ -910,6 +927,8 @@ final class AppVolumeService {
     private var isApplyingMeetingDucking = false
     private let alerter: AppVolumeAlerting
     private var notificationTracker = AppVolumeNotificationTracker()
+    /// 输入电平监控开始前的输入状态，用于停止后恢复。
+    private var inputLevelRestore: AppVolumeInputLevelRestore?
 
     init(
         backend: AppVolumeRoutingBackend,
@@ -991,15 +1010,41 @@ final class AppVolumeService {
 
     func startInputLevelMonitoring() {
         guard isStarted else { return }
+        if !input.deviceUID.isEmpty {
+            inputLevelRestore = AppVolumeInputLevelRestore(
+                deviceUID: input.deviceUID,
+                volume: input.volume,
+                isMuted: input.isMuted
+            )
+        }
         backend.startInputLevelMonitoring()
     }
 
     func stopInputLevelMonitoring() {
         backend.stopInputLevelMonitoring()
+        restoreInputStateAfterMonitoring()
+    }
+
+    /// 停止监控后把输入音量与静音恢复到开启前的值（仅当设备未变且值被改动）。
+    private func restoreInputStateAfterMonitoring() {
+        defer {
+            inputLevelRestore = nil
+            input.peakLevel = 0
+            notifySnapshotChanged()
+        }
+        guard let captured = inputLevelRestore,
+              let restoration = captured.restoration(for: input) else { return }
+        if abs(restoration.volume - input.volume) > 0.001 {
+            setInputVolume(restoration.volume)
+        }
+        if restoration.isMuted != input.isMuted {
+            setInputMuted(restoration.isMuted)
+        }
     }
 
     func stop() {
         guard isStarted else { return }
+        restoreInputStateAfterMonitoring()
         sessions.forEach { backend.removeRoute(for: $0.rootBundleID) }
         backend.stop()
         stopAutomationMonitoring()

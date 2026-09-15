@@ -917,6 +917,7 @@
 "volume.section.input" = "Microphone Input";
 "volume.input" = "Microphone Volume";
 "volume.input.liveLevel" = "Show Live Microphone Level";
+"volume.input.liveLevel.desc" = "Bluetooth headsets switch to call mode while monitoring, which may change the input volume; turning it off restores the previous value.";
 "volume.muteInput" = "Mute Microphone";
 "volume.input.unknown" = "Current Input Device";
 "volume.input.fixed" = "This input device does not provide adjustable volume.";

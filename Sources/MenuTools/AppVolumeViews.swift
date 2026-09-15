@@ -326,6 +326,10 @@ struct AppVolumeSettingsView: View {
                         }
                     }
 
+                Text(L("volume.input.liveLevel.desc"))
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+
                 Button(L("volume.meeting.check")) {
                     _ = service.runMeetingAudioCheck()
                 }

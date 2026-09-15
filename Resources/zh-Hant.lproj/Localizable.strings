@@ -917,6 +917,7 @@
 "volume.section.input" = "麥克風輸入";
 "volume.input" = "麥克風音量";
 "volume.input.liveLevel" = "顯示麥克風即時電平";
+"volume.input.liveLevel.desc" = "藍牙耳機會在監控期間切到通話模式，輸入音量可能暫時改變；關閉後會恢復先前的值";
 "volume.muteInput" = "靜音麥克風";
 "volume.input.unknown" = "目前輸入裝置";
 "volume.input.fixed" = "此輸入裝置不提供可調音量。";

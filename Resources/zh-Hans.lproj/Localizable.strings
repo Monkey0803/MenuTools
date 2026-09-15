@@ -917,6 +917,7 @@
 "volume.section.input" = "麦克风输入";
 "volume.input" = "麦克风音量";
 "volume.input.liveLevel" = "显示麦克风实时电平";
+"volume.input.liveLevel.desc" = "蓝牙耳机会在监控期间切到通话模式，输入音量可能临时变化；关闭后会恢复到之前的值";
 "volume.muteInput" = "静音麦克风";
 "volume.input.unknown" = "当前输入设备";
 "volume.input.fixed" = "此输入设备不提供可调音量。";

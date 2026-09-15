@@ -51,6 +51,8 @@
 	<string>MenuTools 需要访问 Finder 以获取当前窗口路径，并通过“系统事件”切换深色/浅色外观。</string>
 	<key>NSAudioCaptureUsageDescription</key>
 	<string>MenuTools 需要捕获其他 App 的系统音频，以单独调节每个 App 的音量。</string>
+	<key>NSMicrophoneUsageDescription</key>
+	<string>MenuTools 需要访问麦克风以显示实时输入电平，并在会议前做音频自检。</string>
 	<key>NSBluetoothAlwaysUsageDescription</key>
 	<string>MenuTools 需要访问蓝牙以读取已连接设备（键盘、鼠标、耳机）的电量。</string>
 	<key>NSHumanReadableCopyright</key>
