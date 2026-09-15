@@ -1368,3 +1368,84 @@ func channelTestChannelsMapToPan() {
         #expect(!channel.titleKey.isEmpty)
     }
 }
+
+private func selfCheckSteps(
+    permission: AppVolumePermissionState = .authorized,
+    outputReady: Bool = true,
+    inputReady: Bool = true,
+    active: Int = 1,
+    routed: Int = 1,
+    failed: Int = 0,
+    hasError: Bool = false
+) -> [AppVolumeSelfCheckStep] {
+    AppVolumeSelfCheck.steps(
+        permission: permission,
+        outputReady: outputReady,
+        inputReady: inputReady,
+        activeSessions: active,
+        routedSessions: routed,
+        failedSessions: failed,
+        hasError: hasError
+    )
+}
+
+@Test("自检在一切正常时全部通过，顺序为权限→输出→输入→路由→错误")
+func selfCheckReportsAllClear() {
+    let steps = selfCheckSteps()
+
+    #expect(steps.map(\.kind) == [.permission, .output, .input, .routing, .errors])
+    #expect(steps.allSatisfy { $0.status == .pass })
+    #expect(steps.allSatisfy { !$0.detail.isEmpty })
+    #expect(steps.map(\.id).count == Set(steps.map(\.id)).count)
+}
+
+@Test("权限被拒与没有输出设备会判为失败")
+func selfCheckFailsOnPermissionAndOutput() {
+    let denied = selfCheckSteps(permission: .denied)
+    #expect(denied.first?.status == .failure)
+
+    let noOutput = selfCheckSteps(outputReady: false)
+    #expect(noOutput.first { $0.kind == .output }?.status == .failure)
+
+    // 尚未申请权限只是提醒，不是失败
+    let notRequested = selfCheckSteps(permission: .notRequested)
+    #expect(notRequested.first?.status == .warning)
+}
+
+@Test("没有麦克风、没有 App 发声、路由失败与有错误各自给出对应结论")
+func selfCheckReportsWarningsAndRoutingFailures() {
+    let noInput = selfCheckSteps(inputReady: false)
+    #expect(noInput.first { $0.kind == .input }?.status == .warning)
+
+    let idle = selfCheckSteps(active: 0, routed: 0)
+    #expect(idle.first { $0.kind == .routing }?.status == .warning)
+
+    let failedRoutes = selfCheckSteps(active: 2, routed: 1, failed: 1)
+    #expect(failedRoutes.first { $0.kind == .routing }?.status == .failure)
+
+    let quiet = selfCheckSteps(active: 1, routed: 0)
+    #expect(quiet.first { $0.kind == .routing }?.status == .pass)
+
+    let withError = selfCheckSteps(hasError: true)
+    #expect(withError.last?.status == .warning)
+}
+
+@Test("服务能根据当前状态给出自检步骤")
+@MainActor
+func serviceExposesSelfChecks() throws {
+    let defaults = try makeEnhancementDefaults("selfCheck")
+    let backend = EnhancedFakeAppVolumeBackend()
+    let service = AppVolumeService(backend: backend, userDefaults: defaults)
+    service.start()
+    backend.send(candidates: [.music], output: .fixture())
+    service.setEnabled(true)
+    service.setVolume(0.5, for: "com.apple.Music")
+
+    let steps = service.selfCheckSteps
+
+    #expect(steps.count == AppVolumeSelfCheckStep.Kind.allCases.count)
+    #expect(steps.first { $0.kind == .output }?.status == .pass)
+    #expect(steps.first { $0.kind == .routing }?.status == .pass)
+    // 没有任何错误时最后一步是 pass
+    #expect(steps.last?.status == .pass)
+}

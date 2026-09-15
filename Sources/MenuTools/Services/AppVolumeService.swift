@@ -1922,6 +1922,19 @@ final class AppVolumeService {
         userDefaults.object(forKey: key) as? Bool ?? fallback
     }
 
+    /// 自检步骤：权限、设备、路由与错误状态的汇总，供诊断页直接展示。
+    var selfCheckSteps: [AppVolumeSelfCheckStep] {
+        AppVolumeSelfCheck.steps(
+            permission: permissionState,
+            outputReady: output.deviceID != kAudioObjectUnknown,
+            inputReady: input.deviceID != kAudioObjectUnknown,
+            activeSessions: sessions.filter(\.isRunningOutput).count,
+            routedSessions: sessions.filter { $0.routeStatus == .active }.count,
+            failedSessions: sessions.filter { $0.routeStatus == .failed }.count,
+            hasError: errorMessage != nil
+        )
+    }
+
     /// 菜单栏显示模式；改动会立即刷新菜单栏标题。
     func setMenuBarDisplayMode(_ mode: AppVolumeMenuBarDisplayMode) {
         guard menuBarDisplayMode != mode else { return }

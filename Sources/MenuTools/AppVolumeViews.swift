@@ -776,6 +776,25 @@ struct AppVolumeSettingsView: View {
             .onAppear(perform: refreshPresetSyncState)
 
             Section {
+                ForEach(service.selfCheckSteps) { step in
+                    HStack(alignment: .top, spacing: 8) {
+                        Image(systemName: step.status.symbolName)
+                            .foregroundStyle(selfCheckColor(for: step.status))
+                        VStack(alignment: .leading, spacing: 2) {
+                            Text(L(step.titleKey))
+                            Text(step.detail)
+                                .font(.caption)
+                                .foregroundStyle(.secondary)
+                                .fixedSize(horizontal: false, vertical: true)
+                        }
+                        Spacer(minLength: 0)
+                    }
+                }
+            } header: {
+                Label(L("volume.selfCheck.title"), systemImage: "checklist")
+            }
+
+            Section {
                 Button(didCopyDiagnostic ? L("volume.diagnostics.copied") : L("volume.diagnostics.copy")) {
                     didCopyDiagnostic = service.copyDiagnosticReport()
                 }
@@ -906,6 +925,14 @@ struct AppVolumeSettingsView: View {
             string: "x-apple.systempreferences:com.apple.preference.security?Privacy_Accessibility"
         ) else { return }
         NSWorkspace.shared.open(url)
+    }
+
+    private func selfCheckColor(for status: AppVolumeSelfCheckStatus) -> Color {
+        switch status {
+        case .pass: .green
+        case .warning: .orange
+        case .failure: .red
+        }
     }
 
     private func openSystemSettings() {
