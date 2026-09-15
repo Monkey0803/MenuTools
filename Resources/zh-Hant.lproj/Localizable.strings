@@ -953,6 +953,7 @@
 "volume.output.forApp" = "為此應用程式選擇輸出裝置";
 "volume.output.unavailable" = "已選裝置無法使用";
 "volume.error.outputDeviceMissing" = "指定的輸出裝置已無法使用";
+"volume.error.channelLayout" = "音訊聲道數不一致（輸入 %d / 輸出 %d），已保持系統原始音量";
 "volume.warning.outputDeviceRecovered" = "原指定的輸出裝置已無法使用，已改用系統預設裝置";
 "volume.section.input" = "麥克風輸入";
 "volume.input" = "麥克風音量";

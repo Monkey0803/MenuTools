@@ -225,11 +225,15 @@ final class CoreAudioAppVolumeBackend: AppVolumeRoutingBackend {
 
     private func refresh() {
         do {
-            let failed = routes.compactMap { identifier, route in
-                route.consumePendingFailure().map { (identifier, $0) }
+            let failed = routes.compactMap { identifier, route -> (String, AppVolumeTarget, AppVolumeRoutingError)? in
+                guard let target = route.consumePendingFailure() else { return nil }
+                if let mismatch = route.consumeLayoutMismatch() {
+                    return (identifier, target, .channelLayoutMismatch(input: mismatch.input, output: mismatch.output))
+                }
+                return (identifier, target, .unsupportedFormat)
             }
-            for (identifier, target) in failed {
-                failedRoutes[identifier] = FailedRoute(target: target, error: .unsupportedFormat)
+            for (identifier, target, error) in failed {
+                failedRoutes[identifier] = FailedRoute(target: target, error: error)
                 stopRoute(for: identifier)
             }
             let outputDevice = try readDefaultOutputDevice()
@@ -539,6 +543,45 @@ enum AppVolumeRouteFailurePolicy {
     }
 }
 
+/// 音频缓冲列表的声道布局。
+///
+/// 进程 tap 给出的是**交错**缓冲（一个缓冲装多声道），而聚合设备的输出常是**非交错**的
+/// （每声道一个缓冲）。按声道映射才能兼容两者，不能要求两边缓冲数一致。
+enum AppVolumeBufferLayout {
+    /// 声道总数（把交错缓冲里的多声道拆开计数）。
+    static func totalChannels(_ buffers: UnsafeMutableAudioBufferListPointer) -> Int {
+        buffers.reduce(0) { $0 + max(Int($1.mNumberChannels), 1) }
+    }
+
+    /// 第 `channel` 个声道的读取方式：缓冲下标、缓冲内偏移（以 Float 计）与步长。
+    static func accessor(
+        _ buffers: UnsafeMutableAudioBufferListPointer,
+        channel: Int
+    ) -> (index: Int, offset: Int, stride: Int)? {
+        guard channel >= 0 else { return nil }
+        var remaining = channel
+        for index in buffers.indices {
+            let channels = max(Int(buffers[index].mNumberChannels), 1)
+            if remaining < channels {
+                return (index, remaining, channels)
+            }
+            remaining -= channels
+        }
+        return nil
+    }
+
+    /// 可处理的帧数：按每个缓冲的声道数换算后取最小值。
+    static func frames(_ buffers: UnsafeMutableAudioBufferListPointer) -> Int {
+        var frames = Int.max
+        for buffer in buffers {
+            let channels = max(Int(buffer.mNumberChannels), 1)
+            let bufferFrames = Int(buffer.mDataByteSize) / (MemoryLayout<Float>.size * channels)
+            frames = min(frames, bufferFrames)
+        }
+        return frames == Int.max ? 0 : frames
+    }
+}
+
 private final class AppVolumeRouteState: @unchecked Sendable {
     let targetGain: Atomic<Float>
     let currentGain: Atomic<Float>
@@ -549,6 +592,9 @@ private final class AppVolumeRouteState: @unchecked Sendable {
     let failurePending = Atomic(false)
     let invalidCallbackCount = Atomic(0)
     let failureSignaled = Atomic(false)
+    private let layoutMismatch = Atomic(false)
+    private let lastInputChannels = Atomic(0)
+    private let lastOutputChannels = Atomic(0)
     private let pan = Atomic<Float>(0)
     private let mono = Atomic(false)
     private let equalizerConfiguration = Atomic<UnsafeRawPointer?>(nil)
@@ -564,6 +610,21 @@ private final class AppVolumeRouteState: @unchecked Sendable {
         rmsLevel = Atomic(0)
         clipping = Atomic(0)
         cpuLoad = Atomic(0)
+    }
+
+    /// 记录一次「输入输出声道数不一致」，供诊断使用。
+    func noteLayoutMismatch(input: Int, output: Int) {
+        lastInputChannels.store(input, ordering: .relaxed)
+        lastOutputChannels.store(output, ordering: .relaxed)
+        layoutMismatch.store(true, ordering: .relaxed)
+    }
+
+    func consumeLayoutMismatch() -> (input: Int, output: Int)? {
+        guard layoutMismatch.exchange(false, ordering: .relaxed) else { return nil }
+        return (
+            lastInputChannels.load(ordering: .relaxed),
+            lastOutputChannels.load(ordering: .relaxed)
+        )
     }
 
     /// 更新左右平衡与单声道下混（IOProc 每个缓冲区读取一次）。
@@ -831,6 +892,11 @@ private final class CoreAudioAppVolumeRoute: @unchecked Sendable {
         state.failurePending.exchange(false, ordering: .relaxed) ? target : nil
     }
 
+    /// 上次失败是否因为输入输出声道数不一致。
+    func consumeLayoutMismatch() -> (input: Int, output: Int)? {
+        state.consumeLayoutMismatch()
+    }
+
     func stop() {
         guard !stopped else { return }
         stopped = true
@@ -947,7 +1013,17 @@ private final class CoreAudioAppVolumeRoute: @unchecked Sendable {
             guard let data = buffer.mData else { continue }
             memset(data, 0, Int(buffer.mDataByteSize))
         }
-        guard inputs.count == outputs.count, !outputs.isEmpty else { return false }
+        guard !outputs.isEmpty else { return false }
+
+        let inputChannels = AppVolumeBufferLayout.totalChannels(inputs)
+        let outputChannels = AppVolumeBufferLayout.totalChannels(outputs)
+        // 进程 tap 常给出交错缓冲，而聚合设备输出是非交错的：只要声道数一致就逐声道映射。
+        guard inputChannels > 0, inputChannels == outputChannels else {
+            state.noteLayoutMismatch(input: inputChannels, output: outputChannels)
+            return false
+        }
+        let frames = min(AppVolumeBufferLayout.frames(inputs), AppVolumeBufferLayout.frames(outputs))
+        guard frames > 0 else { return false }
 
         let startedAt = DispatchTime.now().uptimeNanoseconds
         let target = state.targetGain.load(ordering: .relaxed)
@@ -955,51 +1031,40 @@ private final class CoreAudioAppVolumeRoute: @unchecked Sendable {
         var current = state.currentGain.load(ordering: .relaxed)
         let panGains = AppVolumeChannelMix.panGains(pan: state.currentPan())
         let mono = state.isMonoRequested()
-        let channelCount = inputs.count
         var peak: Float = 0
         var sumSquares: Double = 0
         var sampleCount = 0
         var isClipping = false
-        var frames = Int.max
-        for buffer in outputs {
-            frames = min(frames, Int(buffer.mDataByteSize) / MemoryLayout<Float>.size)
-        }
-        if frames == Int.max { frames = 0 }
-        guard frames > 0 else { return false }
         let step = AppVolumeGainRamp.step(from: current, to: target, frames: frames)
 
-        for index in inputs.indices {
-            let inputBuffer = inputs[index]
-            let outputBuffer = outputs[index]
-            guard inputBuffer.mDataByteSize == outputBuffer.mDataByteSize,
-                  let source = inputBuffer.mData?.assumingMemoryBound(to: Float.self),
-                  let destination = outputBuffer.mData?.assumingMemoryBound(to: Float.self) else {
+        for channel in 0..<outputChannels {
+            guard let destination = AppVolumeBufferLayout.accessor(outputs, channel: channel),
+                  let source = AppVolumeBufferLayout.accessor(inputs, channel: channel),
+                  let destinationPointer = outputs[destination.index].mData?.assumingMemoryBound(to: Float.self),
+                  let sourcePointer = inputs[source.index].mData?.assumingMemoryBound(to: Float.self) else {
                 return false
             }
             var gain = current
-            let count = Int(outputBuffer.mDataByteSize) / MemoryLayout<Float>.size
-            for sample in 0..<count {
+            for frame in 0..<frames {
                 gain = AppVolumeGainRamp.advanced(gain, by: step)
-                var value = source[sample]
-                if mono, channelCount > 1 {
-                    // 单声道下混：把各声道同一采样点取平均（不分配内存）。
+                var value = sourcePointer[source.offset + frame * source.stride]
+                if mono, inputChannels > 1 {
+                    // 单声道下混：把各声道同一帧取平均（不分配内存）。
                     var sum = value
-                    for other in inputs.indices where other != index {
-                        if let pointer = inputs[other].mData?.assumingMemoryBound(to: Float.self) {
-                            sum += pointer[sample]
+                    for other in 0..<inputChannels where other != channel {
+                        guard let accessor = AppVolumeBufferLayout.accessor(inputs, channel: other),
+                              let pointer = inputs[accessor.index].mData?.assumingMemoryBound(to: Float.self) else {
+                            continue
                         }
+                        sum += pointer[accessor.offset + frame * accessor.stride]
                     }
-                    value = AppVolumeChannelMix.monoSample(sum, channelCount: channelCount)
+                    value = AppVolumeChannelMix.monoSample(sum, channelCount: inputChannels)
                 }
-                let scaled = value * gain
-                let channel = outputs.count == 1
-                    ? sample % max(Int(outputBuffer.mNumberChannels), 1)
-                    : index
                 let channelGain: Float = channel == 0
                     ? panGains.left
                     : (channel == 1 ? panGains.right : 1)
                 let processed = state.equalizerProcessor.process(
-                    scaled * channelGain,
+                    value * gain * channelGain,
                     channel: channel,
                     configuration: equalizerConfiguration
                 )
@@ -1007,7 +1072,7 @@ private final class CoreAudioAppVolumeRoute: @unchecked Sendable {
                 sumSquares += Double(processed * processed)
                 sampleCount += 1
                 isClipping = isClipping || abs(processed) > 1
-                destination[sample] = AppVolumeGainRamp.clamped(processed)
+                destinationPointer[destination.offset + frame * destination.stride] = AppVolumeGainRamp.clamped(processed)
             }
         }
         current = target

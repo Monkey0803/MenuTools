@@ -1725,3 +1725,69 @@ func staleOutputDeviceFallbackCanStillFail() throws {
     #expect(session.routeStatus == .failed)
     #expect(service.errorMessage != nil)
 }
+
+/// 构造一个 AudioBufferList 用于测试声道布局。
+private func makeBufferList(
+    channelsPerBuffer: [Int],
+    frames: Int = 8
+) -> (UnsafeMutableAudioBufferListPointer, [UnsafeMutablePointer<Float>]) {
+    let list = AudioBufferList.allocate(maximumBuffers: channelsPerBuffer.count)
+    var pointers: [UnsafeMutablePointer<Float>] = []
+    for (index, channels) in channelsPerBuffer.enumerated() {
+        let count = frames * channels
+        let pointer = UnsafeMutablePointer<Float>.allocate(capacity: count)
+        pointer.initialize(repeating: 0, count: count)
+        pointers.append(pointer)
+        list[index] = AudioBuffer(
+            mNumberChannels: UInt32(channels),
+            mDataByteSize: UInt32(count * MemoryLayout<Float>.size),
+            mData: UnsafeMutableRawPointer(pointer)
+        )
+    }
+    return (list, pointers)
+}
+
+@Test("声道布局支持交错与非交错，并能按声道定位")
+func bufferLayoutMapsInterleavedAndPlanar() {
+    // 非交错立体声：两个单声道缓冲
+    let (planar, planarPointers) = makeBufferList(channelsPerBuffer: [1, 1])
+    defer { planarPointers.forEach { $0.deallocate() }; free(planar.unsafeMutablePointer) }
+    let planarList = planar
+    #expect(AppVolumeBufferLayout.totalChannels(planarList) == 2)
+    #expect(AppVolumeBufferLayout.accessor(planarList, channel: 0)?.stride == 1)
+    #expect(AppVolumeBufferLayout.accessor(planarList, channel: 0)?.index == 0)
+    #expect(AppVolumeBufferLayout.accessor(planarList, channel: 1)?.index == 1)
+
+    // 交错立体声：一个双声道缓冲
+    let (interleaved, interleavedPointers) = makeBufferList(channelsPerBuffer: [2])
+    defer { interleavedPointers.forEach { $0.deallocate() }; free(interleaved.unsafeMutablePointer) }
+    let interleavedList = interleaved
+    #expect(AppVolumeBufferLayout.totalChannels(interleavedList) == 2)
+    let left = try? #require(AppVolumeBufferLayout.accessor(interleavedList, channel: 0))
+    let right = try? #require(AppVolumeBufferLayout.accessor(interleavedList, channel: 1))
+    #expect(left?.stride == 2)
+    #expect(left?.offset == 0)
+    #expect(right?.stride == 2)
+    #expect(right?.offset == 1)
+
+    // 越界返回 nil
+    #expect(AppVolumeBufferLayout.accessor(interleavedList, channel: 2) == nil)
+}
+
+@Test("声道布局的帧数按每缓冲声道数换算，并取各缓冲最小值")
+func bufferLayoutComputesFrames() {
+    // 8 帧非交错立体声 = 每个缓冲 8 个 Float
+    let (planar, planarPointers) = makeBufferList(channelsPerBuffer: [1, 1], frames: 8)
+    defer { planarPointers.forEach { $0.deallocate() }; free(planar.unsafeMutablePointer) }
+    let planarList = planar
+    #expect(AppVolumeBufferLayout.frames(planarList) == 8)
+
+    // 8 帧交错立体声 = 一个缓冲 16 个 Float
+    let (interleaved, interleavedPointers) = makeBufferList(channelsPerBuffer: [2], frames: 8)
+    defer { interleavedPointers.forEach { $0.deallocate() }; free(interleaved.unsafeMutablePointer) }
+    let interleavedList = interleaved
+    #expect(AppVolumeBufferLayout.frames(interleavedList) == 8)
+
+    // 交错输入与非交错输出的声道总数一致 → 可以逐声道映射
+    #expect(AppVolumeBufferLayout.totalChannels(interleavedList) == AppVolumeBufferLayout.totalChannels(planarList))
+}

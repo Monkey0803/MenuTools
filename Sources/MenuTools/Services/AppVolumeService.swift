@@ -802,6 +802,8 @@ enum AppVolumeRoutingError: LocalizedError, Equatable, Sendable {
     /// 这台 App 指定的输出设备已经不在了（例如蓝牙耳机换档后 UID 变了）。
     /// 上层会清掉失效指定并回退到系统默认设备，而不是让这台 App 一直失败。
     case outputDeviceMissing(uid: String)
+    /// 进程 tap 与输出设备的声道数不一致，无法逐声道映射。
+    case channelLayoutMismatch(input: Int, output: Int)
     case operationFailed(String, OSStatus)
 
     var errorDescription: String? {
@@ -812,6 +814,8 @@ enum AppVolumeRoutingError: LocalizedError, Equatable, Sendable {
             return L("volume.error.format")
         case .outputDeviceMissing:
             return L("volume.error.outputDeviceMissing")
+        case let .channelLayoutMismatch(input, output):
+            return L("volume.error.channelLayout", input, output)
         case .operationFailed(let operation, let status):
             return L("volume.error.operation", operation, status)
         }

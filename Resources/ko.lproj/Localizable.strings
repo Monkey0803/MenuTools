@@ -953,6 +953,7 @@
 "volume.output.forApp" = "이 앱의 출력 장치 선택";
 "volume.output.unavailable" = "선택한 장치를 사용할 수 없음";
 "volume.error.outputDeviceMissing" = "지정한 출력 기기를 사용할 수 없습니다";
+"volume.error.channelLayout" = "오디오 채널 수가 일치하지 않습니다(입력 %d / 출력 %d). 시스템 원래 볼륨을 유지합니다";
 "volume.warning.outputDeviceRecovered" = "지정한 출력 기기가 없어져 시스템 기본 기기로 전환했습니다";
 "volume.section.input" = "마이크 입력";
 "volume.input" = "마이크 음량";

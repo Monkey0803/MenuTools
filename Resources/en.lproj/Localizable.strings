@@ -953,6 +953,7 @@
 "volume.output.forApp" = "Choose output for this app";
 "volume.output.unavailable" = "Selected device unavailable";
 "volume.error.outputDeviceMissing" = "The chosen output device is unavailable";
+"volume.error.channelLayout" = "Audio channel counts differ (input %d / output %d); keeping the original system volume";
 "volume.warning.outputDeviceRecovered" = "The chosen output device is gone; switched to the system default";
 "volume.section.input" = "Microphone Input";
 "volume.input" = "Microphone Volume";
