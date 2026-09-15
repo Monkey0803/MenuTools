@@ -408,6 +408,15 @@ struct DefaultSystemResourceProvider: SystemResourceProviding {
     }
 }
 
+/// 资源告警的设置键。
+enum SystemResourceAlertSettings {
+    static let enabledKey = "systemResource.alerts.enabled"
+    static let cpuUsageKey = "systemResource.alerts.cpuUsage"
+    static let cpuSustainSecondsKey = "systemResource.alerts.cpuSustainSeconds"
+    static let diskFreeRatioKey = "systemResource.alerts.diskFreeRatio"
+    static let defaultEnabled = true
+}
+
 /// 资源采样节奏：面板可见时才按秒刷新；没有观察者且没开告警时不采样（省电）。
 enum SystemResourceSamplingPolicy {
     /// 面板可见时的采样间隔。
@@ -434,6 +443,14 @@ final class SystemResourceService {
     private let provider: any SystemResourceProviding
     private let memoryReleaser: any SystemMemoryReleasing
     private let historyStore: any SystemResourceHistoryStoring
+    private let alerter: SystemResourceAlerting
+    private let userDefaults: UserDefaults
+    private var alertPolicy = SystemResourceAlertPolicy()
+
+    /// 是否开启了资源告警。
+    private(set) var alertsEnabled: Bool
+    private(set) var alertThresholds: SystemResourceAlertThresholds
+    private(set) var notificationPermission: SystemResourceNotificationPermission = .notRequested
     private var previousReading: SystemResourceReading?
     private var samplingTask: Task<Void, Never>?
     /// 当前正在聚合的那一分钟。
@@ -451,11 +468,25 @@ final class SystemResourceService {
     init(
         provider: any SystemResourceProviding = DefaultSystemResourceProvider(),
         memoryReleaser: any SystemMemoryReleasing = DefaultSystemMemoryReleaser(),
-        historyStore: any SystemResourceHistoryStoring = SystemResourceHistoryStore()
+        historyStore: any SystemResourceHistoryStoring = SystemResourceHistoryStore(),
+        alerter: SystemResourceAlerting = UserNotificationSystemResourceAlerter(),
+        userDefaults: UserDefaults = .standard
     ) {
         self.provider = provider
         self.memoryReleaser = memoryReleaser
         self.historyStore = historyStore
+        self.alerter = alerter
+        self.userDefaults = userDefaults
+        alertsEnabled = userDefaults.object(forKey: SystemResourceAlertSettings.enabledKey) as? Bool
+            ?? SystemResourceAlertSettings.defaultEnabled
+        let storedCPU = userDefaults.object(forKey: SystemResourceAlertSettings.cpuUsageKey) as? Double
+        let storedSustain = userDefaults.object(forKey: SystemResourceAlertSettings.cpuSustainSecondsKey) as? Double
+        let storedDisk = userDefaults.object(forKey: SystemResourceAlertSettings.diskFreeRatioKey) as? Double
+        alertThresholds = SystemResourceAlertThresholds(
+            cpuUsage: storedCPU ?? 0.9,
+            cpuSustainDuration: storedSustain ?? 5 * 60,
+            diskFreeRatio: storedDisk ?? 0.1
+        ).normalized()
     }
 
     /// 开始按节奏采样（面板可见时调用；插件关闭时不应调用）。
@@ -490,6 +521,50 @@ final class SystemResourceService {
         )
         previousReading = current
         recordHistory(now: now)
+        evaluateAlerts(now: now)
+    }
+
+    // MARK: - 告警
+
+    func setAlertsEnabled(_ enabled: Bool) {
+        alertsEnabled = enabled
+        userDefaults.set(enabled, forKey: SystemResourceAlertSettings.enabledKey)
+        if enabled, notificationPermission == .notRequested {
+            requestNotificationPermission()
+        }
+    }
+
+    func setAlertThresholds(_ thresholds: SystemResourceAlertThresholds) {
+        alertThresholds = thresholds.normalized()
+        userDefaults.set(alertThresholds.cpuUsage, forKey: SystemResourceAlertSettings.cpuUsageKey)
+        userDefaults.set(
+            alertThresholds.cpuSustainDuration,
+            forKey: SystemResourceAlertSettings.cpuSustainSecondsKey
+        )
+        userDefaults.set(alertThresholds.diskFreeRatio, forKey: SystemResourceAlertSettings.diskFreeRatioKey)
+    }
+
+    func requestNotificationPermission() {
+        guard alertsEnabled else { return }
+        alerter.requestPermission()
+        Task { [weak self] in
+            await self?.refreshNotificationPermission()
+        }
+    }
+
+    func refreshNotificationPermission() async {
+        let permission = await alerter.currentPermission()
+        guard notificationPermission != permission else { return }
+        notificationPermission = permission
+    }
+
+    /// 采样后评估告警；只在开启且拿到快照时才判定。
+    func evaluateAlerts(now: Date = Date()) {
+        guard alertsEnabled, let snapshot else { return }
+        let fired = alertPolicy.evaluate(snapshot: snapshot, now: now, thresholds: alertThresholds)
+        for kind in fired {
+            alerter.send(kind, snapshot: snapshot)
+        }
     }
 
     /// 按分钟聚合历史：同一分钟只在内存里取平均，分钟切换时才写库（避免每 2 秒写一次）。

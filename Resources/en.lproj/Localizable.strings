@@ -45,6 +45,23 @@
 "resource.process.sort.memory" = "Memory";
 "resource.process.sort.disk" = "Disk";
 "resource.process.sort.name" = "Name";
+"resource.alert.cpuSustained" = "Sustained high CPU";
+"resource.alert.cpuSustained.desc" = "CPU has stayed above the threshold for a while; open the System Resources page to see the busiest processes.";
+"resource.alert.memoryPressure" = "Memory pressure critical";
+"resource.alert.memoryPressure.desc" = "System memory pressure is critical; consider releasing memory or quitting heavy apps.";
+"resource.alert.diskSpace" = "Low disk space";
+"resource.alert.diskSpace.desc" = "Free disk space is below the threshold; use the DerivedData cleanup in the panel to reclaim space.";
+"resource.alert.permission.notRequested" = "macOS will ask when you enable alerts";
+"resource.alert.permission.authorized" = "Authorized";
+"resource.alert.permission.denied" = "macOS is not allowing notifications, alerts will not be delivered";
+"resource.alert.section" = "Resource alerts";
+"resource.alert.enable" = "Enable alerts";
+"resource.alert.permission" = "Notification permission";
+"resource.alert.cpuThreshold" = "CPU threshold";
+"resource.alert.cpuSustain" = "Sustain duration";
+"resource.alert.diskThreshold" = "Free disk threshold";
+"resource.alert.minutes" = "%d minutes";
+"resource.alert.openSettings" = "Open System Settings";
 "resource.loading" = "Reading system resources…";
 
 /* Network Status */

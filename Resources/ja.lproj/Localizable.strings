@@ -45,6 +45,23 @@
 "resource.process.sort.memory" = "メモリ";
 "resource.process.sort.disk" = "ディスク";
 "resource.process.sort.name" = "名前";
+"resource.alert.cpuSustained" = "CPU の高負荷が継続";
+"resource.alert.cpuSustained.desc" = "CPU が設定したしきい値を長時間上回っています。システムリソースページで負荷の高いプロセスを確認できます。";
+"resource.alert.memoryPressure" = "メモリプレッシャーがひっ迫";
+"resource.alert.memoryPressure.desc" = "システムのメモリプレッシャーが限界です。メモリ解放や負荷の高い App の終了を検討してください。";
+"resource.alert.diskSpace" = "ディスクの空き不足";
+"resource.alert.diskSpace.desc" = "ディスクの空きがしきい値を下回っています。パネルの DerivedData クリーンアップで空きを確保できます。";
+"resource.alert.permission.notRequested" = "通知を有効にするとシステムが確認します";
+"resource.alert.permission.authorized" = "許可済み";
+"resource.alert.permission.denied" = "システムが通知を許可していないため、通知は届きません";
+"resource.alert.section" = "リソース通知";
+"resource.alert.enable" = "通知を有効化";
+"resource.alert.permission" = "通知の許可";
+"resource.alert.cpuThreshold" = "CPU しきい値";
+"resource.alert.cpuSustain" = "継続時間";
+"resource.alert.diskThreshold" = "ディスク空きしきい値";
+"resource.alert.minutes" = "%d 分";
+"resource.alert.openSettings" = "システム設定を開く";
 "resource.loading" = "システムリソースを読み込み中…";
 
 /* ネットワーク状態 */

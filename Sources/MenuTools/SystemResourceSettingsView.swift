@@ -1,3 +1,4 @@
+import AppKit
 import SwiftUI
 
 /// 系统资源设置页的一级页面。
@@ -41,6 +42,7 @@ struct SystemResourceSettingsView: View {
 
             if page == .overview {
                 overviewSections
+                alertSection
             } else {
                 processSections
             }
@@ -229,6 +231,87 @@ struct SystemResourceSettingsView: View {
         } header: {
             Label(L("resource.process.title"), systemImage: "list.bullet.rectangle")
         }
+    }
+
+    // MARK: - 告警
+
+    @ViewBuilder
+    private var alertSection: some View {
+        Section {
+            Toggle(L("resource.alert.enable"), isOn: Binding(
+                get: { resource.alertsEnabled },
+                set: { resource.setAlertsEnabled($0) }
+            ))
+
+            LabeledContent(L("resource.alert.permission")) {
+                HStack(spacing: 8) {
+                    Text(L(resource.notificationPermission.titleKey))
+                        .foregroundStyle(resource.notificationPermission == .denied ? .orange : .secondary)
+                    if resource.notificationPermission != .authorized {
+                        Button(L("resource.alert.openSettings"), action: openNotificationSettings)
+                    }
+                }
+            }
+
+            if resource.alertsEnabled {
+                LabeledContent(L("resource.alert.cpuThreshold")) {
+                    HStack(spacing: 8) {
+                        Slider(value: Binding(
+                            get: { resource.alertThresholds.cpuUsage },
+                            set: { updateThresholds(cpuUsage: $0) }
+                        ), in: 0.5 ... 1)
+                        .frame(width: 140)
+                        Text(percent(resource.alertThresholds.cpuUsage))
+                            .font(.caption.monospacedDigit())
+                            .foregroundStyle(.secondary)
+                    }
+                }
+
+                Picker(L("resource.alert.cpuSustain"), selection: Binding(
+                    get: { Int(resource.alertThresholds.cpuSustainDuration / 60) },
+                    set: { updateThresholds(cpuSustainMinutes: $0) }
+                )) {
+                    ForEach([2, 5, 10, 15], id: \.self) { minutes in
+                        Text(L("resource.alert.minutes", minutes)).tag(minutes)
+                    }
+                }
+
+                LabeledContent(L("resource.alert.diskThreshold")) {
+                    HStack(spacing: 8) {
+                        Slider(value: Binding(
+                            get: { resource.alertThresholds.diskFreeRatio },
+                            set: { updateThresholds(diskFreeRatio: $0) }
+                        ), in: 0.01 ... 0.3)
+                        .frame(width: 140)
+                        Text(percent(resource.alertThresholds.diskFreeRatio))
+                            .font(.caption.monospacedDigit())
+                            .foregroundStyle(.secondary)
+                    }
+                }
+            }
+        } header: {
+            Label(L("resource.alert.section"), systemImage: "bell.badge")
+        }
+        .task {
+            await resource.refreshNotificationPermission()
+        }
+    }
+
+    private func updateThresholds(
+        cpuUsage: Double? = nil,
+        cpuSustainMinutes: Int? = nil,
+        diskFreeRatio: Double? = nil
+    ) {
+        var thresholds = resource.alertThresholds
+        if let cpuUsage { thresholds.cpuUsage = cpuUsage }
+        if let cpuSustainMinutes { thresholds.cpuSustainDuration = TimeInterval(cpuSustainMinutes) * 60 }
+        if let diskFreeRatio { thresholds.diskFreeRatio = diskFreeRatio }
+        resource.setAlertThresholds(thresholds)
+    }
+
+    private func openNotificationSettings() {
+        guard let url = URL(string: "x-apple.systempreferences:com.apple.preference.notifications") else { return }
+        NSWorkspace.shared.open(url)
     }
 
     // MARK: - 格式化

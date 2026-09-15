@@ -45,6 +45,23 @@
 "resource.process.sort.memory" = "메모리";
 "resource.process.sort.disk" = "디스크";
 "resource.process.sort.name" = "이름";
+"resource.alert.cpuSustained" = "CPU 고부하 지속";
+"resource.alert.cpuSustained.desc" = "CPU가 설정한 임계값을 오랫동안 넘었습니다. 시스템 리소스 페이지에서 부하가 큰 프로세스를 확인하세요.";
+"resource.alert.memoryPressure" = "메모리 압력 위험";
+"resource.alert.memoryPressure.desc" = "시스템 메모리 압력이 위험합니다. 메모리 해제나 부하가 큰 App 종료를 고려하세요.";
+"resource.alert.diskSpace" = "디스크 공간 부족";
+"resource.alert.diskSpace.desc" = "디스크 여유 공간이 임계값보다 적습니다. 패널의 DerivedData 정리로 공간을 확보할 수 있습니다.";
+"resource.alert.permission.notRequested" = "알림을 켜면 시스템이 확인합니다";
+"resource.alert.permission.authorized" = "허용됨";
+"resource.alert.permission.denied" = "시스템이 알림을 허용하지 않아 알림이 전달되지 않습니다";
+"resource.alert.section" = "리소스 알림";
+"resource.alert.enable" = "알림 사용";
+"resource.alert.permission" = "알림 권한";
+"resource.alert.cpuThreshold" = "CPU 임계값";
+"resource.alert.cpuSustain" = "지속 시간";
+"resource.alert.diskThreshold" = "디스크 여유 임계값";
+"resource.alert.minutes" = "%d분";
+"resource.alert.openSettings" = "시스템 설정 열기";
 "resource.loading" = "시스템 리소스 읽는 중…";
 
 /* 네트워크 상태 */

@@ -672,3 +672,214 @@ private func historySnapshot(
         diskWriteBytesPerSecond: write
     )
 }
+
+@Test("CPU 需持续高于阈值才告警，掉回阈值以下会重置计时")
+func alertPolicyRequiresSustainedCPU() {
+    var policy = SystemResourceAlertPolicy()
+    let thresholds = SystemResourceAlertThresholds(cpuUsage: 0.9, cpuSustainDuration: 300, diskFreeRatio: 0.1)
+    let base = Date(timeIntervalSince1970: 1_800_000_000)
+
+    // 未达阈值不告警
+    #expect(policy.evaluate(snapshot: alertSnapshot(cpu: 0.5), now: base, thresholds: thresholds).isEmpty)
+
+    // 达到阈值但时长不够
+    #expect(policy.evaluate(snapshot: alertSnapshot(cpu: 0.95), now: base, thresholds: thresholds).isEmpty)
+    #expect(policy.evaluate(snapshot: alertSnapshot(cpu: 0.95), now: base.addingTimeInterval(200), thresholds: thresholds).isEmpty)
+
+    // 坚持满 5 分钟 → 告警一次
+    #expect(policy.evaluate(snapshot: alertSnapshot(cpu: 0.95), now: base.addingTimeInterval(320), thresholds: thresholds) == [.cpuSustained])
+    // 冷却期内不再告警
+    #expect(policy.evaluate(snapshot: alertSnapshot(cpu: 0.97), now: base.addingTimeInterval(400), thresholds: thresholds).isEmpty)
+    // 冷却结束且仍在高位 → 再次告警
+    #expect(policy.evaluate(snapshot: alertSnapshot(cpu: 0.97), now: base.addingTimeInterval(320 + 1_900), thresholds: thresholds) == [.cpuSustained])
+
+    // 中途掉回阈值以下：计时重置，需要重新坚持 5 分钟
+    var reset = SystemResourceAlertPolicy()
+    _ = reset.evaluate(snapshot: alertSnapshot(cpu: 0.95), now: base, thresholds: thresholds)
+    _ = reset.evaluate(snapshot: alertSnapshot(cpu: 0.2), now: base.addingTimeInterval(120), thresholds: thresholds)
+    #expect(reset.evaluate(snapshot: alertSnapshot(cpu: 0.95), now: base.addingTimeInterval(400), thresholds: thresholds).isEmpty)
+    #expect(reset.evaluate(snapshot: alertSnapshot(cpu: 0.95), now: base.addingTimeInterval(720), thresholds: thresholds) == [.cpuSustained])
+}
+
+@Test("内存只在临界时告警，磁盘按剩余比例告警，各自有冷却")
+func alertPolicyCoversMemoryAndDisk() {
+    var policy = SystemResourceAlertPolicy()
+    let thresholds = SystemResourceAlertThresholds(cpuUsage: 0.99, cpuSustainDuration: 300, diskFreeRatio: 0.1)
+    let base = Date(timeIntervalSince1970: 1_800_000_000)
+
+    // 内存偏高但不临界 → 不告警
+    #expect(policy.evaluate(snapshot: alertSnapshot(memoryPressure: .warning), now: base, thresholds: thresholds).isEmpty)
+    #expect(policy.evaluate(snapshot: alertSnapshot(memoryPressure: .critical), now: base, thresholds: thresholds) == [.memoryPressure])
+    // 冷却内不重复
+    #expect(policy.evaluate(snapshot: alertSnapshot(memoryPressure: .critical), now: base.addingTimeInterval(60), thresholds: thresholds).isEmpty)
+
+    // 磁盘剩余 5%（阈值 10%）→ 告警；冷却内不重复
+    var diskPolicy = SystemResourceAlertPolicy()
+    #expect(diskPolicy.evaluate(
+        snapshot: alertSnapshot(diskFree: 50, diskTotal: 1_000),
+        now: base,
+        thresholds: thresholds
+    ) == [.diskSpace])
+    #expect(diskPolicy.evaluate(
+        snapshot: alertSnapshot(diskFree: 50, diskTotal: 1_000),
+        now: base.addingTimeInterval(3_600),
+        thresholds: thresholds
+    ).isEmpty)
+
+    // 剩余 50% 远高于阈值 → 不告警（阈值收紧到 1% 也不该误报）
+    var healthyPolicy = SystemResourceAlertPolicy()
+    #expect(healthyPolicy.evaluate(
+        snapshot: alertSnapshot(diskFree: 500, diskTotal: 1_000),
+        now: base,
+        thresholds: SystemResourceAlertThresholds(cpuUsage: 0.9, cpuSustainDuration: 300, diskFreeRatio: 0.01)
+    ).isEmpty)
+    #expect(healthyPolicy.evaluate(
+        snapshot: alertSnapshot(diskFree: 500, diskTotal: 1_000),
+        now: base,
+        thresholds: thresholds
+    ).isEmpty)
+
+    // 磁盘容量未知（0）时不误报
+    var unknownDisk = SystemResourceAlertPolicy()
+    #expect(unknownDisk.evaluate(
+        snapshot: alertSnapshot(diskFree: 0, diskTotal: 0),
+        now: base,
+        thresholds: thresholds
+    ).isEmpty)
+}
+
+@Test("阈值会归一化到有效范围")
+func alertThresholdsNormalize() {
+    let normalized = SystemResourceAlertThresholds(cpuUsage: 5, cpuSustainDuration: 1, diskFreeRatio: -1).normalized()
+
+    #expect(normalized.cpuUsage == 1)
+    #expect(normalized.cpuSustainDuration == 30)
+    #expect(normalized.diskFreeRatio == 0.01)
+}
+
+@Test("通知授权状态映射覆盖未决定、拒绝与已授权")
+func resourceNotificationPermissionMapping() {
+    #expect(SystemResourceNotificationPermission.resolve(.notDetermined) == .notRequested)
+    #expect(SystemResourceNotificationPermission.resolve(.denied) == .denied)
+    #expect(SystemResourceNotificationPermission.resolve(.authorized) == .authorized)
+    #expect(SystemResourceNotificationPermission.resolve(.provisional) == .authorized)
+}
+
+private func alertSnapshot(
+    cpu: Double = 0.1,
+    memoryPressure: SystemMemoryPressure = .normal,
+    diskFree: Int64 = 1_000,
+    diskTotal: Int64 = 1_000
+) -> SystemResourceSnapshot {
+    SystemResourceSnapshot(
+        cpuUsage: cpu,
+        memoryUsedBytes: 0,
+        memoryTotalBytes: 0,
+        memoryPressure: memoryPressure,
+        diskAvailableBytes: diskFree,
+        diskTotalBytes: diskTotal,
+        networkDownloadBytesPerSecond: 0,
+        networkUploadBytesPerSecond: 0
+    )
+}
+
+@Test("服务按阈值触发告警并遵守开关与冷却")
+@MainActor
+func resourceServiceFiresAlerts() {
+    let defaults = UserDefaults(suiteName: "SystemResourceAlertTests.\(UUID().uuidString)") ?? .standard
+    defaults.removePersistentDomain(forName: defaults.description)
+    let alerter = RecordingResourceAlerter()
+    let service = SystemResourceService(
+        provider: AlertingResourceProvider(),
+        memoryReleaser: NoopMemoryReleaser(),
+        historyStore: RecordingHistoryStore(),
+        alerter: alerter,
+        userDefaults: defaults
+    )
+    let base = Date(timeIntervalSince1970: 1_800_000_000)
+    service.setAlertThresholds(SystemResourceAlertThresholds(cpuUsage: 0.9, cpuSustainDuration: 300, diskFreeRatio: 0.1))
+
+    // 首次采样只建立基线，CPU 使用率为 0，不告警
+    service.refresh(now: base)
+    #expect(alerter.sent.isEmpty)
+
+    // 第二次采样起进入高位，但持续时长还不够
+    service.refresh(now: base.addingTimeInterval(10))
+    #expect(alerter.sent.isEmpty)
+
+    // 高位持续超过 5 分钟 → 触发一次 CPU 告警
+    service.refresh(now: base.addingTimeInterval(330))
+    #expect(alerter.sent == [.cpuSustained])
+
+    // 冷却期内不再触发
+    service.refresh(now: base.addingTimeInterval(400))
+    #expect(alerter.sent == [.cpuSustained])
+
+    // 关闭告警后不再发送
+    service.setAlertsEnabled(false)
+    service.refresh(now: base.addingTimeInterval(330 + 1_900))
+    #expect(alerter.sent == [.cpuSustained])
+    #expect(!service.alertsEnabled)
+}
+
+@Test("阈值会持久化并在新实例里恢复")
+@MainActor
+func resourceAlertThresholdsPersist() {
+    let suiteName = "SystemResourceAlertThresholdTests.\(UUID().uuidString)"
+    let defaults = UserDefaults(suiteName: suiteName) ?? .standard
+    defaults.removePersistentDomain(forName: suiteName)
+
+    let service = SystemResourceService(
+        provider: CountingResourceProvider(),
+        memoryReleaser: NoopMemoryReleaser(),
+        historyStore: RecordingHistoryStore(),
+        alerter: RecordingResourceAlerter(),
+        userDefaults: defaults
+    )
+    service.setAlertsEnabled(false)
+    service.setAlertThresholds(SystemResourceAlertThresholds(cpuUsage: 0.5, cpuSustainDuration: 60, diskFreeRatio: 0.3))
+
+    let restored = SystemResourceService(
+        provider: CountingResourceProvider(),
+        memoryReleaser: NoopMemoryReleaser(),
+        historyStore: RecordingHistoryStore(),
+        alerter: RecordingResourceAlerter(),
+        userDefaults: defaults
+    )
+    #expect(!restored.alertsEnabled)
+    #expect(restored.alertThresholds.cpuUsage == 0.5)
+    #expect(restored.alertThresholds.cpuSustainDuration == 60)
+    #expect(restored.alertThresholds.diskFreeRatio == 0.3)
+}
+
+@MainActor
+private final class RecordingResourceAlerter: SystemResourceAlerting {
+    var sent: [SystemResourceAlertKind] = []
+    var requestedPermission = false
+    var permission: SystemResourceNotificationPermission = .authorized
+
+    func requestPermission() { requestedPermission = true }
+    func currentPermission() async -> SystemResourceNotificationPermission { permission }
+    func send(_ kind: SystemResourceAlertKind, snapshot: SystemResourceSnapshot) { sent.append(kind) }
+}
+
+/// 持续高 CPU 的数据源，用来驱动告警（计数器必须递增，否则差值为 0）。
+private final class AlertingResourceProvider: SystemResourceProviding, @unchecked Sendable {
+    private var user: UInt64 = 0
+    private var idle: UInt64 = 0
+
+    func read() -> SystemResourceReading {
+        user += 95
+        idle += 5
+        return SystemResourceReading(
+            timestamp: 0,
+            cpuTicks: SystemResourceCPUTicks(user: user, system: 0, idle: idle, nice: 0),
+            memoryUsedBytes: 1,
+            memoryTotalBytes: 2,
+            diskAvailableBytes: 500,
+            diskTotalBytes: 1_000,
+            networkReceivedBytes: 0,
+            networkSentBytes: 0
+        )
+    }
+}

@@ -45,6 +45,23 @@
 "resource.process.sort.memory" = "記憶體";
 "resource.process.sort.disk" = "磁碟";
 "resource.process.sort.name" = "名稱";
+"resource.alert.cpuSustained" = "CPU 持續高負載";
+"resource.alert.cpuSustained.desc" = "CPU 已長時間高於設定閾值，可到系統資源頁查看佔用最高的程序。";
+"resource.alert.memoryPressure" = "記憶體壓力緊張";
+"resource.alert.memoryPressure.desc" = "系統記憶體壓力已到臨界，可考慮釋放記憶體或關閉佔用較高的 App。";
+"resource.alert.diskSpace" = "磁碟剩餘不足";
+"resource.alert.diskSpace.desc" = "磁碟可用空間已低於設定閾值，可在面板裡用 DerivedData 清理釋放空間。";
+"resource.alert.permission.notRequested" = "啟用告警時系統會詢問";
+"resource.alert.permission.authorized" = "已授權";
+"resource.alert.permission.denied" = "系統未允許通知，告警不會送達";
+"resource.alert.section" = "資源告警";
+"resource.alert.enable" = "開啟告警";
+"resource.alert.permission" = "通知授權";
+"resource.alert.cpuThreshold" = "CPU 閾值";
+"resource.alert.cpuSustain" = "持續時間";
+"resource.alert.diskThreshold" = "磁碟剩餘閾值";
+"resource.alert.minutes" = "%d 分鐘";
+"resource.alert.openSettings" = "打開系統設定";
 "resource.loading" = "正在讀取系統資源…";
 
 /* 網路狀態 */

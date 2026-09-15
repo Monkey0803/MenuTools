@@ -45,6 +45,23 @@
 "resource.process.sort.memory" = "内存";
 "resource.process.sort.disk" = "磁盘";
 "resource.process.sort.name" = "名称";
+"resource.alert.cpuSustained" = "CPU 持续高负载";
+"resource.alert.cpuSustained.desc" = "CPU 已经长时间高于设定阈值，可到系统资源页查看占用最高的进程。";
+"resource.alert.memoryPressure" = "内存压力紧张";
+"resource.alert.memoryPressure.desc" = "系统内存压力已到临界，可考虑释放内存或关闭占用较高的 App。";
+"resource.alert.diskSpace" = "磁盘剩余不足";
+"resource.alert.diskSpace.desc" = "磁盘可用空间已低于设定阈值，可在面板里用 DerivedData 清理释放空间。";
+"resource.alert.permission.notRequested" = "启用告警时系统会询问";
+"resource.alert.permission.authorized" = "已授权";
+"resource.alert.permission.denied" = "系统未允许通知，告警不会送达";
+"resource.alert.section" = "资源告警";
+"resource.alert.enable" = "开启告警";
+"resource.alert.permission" = "通知授权";
+"resource.alert.cpuThreshold" = "CPU 阈值";
+"resource.alert.cpuSustain" = "持续时间";
+"resource.alert.diskThreshold" = "磁盘剩余阈值";
+"resource.alert.minutes" = "%d 分钟";
+"resource.alert.openSettings" = "打开系统设置";
 "resource.loading" = "正在读取系统资源…";
 
 /* 网络状态 */
