@@ -1743,6 +1743,23 @@ private struct AppVolumeEqualizerEditor: View {
             .padding(12)
             .background(Color.primary.opacity(0.035), in: RoundedRectangle(cornerRadius: 10, style: .continuous))
 
+            Toggle(isOn: Binding(
+                get: { session?.skipRouting ?? false },
+                set: { service.setSkipRouting($0, for: rootBundleID) }
+            )) {
+                VStack(alignment: .leading, spacing: 2) {
+                    Text(L("volume.skipRouting.title"))
+                    Text(L("volume.skipRouting.desc"))
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                        .fixedSize(horizontal: false, vertical: true)
+                }
+            }
+            .toggleStyle(.switch)
+            .controlSize(.small)
+            .focusable(false)
+            .focusEffectDisabled()
+
             VStack(spacing: 10) {
                 HStack {
                     Text("−12 dB")

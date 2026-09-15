@@ -971,6 +971,9 @@
 "volume.pan.title" = "Balance";
 "volume.pan.reset" = "Center";
 "volume.mono.title" = "Mono downmix";
+"volume.skipRouting.title" = "Don't manage this app's audio";
+"volume.skipRouting.desc" = "Skip audio routing: no Process Tap is created for it, saving CPU; DRM-protected sources cannot be tapped anyway";
+"volume.skipRouting.tag" = "Unmanaged";
 "volume.menuBar.title" = "Menu bar display";
 "volume.menuBar.off" = "Off";
 "volume.menuBar.master" = "Master volume";

@@ -971,6 +971,9 @@
 "volume.pan.title" = "左右バランス";
 "volume.pan.reset" = "中央";
 "volume.mono.title" = "モノラルにダウンミックス";
+"volume.skipRouting.title" = "この App の音声を接管しない";
+"volume.skipRouting.desc" = "音声ルーティングをスキップします。Process Tap を作らないため CPU を節約でき、DRM 音源はそもそも接管できません";
+"volume.skipRouting.tag" = "未接管";
 "volume.menuBar.title" = "メニューバー表示";
 "volume.menuBar.off" = "オフ";
 "volume.menuBar.master" = "マスター音量";

@@ -971,6 +971,9 @@
 "volume.pan.title" = "좌우 밸런스";
 "volume.pan.reset" = "중앙";
 "volume.mono.title" = "모노 다운믹스";
+"volume.skipRouting.title" = "이 App 오디오를 관리하지 않음";
+"volume.skipRouting.desc" = "오디오 라우팅을 건너뜁니다. Process Tap을 만들지 않아 CPU를 절약하며, DRM 음원은 원래 관리할 수 없습니다";
+"volume.skipRouting.tag" = "관리 안 함";
 "volume.menuBar.title" = "메뉴 막대 표시";
 "volume.menuBar.off" = "끄기";
 "volume.menuBar.master" = "마스터 볼륨";

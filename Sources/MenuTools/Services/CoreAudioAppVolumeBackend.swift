@@ -52,7 +52,9 @@ final class CoreAudioAppVolumeBackend: AppVolumeRoutingBackend {
         guard AppVolumeSafetyPolicy.requiresRoute(
             for: volume,
             equalizer: target.equalizer,
-            outputDeviceUID: target.outputDeviceUID
+            outputDeviceUID: target.outputDeviceUID,
+            pan: target.pan,
+            isMono: target.isMono
         ) else {
             removeRoute(for: target.rootBundleID)
             return

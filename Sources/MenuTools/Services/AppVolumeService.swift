@@ -17,6 +17,8 @@ struct AppVolumeProfile: Codable, Equatable, Sendable {
     var outputDeviceUID: String? = nil
     var pan: Double = 0
     var isMono: Bool = false
+    /// 用户要求不接管这台 App 的音频（不建立 Process Tap 路由）。
+    var skipRouting: Bool = false
 
     func normalized(maximumGain: Double = 1) -> Self {
         var copy = self
@@ -48,6 +50,9 @@ extension AppVolumeProfile {
         case appGroup
         case equalizer
         case outputDeviceUID
+        case pan
+        case isMono
+        case skipRouting
     }
 
     init(from decoder: Decoder) throws {
@@ -63,6 +68,10 @@ extension AppVolumeProfile {
         appGroup = try container.decodeIfPresent(AppVolumeAppGroup.self, forKey: .appGroup)
         equalizer = try container.decodeIfPresent(AppVolumeEqualizer.self, forKey: .equalizer) ?? .flat
         outputDeviceUID = try container.decodeIfPresent(String.self, forKey: .outputDeviceUID)
+        // 声像/单声道/不接管是后加的字段：老数据没有这些键，按默认值处理。
+        pan = AppVolumeChannelMix.normalizedPan(try container.decodeIfPresent(Double.self, forKey: .pan) ?? 0)
+        isMono = try container.decodeIfPresent(Bool.self, forKey: .isMono) ?? false
+        skipRouting = try container.decodeIfPresent(Bool.self, forKey: .skipRouting) ?? false
     }
 }
 
@@ -175,9 +184,12 @@ enum AppVolumeSafetyPolicy {
         equalizer: AppVolumeEqualizer = .flat,
         outputDeviceUID: String? = nil,
         pan: Double = 0,
-        isMono: Bool = false
+        isMono: Bool = false,
+        skipRouting: Bool = false
     ) -> Bool {
-        abs(gain - 1) > 0.001
+        // 用户明确要求不接管这台 App 的音频：不建路由，省 CPU，也绕开 DRM 类音源。
+        guard !skipRouting else { return false }
+        return abs(gain - 1) > 0.001
             || equalizer.requiresProcessing
             || outputDeviceUID != nil
             || abs(AppVolumeChannelMix.normalizedPan(pan)) > 0.001
@@ -355,6 +367,8 @@ struct AppAudioSession: Identifiable, Equatable, Sendable {
     var outputDeviceUID: String? = nil
     var pan: Double = 0
     var isMono: Bool = false
+    /// 已选择不接管（界面显示「不接管」标记）。
+    var skipRouting: Bool = false
 
     var target: AppVolumeTarget {
         AppVolumeTarget(
@@ -404,7 +418,8 @@ struct AppAudioSession: Identifiable, Equatable, Sendable {
                 equalizer: profile?.equalizer ?? .flat,
                 outputDeviceUID: profile?.outputDeviceUID,
                 pan: profile?.pan ?? 0,
-                isMono: profile?.isMono ?? false
+                isMono: profile?.isMono ?? false,
+                skipRouting: profile?.skipRouting ?? false
             )
         }
         .sorted {
@@ -1236,6 +1251,33 @@ final class AppVolumeService {
         updateAudioProcessingProfile(for: rootBundleID) { profile in
             profile.pan = value
         }
+    }
+
+    /// 是否不接管这台 App 的音频：跳过路由、省 CPU，也绕开 DRM 类音源。
+    func setSkipRouting(_ skipRouting: Bool, for rootBundleID: String) {
+        guard let session = session(id: rootBundleID),
+              (profiles[rootBundleID]?.skipRouting ?? false) != skipRouting else { return }
+        var profile = profiles[rootBundleID] ?? AppVolumeProfile(
+            rootBundleID: rootBundleID,
+            displayName: session.displayName,
+            bundleURL: session.bundleURL,
+            volume: session.volume,
+            lastNonzeroVolume: session.volume > 0 ? session.volume : 1,
+            audioBundleIDs: session.audioBundleIDs,
+            lastAdjustedAt: session.lastAdjustedAt
+        )
+        profile.skipRouting = skipRouting
+        profiles[rootBundleID] = profile.normalized(maximumGain: maximumAppGain)
+        persistProfiles()
+        rebuildSessions()
+        if skipRouting {
+            backend.removeRoute(for: rootBundleID)
+            setRouteStatus(.bypassed, id: rootBundleID)
+        } else {
+            _ = applyCurrentProfile(for: rootBundleID)
+        }
+        refreshErrorMessageFromSessions()
+        notifySnapshotChanged()
     }
 
     /// 多声道下混为单声道。
@@ -2334,7 +2376,8 @@ final class AppVolumeService {
                   equalizer: session.equalizer,
                   outputDeviceUID: session.outputDeviceUID,
                   pan: session.pan,
-                  isMono: session.isMono
+                  isMono: session.isMono,
+                  skipRouting: session.skipRouting
               ),
               !session.processObjectIDs.isEmpty else {
             backend.removeRoute(for: rootBundleID)

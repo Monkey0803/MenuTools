@@ -1573,3 +1573,92 @@ func sleepTimerAppliesFadeAndCancelRestores() throws {
     #expect(service.sleepTimer == nil)
     #expect(service.output.isMuted)
 }
+
+@Test("需要接管音频的判定包含声像与单声道，并尊重不接管选项")
+func routingPolicyIncludesChannelMixAndSkip() {
+    // 只看声像或单声道也需要建立路由（此前后端漏判，导致该功能实际失效）
+    #expect(AppVolumeSafetyPolicy.requiresRoute(for: 1, pan: -1))
+    #expect(AppVolumeSafetyPolicy.requiresRoute(for: 1, isMono: true))
+    #expect(!AppVolumeSafetyPolicy.requiresRoute(for: 1))
+
+    // 不接管优先于其它条件
+    #expect(!AppVolumeSafetyPolicy.requiresRoute(for: 0.5, skipRouting: true))
+    #expect(!AppVolumeSafetyPolicy.requiresRoute(for: 1, pan: -1, skipRouting: true))
+}
+
+@Test("不接管后不再建立路由，取消后恢复接管")
+@MainActor
+func skipRoutingBypassesAndRestoresRoute() throws {
+    let defaults = try makeEnhancementDefaults("skipRouting")
+    let backend = EnhancedFakeAppVolumeBackend()
+    let service = AppVolumeService(backend: backend, userDefaults: defaults)
+    service.start()
+    backend.send(candidates: [.music], output: .fixture())
+    service.setEnabled(true)
+    service.setVolume(0.5, for: "com.apple.Music")
+
+    let appliedBefore = backend.appliedTargets.count
+    #expect(appliedBefore > 0)
+
+    // 不接管：立刻停掉路由，之后的音量/声像改变也不再建立路由
+    service.setSkipRouting(true, for: "com.apple.Music")
+    #expect(service.session(id: "com.apple.Music")?.skipRouting == true)
+    #expect(service.session(id: "com.apple.Music")?.routeStatus == .bypassed)
+
+    service.setVolume(0.3, for: "com.apple.Music")
+    service.setPan(-1, for: "com.apple.Music")
+    #expect(backend.appliedTargets.count == appliedBefore)
+
+    // 取消不接管：重新按当前设置建立路由
+    service.setSkipRouting(false, for: "com.apple.Music")
+    #expect(service.session(id: "com.apple.Music")?.skipRouting == false)
+    #expect(backend.appliedTargets.count > appliedBefore)
+
+    // 设置会持久化：新实例里仍然是不接管
+    service.setSkipRouting(true, for: "com.apple.Music")
+    let restored = AppVolumeService(backend: EnhancedFakeAppVolumeBackend(), userDefaults: defaults)
+    restored.start()
+    let restoredSession = try #require(restored.session(id: "com.apple.Music"))
+    #expect(restoredSession.skipRouting)
+    #expect(restoredSession.routeStatus == .bypassed)
+}
+
+@Test("App 配置的声像、单声道与不接管会随配置持久化，旧数据按默认值解码")
+func profileCodingKeepsChannelMixAndSkipRouting() throws {
+    var profile = AppVolumeProfile(
+        rootBundleID: "com.example.player",
+        displayName: "Player",
+        volume: 0.5,
+        lastNonzeroVolume: 0.5,
+        audioBundleIDs: ["com.example.player"],
+        lastAdjustedAt: Date(timeIntervalSince1970: 1_000)
+    )
+    profile.pan = -0.5
+    profile.isMono = true
+    profile.skipRouting = true
+
+    let data = try JSONEncoder().encode(profile)
+    let decoded = try JSONDecoder().decode(AppVolumeProfile.self, from: data)
+
+    #expect(decoded.pan == -0.5)
+    #expect(decoded.isMono)
+    #expect(decoded.skipRouting)
+
+    // 旧版本存下来的配置没有这些键，解码时应落到默认值而不是报错
+    let legacy = """
+    {
+      "rootBundleID": "legacy",
+      "displayName": "Legacy",
+      "volume": 0.4,
+      "lastNonzeroVolume": 0.4,
+      "audioBundleIDs": ["legacy"],
+      "lastAdjustedAt": 760000000
+    }
+    """
+    let legacyProfile = try JSONDecoder().decode(AppVolumeProfile.self, from: Data(legacy.utf8))
+
+    #expect(legacyProfile.volume == 0.4)
+    #expect(legacyProfile.pan == 0)
+    #expect(!legacyProfile.isMono)
+    #expect(!legacyProfile.skipRouting)
+}

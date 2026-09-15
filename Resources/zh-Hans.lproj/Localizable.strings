@@ -971,6 +971,9 @@
 "volume.pan.title" = "左右平衡";
 "volume.pan.reset" = "居中";
 "volume.mono.title" = "单声道下混";
+"volume.skipRouting.title" = "不接管此 App 的音频";
+"volume.skipRouting.desc" = "跳过音频路由：不再为它建立 Process Tap，省 CPU；DRM 类音源本来也无法接管";
+"volume.skipRouting.tag" = "不接管";
 "volume.menuBar.title" = "菜单栏显示";
 "volume.menuBar.off" = "关闭";
 "volume.menuBar.master" = "主音量";
