@@ -375,16 +375,16 @@ struct SystemResourceSettingsView: View {
             .frame(height: 18)
 
             GeometryReader { geometry in
-                let barWidth = SystemResourceHistoryChartLayout.barWidth(
-                    width: geometry.size.width,
-                    count: buckets.count
+                let layout = SystemResourceHistoryChartLayout.barLayout(
+                    totalWidth: geometry.size.width,
+                    sampleCount: buckets.count
                 )
-                HStack(alignment: .bottom, spacing: 2) {
+                HStack(alignment: .bottom, spacing: layout.spacing) {
                     ForEach(Array(buckets.enumerated()), id: \.element.id) { index, bucket in
                         RoundedRectangle(cornerRadius: 2)
                             .fill(historyBarColor(index: index))
                             .frame(
-                                width: barWidth,
+                                width: layout.width,
                                 height: max(geometry.size.height * (values[index] / maximum), 1)
                             )
                             .opacity(hoveredHistoryIndex == nil || hoveredHistoryIndex == index ? 1 : 0.42)
@@ -398,8 +398,9 @@ struct SystemResourceSettingsView: View {
                     case .active(let location):
                         let index = SystemResourceHistoryChartLayout.hoveredIndex(
                             x: location.x,
-                            width: geometry.size.width,
-                            count: buckets.count
+                            totalWidth: geometry.size.width,
+                            sampleCount: buckets.count,
+                            layout: layout
                         )
                         if index != hoveredHistoryIndex {
                             hoveredHistoryIndex = index

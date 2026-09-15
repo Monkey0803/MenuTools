@@ -943,14 +943,36 @@ func historyRangeAndChartLayout() {
         #expect(!range.titleKey.isEmpty)
     }
 
-    // 悬停命中：宽度 300、10 个柱子 → 每个 30pt
-    #expect(SystemResourceHistoryChartLayout.hoveredIndex(x: 0, width: 300, count: 10) == 0)
-    #expect(SystemResourceHistoryChartLayout.hoveredIndex(x: 45, width: 300, count: 10) == 1)
-    #expect(SystemResourceHistoryChartLayout.hoveredIndex(x: 299, width: 300, count: 10) == 9)
-    #expect(SystemResourceHistoryChartLayout.hoveredIndex(x: 300, width: 300, count: 10) == 9)
-    #expect(SystemResourceHistoryChartLayout.hoveredIndex(x: -1, width: 300, count: 10) == nil)
-    #expect(SystemResourceHistoryChartLayout.hoveredIndex(x: 10, width: 300, count: 0) == nil)
-    #expect(SystemResourceHistoryChartLayout.barWidth(width: 300, count: 10) > 1)
+    // 悬停命中：柱子之间留有空隙 → 空隙里不命中，避免来回抖动
+    let layout = SystemResourceHistoryChartLayout.barLayout(totalWidth: 300, sampleCount: 10)
+    #expect(SystemResourceHistoryChartLayout.hoveredIndex(x: 0, totalWidth: 300, sampleCount: 10) == 0)
+    #expect(SystemResourceHistoryChartLayout.hoveredIndex(x: -1, totalWidth: 300, sampleCount: 10) == nil)
+    #expect(SystemResourceHistoryChartLayout.hoveredIndex(x: 10, totalWidth: 300, sampleCount: 0) == nil)
+    // 落在柱子里命中，落在空隙里不命中
+    #expect(SystemResourceHistoryChartLayout.hoveredIndex(
+        x: layout.width / 2, totalWidth: 300, sampleCount: 10, layout: layout
+    ) == 0)
+    #expect(SystemResourceHistoryChartLayout.hoveredIndex(
+        x: layout.width + layout.spacing / 2, totalWidth: 300, sampleCount: 10, layout: layout
+    ) == nil)
+}
+
+@Test("趋势图每个范围的柱数受限，且柱与间距一定放得下（1 周/1 月不再挤成一团）")
+func historyChartBarsAlwaysFitWidth() {
+    // 至少 60 根、至多 96 根：太少看不出趋势，太多会挤在一起
+    for range in SystemResourceHistoryRange.allCases {
+        let count = range.pointCount
+        #expect(count >= 60)
+        #expect(count <= 96)
+
+        for totalWidth in [320.0, 420.0, 620.0, 900.0] as [CGFloat] {
+            let layout = SystemResourceHistoryChartLayout.barLayout(totalWidth: totalWidth, sampleCount: count)
+            let occupied = CGFloat(count) * layout.width + CGFloat(count - 1) * layout.spacing
+            #expect(occupied <= totalWidth + 0.001, "范围 \(range.rawValue) 在 \(totalWidth)pt 下占了 \(occupied)pt")
+            #expect(layout.width >= 1)
+            #expect(layout.spacing >= 0)
+        }
+    }
 }
 
 @Test("采样档位：面板 2 秒、后台 10 秒、面板关闭回落、都关则停并清快照")

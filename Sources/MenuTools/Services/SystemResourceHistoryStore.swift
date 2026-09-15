@@ -130,13 +130,26 @@ enum SystemResourceHistoryRange: String, CaseIterable, Equatable, Sendable {
         }
     }
 
-    /// 聚合后每个柱子覆盖的秒数（分钟桶之上再合并，控制柱子数量）。
+    /// 聚合后每个柱子覆盖的秒数（分钟桶之上再合并）。
+    ///
+    /// 密度与网络流量图表一致：一小时 1 分钟一根、一天 20 分钟一根、
+    /// 一周 2 小时一根、一月 12 小时一根——柱子太多会挤在一起看不清趋势。
     var bucketInterval: TimeInterval {
         switch self {
         case .hour: return 60
-        case .day: return 5 * 60
-        case .week: return 60 * 60
-        case .month: return 4 * 60 * 60
+        case .day: return 20 * 60
+        case .week: return 2 * 60 * 60
+        case .month: return 12 * 60 * 60
+        }
+    }
+
+    /// 满窗口时的柱子数量。
+    var pointCount: Int {
+        switch self {
+        case .hour: return 60
+        case .day: return 72
+        case .week: return 84
+        case .month: return 60
         }
     }
 }
@@ -162,22 +175,49 @@ enum SystemResourceHistoryMetric: String, CaseIterable, Equatable, Sendable {
     var isRatio: Bool { self != .disk }
 }
 
-/// 趋势图的纯布局计算：柱子宽度与悬停命中（可回归）。
+/// 趋势图的纯布局计算：柱子宽度、间距与悬停命中（可回归）。
+///
+/// 关键不变量：`柱子数 × 柱宽 + (柱子数 - 1) × 间距 ≤ 可用宽度`。
+/// 否则 HStack 会把柱子挤压重叠，视觉上「连成一片」——1 周/1 月这种高密度范围尤其明显。
 enum SystemResourceHistoryChartLayout {
     static let minimumBarWidth: CGFloat = 1
+    static let maximumBarWidth: CGFloat = 12
+    static let preferredSpacing: CGFloat = 2
 
-    static func barWidth(width: CGFloat, count: Int, spacing: CGFloat = 2) -> CGFloat {
-        guard count > 0, width > 0 else { return minimumBarWidth }
-        let available = width - spacing * CGFloat(count - 1)
-        return max(available / CGFloat(count), minimumBarWidth)
+    /// 柱宽与间距：先按偏好间距算，放不下就收紧间距，仍放不下才压到最小宽度。
+    static func barLayout(totalWidth: CGFloat, sampleCount: Int) -> (width: CGFloat, spacing: CGFloat) {
+        guard totalWidth > 0, sampleCount > 0 else { return (0, 0) }
+        guard sampleCount > 1 else {
+            return (min(max(totalWidth, minimumBarWidth), maximumBarWidth), 0)
+        }
+
+        let gaps = CGFloat(sampleCount - 1)
+        var spacing = preferredSpacing
+        var width = (totalWidth - gaps * spacing) / CGFloat(sampleCount)
+        if width < minimumBarWidth {
+            // 宽度不够：把间距压到 0，让柱子紧挨着但绝不重叠
+            spacing = max(0, (totalWidth - CGFloat(sampleCount) * minimumBarWidth) / gaps)
+            width = (totalWidth - gaps * spacing) / CGFloat(sampleCount)
+        }
+        return (min(max(width, minimumBarWidth), maximumBarWidth), spacing)
     }
 
-    /// 悬停位置对应第几个柱子；越界或数量为 0 时返回 nil。
-    static func hoveredIndex(x: CGFloat, width: CGFloat, count: Int) -> Int? {
-        guard count > 0, width > 0, x >= 0, x <= width else { return nil }
-        let slot = width / CGFloat(count)
+    /// 悬停位置对应第几个柱子；落在柱子之间的空隙或越界时返回 nil。
+    static func hoveredIndex(
+        x: CGFloat,
+        totalWidth: CGFloat,
+        sampleCount: Int,
+        layout: (width: CGFloat, spacing: CGFloat)? = nil
+    ) -> Int? {
+        guard sampleCount > 0, totalWidth > 0, x >= 0, x <= totalWidth else { return nil }
+        let resolved = layout ?? barLayout(totalWidth: totalWidth, sampleCount: sampleCount)
+        guard resolved.width > 0 else { return nil }
+        let slot = resolved.width + resolved.spacing
         guard slot > 0 else { return nil }
-        return min(max(Int(x / slot), 0), count - 1)
+        let index = Int(x / slot)
+        guard index >= 0, index < sampleCount else { return nil }
+        let offsetInSlot = x - CGFloat(index) * slot
+        return offsetInSlot <= resolved.width ? index : nil
     }
 }
 
