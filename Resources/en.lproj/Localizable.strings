@@ -64,6 +64,13 @@
 "resource.selfCheck.notification" = "Notification permission";
 "resource.selfCheck.notification.off" = "Alerts are off";
 "resource.selfCheck.notification.advice" = "Allow notifications in System Settings, or re-request permission in the Resource alerts section";
+"resource.optional.title" = "Temperature and GPU";
+"resource.temperature" = "Temperature";
+"resource.gpu" = "GPU usage";
+"resource.selfCheck.optional" = "Temperature and GPU";
+"resource.selfCheck.optional.unavailable" = "Not provided by this system (unavailable on some models or OS versions)";
+"resource.selfCheck.optional.noTemperature" = "Temperature unavailable";
+"resource.selfCheck.optional.noGPU" = "GPU unavailable";
 "resource.alert.cpuSustained" = "Sustained high CPU";
 "resource.alert.cpuSustained.desc" = "CPU has stayed above the threshold for a while; open the System Resources page to see the busiest processes.";
 "resource.alert.memoryPressure" = "Memory pressure critical";

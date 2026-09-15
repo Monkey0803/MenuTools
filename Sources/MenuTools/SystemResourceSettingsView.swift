@@ -128,6 +128,22 @@ struct SystemResourceSettingsView: View {
                 Label(L("resource.disk"), systemImage: "internaldrive")
             }
 
+            if snapshot.temperatureCelsius != nil || snapshot.gpuUsage != nil {
+                Section {
+                    if let temperature = snapshot.temperatureCelsius {
+                        LabeledContent(
+                            L("resource.temperature"),
+                            value: String(format: "%.0f °C", temperature)
+                        )
+                    }
+                    if let gpu = snapshot.gpuUsage {
+                        LabeledContent(L("resource.gpu"), value: percent(gpu))
+                    }
+                } header: {
+                    Label(L("resource.optional.title"), systemImage: "thermometer.medium")
+                }
+            }
+
             Section {
                 LabeledContent(L("resource.network.download"), value: rate(snapshot.networkDownloadBytesPerSecond))
                 LabeledContent(L("resource.network.upload"), value: rate(snapshot.networkUploadBytesPerSecond))

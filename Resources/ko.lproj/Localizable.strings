@@ -64,6 +64,13 @@
 "resource.selfCheck.notification" = "알림 권한";
 "resource.selfCheck.notification.off" = "알림이 꺼져 있습니다";
 "resource.selfCheck.notification.advice" = "시스템 설정에서 알림을 허용하거나 '리소스 알림'에서 다시 권한을 요청하세요";
+"resource.optional.title" = "온도 및 GPU";
+"resource.temperature" = "온도";
+"resource.gpu" = "GPU 사용률";
+"resource.selfCheck.optional" = "온도 및 GPU";
+"resource.selfCheck.optional.unavailable" = "이 시스템에서 제공하지 않습니다(일부 모델/OS에서 불가)";
+"resource.selfCheck.optional.noTemperature" = "온도를 읽을 수 없음";
+"resource.selfCheck.optional.noGPU" = "GPU를 읽을 수 없음";
 "resource.alert.cpuSustained" = "CPU 고부하 지속";
 "resource.alert.cpuSustained.desc" = "CPU가 설정한 임계값을 오랫동안 넘었습니다. 시스템 리소스 페이지에서 부하가 큰 프로세스를 확인하세요.";
 "resource.alert.memoryPressure" = "메모리 압력 위험";

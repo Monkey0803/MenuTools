@@ -138,6 +138,28 @@ enum SystemResourceSelfCheck {
             adviceKey: permission == .ok ? nil : "resource.selfCheck.notification.advice"
         ))
 
+        // 7. 可选指标（温度 / GPU）：硬件与系统决定是否可得，因此只作说明不作告警
+        let gpu = snapshot?.gpuUsage
+        let temperature = snapshot?.temperatureCelsius
+        let optionalDetail: String?
+        switch (gpu, temperature) {
+        case let (.some(gpu), .some(temperature)):
+            optionalDetail = "\(percent(gpu)) · \(Int(temperature.rounded()))°C"
+        case let (.some(gpu), .none):
+            optionalDetail = "\(percent(gpu)) · \(L("resource.selfCheck.optional.noTemperature"))"
+        case let (.none, .some(temperature)):
+            optionalDetail = "\(Int(temperature.rounded()))°C · \(L("resource.selfCheck.optional.noGPU"))"
+        case (.none, .none):
+            optionalDetail = L("resource.selfCheck.optional.unavailable")
+        }
+        steps.append(SystemResourceSelfCheckStep(
+            id: "optional",
+            titleKey: "resource.selfCheck.optional",
+            status: .ok,
+            detail: optionalDetail,
+            adviceKey: nil
+        ))
+
         return steps
     }
 

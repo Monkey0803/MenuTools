@@ -64,6 +64,13 @@
 "resource.selfCheck.notification" = "通知の許可";
 "resource.selfCheck.notification.off" = "通知は無効です";
 "resource.selfCheck.notification.advice" = "システム設定で通知を許可するか、「リソース通知」で再度許可を求めてください";
+"resource.optional.title" = "温度と GPU";
+"resource.temperature" = "温度";
+"resource.gpu" = "GPU 使用率";
+"resource.selfCheck.optional" = "温度と GPU";
+"resource.selfCheck.optional.unavailable" = "このシステムでは取得できません（機種や OS によっては不可）";
+"resource.selfCheck.optional.noTemperature" = "温度は取得できません";
+"resource.selfCheck.optional.noGPU" = "GPU は取得できません";
 "resource.alert.cpuSustained" = "CPU の高負荷が継続";
 "resource.alert.cpuSustained.desc" = "CPU が設定したしきい値を長時間上回っています。システムリソースページで負荷の高いプロセスを確認できます。";
 "resource.alert.memoryPressure" = "メモリプレッシャーがひっ迫";

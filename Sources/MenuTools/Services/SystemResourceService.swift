@@ -48,6 +48,10 @@ struct SystemResourceReading: Equatable, Sendable {
     /// 磁盘累计读写字节（跨所有块设备驱动求和）。
     var diskReadBytes: Int64 = 0
     var diskWrittenBytes: Int64 = 0
+    /// GPU 占用（0…1）；系统不提供时为 nil。
+    var gpuUsage: Double?
+    /// 温度（摄氏度）；系统不提供时为 nil。
+    var temperatureCelsius: Double?
 }
 
 enum SystemMemoryPressure: Equatable, Sendable {
@@ -76,6 +80,10 @@ struct SystemResourceSnapshot: Equatable, Sendable {
     var memoryDetail: SystemResourceMemoryDetail?
     var diskReadBytesPerSecond: Int64 = 0
     var diskWriteBytesPerSecond: Int64 = 0
+    /// GPU 占用（0…1）；系统不提供时为 nil。
+    var gpuUsage: Double?
+    /// 温度（摄氏度）；系统不提供时为 nil。
+    var temperatureCelsius: Double?
 }
 
 /// 将系统原始读数转换为稳定的 UI 快照。
@@ -137,7 +145,9 @@ enum SystemResourceCalculator {
             coreUsages: perCoreUsages,
             memoryDetail: memoryDetail(current),
             diskReadBytesPerSecond: diskReadRate,
-            diskWriteBytesPerSecond: diskWriteRate
+            diskWriteBytesPerSecond: diskWriteRate,
+            gpuUsage: current.gpuUsage.map { min(max($0, 0), 1) },
+            temperatureCelsius: current.temperatureCelsius
         )
     }
 
@@ -227,6 +237,12 @@ protocol SystemResourceProviding: Sendable {
 }
 
 struct DefaultSystemResourceProvider: SystemResourceProviding {
+    private let optionalMetrics: any SystemResourceOptionalMetricsReading
+
+    init(optionalMetrics: any SystemResourceOptionalMetricsReading = DefaultSystemResourceOptionalMetricsReader()) {
+        self.optionalMetrics = optionalMetrics
+    }
+
     func read() -> SystemResourceReading {
         let memory = memoryReading()
         let disk = diskReading()
@@ -249,7 +265,9 @@ struct DefaultSystemResourceProvider: SystemResourceProviding {
             memoryCachedBytes: memoryDetail.cached,
             memoryFreeBytes: memoryDetail.free,
             diskReadBytes: diskCounters.read,
-            diskWrittenBytes: diskCounters.written
+            diskWrittenBytes: diskCounters.written,
+            gpuUsage: optionalMetrics.readGPUUsage(),
+            temperatureCelsius: optionalMetrics.readTemperatureCelsius()
         )
     }
 

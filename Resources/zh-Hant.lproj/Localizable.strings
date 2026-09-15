@@ -64,6 +64,13 @@
 "resource.selfCheck.notification" = "通知授權";
 "resource.selfCheck.notification.off" = "告警未開啟";
 "resource.selfCheck.notification.advice" = "在系統設定裡允許通知，或回到「資源告警」區塊重新授權";
+"resource.optional.title" = "溫度與 GPU";
+"resource.temperature" = "溫度";
+"resource.gpu" = "GPU 佔用";
+"resource.selfCheck.optional" = "溫度與 GPU";
+"resource.selfCheck.optional.unavailable" = "系統未提供（部分機型或系統版本不可讀）";
+"resource.selfCheck.optional.noTemperature" = "溫度不可讀";
+"resource.selfCheck.optional.noGPU" = "GPU 不可讀";
 "resource.alert.cpuSustained" = "CPU 持續高負載";
 "resource.alert.cpuSustained.desc" = "CPU 已長時間高於設定閾值，可到系統資源頁查看佔用最高的程序。";
 "resource.alert.memoryPressure" = "記憶體壓力緊張";

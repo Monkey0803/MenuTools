@@ -1111,8 +1111,8 @@ func selfCheckReportsHealthySources() {
         notificationPermission: .authorized
     )
 
-    #expect(steps.count == 6)
-    #expect(steps.map(\.id) == ["cpu", "disk", "process", "history", "sampling", "notification"])
+    #expect(steps.count == 7)
+    #expect(steps.map(\.id) == ["cpu", "disk", "process", "history", "sampling", "notification", "optional"])
     #expect(steps.allSatisfy { $0.status == .ok })
     #expect(steps.allSatisfy { $0.adviceKey == nil })
     // 测试进程里 L() 返回原始键，所以这里只断言核心数与百分比这两项与语言无关的信息
@@ -1134,7 +1134,7 @@ func selfCheckReportsProblems() {
         notificationPermission: .denied
     )
 
-    #expect(steps.count == 6)
+    #expect(steps.count == 7)
     #expect(steps[0].status == .failed && steps[0].adviceKey != nil)   // CPU/内存取不到
     #expect(steps[1].status == .failed && steps[1].adviceKey != nil)   // 磁盘取不到
     #expect(steps[2].status == .warning)                               // 进程列表为空
@@ -1181,5 +1181,83 @@ func selfCheckStatusHasPresentation() {
     for status in [SystemResourceSelfCheckStatus.ok, .warning, .failed] {
         #expect(!status.titleKey.isEmpty)
         #expect(!status.symbol.isEmpty)
+    }
+}
+
+@Test("GPU 占用解析：支持数字/字符串，越界与缺失返回 nil")
+func gpuStatisticsParserHandlesValues() {
+    #expect(SystemResourceGPUStatisticsParser.utilization(from: ["Device Utilization %": 15]) == 0.15)
+    #expect(SystemResourceGPUStatisticsParser.utilization(from: ["Device Utilization %": 0]) == 0)
+    #expect(SystemResourceGPUStatisticsParser.utilization(from: ["Device Utilization %": 100]) == 1)
+    #expect(SystemResourceGPUStatisticsParser.utilization(from: ["Device Utilization %": "42"]) == 0.42)
+    #expect(SystemResourceGPUStatisticsParser.utilization(from: ["Device Utilization %": NSNumber(value: 7.5)]) == 0.075)
+
+    // 缺失键、非数值、越界（负数/超大）都视为不可用
+    #expect(SystemResourceGPUStatisticsParser.utilization(from: [:]) == nil)
+    #expect(SystemResourceGPUStatisticsParser.utilization(from: ["Device Utilization %": "abc"]) == nil)
+    #expect(SystemResourceGPUStatisticsParser.utilization(from: ["Device Utilization %": -5]) == nil)
+    #expect(SystemResourceGPUStatisticsParser.utilization(from: ["Device Utilization %": 10_000]) == nil)
+    #expect(SystemResourceGPUStatisticsParser.utilization(from: ["Device Utilization %": [1, 2]]) == nil)
+    // 超过 100% 但在合理上限内会被收敛到 1（多 GPU 叠加场景）
+    #expect(SystemResourceGPUStatisticsParser.utilization(from: ["Device Utilization %": 150]) == 1)
+}
+
+@Test("SMC sp78 温度解码：正值、负值与不合理读数")
+func smcTemperatureDecoderHandlesSP78() {
+    // 0x3000 = 12288 / 256 = 48.0
+    #expect(SystemResourceSMCDecoder.temperature(sp78: 0x30, 0x00) == 48)
+    // 0x2D80 = 11648 / 256 = 45.5
+    #expect(SystemResourceSMCDecoder.temperature(sp78: 0x2D, 0x80) == 45.5)
+    // 0xFF80 = -128 / 256 = -0.5
+    #expect(SystemResourceSMCDecoder.temperature(sp78: 0xFF, 0x80) == -0.5)
+    // 0x8000 = -128 摄氏度：明显不合理，判为无效
+    #expect(SystemResourceSMCDecoder.temperature(sp78: 0x80, 0x00) == nil)
+    // 0x7FFF = 127.99：仍在可接受范围内
+    #expect(SystemResourceSMCDecoder.temperature(sp78: 0x7F, 0xFF) != nil)
+}
+
+@Test("可选指标会随快照透出，缺失时保持 nil")
+func snapshotCarriesOptionalMetrics() {
+    func reading(gpu: Double?, temperature: Double?) -> SystemResourceReading {
+        SystemResourceReading(
+            timestamp: 0,
+            cpuTicks: SystemResourceCPUTicks(user: 1, system: 0, idle: 1, nice: 0),
+            memoryUsedBytes: 1,
+            memoryTotalBytes: 2,
+            diskAvailableBytes: 1,
+            diskTotalBytes: 2,
+            networkReceivedBytes: 0,
+            networkSentBytes: 0,
+            gpuUsage: gpu,
+            temperatureCelsius: temperature
+        )
+    }
+
+    let present = SystemResourceCalculator.snapshot(
+        current: reading(gpu: 0.15, temperature: 48),
+        previous: nil
+    )
+    #expect(present.gpuUsage == 0.15)
+    #expect(present.temperatureCelsius == 48)
+
+    // 越界 GPU 会被收敛
+    let clamped = SystemResourceCalculator.snapshot(current: reading(gpu: 2.5, temperature: nil), previous: nil)
+    #expect(clamped.gpuUsage == 1)
+    #expect(clamped.temperatureCelsius == nil)
+
+    let absent = SystemResourceCalculator.snapshot(current: reading(gpu: nil, temperature: nil), previous: nil)
+    #expect(absent.gpuUsage == nil)
+    #expect(absent.temperatureCelsius == nil)
+}
+
+@Test("真机读取器：GPU 可读则为 0…1，温度不可读时应为 nil 而不是 0")
+func optionalMetricsReaderIsHonestOnThisMachine() {
+    let reader = DefaultSystemResourceOptionalMetricsReader()
+    if let gpu = reader.readGPUUsage() {
+        #expect(gpu >= 0 && gpu <= 1)
+    }
+    // SMC 通道不可用时必须返回 nil（界面据此隐藏），不能伪造 0 度
+    if let temperature = reader.readTemperatureCelsius() {
+        #expect(temperature > -40 && temperature < 150)
     }
 }
