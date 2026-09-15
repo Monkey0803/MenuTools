@@ -210,6 +210,25 @@ enum WindowSnapFeedback {
 /// 把已经吸附的窗口拖出来时，恢复吸附前的尺寸。
 ///
 /// 对标 Rectangle 的 unsnap restore：左半屏/最大化的窗口被拖走时不应该还保持那块大尺寸。
+enum WindowDragRestoreZone {
+    /// 标题栏中关闭、缩小、放大按钮所在的横排（以窗口 Cocoa 坐标的顶部为基准）。
+    ///
+    /// 标题栏其他区域仍然可以正常移动窗口，但不会因为拖动而恢复窗口尺寸。
+    static let topInset: CGFloat = 12
+    static let bottomInset: CGFloat = 32
+
+    static func contains(_ point: CGPoint, in frame: CGRect) -> Bool {
+        guard frame.width > 0, frame.height > 0, frame.contains(point) else { return false }
+        let row = CGRect(
+            x: frame.minX,
+            y: frame.maxY - bottomInset,
+            width: frame.width,
+            height: bottomInset - topInset
+        )
+        return row.contains(point)
+    }
+}
+
 enum WindowUnsnapCalculator {
     /// 尺寸差异小于该值视为「没有变化」，不做恢复。
     static let minimumSizeDelta: CGFloat = 2

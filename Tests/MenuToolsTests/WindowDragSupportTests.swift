@@ -23,6 +23,16 @@ func hapticFeedbackTriggersOnlyWhenSnapZoneChanges() {
 
 // MARK: - 拖出已吸附窗口恢复原尺寸
 
+@Test("只有关闭缩小放大按钮所在横排会触发拖出恢复")
+func unsnapRestoreOnlyStartsInWindowControlRow() {
+    let frame = CGRect(x: 100, y: 100, width: 700, height: 500)
+
+    #expect(WindowDragRestoreZone.contains(CGPoint(x: 140, y: 580), in: frame))
+    #expect(!WindowDragRestoreZone.contains(CGPoint(x: 140, y: 596), in: frame))
+    #expect(!WindowDragRestoreZone.contains(CGPoint(x: 140, y: 562), in: frame))
+    #expect(!WindowDragRestoreZone.contains(CGPoint(x: 140, y: 580), in: CGRect(x: 100, y: 100, width: 0, height: 0)))
+}
+
 @Test("拖出已吸附窗口时恢复吸附前的尺寸，并保持光标仍在窗口内")
 func unsnapRestoresPreviousSizeKeepingCursorInside() throws {
     let visible = CGRect(x: 0, y: 0, width: 2560, height: 1410)

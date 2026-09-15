@@ -400,6 +400,8 @@ final class WindowManagementService {
     private var unsnapHandledForCurrentDrag = false
     /// 按下点是否落在标题栏/工具栏区域——只有这里才是“拖动窗口”，正文区域是划选内容。
     private var dragStartedInWindowChrome = false
+    /// 按下点是否落在关闭、缩小、放大按钮所在横排——只有这里才恢复吸附前尺寸。
+    private var dragStartedInWindowControlRow = false
     /// 拖拽预览读取 AX 的限流时间戳。
     private var lastSnapProbeTime: TimeInterval = 0
 
@@ -867,6 +869,7 @@ final class WindowManagementService {
         lastDragWindowLookup = 0
         lastSnapProbeTime = 0
         dragStartedInWindowChrome = false
+        dragStartedInWindowControlRow = false
         unsnapHandledForCurrentDrag = false
     }
 
@@ -970,6 +973,7 @@ final class WindowManagementService {
     private func prepareUnsnapRestoreIfNeeded(at point: CGPoint) {
         guard configuration.restoreSizeWhenDraggingOut,
               !unsnapHandledForCurrentDrag,
+              dragStartedInWindowControlRow,
               let start = mouseDownLocation,
               hypot(point.x - start.x, point.y - start.y) > 8 else { return }
         unsnapHandledForCurrentDrag = true
@@ -1062,6 +1066,9 @@ final class WindowManagementService {
         dragWindowPID = processIdentifier
         dragWindowFrameAtMouseDown = try? cocoaFrame(of: window)
         dragStartedInWindowChrome = isTitleBarLocation(point, window: window)
+        dragStartedInWindowControlRow = dragWindowFrameAtMouseDown.map {
+            WindowDragRestoreZone.contains(point, in: $0)
+        } ?? false
     }
 
     /// 按下点是否落在窗口顶部的标题栏/工具栏区域。
