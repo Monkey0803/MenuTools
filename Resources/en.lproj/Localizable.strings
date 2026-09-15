@@ -939,7 +939,10 @@
 "volume.equalizer.custom.name" = "Preset name";
 "volume.equalizer.custom.save" = "Save current curve as a preset";
 "volume.equalizer.custom.delete" = "Delete";
-"volume.preset.coverage" = "%d apps · %d with EQ and device";
+"volume.pan.title" = "Balance";
+"volume.pan.reset" = "Center";
+"volume.mono.title" = "Mono downmix";
+"volume.preset.coverage" = "%d apps · %d with EQ, channels and device";
 "volume.preset.coverageHint" = "Saved by an older version: save again to include EQ and output device";
 "volume.equalizer.custom" = "Custom";
 "volume.equalizer.preset.flat" = "Flat";

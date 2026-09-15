@@ -64,7 +64,12 @@ final class CoreAudioAppVolumeBackend: AppVolumeRoutingBackend {
 
         let output = try outputDevice(uid: target.outputDeviceUID) ?? readDefaultOutputDevice()
         if let route = routes[target.rootBundleID], route.matches(target: target, outputDevice: output.id) {
-            route.setProcessing(gain: volume, equalizer: target.equalizer)
+            route.setProcessing(
+                gain: volume,
+                equalizer: target.equalizer,
+                pan: target.pan,
+                isMono: target.isMono
+            )
             return
         }
 
@@ -544,6 +549,8 @@ private final class AppVolumeRouteState: @unchecked Sendable {
     let failurePending = Atomic(false)
     let invalidCallbackCount = Atomic(0)
     let failureSignaled = Atomic(false)
+    private let pan = Atomic<Float>(0)
+    private let mono = Atomic(false)
     private let equalizerConfiguration = Atomic<UnsafeRawPointer?>(nil)
     let equalizerProcessor = AppVolumeEqualizerProcessor()
     private var currentEqualizer = AppVolumeEqualizer.flat
@@ -557,6 +564,20 @@ private final class AppVolumeRouteState: @unchecked Sendable {
         rmsLevel = Atomic(0)
         clipping = Atomic(0)
         cpuLoad = Atomic(0)
+    }
+
+    /// 更新左右平衡与单声道下混（IOProc 每个缓冲区读取一次）。
+    func setChannelMix(pan value: Double, isMono: Bool) {
+        pan.store(Float(AppVolumeChannelMix.normalizedPan(value)), ordering: .relaxed)
+        mono.store(isMono, ordering: .relaxed)
+    }
+
+    func currentPan() -> Double {
+        Double(pan.load(ordering: .relaxed))
+    }
+
+    func isMonoRequested() -> Bool {
+        mono.load(ordering: .relaxed)
     }
 
     func setEqualizer(_ equalizer: AppVolumeEqualizer, sampleRate: Double) {
@@ -783,12 +804,18 @@ private final class CoreAudioAppVolumeRoute: @unchecked Sendable {
         self.target.processObjectIDs == target.processObjectIDs && outputDeviceID == outputDevice
     }
 
-    func setProcessing(gain: Double, equalizer: AppVolumeEqualizer) {
+    func setProcessing(
+        gain: Double,
+        equalizer: AppVolumeEqualizer,
+        pan: Double,
+        isMono: Bool
+    ) {
         state.targetGain.store(
             Float(min(max(gain, 0), AppVolumeSafetyPolicy.maximumGain(boostEnabled: true))),
             ordering: .relaxed
         )
         state.setEqualizer(equalizer, sampleRate: sampleRate)
+        state.setChannelMix(pan: pan, isMono: isMono)
     }
 
     func consumeMeter() -> AppVolumeMeter {
@@ -859,6 +886,7 @@ private final class CoreAudioAppVolumeRoute: @unchecked Sendable {
         }
         sampleRate = format.mSampleRate
         state.setEqualizer(equalizer, sampleRate: sampleRate)
+        state.setChannelMix(pan: target.pan, isMono: target.isMono)
 
         let aggregateDescription: [String: Any] = [
             kAudioAggregateDeviceNameKey: "MenuTools · \(target.rootBundleID)",
@@ -925,6 +953,9 @@ private final class CoreAudioAppVolumeRoute: @unchecked Sendable {
         let target = state.targetGain.load(ordering: .relaxed)
         let equalizerConfiguration = state.currentEqualizerConfiguration()
         var current = state.currentGain.load(ordering: .relaxed)
+        let panGains = AppVolumeChannelMix.panGains(pan: state.currentPan())
+        let mono = state.isMonoRequested()
+        let channelCount = inputs.count
         var peak: Float = 0
         var sumSquares: Double = 0
         var sampleCount = 0
@@ -949,12 +980,26 @@ private final class CoreAudioAppVolumeRoute: @unchecked Sendable {
             let count = Int(outputBuffer.mDataByteSize) / MemoryLayout<Float>.size
             for sample in 0..<count {
                 gain += step
-                let scaled = source[sample] * gain
+                var value = source[sample]
+                if mono, channelCount > 1 {
+                    // 单声道下混：把各声道同一采样点取平均（不分配内存）。
+                    var sum = value
+                    for other in inputs.indices where other != index {
+                        if let pointer = inputs[other].mData?.assumingMemoryBound(to: Float.self) {
+                            sum += pointer[sample]
+                        }
+                    }
+                    value = AppVolumeChannelMix.monoSample(sum, channelCount: channelCount)
+                }
+                let scaled = value * gain
                 let channel = outputs.count == 1
                     ? sample % max(Int(outputBuffer.mNumberChannels), 1)
                     : index
+                let channelGain: Float = channel == 0
+                    ? panGains.left
+                    : (channel == 1 ? panGains.right : 1)
                 let processed = state.equalizerProcessor.process(
-                    scaled,
+                    scaled * channelGain,
                     channel: channel,
                     configuration: equalizerConfiguration
                 )

@@ -742,3 +742,60 @@ func presetExportIncludesCustomEqualizers() throws {
     #expect(target.customEqualizers.count == 1)
     #expect(target.customEqualizers.first?.gains == AppVolumeEqualizerPreset.lateNight.gains)
 }
+
+@Test("声像与单声道会进入路由目标，单独设置也会建立路由")
+@MainActor
+func panAndMonoReachRoutingTarget() throws {
+    let defaults = try makeEnhancementDefaults("panMono")
+    let backend = EnhancedFakeAppVolumeBackend()
+    let service = AppVolumeService(backend: backend, userDefaults: defaults)
+    backend.send(candidates: [.music], output: .fixture())
+    service.setEnabled(true)
+
+    // 音量保持 100%，只有声像改变也应该建立路由
+    service.setPan(-1, for: "com.apple.Music")
+    var target = try #require(backend.appliedTargets.last)
+    #expect(target.pan == -1)
+    #expect(!target.isMono)
+
+    service.setPan(0.25, for: "com.apple.Music")
+    service.setMono(true, for: "com.apple.Music")
+    target = try #require(backend.appliedTargets.last)
+    #expect(abs(target.pan - 0.25) < 0.0001)
+    #expect(target.isMono)
+
+    let session = try #require(service.session(id: "com.apple.Music"))
+    #expect(session.pan == 0.25)
+    #expect(session.isMono)
+
+    // 恢复默认后不需要路由（被视为旁路）
+    service.setPan(0, for: "com.apple.Music")
+    service.setMono(false, for: "com.apple.Music")
+    #expect(service.session(id: "com.apple.Music")?.routeStatus == .bypassed)
+}
+
+@Test("预设会保存并恢复声像与单声道")
+@MainActor
+func presetRoundTripsPanAndMono() throws {
+    let defaults = try makeEnhancementDefaults("presetPanMono")
+    let backend = EnhancedFakeAppVolumeBackend()
+    let service = AppVolumeService(backend: backend, userDefaults: defaults)
+    backend.send(candidates: [.music], output: .fixture())
+    service.setEnabled(true)
+
+    service.setPan(0.8, for: "com.apple.Music")
+    service.setMono(true, for: "com.apple.Music")
+    let preset = service.savePreset(named: "单声道", appVolumes: ["com.apple.Music": 1])
+
+    let settings = try #require(preset.appSettings["com.apple.Music"])
+    #expect(abs(settings.pan - 0.8) < 0.0001)
+    #expect(settings.isMono)
+
+    service.setPan(-0.5, for: "com.apple.Music")
+    service.setMono(false, for: "com.apple.Music")
+    service.applyPreset(id: preset.id)
+
+    let session = try #require(service.session(id: "com.apple.Music"))
+    #expect(abs(session.pan - 0.8) < 0.0001)
+    #expect(session.isMono)
+}

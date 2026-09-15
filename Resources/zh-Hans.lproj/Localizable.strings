@@ -939,7 +939,10 @@
 "volume.equalizer.custom.name" = "预设名称";
 "volume.equalizer.custom.save" = "把当前曲线存为预设";
 "volume.equalizer.custom.delete" = "删除";
-"volume.preset.coverage" = "%d 个 App · %d 个含 EQ 与设备";
+"volume.pan.title" = "左右平衡";
+"volume.pan.reset" = "居中";
+"volume.mono.title" = "单声道下混";
+"volume.preset.coverage" = "%d 个 App · %d 个含 EQ、声道与设备";
 "volume.preset.coverageHint" = "旧版本保存：重新保存才会包含 EQ 与输出设备";
 "volume.equalizer.custom" = "自定义";
 "volume.equalizer.preset.flat" = "平坦";

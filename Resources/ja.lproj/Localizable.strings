@@ -939,7 +939,10 @@
 "volume.equalizer.custom.name" = "プリセット名";
 "volume.equalizer.custom.save" = "現在の曲線をプリセットとして保存";
 "volume.equalizer.custom.delete" = "削除";
-"volume.preset.coverage" = "%d 個の App · %d 個が EQ とデバイスを含む";
+"volume.pan.title" = "左右バランス";
+"volume.pan.reset" = "中央";
+"volume.mono.title" = "モノラルにダウンミックス";
+"volume.preset.coverage" = "%d 個の App · %d 個が EQ・チャンネル・デバイスを含む";
 "volume.preset.coverageHint" = "旧バージョンで保存：再保存すると EQ と出力デバイスが含まれます";
 "volume.equalizer.custom" = "カスタム";
 "volume.equalizer.preset.flat" = "フラット";

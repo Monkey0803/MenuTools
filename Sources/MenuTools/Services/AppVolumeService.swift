@@ -15,6 +15,8 @@ struct AppVolumeProfile: Codable, Equatable, Sendable {
     var appGroup: AppVolumeAppGroup? = nil
     var equalizer: AppVolumeEqualizer = .flat
     var outputDeviceUID: String? = nil
+    var pan: Double = 0
+    var isMono: Bool = false
 
     func normalized(maximumGain: Double = 1) -> Self {
         var copy = self
@@ -28,6 +30,7 @@ struct AppVolumeProfile: Codable, Equatable, Sendable {
         copy.equalizer = copy.equalizer.normalized()
         copy.outputDeviceUID = copy.outputDeviceUID?.trimmingCharacters(in: .whitespacesAndNewlines)
         if copy.outputDeviceUID?.isEmpty == true { copy.outputDeviceUID = nil }
+        copy.pan = AppVolumeChannelMix.normalizedPan(copy.pan)
         return copy
     }
 }
@@ -63,6 +66,29 @@ extension AppVolumeProfile {
     }
 }
 
+/// 每 App 的声道处理：左右平衡与单声道下混。
+enum AppVolumeChannelMix {
+    static let minimumPan = -1.0
+    static let maximumPan = 1.0
+
+    static func normalizedPan(_ pan: Double) -> Double {
+        min(max(pan.isFinite ? pan : 0, minimumPan), maximumPan)
+    }
+
+    /// 左右平衡：-1 全左、0 居中（两侧都不衰减）、+1 全右。
+    /// 第 3 个及以后的声道不参与平衡，保持原样。
+    static func panGains(pan: Double) -> (left: Float, right: Float) {
+        let value = normalizedPan(pan)
+        return (Float(1 - max(0, value)), Float(1 + min(0, value)))
+    }
+
+    /// 单声道下混：多声道取平均，单声道原样返回。
+    @inline(__always)
+    static func monoSample(_ sum: Float, channelCount: Int) -> Float {
+        channelCount > 1 ? sum / Float(channelCount) : sum
+    }
+}
+
 enum AppVolumeSafetyPolicy {
     static func maximumGain(boostEnabled: Bool) -> Double {
         boostEnabled ? 1.5 : 1
@@ -79,9 +105,15 @@ enum AppVolumeSafetyPolicy {
     static func requiresRoute(
         for gain: Double,
         equalizer: AppVolumeEqualizer = .flat,
-        outputDeviceUID: String? = nil
+        outputDeviceUID: String? = nil,
+        pan: Double = 0,
+        isMono: Bool = false
     ) -> Bool {
-        abs(gain - 1) > 0.001 || equalizer.requiresProcessing || outputDeviceUID != nil
+        abs(gain - 1) > 0.001
+            || equalizer.requiresProcessing
+            || outputDeviceUID != nil
+            || abs(AppVolumeChannelMix.normalizedPan(pan)) > 0.001
+            || isMono
     }
 }
 
@@ -225,6 +257,10 @@ struct AppVolumeTarget: Equatable, Sendable {
     var audioBundleIDs: Set<String>
     var equalizer: AppVolumeEqualizer = .flat
     var outputDeviceUID: String? = nil
+    /// 左右平衡：-1 全左、0 居中、+1 全右。
+    var pan: Double = 0
+    /// 是否把多声道下混为单声道。
+    var isMono: Bool = false
 }
 
 struct AppAudioSession: Identifiable, Equatable, Sendable {
@@ -244,6 +280,8 @@ struct AppAudioSession: Identifiable, Equatable, Sendable {
     var routeStatus: AppVolumeRouteStatus = .bypassed
     var equalizer: AppVolumeEqualizer = .flat
     var outputDeviceUID: String? = nil
+    var pan: Double = 0
+    var isMono: Bool = false
 
     var target: AppVolumeTarget {
         AppVolumeTarget(
@@ -251,7 +289,9 @@ struct AppAudioSession: Identifiable, Equatable, Sendable {
             processObjectIDs: processObjectIDs,
             audioBundleIDs: audioBundleIDs,
             equalizer: equalizer,
-            outputDeviceUID: outputDeviceUID
+            outputDeviceUID: outputDeviceUID,
+            pan: pan,
+            isMono: isMono
         )
     }
 
@@ -289,7 +329,9 @@ struct AppAudioSession: Identifiable, Equatable, Sendable {
                     displayName: first?.displayName ?? profile?.displayName ?? identifier
                 ),
                 equalizer: profile?.equalizer ?? .flat,
-                outputDeviceUID: profile?.outputDeviceUID
+                outputDeviceUID: profile?.outputDeviceUID,
+                pan: profile?.pan ?? 0,
+                isMono: profile?.isMono ?? false
             )
         }
         .sorted {
@@ -369,18 +411,43 @@ struct AppVolumePresetAppSettings: Codable, Equatable, Sendable {
     var outputDeviceUID: String?
     var appGroup: AppVolumeAppGroup
     var isFavorite: Bool
+    var pan: Double
+    var isMono: Bool
 
     init(
         equalizer: AppVolumeEqualizer = .flat,
         outputDeviceUID: String? = nil,
         appGroup: AppVolumeAppGroup = .other,
-        isFavorite: Bool = false
+        isFavorite: Bool = false,
+        pan: Double = 0,
+        isMono: Bool = false
     ) {
         self.equalizer = equalizer.normalized()
         let trimmed = outputDeviceUID?.trimmingCharacters(in: .whitespacesAndNewlines)
         self.outputDeviceUID = (trimmed?.isEmpty ?? true) ? nil : trimmed
         self.appGroup = appGroup
         self.isFavorite = isFavorite
+        self.pan = AppVolumeChannelMix.normalizedPan(pan)
+        self.isMono = isMono
+    }
+
+    private enum CodingKeys: String, CodingKey {
+        case equalizer
+        case outputDeviceUID
+        case appGroup
+        case isFavorite
+        case pan
+        case isMono
+    }
+
+    init(from decoder: any Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        equalizer = try container.decodeIfPresent(AppVolumeEqualizer.self, forKey: .equalizer) ?? .flat
+        outputDeviceUID = try container.decodeIfPresent(String.self, forKey: .outputDeviceUID)
+        appGroup = try container.decodeIfPresent(AppVolumeAppGroup.self, forKey: .appGroup) ?? .other
+        isFavorite = try container.decodeIfPresent(Bool.self, forKey: .isFavorite) ?? false
+        pan = AppVolumeChannelMix.normalizedPan(try container.decodeIfPresent(Double.self, forKey: .pan) ?? 0)
+        isMono = try container.decodeIfPresent(Bool.self, forKey: .isMono) ?? false
     }
 }
 
@@ -994,6 +1061,21 @@ final class AppVolumeService {
         }
     }
 
+    /// 左右平衡：-1 全左、0 居中、+1 全右。
+    func setPan(_ pan: Double, for rootBundleID: String) {
+        let value = AppVolumeChannelMix.normalizedPan(pan)
+        updateAudioProcessingProfile(for: rootBundleID) { profile in
+            profile.pan = value
+        }
+    }
+
+    /// 多声道下混为单声道。
+    func setMono(_ isMono: Bool, for rootBundleID: String) {
+        updateAudioProcessingProfile(for: rootBundleID) { profile in
+            profile.isMono = isMono
+        }
+    }
+
     func muteFilteredSessions() {
         let identifiers = filteredSessions.map(\.rootBundleID)
         identifiers.forEach { setVolume(0, for: $0) }
@@ -1385,7 +1467,9 @@ final class AppVolumeService {
                 equalizer: session.equalizer,
                 outputDeviceUID: session.outputDeviceUID,
                 appGroup: session.appGroup,
-                isFavorite: session.isFavorite
+                isFavorite: session.isFavorite,
+                pan: session.pan,
+                isMono: session.isMono
             )
         }
         guard let profile = profiles[rootBundleID] else { return nil }
@@ -1393,7 +1477,9 @@ final class AppVolumeService {
             equalizer: profile.equalizer,
             outputDeviceUID: profile.outputDeviceUID,
             appGroup: profile.appGroup ?? .other,
-            isFavorite: profile.isFavorite
+            isFavorite: profile.isFavorite,
+            pan: profile.pan,
+            isMono: profile.isMono
         )
     }
 
@@ -1404,6 +1490,8 @@ final class AppVolumeService {
             setFavorite(settings.isFavorite, for: rootBundleID)
             updateAudioProcessingProfile(for: rootBundleID) { profile in
                 profile.equalizer = settings.equalizer
+                profile.pan = settings.pan
+                profile.isMono = settings.isMono
             }
             let device = settings.outputDeviceUID.flatMap { uid in
                 outputDevices.first { $0.uid == uid }
@@ -1417,6 +1505,8 @@ final class AppVolumeService {
         profile.isFavorite = settings.isFavorite
         profile.equalizer = settings.equalizer
         profile.outputDeviceUID = settings.outputDeviceUID
+        profile.pan = settings.pan
+        profile.isMono = settings.isMono
         profiles[rootBundleID] = profile.normalized(maximumGain: maximumAppGain)
         persistProfiles()
         rebuildSessions()
@@ -1769,7 +1859,9 @@ final class AppVolumeService {
               AppVolumeSafetyPolicy.requiresRoute(
                   for: session.volume,
                   equalizer: session.equalizer,
-                  outputDeviceUID: session.outputDeviceUID
+                  outputDeviceUID: session.outputDeviceUID,
+                  pan: session.pan,
+                  isMono: session.isMono
               ),
               !session.processObjectIDs.isEmpty else {
             backend.removeRoute(for: rootBundleID)

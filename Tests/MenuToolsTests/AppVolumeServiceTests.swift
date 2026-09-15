@@ -385,3 +385,34 @@ private func makeVolumeDefaults(_ name: String) throws -> UserDefaults {
     defaults.removePersistentDomain(forName: suiteName)
     return defaults
 }
+
+@Test("左右平衡居中不衰减，全左或全右会静掉对侧")
+func channelMixUsesBalanceLaw() {
+    let center = AppVolumeChannelMix.panGains(pan: 0)
+    #expect(center.left == 1)
+    #expect(center.right == 1)
+
+    let fullRight = AppVolumeChannelMix.panGains(pan: 1)
+    #expect(fullRight.left == 0)
+    #expect(fullRight.right == 1)
+
+    let fullLeft = AppVolumeChannelMix.panGains(pan: -1)
+    #expect(fullLeft.left == 1)
+    #expect(fullLeft.right == 0)
+
+    let halfRight = AppVolumeChannelMix.panGains(pan: 0.5)
+    #expect(abs(halfRight.left - 0.5) < 0.0001)
+    #expect(halfRight.right == 1)
+
+    // 越界与非有限值都会被夹到有效范围
+    #expect(AppVolumeChannelMix.normalizedPan(3) == 1)
+    #expect(AppVolumeChannelMix.normalizedPan(-3) == -1)
+    #expect(AppVolumeChannelMix.normalizedPan(.nan) == 0)
+}
+
+@Test("单声道下混对多声道取平均，单声道原样返回")
+func channelMixDownmixesToMono() {
+    #expect(AppVolumeChannelMix.monoSample(1.0, channelCount: 2) == 0.5)
+    #expect(AppVolumeChannelMix.monoSample(0.6, channelCount: 3) == 0.2)
+    #expect(AppVolumeChannelMix.monoSample(0.4, channelCount: 1) == 0.4)
+}

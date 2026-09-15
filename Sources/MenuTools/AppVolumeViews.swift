@@ -1313,6 +1313,57 @@ private struct AppVolumeEqualizerEditor: View {
             .padding(12)
             .background(Color.primary.opacity(0.035), in: RoundedRectangle(cornerRadius: 10, style: .continuous))
 
+            HStack(spacing: 14) {
+                VStack(alignment: .leading, spacing: 4) {
+                    controlLabel(L("volume.pan.title"), systemImage: "arrow.left.and.right")
+                    HStack(spacing: 8) {
+                        Text("L")
+                            .font(.caption2)
+                            .foregroundStyle(.secondary)
+                        Slider(
+                            value: Binding(
+                                get: { session?.pan ?? 0 },
+                                set: { service.setPan($0, for: rootBundleID) }
+                            ),
+                            in: AppVolumeChannelMix.minimumPan ... AppVolumeChannelMix.maximumPan
+                        )
+                        .controlSize(.small)
+                        .frame(width: 150)
+                        Text("R")
+                            .font(.caption2)
+                            .foregroundStyle(.secondary)
+                        Text("\(Int(((session?.pan ?? 0) * 100).rounded()))%")
+                            .font(.caption2.monospacedDigit())
+                            .foregroundStyle(.secondary)
+                            .frame(width: 34, alignment: .trailing)
+                        Button(L("volume.pan.reset")) {
+                            service.setPan(0, for: rootBundleID)
+                        }
+                        .buttonStyle(.borderless)
+                        .controlSize(.small)
+                        .focusable(false)
+                        .focusEffectDisabled()
+                        .disabled(abs(session?.pan ?? 0) < 0.001)
+                    }
+                }
+
+                Divider()
+
+                Toggle(isOn: Binding(
+                    get: { session?.isMono ?? false },
+                    set: { service.setMono($0, for: rootBundleID) }
+                )) {
+                    Text(L("volume.mono.title"))
+                }
+                .toggleStyle(.switch)
+                .controlSize(.small)
+                .focusable(false)
+                .focusEffectDisabled()
+            }
+            .font(.caption)
+            .padding(12)
+            .background(Color.primary.opacity(0.035), in: RoundedRectangle(cornerRadius: 10, style: .continuous))
+
             VStack(spacing: 10) {
                 HStack {
                     Text("−12 dB")
