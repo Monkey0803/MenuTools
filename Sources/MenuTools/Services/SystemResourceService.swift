@@ -1,5 +1,6 @@
 import Darwin
 import Foundation
+import IOKit
 import Observation
 
 /// CPU 计数器快照；CPU 使用率由相邻两次快照的差值计算。
@@ -8,6 +9,22 @@ struct SystemResourceCPUTicks: Equatable, Sendable {
     let system: UInt64
     let idle: UInt64
     let nice: UInt64
+}
+
+/// 单个 CPU 核心的使用率。
+struct SystemResourceCoreUsage: Equatable, Sendable {
+    let index: Int
+    let usage: Double
+}
+
+/// 内存分区明细（字节）。
+struct SystemResourceMemoryDetail: Equatable, Sendable {
+    let wiredBytes: Int64
+    let activeBytes: Int64
+    let compressedBytes: Int64
+    let cachedBytes: Int64
+    let freeBytes: Int64
+    let totalBytes: Int64
 }
 
 /// 一次系统资源原始读数。
@@ -20,6 +37,17 @@ struct SystemResourceReading: Equatable, Sendable {
     let diskTotalBytes: Int64
     let networkReceivedBytes: Int64
     let networkSentBytes: Int64
+    /// 每核 CPU 计数器（长度等于核心数）。
+    var coreTicks: [SystemResourceCPUTicks] = []
+    /// 内存分区明细的原始页数换算结果。
+    var memoryWiredBytes: Int64 = 0
+    var memoryActiveBytes: Int64 = 0
+    var memoryCompressedBytes: Int64 = 0
+    var memoryCachedBytes: Int64 = 0
+    var memoryFreeBytes: Int64 = 0
+    /// 磁盘累计读写字节（跨所有块设备驱动求和）。
+    var diskReadBytes: Int64 = 0
+    var diskWrittenBytes: Int64 = 0
 }
 
 enum SystemMemoryPressure: Equatable, Sendable {
@@ -42,6 +70,12 @@ struct SystemResourceSnapshot: Equatable, Sendable {
     let diskTotalBytes: Int64
     let networkDownloadBytesPerSecond: Int64
     let networkUploadBytesPerSecond: Int64
+    /// 每核使用率（无数据时为空）。
+    var coreUsages: [SystemResourceCoreUsage] = []
+    /// 内存分区明细；数据源不可用时为 nil。
+    var memoryDetail: SystemResourceMemoryDetail?
+    var diskReadBytesPerSecond: Int64 = 0
+    var diskWriteBytesPerSecond: Int64 = 0
 }
 
 /// 将系统原始读数转换为稳定的 UI 快照。
@@ -53,6 +87,9 @@ enum SystemResourceCalculator {
         let cpuUsage: Double
         let downloadRate: Int64
         let uploadRate: Int64
+        let diskReadRate: Int64
+        let diskWriteRate: Int64
+        var perCoreUsages: [SystemResourceCoreUsage] = []
 
         if let previous {
             let elapsed = max(current.timestamp - previous.timestamp, 0.001)
@@ -64,10 +101,15 @@ enum SystemResourceCalculator {
             cpuUsage = total == 0 ? 0 : min(max(Double(user + system + nice) / Double(total), 0), 1)
             downloadRate = rate(delta(current.networkReceivedBytes, previous.networkReceivedBytes), elapsed)
             uploadRate = rate(delta(current.networkSentBytes, previous.networkSentBytes), elapsed)
+            diskReadRate = rate(delta(current.diskReadBytes, previous.diskReadBytes), elapsed)
+            diskWriteRate = rate(delta(current.diskWrittenBytes, previous.diskWrittenBytes), elapsed)
+            perCoreUsages = coreUsages(current: current, previous: previous)
         } else {
             cpuUsage = 0
             downloadRate = 0
             uploadRate = 0
+            diskReadRate = 0
+            diskWriteRate = 0
         }
 
         let memoryTotal = max(current.memoryTotalBytes, 0)
@@ -91,7 +133,50 @@ enum SystemResourceCalculator {
             diskAvailableBytes: max(current.diskAvailableBytes, 0),
             diskTotalBytes: max(current.diskTotalBytes, 0),
             networkDownloadBytesPerSecond: downloadRate,
-            networkUploadBytesPerSecond: uploadRate
+            networkUploadBytesPerSecond: uploadRate,
+            coreUsages: perCoreUsages,
+            memoryDetail: memoryDetail(current),
+            diskReadBytesPerSecond: diskReadRate,
+            diskWriteBytesPerSecond: diskWriteRate
+        )
+    }
+
+    /// 每核使用率：按核心下标与上一次读数配对；数量不一致时只算能对上的部分。
+    private static func coreUsages(
+        current: SystemResourceReading,
+        previous: SystemResourceReading
+    ) -> [SystemResourceCoreUsage] {
+        let count = min(current.coreTicks.count, previous.coreTicks.count)
+        guard count > 0 else { return [] }
+        return (0 ..< count).compactMap { index in
+            let now = current.coreTicks[index]
+            let before = previous.coreTicks[index]
+            let user = delta(now.user, before.user)
+            let system = delta(now.system, before.system)
+            let idle = delta(now.idle, before.idle)
+            let nice = delta(now.nice, before.nice)
+            let total = user + system + idle + nice
+            guard total > 0 else { return nil }
+            let usage = min(max(Double(user + system + nice) / Double(total), 0), 1)
+            return SystemResourceCoreUsage(index: index, usage: usage)
+        }
+    }
+
+    /// 内存分区明细：全部为 0 时视为数据源不可用。
+    private static func memoryDetail(_ reading: SystemResourceReading) -> SystemResourceMemoryDetail? {
+        let wired = max(reading.memoryWiredBytes, 0)
+        let active = max(reading.memoryActiveBytes, 0)
+        let compressed = max(reading.memoryCompressedBytes, 0)
+        let cached = max(reading.memoryCachedBytes, 0)
+        let free = max(reading.memoryFreeBytes, 0)
+        guard wired + active + compressed + cached + free > 0 else { return nil }
+        return SystemResourceMemoryDetail(
+            wiredBytes: wired,
+            activeBytes: active,
+            compressedBytes: compressed,
+            cachedBytes: cached,
+            freeBytes: free,
+            totalBytes: max(reading.memoryTotalBytes, 0)
         )
     }
 
@@ -109,6 +194,34 @@ enum SystemResourceCalculator {
     }
 }
 
+/// 汇总 IOKit 块设备驱动统计里的累计读写字节。
+enum SystemResourceDiskStatisticsParser {
+    static let statisticsKey = "Statistics"
+    static let bytesReadKey = "Bytes (Read)"
+    static let bytesWrittenKey = "Bytes (Write)"
+
+    /// 入参是每个驱动服务的 Statistics 字典；字段缺失或类型异常按 0 计。
+    static func counters(fromStatistics statistics: [[String: Any]]) -> (read: Int64, written: Int64) {
+        var read: Int64 = 0
+        var written: Int64 = 0
+        for entry in statistics {
+            read += int64(entry[bytesReadKey])
+            written += int64(entry[bytesWrittenKey])
+        }
+        return (read, written)
+    }
+
+    private static func int64(_ value: Any?) -> Int64 {
+        switch value {
+        case let number as Int64: return max(number, 0)
+        case let number as Int: return max(Int64(number), 0)
+        case let number as UInt64: return number > UInt64(Int64.max) ? 0 : Int64(number)
+        case let number as NSNumber: return max(number.int64Value, 0)
+        default: return 0
+        }
+    }
+}
+
 protocol SystemResourceProviding: Sendable {
     func read() -> SystemResourceReading
 }
@@ -118,6 +231,8 @@ struct DefaultSystemResourceProvider: SystemResourceProviding {
         let memory = memoryReading()
         let disk = diskReading()
         let network = networkReading()
+        let memoryDetail = memoryDetailReading()
+        let diskCounters = diskCounterReading()
         return SystemResourceReading(
             timestamp: ProcessInfo.processInfo.systemUptime,
             cpuTicks: cpuReading(),
@@ -126,8 +241,94 @@ struct DefaultSystemResourceProvider: SystemResourceProviding {
             diskAvailableBytes: disk.available,
             diskTotalBytes: disk.total,
             networkReceivedBytes: network.received,
-            networkSentBytes: network.sent
+            networkSentBytes: network.sent,
+            coreTicks: coreReadings(),
+            memoryWiredBytes: memoryDetail.wired,
+            memoryActiveBytes: memoryDetail.active,
+            memoryCompressedBytes: memoryDetail.compressed,
+            memoryCachedBytes: memoryDetail.cached,
+            memoryFreeBytes: memoryDetail.free,
+            diskReadBytes: diskCounters.read,
+            diskWrittenBytes: diskCounters.written
         )
+    }
+
+    /// 每核 CPU 计数器。
+    private func coreReadings() -> [SystemResourceCPUTicks] {
+        var cpuCount: natural_t = 0
+        var info: processor_info_array_t?
+        var infoCount: mach_msg_type_number_t = 0
+        let result = host_processor_info(
+            mach_host_self(),
+            PROCESSOR_CPU_LOAD_INFO,
+            &cpuCount,
+            &info,
+            &infoCount
+        )
+        guard result == KERN_SUCCESS, let info, cpuCount > 0 else { return [] }
+        defer {
+            vm_deallocate(
+                mach_task_self_,
+                vm_address_t(UInt(bitPattern: info)),
+                vm_size_t(Int(infoCount) * MemoryLayout<integer_t>.stride)
+            )
+        }
+        return (0 ..< Int(cpuCount)).map { core in
+            let base = core * Int(CPU_STATE_MAX)
+            return SystemResourceCPUTicks(
+                user: UInt64(info[base + Int(CPU_STATE_USER)]),
+                system: UInt64(info[base + Int(CPU_STATE_SYSTEM)]),
+                idle: UInt64(info[base + Int(CPU_STATE_IDLE)]),
+                nice: UInt64(info[base + Int(CPU_STATE_NICE)])
+            )
+        }
+    }
+
+    /// 内存分区明细，来自 vm_statistics64 的页数。
+    private func memoryDetailReading() -> (wired: Int64, active: Int64, compressed: Int64, cached: Int64, free: Int64) {
+        var info = vm_statistics64()
+        var count = mach_msg_type_number_t(
+            MemoryLayout<vm_statistics64_data_t>.stride / MemoryLayout<integer_t>.stride
+        )
+        let result = withUnsafeMutablePointer(to: &info) { pointer in
+            pointer.withMemoryRebound(to: integer_t.self, capacity: Int(count)) {
+                host_statistics64(mach_host_self(), HOST_VM_INFO64, $0, &count)
+            }
+        }
+        guard result == KERN_SUCCESS else { return (0, 0, 0, 0, 0) }
+        var pageSize: vm_size_t = 0
+        host_page_size(mach_host_self(), &pageSize)
+        let page = Int64(pageSize)
+        return (
+            Int64(info.wire_count) * page,
+            Int64(info.active_count) * page,
+            Int64(info.compressor_page_count) * page,
+            (Int64(info.purgeable_count) + Int64(info.speculative_count)) * page,
+            Int64(info.free_count) * page
+        )
+    }
+
+    /// 磁盘累计读写字节：遍历块设备驱动服务的统计属性。
+    private func diskCounterReading() -> (read: Int64, written: Int64) {
+        guard let matching = IOServiceMatching("IOBlockStorageDriver") else { return (0, 0) }
+        var iterator: io_iterator_t = 0
+        guard IOServiceGetMatchingServices(kIOMainPortDefault, matching, &iterator) == KERN_SUCCESS else {
+            return (0, 0)
+        }
+        defer { IOObjectRelease(iterator) }
+
+        var statistics: [[String: Any]] = []
+        while case let service = IOIteratorNext(iterator), service != 0 {
+            defer { IOObjectRelease(service) }
+            guard let property = IORegistryEntryCreateCFProperty(
+                service,
+                SystemResourceDiskStatisticsParser.statisticsKey as CFString,
+                kCFAllocatorDefault,
+                0
+            )?.takeRetainedValue() as? [String: Any] else { continue }
+            statistics.append(property)
+        }
+        return SystemResourceDiskStatisticsParser.counters(fromStatistics: statistics)
     }
 
     private func cpuReading() -> SystemResourceCPUTicks {
