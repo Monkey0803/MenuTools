@@ -95,6 +95,57 @@ enum AppVolumeQuickAccessLayout {
     }
 }
 
+/// 音量设置页的一级任务，默认进入调音台而不是配置项列表。
+enum AppVolumeSettingsPage: String, CaseIterable, Identifiable {
+    case mixer
+    case devices
+    case scenes
+    case settings
+
+    var id: Self { self }
+
+    var titleKey: String { "volume.page.\(rawValue)" }
+
+    var symbol: String {
+        switch self {
+        case .mixer: "slider.horizontal.3"
+        case .devices: "hifispeaker.and.homepod"
+        case .scenes: "wand.and.stars"
+        case .settings: "gearshape"
+        }
+    }
+}
+
+/// 将服务层已筛选的会话分成“正在发声”和“已记住”，避免视图自行改变排序。
+struct AppVolumeMixerContent: Equatable {
+    let active: [AppAudioSession]
+    let remembered: [AppAudioSession]
+    let hasNarrowingFilter: Bool
+
+    init(
+        sessions: [AppAudioSession],
+        searchQuery: String,
+        filter: AppVolumeSessionFilter,
+        group: AppVolumeAppGroup?
+    ) {
+        active = sessions.filter(\.isRunningOutput)
+        remembered = sessions.filter { !$0.isRunningOutput }
+        hasNarrowingFilter = !searchQuery.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+            || filter != .all
+            || group != nil
+    }
+
+    /// 已记住的 App 只有在存在、且用户展开或正在筛选时才显示。
+    func showsRemembered(userExpanded: Bool) -> Bool {
+        !remembered.isEmpty && (userExpanded || hasNarrowingFilter)
+    }
+
+    /// 活跃列表为空时，用于区分「没有播放中的应用」与「筛选无结果」。
+    var emptyStateKey: String {
+        hasNarrowingFilter ? "volume.empty.filtered" : "volume.empty.idle"
+    }
+}
+
 enum AppVolumeRowInteractionPolicy {
     static func canAdjust(isEnabled: Bool) -> Bool {
         isEnabled
@@ -200,148 +251,41 @@ struct AppVolumeSettingsView: View {
     @State private var didCopyDiagnostic = false
     @State private var isInputLevelMonitoring = false
     @State private var channelTester = AppVolumeChannelTester.shared
+    @State private var page: AppVolumeSettingsPage = .mixer
+    /// 「已记住」分区由用户手动展开；有搜索/筛选时自动展开。
+    @State private var showsRememberedSessions = false
     @State private var presetSync = AppVolumePresetSyncService.shared
     @State private var presetSyncPassphrase = ""
     @State private var presetSyncConflictCopies: [URL] = []
 
-    private var activeSessions: [AppAudioSession] {
-        service.filteredSessions.filter(\.isRunningOutput)
-    }
-
-    private var rememberedSessions: [AppAudioSession] {
-        service.filteredSessions.filter { !$0.isRunningOutput }
+    /// 调音台内容：服务层已经排好序，这里只做「正在发声 / 已记住」分区。
+    private var mixerContent: AppVolumeMixerContent {
+        AppVolumeMixerContent(
+            sessions: service.filteredSessions,
+            searchQuery: service.searchQuery,
+            filter: service.sessionFilter,
+            group: service.appGroupFilter
+        )
     }
 
     var body: some View {
         Form {
             Section {
-                HStack(alignment: .center, spacing: 12) {
-                    VStack(alignment: .leading, spacing: 2) {
-                        Text(L("volume.enabled"))
-                        Text(L("volume.enabled.desc"))
-                            .font(.caption)
-                            .foregroundStyle(.secondary)
-                    }
-                    Spacer(minLength: 12)
-                    Toggle("", isOn: Binding(
-                        get: { service.isEnabled },
-                        set: { service.setEnabled($0) }
-                    ))
-                    .labelsHidden()
-                    .accessibilityLabel(L("volume.enabled"))
-                }
-
-                Picker(selection: Binding(
-                    get: { service.menuBarDisplayMode },
-                    set: { service.setMenuBarDisplayMode($0) }
-                )) {
-                    ForEach(AppVolumeMenuBarDisplayMode.allCases, id: \.self) { mode in
-                        Text(L(mode.titleKey)).tag(mode)
-                    }
-                } label: {
-                    Label(L("volume.menuBar.title"), systemImage: "menubar.rectangle")
-                }
-
-                if service.permissionState == .denied {
-                    LabeledContent(L("volume.permission.status")) {
-                        HStack(spacing: 8) {
-                            Text(L("volume.permission.denied"))
-                                .foregroundStyle(.orange)
-                            Button(L("volume.openSettings"), action: openSystemSettings)
-                        }
-                    }
-                } else if service.permissionState == .notRequested {
-                    LabeledContent(
-                        L("volume.permission.status"),
-                        value: L("volume.permission.pending")
-                    )
-                } else {
-                    LabeledContent(L("volume.permission.status")) {
-                        Label(L("volume.permission.authorized"), systemImage: "checkmark.circle.fill")
-                            .foregroundStyle(.green)
+                Picker(L("volume.page.title"), selection: $page) {
+                    ForEach(AppVolumeSettingsPage.allCases) { item in
+                        Label(L(item.titleKey), systemImage: item.symbol).tag(item)
                     }
                 }
-
-                Button(L("volume.resetAll"), role: .destructive) {
-                    service.resetAllProfiles()
-                }
-                .disabled(!service.hasProfiles)
-
-                if !shortcutService.isAccessibilityTrusted {
-                    LabeledContent(L("volume.shortcut")) {
-                        HStack(spacing: 8) {
-                            Label(L("shortcut.permission"), systemImage: "exclamationmark.triangle.fill")
-                                .foregroundStyle(.orange)
-                            Button(L("shortcut.openPermission"), action: openAccessibilitySettings)
-                        }
-                    }
-                }
-
-                Picker(L("volume.filter"), selection: Binding(
-                    get: { service.sessionFilter },
-                    set: { service.setSessionFilter($0) }
-                )) {
-                    ForEach(AppVolumeSessionFilter.allCases, id: \.self) { filter in
-                        Text(L("volume.filter.\(filter.rawValue)")).tag(filter)
-                    }
-                }
-
-                Picker(L("volume.step"), selection: Binding(
-                    get: { service.volumeStep },
-                    set: { service.setVolumeStep($0) }
-                )) {
-                    Text("1%").tag(0.01)
-                    Text("5%").tag(0.05)
-                    Text("10%").tag(0.1)
-                    Text("15%").tag(0.15)
-                }
-
-                Toggle(L("volume.boost"), isOn: Binding(
-                    get: { service.isBoostEnabled },
-                    set: { service.setBoostEnabled($0) }
-                ))
-
-                Text(L("volume.shortcut.mediaKeyHint"))
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
-
-                ForEach(AppVolumeShortcutAction.allCases) { action in
-                    volumeShortcutControl(for: action)
-                }
-            } header: {
-                Label(L("volume.section.control"), systemImage: "waveform.badge.magnifyingglass")
+                .pickerStyle(.segmented)
+                .labelsHidden()
+                .focusable(false)
+                .focusEffectDisabled()
             }
 
+            if page == .mixer {
             Section {
                 SystemOutputVolumeRow(service: service, compact: false)
 
-                HStack(spacing: 8) {
-                    Label(L("volume.channelTest.title"), systemImage: "waveform")
-                        .font(.caption)
-                        .foregroundStyle(.secondary)
-                    Spacer()
-                    ForEach(AppVolumeChannelTester.Channel.allCases, id: \.self) { channel in
-                        Button(L(channel.titleKey)) {
-                            channelTester.play(channel)
-                        }
-                        .buttonStyle(.bordered)
-                        .controlSize(.small)
-                        .focusable(false)
-                        .focusEffectDisabled()
-                    }
-                    if channelTester.isPlaying {
-                        Button(L("volume.channelTest.stop")) {
-                            channelTester.stop()
-                        }
-                        .buttonStyle(.bordered)
-                        .controlSize(.small)
-                        .focusable(false)
-                        .focusEffectDisabled()
-                    }
-                }
-
-                Text(L("volume.channelTest.desc"))
-                    .font(.caption)
                     .foregroundStyle(.secondary)
             } header: {
                 Label(L("volume.section.output"), systemImage: "speaker.wave.2")
@@ -350,29 +294,6 @@ struct AppVolumeSettingsView: View {
             Section {
                 SystemInputVolumeRow(service: service)
 
-                Toggle(L("volume.input.liveLevel"), isOn: $isInputLevelMonitoring)
-                    .onChange(of: isInputLevelMonitoring) { _, isEnabled in
-                        if isEnabled {
-                            service.startInputLevelMonitoring()
-                        } else {
-                            service.stopInputLevelMonitoring()
-                        }
-                    }
-
-                Text(L("volume.input.liveLevel.desc"))
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
-
-                Button(L("volume.meeting.check")) {
-                    _ = service.runMeetingAudioCheck()
-                }
-                if let meetingCheck = service.meetingCheck {
-                    Label(
-                        meetingCheck.isReady ? L("volume.meeting.ready") : L("volume.meeting.attention"),
-                        systemImage: meetingCheck.isReady ? "checkmark.circle.fill" : "exclamationmark.triangle.fill"
-                    )
-                    .foregroundStyle(meetingCheck.isReady ? .green : .orange)
-                }
             } header: {
                 Label(L("volume.section.input"), systemImage: "mic")
             }
@@ -407,11 +328,16 @@ struct AppVolumeSettingsView: View {
                     Button(L("volume.muteFiltered"), action: service.muteFilteredSessions)
                     Button(L("volume.restoreFiltered"), action: service.restoreFilteredSessions)
                 }
-                if activeSessions.isEmpty {
-                    Text(L("volume.empty"))
+                Toggle(L("volume.remembered.show"), isOn: $showsRememberedSessions)
+                    .font(.caption)
+                    .focusable(false)
+                    .focusEffectDisabled()
+
+                if mixerContent.active.isEmpty {
+                    Text(L(mixerContent.emptyStateKey))
                         .foregroundStyle(.secondary)
                 } else {
-                    ForEach(activeSessions) { session in
+                    ForEach(mixerContent.active) { session in
                         AppVolumeRow(service: service, session: session, compact: false)
                     }
                 }
@@ -419,9 +345,9 @@ struct AppVolumeSettingsView: View {
                 Label(L("volume.section.active"), systemImage: "waveform")
             }
 
-            if !rememberedSessions.isEmpty {
+            if mixerContent.showsRemembered(userExpanded: showsRememberedSessions) {
                 Section {
-                    ForEach(rememberedSessions) { session in
+                    ForEach(mixerContent.remembered) { session in
                         AppVolumeRow(service: service, session: session, compact: false)
                     }
                 } header: {
@@ -430,29 +356,6 @@ struct AppVolumeSettingsView: View {
             }
 
             Section {
-                HStack {
-                    Text(L("volume.masterLimit"))
-                    Slider(value: Binding(
-                        get: { service.masterVolumeLimit },
-                        set: { service.setMasterVolumeLimit($0) }
-                    ), in: 0.1...1)
-                    Text("\(Int((service.masterVolumeLimit * 100).rounded()))%")
-                        .font(.caption.monospacedDigit())
-                        .foregroundStyle(.secondary)
-                }
-                Toggle(L("volume.masterLimit.headphones"), isOn: Binding(
-                    get: { service.limitsHeadphoneVolume },
-                    set: { service.setLimitsHeadphoneVolume($0) }
-                ))
-                if let warning = service.hearingWarningMessage {
-                    HStack {
-                        Label(warning, systemImage: "ear.trianglebadge.exclamationmark")
-                            .foregroundStyle(.orange)
-                        Spacer()
-                        Button(L("common.gotIt"), action: service.dismissHearingWarning)
-                    }
-                }
-            Section {
                 ForEach(AppVolumeAppGroup.allCases, id: \.self) { group in
                     AppVolumeGroupVolumeRow(service: service, group: group)
                 }
@@ -460,71 +363,70 @@ struct AppVolumeSettingsView: View {
                 Label(L("volume.groupVolume.title"), systemImage: "dial.medium")
             }
 
-            } header: {
-                Label(L("volume.hearing.title"), systemImage: "ear")
-            }
+            } else if page == .devices {
+                AppVolumeOutputDeviceSection(service: service)
+                AppVolumeInputDeviceSection(service: service)
 
-            Section {
-                Toggle(L("volume.meetingDucking"), isOn: Binding(
-                    get: { service.meetingDuckingEnabled },
-                    set: { service.setMeetingDuckingEnabled($0) }
-                ))
-                HStack {
-                    Text(L("volume.meetingDucking.keepVolume"))
-                    Slider(value: Binding(
-                        get: { service.meetingDuckingFactor },
-                        set: { service.setMeetingDuckingFactor($0) }
-                    ), in: 0.1...0.8)
-                    Text("\(Int((service.meetingDuckingFactor * 100).rounded()))%")
-                        .font(.caption.monospacedDigit())
-                        .foregroundStyle(.secondary)
-                }
-                if service.isMeetingDuckingActive {
-                    Label(L("volume.meetingDucking.active"), systemImage: "person.2.wave.2.fill")
+                Section {
+                HStack(spacing: 8) {
+                    Label(L("volume.channelTest.title"), systemImage: "waveform")
                         .font(.caption)
-                        .foregroundStyle(.tint)
-                }
-            Section {
-                if let remaining = service.sleepTimerRemainingMinutes {
-                    LabeledContent(L("volume.sleepTimer.active", remaining)) {
-                        Button(L("volume.sleepTimer.cancel")) {
-                            service.cancelSleepTimer()
+                        .foregroundStyle(.secondary)
+                    Spacer()
+                    ForEach(AppVolumeChannelTester.Channel.allCases, id: \.self) { channel in
+                        Button(L(channel.titleKey)) {
+                            channelTester.play(channel)
                         }
+                        .buttonStyle(.bordered)
+                        .controlSize(.small)
+                        .focusable(false)
+                        .focusEffectDisabled()
                     }
-                } else {
-                    Menu(L("volume.sleepTimer.start")) {
-                        ForEach(AppVolumeSleepTimer.minuteOptions, id: \.self) { minutes in
-                            Button(L("volume.sleepTimer.minutes", minutes)) {
-                                service.startSleepTimer(minutes: minutes)
-                            }
+                    if channelTester.isPlaying {
+                        Button(L("volume.channelTest.stop")) {
+                            channelTester.stop()
                         }
+                        .buttonStyle(.bordered)
+                        .controlSize(.small)
+                        .focusable(false)
+                        .focusEffectDisabled()
                     }
-                    .frame(maxWidth: 220, alignment: .leading)
                 }
 
-                Text(L("volume.sleepTimer.desc"))
+                Text(L("volume.channelTest.desc"))
+                    .font(.caption)
+                } header: {
+                    Label(L("volume.channelTest.title"), systemImage: "waveform")
+                }
+
+                Section {
+                Toggle(L("volume.input.liveLevel"), isOn: $isInputLevelMonitoring)
+                    .onChange(of: isInputLevelMonitoring) { _, isEnabled in
+                        if isEnabled {
+                            service.startInputLevelMonitoring()
+                        } else {
+                            service.stopInputLevelMonitoring()
+                        }
+                    }
+
+                Text(L("volume.input.liveLevel.desc"))
                     .font(.caption)
                     .foregroundStyle(.secondary)
 
-                if service.sleepTimerDidFinish {
-                    HStack(spacing: 8) {
-                        Label(L("volume.sleepTimer.finished"), systemImage: "moon.zzz.fill")
-                            .foregroundStyle(.secondary)
-                        Button(L("volume.sleepTimer.dismiss")) {
-                            service.acknowledgeSleepTimerFinish()
-                        }
-                        .buttonStyle(.borderless)
-                        .controlSize(.small)
-                    }
+                Button(L("volume.meeting.check")) {
+                    _ = service.runMeetingAudioCheck()
                 }
-            } header: {
-                Label(L("volume.sleepTimer.title"), systemImage: "moon.zzz")
-            }
-
-            } header: {
-                Label(L("volume.meetingDucking.title"), systemImage: "person.2.wave.2")
-            }
-
+                if let meetingCheck = service.meetingCheck {
+                    Label(
+                        meetingCheck.isReady ? L("volume.meeting.ready") : L("volume.meeting.attention"),
+                        systemImage: meetingCheck.isReady ? "checkmark.circle.fill" : "exclamationmark.triangle.fill"
+                    )
+                    .foregroundStyle(meetingCheck.isReady ? .green : .orange)
+                }
+                } header: {
+                    Label(L("volume.input.monitor.title"), systemImage: "waveform.badge.mic")
+                }
+            } else if page == .scenes {
             Section {
                 HStack {
                     TextField(L("volume.preset.name"), text: $presetName)
@@ -723,36 +625,6 @@ struct AppVolumeSettingsView: View {
             }
 
             Section {
-                LabeledContent(L("volume.notification.permission.title")) {
-                    HStack(spacing: 8) {
-                        Text(L(service.notificationPermission.titleKey))
-                            .foregroundStyle(service.notificationPermission == .denied ? .orange : .secondary)
-                        if service.notificationPermission != .authorized {
-                            Button(L("volume.notification.openSettings"), action: openSystemSettings)
-                        }
-                    }
-                }
-                ForEach(AppVolumeNotificationKind.allCases, id: \.self) { kind in
-                    Toggle(isOn: Binding(
-                        get: { service.notificationPolicy.isEnabled(kind) },
-                        set: { service.setNotificationEnabled($0, for: kind) }
-                    )) {
-                        VStack(alignment: .leading, spacing: 2) {
-                            Text(L(kind.titleKey))
-                            Text(L(kind.detailKey))
-                                .font(.caption)
-                                .foregroundStyle(.secondary)
-                        }
-                    }
-                }
-            } header: {
-                Label(L("volume.notification.title"), systemImage: "bell.badge")
-            }
-            .onAppear {
-                Task { await service.refreshNotificationPermission() }
-            }
-
-            Section {
                 Text(L("volume.presetSync.desc"))
                     .font(.caption)
                     .foregroundStyle(.secondary)
@@ -845,6 +717,221 @@ struct AppVolumeSettingsView: View {
             }
             .onAppear(perform: refreshPresetSyncState)
 
+            } else {
+            Section {
+                HStack(alignment: .center, spacing: 12) {
+                    VStack(alignment: .leading, spacing: 2) {
+                        Text(L("volume.enabled"))
+                        Text(L("volume.enabled.desc"))
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                    }
+                    Spacer(minLength: 12)
+                    Toggle("", isOn: Binding(
+                        get: { service.isEnabled },
+                        set: { service.setEnabled($0) }
+                    ))
+                    .labelsHidden()
+                    .accessibilityLabel(L("volume.enabled"))
+                }
+
+                Picker(selection: Binding(
+                    get: { service.menuBarDisplayMode },
+                    set: { service.setMenuBarDisplayMode($0) }
+                )) {
+                    ForEach(AppVolumeMenuBarDisplayMode.allCases, id: \.self) { mode in
+                        Text(L(mode.titleKey)).tag(mode)
+                    }
+                } label: {
+                    Label(L("volume.menuBar.title"), systemImage: "menubar.rectangle")
+                }
+
+                if service.permissionState == .denied {
+                    LabeledContent(L("volume.permission.status")) {
+                        HStack(spacing: 8) {
+                            Text(L("volume.permission.denied"))
+                                .foregroundStyle(.orange)
+                            Button(L("volume.openSettings"), action: openSystemSettings)
+                        }
+                    }
+                } else if service.permissionState == .notRequested {
+                    LabeledContent(
+                        L("volume.permission.status"),
+                        value: L("volume.permission.pending")
+                    )
+                } else {
+                    LabeledContent(L("volume.permission.status")) {
+                        Label(L("volume.permission.authorized"), systemImage: "checkmark.circle.fill")
+                            .foregroundStyle(.green)
+                    }
+                }
+
+                Button(L("volume.resetAll"), role: .destructive) {
+                    service.resetAllProfiles()
+                }
+                .disabled(!service.hasProfiles)
+
+                if !shortcutService.isAccessibilityTrusted {
+                    LabeledContent(L("volume.shortcut")) {
+                        HStack(spacing: 8) {
+                            Label(L("shortcut.permission"), systemImage: "exclamationmark.triangle.fill")
+                                .foregroundStyle(.orange)
+                            Button(L("shortcut.openPermission"), action: openAccessibilitySettings)
+                        }
+                    }
+                }
+
+                Picker(L("volume.filter"), selection: Binding(
+                    get: { service.sessionFilter },
+                    set: { service.setSessionFilter($0) }
+                )) {
+                    ForEach(AppVolumeSessionFilter.allCases, id: \.self) { filter in
+                        Text(L("volume.filter.\(filter.rawValue)")).tag(filter)
+                    }
+                }
+
+                Picker(L("volume.step"), selection: Binding(
+                    get: { service.volumeStep },
+                    set: { service.setVolumeStep($0) }
+                )) {
+                    Text("1%").tag(0.01)
+                    Text("5%").tag(0.05)
+                    Text("10%").tag(0.1)
+                    Text("15%").tag(0.15)
+                }
+
+                Toggle(L("volume.boost"), isOn: Binding(
+                    get: { service.isBoostEnabled },
+                    set: { service.setBoostEnabled($0) }
+                ))
+
+                Text(L("volume.shortcut.mediaKeyHint"))
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+
+                ForEach(AppVolumeShortcutAction.allCases) { action in
+                    volumeShortcutControl(for: action)
+                }
+            } header: {
+                Label(L("volume.section.control"), systemImage: "waveform.badge.magnifyingglass")
+            }
+
+            Section {
+                HStack {
+                    Text(L("volume.masterLimit"))
+                    Slider(value: Binding(
+                        get: { service.masterVolumeLimit },
+                        set: { service.setMasterVolumeLimit($0) }
+                    ), in: 0.1...1)
+                    Text("\(Int((service.masterVolumeLimit * 100).rounded()))%")
+                        .font(.caption.monospacedDigit())
+                        .foregroundStyle(.secondary)
+                }
+                Toggle(L("volume.masterLimit.headphones"), isOn: Binding(
+                    get: { service.limitsHeadphoneVolume },
+                    set: { service.setLimitsHeadphoneVolume($0) }
+                ))
+                if let warning = service.hearingWarningMessage {
+                    HStack {
+                        Label(warning, systemImage: "ear.trianglebadge.exclamationmark")
+                            .foregroundStyle(.orange)
+                        Spacer()
+                        Button(L("common.gotIt"), action: service.dismissHearingWarning)
+                    }
+                }
+            } header: {
+                Label(L("volume.hearing.title"), systemImage: "ear")
+            }
+            Section {
+                Toggle(L("volume.meetingDucking"), isOn: Binding(
+                    get: { service.meetingDuckingEnabled },
+                    set: { service.setMeetingDuckingEnabled($0) }
+                ))
+                HStack {
+                    Text(L("volume.meetingDucking.keepVolume"))
+                    Slider(value: Binding(
+                        get: { service.meetingDuckingFactor },
+                        set: { service.setMeetingDuckingFactor($0) }
+                    ), in: 0.1...0.8)
+                    Text("\(Int((service.meetingDuckingFactor * 100).rounded()))%")
+                        .font(.caption.monospacedDigit())
+                        .foregroundStyle(.secondary)
+                }
+                if service.isMeetingDuckingActive {
+                    Label(L("volume.meetingDucking.active"), systemImage: "person.2.wave.2.fill")
+                        .font(.caption)
+                        .foregroundStyle(.tint)
+                }
+            } header: {
+                Label(L("volume.meetingDucking.title"), systemImage: "person.2.wave.2")
+            }
+            Section {
+                if let remaining = service.sleepTimerRemainingMinutes {
+                    LabeledContent(L("volume.sleepTimer.active", remaining)) {
+                        Button(L("volume.sleepTimer.cancel")) {
+                            service.cancelSleepTimer()
+                        }
+                    }
+                } else {
+                    Menu(L("volume.sleepTimer.start")) {
+                        ForEach(AppVolumeSleepTimer.minuteOptions, id: \.self) { minutes in
+                            Button(L("volume.sleepTimer.minutes", minutes)) {
+                                service.startSleepTimer(minutes: minutes)
+                            }
+                        }
+                    }
+                    .frame(maxWidth: 220, alignment: .leading)
+                }
+
+                Text(L("volume.sleepTimer.desc"))
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+
+                if service.sleepTimerDidFinish {
+                    HStack(spacing: 8) {
+                        Label(L("volume.sleepTimer.finished"), systemImage: "moon.zzz.fill")
+                            .foregroundStyle(.secondary)
+                        Button(L("volume.sleepTimer.dismiss")) {
+                            service.acknowledgeSleepTimerFinish()
+                        }
+                        .buttonStyle(.borderless)
+                        .controlSize(.small)
+                    }
+                }
+            } header: {
+                Label(L("volume.sleepTimer.title"), systemImage: "moon.zzz")
+            }
+
+            Section {
+                LabeledContent(L("volume.notification.permission.title")) {
+                    HStack(spacing: 8) {
+                        Text(L(service.notificationPermission.titleKey))
+                            .foregroundStyle(service.notificationPermission == .denied ? .orange : .secondary)
+                        if service.notificationPermission != .authorized {
+                            Button(L("volume.notification.openSettings"), action: openSystemSettings)
+                        }
+                    }
+                }
+                ForEach(AppVolumeNotificationKind.allCases, id: \.self) { kind in
+                    Toggle(isOn: Binding(
+                        get: { service.notificationPolicy.isEnabled(kind) },
+                        set: { service.setNotificationEnabled($0, for: kind) }
+                    )) {
+                        VStack(alignment: .leading, spacing: 2) {
+                            Text(L(kind.titleKey))
+                            Text(L(kind.detailKey))
+                                .font(.caption)
+                                .foregroundStyle(.secondary)
+                        }
+                    }
+                }
+            } header: {
+                Label(L("volume.notification.title"), systemImage: "bell.badge")
+            }
+            .onAppear {
+                Task { await service.refreshNotificationPermission() }
+            }
+
             Section {
                 ForEach(service.selfCheckSteps) { step in
                     HStack(alignment: .top, spacing: 8) {
@@ -875,6 +962,7 @@ struct AppVolumeSettingsView: View {
                 Label(L("volume.diagnostics.title"), systemImage: "stethoscope")
             }
         }
+            }
         .formStyle(.grouped)
         .onAppear {
             shortcutService.refreshAccessibilityTrust()
@@ -1540,6 +1628,79 @@ private struct AppVolumeRow: View {
                 .resizable()
                 .scaledToFit()
                 .foregroundStyle(.secondary)
+        }
+    }
+}
+
+/// 输出设备选择（独立成页，调音台只保留音量条）。
+private struct AppVolumeOutputDeviceSection: View {
+    @Bindable var service: AppVolumeService
+
+    var body: some View {
+        Section {
+            if service.outputDevices.isEmpty {
+                Text(L("volume.output.none"))
+                    .foregroundStyle(.secondary)
+            } else {
+                ForEach(service.outputDevices) { device in
+                    Button {
+                        service.selectOutputDevice(device)
+                    } label: {
+                        HStack(spacing: 8) {
+                            Label(
+                                device.name,
+                                systemImage: device.isDefault ? "checkmark.seal" : "speaker.wave.2"
+                            )
+                            Spacer()
+                            if device.uid == service.output.deviceUID {
+                                Image(systemName: "checkmark")
+                                    .foregroundStyle(Color.accentColor)
+                            }
+                        }
+                        .contentShape(Rectangle())
+                    }
+                    .buttonStyle(.plain)
+                    .focusable(false)
+                    .focusEffectDisabled()
+                }
+            }
+        } header: {
+            Label(L("volume.section.output"), systemImage: "speaker.wave.2")
+        }
+    }
+}
+
+/// 输入设备选择。
+private struct AppVolumeInputDeviceSection: View {
+    @Bindable var service: AppVolumeService
+
+    var body: some View {
+        Section {
+            if service.inputDevices.isEmpty {
+                Text(L("volume.input.none"))
+                    .foregroundStyle(.secondary)
+            } else {
+                ForEach(service.inputDevices) { device in
+                    Button {
+                        service.selectInputDevice(device)
+                    } label: {
+                        HStack(spacing: 8) {
+                            Label(device.name, systemImage: "mic")
+                            Spacer()
+                            if device.uid == service.input.deviceUID {
+                                Image(systemName: "checkmark")
+                                    .foregroundStyle(Color.accentColor)
+                            }
+                        }
+                        .contentShape(Rectangle())
+                    }
+                    .buttonStyle(.plain)
+                    .focusable(false)
+                    .focusEffectDisabled()
+                }
+            }
+        } header: {
+            Label(L("volume.section.input"), systemImage: "mic")
         }
     }
 }

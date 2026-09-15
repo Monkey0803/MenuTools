@@ -871,6 +871,16 @@
 "volume.mute" = "시스템 출력 음소거";
 "volume.output.unknown" = "현재 출력 기기";
 "volume.output.fixed" = "이 출력 기기는 마스터 볼륨을 조절할 수 없습니다. 기기 자체의 볼륨 조절을 사용하세요.";
+"volume.page.title" = "볼륨 페이지";
+"volume.page.mixer" = "믹서";
+"volume.page.devices" = "기기";
+"volume.page.scenes" = "장면";
+"volume.page.settings" = "설정";
+"volume.empty.idle" = "지금 소리를 내는 App이 없습니다";
+"volume.empty.filtered" = "조건에 맞는 App이 없습니다";
+"volume.remembered.show" = "기억된 App 표시";
+"volume.input.monitor.title" = "마이크 및 회의";
+"volume.input.none" = "입력 기기를 찾지 못했습니다";
 "volume.section.control" = "App별 볼륨 제어";
 "volume.section.output" = "시스템 출력";
 "volume.section.active" = "재생 중";

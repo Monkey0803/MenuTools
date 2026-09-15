@@ -871,6 +871,16 @@
 "volume.mute" = "静音系统输出";
 "volume.output.unknown" = "当前输出设备";
 "volume.output.fixed" = "此输出设备不提供可调主音量，请使用设备自身的音量控制。";
+"volume.page.title" = "音量页面";
+"volume.page.mixer" = "调音台";
+"volume.page.devices" = "设备";
+"volume.page.scenes" = "场景";
+"volume.page.settings" = "设置";
+"volume.empty.idle" = "还没有 App 正在发声";
+"volume.empty.filtered" = "没有匹配的 App";
+"volume.remembered.show" = "显示已记住的 App";
+"volume.input.monitor.title" = "麦克风与会议";
+"volume.input.none" = "没有检测到输入设备";
 "volume.section.control" = "单 App 音量控制";
 "volume.section.output" = "系统输出";
 "volume.section.active" = "正在发声";

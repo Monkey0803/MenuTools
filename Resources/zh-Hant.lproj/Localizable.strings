@@ -871,6 +871,16 @@
 "volume.mute" = "靜音系統輸出";
 "volume.output.unknown" = "目前輸出裝置";
 "volume.output.fixed" = "此輸出裝置不提供可調主音量，請使用裝置本身的音量控制。";
+"volume.page.title" = "音量頁面";
+"volume.page.mixer" = "調音台";
+"volume.page.devices" = "裝置";
+"volume.page.scenes" = "場景";
+"volume.page.settings" = "設定";
+"volume.empty.idle" = "還沒有 App 正在發聲";
+"volume.empty.filtered" = "沒有符合的 App";
+"volume.remembered.show" = "顯示已記住的 App";
+"volume.input.monitor.title" = "麥克風與會議";
+"volume.input.none" = "沒有偵測到輸入裝置";
 "volume.section.control" = "單 App 音量控制";
 "volume.section.output" = "系統輸出";
 "volume.section.active" = "正在發聲";

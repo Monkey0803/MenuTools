@@ -871,6 +871,16 @@
 "volume.mute" = "システム出力をミュート";
 "volume.output.unknown" = "現在の出力デバイス";
 "volume.output.fixed" = "この出力デバイスの主音量は調整できません。デバイス本体の音量調整を使用してください。";
+"volume.page.title" = "音量ページ";
+"volume.page.mixer" = "ミキサー";
+"volume.page.devices" = "デバイス";
+"volume.page.scenes" = "シーン";
+"volume.page.settings" = "設定";
+"volume.empty.idle" = "再生中の App はありません";
+"volume.empty.filtered" = "条件に一致する App はありません";
+"volume.remembered.show" = "記憶した App を表示";
+"volume.input.monitor.title" = "マイクと会議";
+"volume.input.none" = "入力デバイスが見つかりません";
 "volume.section.control" = "App ごとの音量調整";
 "volume.section.output" = "システム出力";
 "volume.section.active" = "再生中";

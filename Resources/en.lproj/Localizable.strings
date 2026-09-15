@@ -871,6 +871,16 @@
 "volume.mute" = "Mute system output";
 "volume.output.unknown" = "Current output device";
 "volume.output.fixed" = "This output device has no adjustable master volume. Use the device's own volume control.";
+"volume.page.title" = "Volume page";
+"volume.page.mixer" = "Mixer";
+"volume.page.devices" = "Devices";
+"volume.page.scenes" = "Scenes";
+"volume.page.settings" = "Settings";
+"volume.empty.idle" = "No app is playing audio right now";
+"volume.empty.filtered" = "No app matches the filter";
+"volume.remembered.show" = "Show remembered apps";
+"volume.input.monitor.title" = "Microphone and meetings";
+"volume.input.none" = "No input device found";
 "volume.section.control" = "Per-app volume control";
 "volume.section.output" = "System Output";
 "volume.section.active" = "Playing Audio";
