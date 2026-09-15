@@ -37,6 +37,7 @@ swift Scripts/test_network_traffic.swift --duration 28800 --interval 10 --no-dow
 | 存储上限 | 主库 **25.2 MB**（上限 64 MB）、WAL ≈ 0（上限 8 MB） | `network-traffic-history.sqlite3` 体积 |
 | 维度隔离 | `external:tcp` 170,694 行（持续写入）、`external:all` 1,118 行、`all:all` 8 行，三套互不干扰；**只有当前筛选维度在累计**，与设计文档一致 | `GROUP BY query_key` |
 | 诊断数据来源 | 采样耗时、失败次数由同一套采样链路产生；本次 15 次采样 0 失败 | 脚本汇总 |
+| 复跑（1.1.3 开发期） | 2026-09-15 再跑一次冒烟：**15/15 次成功**，平均 69ms / 最大 70ms，与基线一致 | `swift Scripts/test_network_traffic.swift --duration 30 --connections --strict` |
 
 > 未覆盖的部分：以下带 `- [x]` 的条目都需要在真机界面上逐项核对。本次没能自动化是因为运行环境**没有屏幕录制权限**，且 SwiftUI `MenuBarExtra` 面板不通过辅助功能暴露控件——既无法截图也无法读取界面数值。
 
