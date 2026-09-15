@@ -951,3 +951,137 @@ func historyRangeAndChartLayout() {
     #expect(SystemResourceHistoryChartLayout.hoveredIndex(x: 10, width: 300, count: 0) == nil)
     #expect(SystemResourceHistoryChartLayout.barWidth(width: 300, count: 10) > 1)
 }
+
+@Test("采样档位：面板 2 秒、后台 10 秒、面板关闭回落、都关则停并清快照")
+@MainActor
+func resourceSamplingTiers() {
+    let service = SystemResourceService(
+        provider: CountingResourceProvider(),
+        memoryReleaser: NoopMemoryReleaser(),
+        historyStore: RecordingHistoryStore(),
+        alerter: RecordingResourceAlerter(),
+        userDefaults: UserDefaults(suiteName: "SystemResourceTierTests.\(UUID().uuidString)") ?? .standard
+    )
+
+    // 未启用任何采样源
+    #expect(!service.isMonitoring)
+    #expect(service.currentSamplingInterval == nil)
+
+    // 插件启用（后台档）
+    service.setBackgroundMonitoring(true)
+    #expect(service.isMonitoring)
+    #expect(service.currentSamplingInterval == SystemResourceSamplingPolicy.alertInterval)
+
+    // 面板打开 → 升到面板档
+    service.beginMonitoring()
+    #expect(service.currentSamplingInterval == SystemResourceSamplingPolicy.panelInterval)
+
+    // 面板关闭 → 回落到后台档，仍在采样
+    service.endPanelMonitoring()
+    #expect(service.isMonitoring)
+    #expect(service.currentSamplingInterval == SystemResourceSamplingPolicy.alertInterval)
+
+    // 后台需求消失 → 完全停止并清快照
+    service.setBackgroundMonitoring(false)
+    #expect(!service.isMonitoring)
+    #expect(service.currentSamplingInterval == nil)
+    #expect(service.snapshot == nil)
+
+    // 插件关闭路径同样彻底停止
+    service.beginMonitoring()
+    service.endMonitoring()
+    #expect(!service.isMonitoring)
+    #expect(service.snapshot == nil)
+}
+
+@Test("菜单栏选择资源指标或开启告警时会开启后台采样")
+@MainActor
+func resourceBackgroundSamplingFollowsSettings() {
+    let suiteName = "SystemResourceBackgroundTests.\(UUID().uuidString)"
+    let defaults = UserDefaults(suiteName: suiteName) ?? .standard
+    defaults.removePersistentDomain(forName: suiteName)
+    let service = SystemResourceService(
+        provider: CountingResourceProvider(),
+        memoryReleaser: NoopMemoryReleaser(),
+        historyStore: RecordingHistoryStore(),
+        alerter: RecordingResourceAlerter(),
+        userDefaults: defaults
+    )
+
+    // 默认：告警开启（默认 true）→ 需要后台采样
+    service.refreshBackgroundSampling(userDefaults: defaults)
+    #expect(service.isMonitoring)
+
+    // 关掉告警且菜单栏不显示资源指标 → 停
+    service.setAlertsEnabled(false)
+    #expect(!service.isMonitoring)
+
+    // 菜单栏选 CPU → 重新开启后台采样
+    defaults.set(MenuBarMetric.cpu.rawValue, forKey: SettingsKey.menuBarMetric)
+    service.refreshBackgroundSampling(userDefaults: defaults)
+    #expect(service.isMonitoring)
+    #expect(service.currentSamplingInterval == SystemResourceSamplingPolicy.alertInterval)
+
+    // 切回自动（不显示资源指标）且告警仍关 → 又停
+    defaults.set(MenuBarMetric.automatic.rawValue, forKey: SettingsKey.menuBarMetric)
+    service.refreshBackgroundSampling(userDefaults: defaults)
+    #expect(!service.isMonitoring)
+}
+
+@Test("统一菜单栏选择器：指定项优先，自动时沿用网速优先其次音量")
+func menuBarMetricResolverPicksSingleSource() {
+    // 未设置或自动 → 旧行为
+    #expect(MenuBarMetricResolver.resolve(unified: nil, trafficModeOff: false, volumeModeOff: false) == .networkSpeed)
+    #expect(MenuBarMetricResolver.resolve(unified: .automatic, trafficModeOff: false, volumeModeOff: false) == .networkSpeed)
+    #expect(MenuBarMetricResolver.resolve(unified: .automatic, trafficModeOff: true, volumeModeOff: false) == .volume)
+    #expect(MenuBarMetricResolver.resolve(unified: .automatic, trafficModeOff: true, volumeModeOff: true) == .off)
+
+    // 指定项覆盖模块设置，且互斥（只可能返回一个）
+    for metric in [MenuBarMetric.cpu, .memory, .disk, .volume, .networkSpeed, .off] {
+        #expect(MenuBarMetricResolver.resolve(unified: metric, trafficModeOff: false, volumeModeOff: false) == metric)
+        #expect(MenuBarMetricResolver.resolve(unified: metric, trafficModeOff: true, volumeModeOff: true) == metric)
+    }
+}
+
+@Test("资源菜单栏标题：只对 CPU/内存/磁盘产出，百分比固定三位宽")
+func resourceMenuBarPresenterFormatsTitle() {
+    let snapshot = SystemResourceSnapshot(
+        cpuUsage: 0.42,
+        memoryUsedBytes: 680,
+        memoryTotalBytes: 1_000,
+        memoryPressure: .normal,
+        diskAvailableBytes: 120,
+        diskTotalBytes: 1_000,
+        networkDownloadBytesPerSecond: 0,
+        networkUploadBytesPerSecond: 0
+    )
+
+    let cpuTitle = SystemResourceMenuBarPresenter.title(snapshot: snapshot, metric: .cpu)
+    #expect(cpuTitle?.hasSuffix(" 42%") == true)
+    let memoryTitle = SystemResourceMenuBarPresenter.title(snapshot: snapshot, metric: .memory)
+    #expect(memoryTitle?.hasSuffix(" 68%") == true)
+    // 磁盘显示已用占比：1 - 120/1000 = 88%
+    let diskTitle = SystemResourceMenuBarPresenter.title(snapshot: snapshot, metric: .disk)
+    #expect(diskTitle?.hasSuffix(" 88%") == true)
+
+    // 固定宽度：个位数百分比也占三位
+    #expect(SystemResourceMenuBarPresenter.percent(0.05) == "  5%")
+    #expect(SystemResourceMenuBarPresenter.percent(1) == "100%")
+    #expect(SystemResourceMenuBarPresenter.percent(0) == "  0%")
+    // 越界与 NaN 收敛
+    #expect(SystemResourceMenuBarPresenter.percent(-1) == "  0%")
+    #expect(SystemResourceMenuBarPresenter.percent(.nan) == "  0%")
+
+    // 其余取值不产出标题；没有快照也不产出
+    for metric in [MenuBarMetric.automatic, .networkSpeed, .volume, .off] {
+        #expect(SystemResourceMenuBarPresenter.title(snapshot: snapshot, metric: metric) == nil)
+    }
+    #expect(SystemResourceMenuBarPresenter.title(snapshot: nil, metric: .cpu) == nil)
+
+    // 每个取值都有文案，且自动档带说明
+    for metric in MenuBarMetric.allCases {
+        #expect(!metric.titleKey.isEmpty)
+    }
+    #expect(MenuBarMetric.automatic.footerKey != nil)
+    #expect(MenuBarMetric.cpu.footerKey == nil)
+}

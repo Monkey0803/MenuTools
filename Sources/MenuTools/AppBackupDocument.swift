@@ -34,6 +34,8 @@ struct AppBackupSettings: Codable, Equatable, Sendable {
     var networkTrafficQuery: String? = nil
     var networkTrafficAlertThreshold: Int64? = nil
     var networkTrafficMenuBarDisplayMode: String? = nil
+    /// 菜单栏显示内容（跨模块统一选择器）。
+    var menuBarMetric: String? = nil
     var networkTrafficMonthlyQuota: Int64? = nil
 }
 
@@ -53,6 +55,7 @@ enum AppBackupValidationError: Error, Equatable, Sendable {
     case invalidNetworkTrafficQuery(String)
     case invalidNetworkTrafficThreshold(Int64)
     case invalidNetworkTrafficMenuBarDisplayMode(String)
+    case invalidMenuBarMetric(String)
     case invalidNetworkTrafficMonthlyQuota(Int64)
 }
 
@@ -160,6 +163,10 @@ struct AppBackupDocument: Codable, Equatable, Sendable {
         if let mode = settings.networkTrafficMenuBarDisplayMode,
            NetworkTrafficMenuBarDisplayMode(rawValue: mode) == nil {
             throw AppBackupValidationError.invalidNetworkTrafficMenuBarDisplayMode(mode)
+        }
+        if let metric = settings.menuBarMetric,
+           MenuBarMetric(rawValue: metric) == nil {
+            throw AppBackupValidationError.invalidMenuBarMetric(metric)
         }
         if let quota = settings.networkTrafficMonthlyQuota,
            !(0...10_000_000_000_000_000).contains(quota) {

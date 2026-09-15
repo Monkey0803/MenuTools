@@ -399,6 +399,7 @@ private struct SettingsSidebarItemSurface: ViewModifier {
 struct GeneralSettingsView: View {
     @AppStorage(SettingsKey.menuBarIcon) private var menuBarIcon = MenuBarIcon.default.rawValue
     @AppStorage(SettingsKey.menuBarShowTitle) private var showMenuBarTitle = false
+    @AppStorage(SettingsKey.menuBarMetric) private var menuBarMetric = MenuBarMetric.automatic.rawValue
     @AppStorage(SettingsKey.togglesShowTitle) private var togglesShowTitle = false
     @AppStorage(SettingsKey.preferredTerminal) private var preferredTerminal = TerminalApp.systemDefault.rawValue
     @AppStorage(SettingsKey.autoCheckUpdate) private var autoCheckUpdate = true
@@ -456,6 +457,19 @@ struct GeneralSettingsView: View {
                     }
                 }
                 .padding(.vertical, 4)
+            }
+
+            Section(L("menubar.metric.title")) {
+                Picker(L("menubar.metric.title"), selection: $menuBarMetric) {
+                    ForEach(MenuBarMetric.allCases, id: \.self) { metric in
+                        Text(L(metric.titleKey)).tag(metric.rawValue)
+                    }
+                }
+                if let footerKey = MenuBarMetric(rawValue: menuBarMetric)?.footerKey {
+                    Text(L(footerKey))
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                }
             }
 
             Section(L("settings.section.panel")) {

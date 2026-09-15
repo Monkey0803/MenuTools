@@ -83,6 +83,7 @@ enum AppBackupService {
             networkTrafficAlertThreshold: userDefaults.object(forKey: NetworkTrafficSettingsKey.alertThreshold)
                 == nil ? nil : Int64(userDefaults.integer(forKey: NetworkTrafficSettingsKey.alertThreshold)),
             networkTrafficMenuBarDisplayMode: userDefaults.string(forKey: NetworkTrafficSettingsKey.menuBarDisplayMode),
+            menuBarMetric: userDefaults.string(forKey: SettingsKey.menuBarMetric),
             networkTrafficMonthlyQuota: userDefaults.object(forKey: NetworkTrafficSettingsKey.monthlyQuota)
                 == nil ? nil : Int64(userDefaults.integer(forKey: NetworkTrafficSettingsKey.monthlyQuota))
         )
@@ -190,6 +191,7 @@ enum AppBackupService {
         NetworkTrafficSettingsKey.query,
         NetworkTrafficSettingsKey.alertThreshold,
         NetworkTrafficSettingsKey.menuBarDisplayMode,
+        SettingsKey.menuBarMetric,
         NetworkTrafficSettingsKey.monthlyQuota,
         BuiltInPluginManager.storageKey
     ]
@@ -228,6 +230,9 @@ enum AppBackupService {
         }
         if let mode = settings.networkTrafficMenuBarDisplayMode {
             userDefaults.set(mode, forKey: NetworkTrafficSettingsKey.menuBarDisplayMode)
+        }
+        if let metric = settings.menuBarMetric {
+            userDefaults.set(metric, forKey: SettingsKey.menuBarMetric)
         }
         if let quota = settings.networkTrafficMonthlyQuota {
             userDefaults.set(quota, forKey: NetworkTrafficSettingsKey.monthlyQuota)

@@ -55,7 +55,7 @@ enum BuiltInPluginCatalog {
                 id: .systemResources,
                 category: .system,
                 symbol: "cpu",
-                start: { SystemResourceService.shared.beginMonitoring() },
+                start: { SystemResourceService.shared.refreshBackgroundSampling() },
                 stop: { SystemResourceService.shared.endMonitoring() }
             ),
             registration(

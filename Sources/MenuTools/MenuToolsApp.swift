@@ -19,6 +19,7 @@ private final class MenuToolsApplicationDelegate: NSObject, NSApplicationDelegat
 enum SettingsKey {
     static let menuBarIcon = "menuBarIcon"
     static let menuBarShowTitle = "menuBarShowTitle"   // 菜单栏是否同时显示标题
+    static let menuBarMetric = "menuBarMetric"         // 菜单栏显示内容（跨模块统一选择器）
     static let togglesShowTitle = "togglesShowTitle"   // 面板快捷开关是否显示标题
     static let preferredTerminal = "preferredTerminal"
     static let autoCheckUpdate = "autoCheckUpdateEnabled"

@@ -480,6 +480,16 @@
 
 /* Settings */
 "settings.title" = "MenuTools Settings";
+"menubar.metric.title" = "Menu bar content";
+"menubar.metric.automatic" = "Per module";
+"menubar.metric.automatic.footer" = "Keep each module's own setting: network speed first, then volume. Choosing a specific item decides it here instead.";
+"menubar.metric.networkSpeed" = "Network speed";
+"menubar.metric.volume" = "Volume";
+"menubar.metric.cpu" = "CPU usage";
+"menubar.metric.memory" = "Memory usage";
+"menubar.metric.disk" = "Disk usage";
+"menubar.metric.off" = "Nothing";
+
 "settings.section.icon" = "Menu Bar Icon";
 "settings.menuBar.display" = "Display";
 "settings.menuBar.iconOnly" = "Icon Only";

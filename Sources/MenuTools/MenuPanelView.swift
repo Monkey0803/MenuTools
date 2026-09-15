@@ -489,7 +489,7 @@ struct MenuPanelView: View {
             while !Task.isCancelled {
                 try? await Task.sleep(for: .seconds(30))
             }
-            systemResourceService.endMonitoring()
+            systemResourceService.endPanelMonitoring()
             systemProcessService.endMonitoring()
         }
         .task {

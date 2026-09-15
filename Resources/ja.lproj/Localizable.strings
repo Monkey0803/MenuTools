@@ -480,6 +480,16 @@
 
 /* 設定 */
 "settings.title" = "MenuTools 設定";
+"menubar.metric.title" = "メニューバーの内容";
+"menubar.metric.automatic" = "モジュールごと";
+"menubar.metric.automatic.footer" = "各モジュールの設定に従います（ネット速度が優先、次に音量）。項目を選ぶとここで統一されます。";
+"menubar.metric.networkSpeed" = "ネット速度";
+"menubar.metric.volume" = "音量";
+"menubar.metric.cpu" = "CPU 使用率";
+"menubar.metric.memory" = "メモリ使用率";
+"menubar.metric.disk" = "ディスク使用率";
+"menubar.metric.off" = "表示しない";
+
 "settings.section.icon" = "メニューバーアイコン";
 "settings.menuBar.display" = "表示方法";
 "settings.menuBar.iconOnly" = "アイコンのみ";

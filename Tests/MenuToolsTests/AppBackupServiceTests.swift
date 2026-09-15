@@ -563,3 +563,49 @@ private extension AppBackupSettings {
         scrollDisableModifier: 0
     )
 }
+
+@Test("菜单栏统一选择器会进备份、校验并在恢复时写回")
+func backupIncludesUnifiedMenuBarMetric() throws {
+    let suiteName = "MenuBarMetricBackup.\(UUID().uuidString)"
+    let defaults = UserDefaults(suiteName: suiteName) ?? .standard
+    defaults.removePersistentDomain(forName: suiteName)
+    defaults.set(MenuBarMetric.memory.rawValue, forKey: SettingsKey.menuBarMetric)
+
+    let document = AppBackupService.makeDocument(
+        userDefaults: defaults,
+        rightClick: .default,
+        appVersion: "1.1.4",
+        createdAt: Date(timeIntervalSince1970: 200)
+    )
+    #expect(document.settings.menuBarMetric == MenuBarMetric.memory.rawValue)
+
+    // 非法取值被校验拦下
+    var broken = document
+    broken.settings.menuBarMetric = "not-a-metric"
+    #expect(throws: AppBackupValidationError.invalidMenuBarMetric("not-a-metric")) {
+        _ = try broken.validated()
+    }
+
+    // 恢复后写回设置
+    let restoreName = "MenuBarMetricRestore.\(UUID().uuidString)"
+    let restoreDefaults = UserDefaults(suiteName: restoreName) ?? .standard
+    restoreDefaults.removePersistentDomain(forName: restoreName)
+    try AppBackupService.restore(
+        document,
+        userDefaults: restoreDefaults,
+        rightClickStore: InMemoryRightClickStore(config: .default)
+    )
+    #expect(restoreDefaults.string(forKey: SettingsKey.menuBarMetric) == MenuBarMetric.memory.rawValue)
+
+    // 未包含该字段的旧备份仍可解析（向后兼容）：从真实备份里删掉该键再解码
+    var withoutMetric = document
+    withoutMetric.settings.menuBarMetric = nil
+    let encoded = try AppBackupService.encode(withoutMetric)
+    var object = try #require(try JSONSerialization.jsonObject(with: encoded) as? [String: Any])
+    var settings = try #require(object["settings"] as? [String: Any])
+    settings.removeValue(forKey: "menuBarMetric")
+    object["settings"] = settings
+    let stripped = try JSONSerialization.data(withJSONObject: object)
+    let decoded = try AppBackupService.decode(stripped)
+    #expect(decoded.settings.menuBarMetric == nil)
+}

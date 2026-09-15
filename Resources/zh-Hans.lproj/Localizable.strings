@@ -480,6 +480,16 @@
 
 /* 设置窗口 */
 "settings.title" = "MenuTools 设置";
+"menubar.metric.title" = "菜单栏内容";
+"menubar.metric.automatic" = "按模块设置";
+"menubar.metric.automatic.footer" = "沿用各模块自己的设置：网速优先，其次音量；选具体项目后由这里统一决定。";
+"menubar.metric.networkSpeed" = "网速";
+"menubar.metric.volume" = "音量";
+"menubar.metric.cpu" = "CPU 占用";
+"menubar.metric.memory" = "内存占用";
+"menubar.metric.disk" = "磁盘占用";
+"menubar.metric.off" = "不显示";
+
 "settings.section.icon" = "菜单栏图标";
 "settings.menuBar.display" = "显示方式";
 "settings.menuBar.iconOnly" = "仅图标";

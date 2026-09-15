@@ -480,6 +480,16 @@
 
 /* 설정 */
 "settings.title" = "MenuTools 설정";
+"menubar.metric.title" = "메뉴 막대 내용";
+"menubar.metric.automatic" = "모듈별 설정";
+"menubar.metric.automatic.footer" = "각 모듈의 설정을 따릅니다(네트워크 속도 우선, 다음 볼륨). 항목을 선택하면 여기서 통합됩니다.";
+"menubar.metric.networkSpeed" = "네트워크 속도";
+"menubar.metric.volume" = "볼륨";
+"menubar.metric.cpu" = "CPU 사용률";
+"menubar.metric.memory" = "메모리 사용률";
+"menubar.metric.disk" = "디스크 사용률";
+"menubar.metric.off" = "표시 안 함";
+
 "settings.section.icon" = "메뉴 막대 아이콘";
 "settings.menuBar.display" = "표시 방식";
 "settings.menuBar.iconOnly" = "아이콘만";

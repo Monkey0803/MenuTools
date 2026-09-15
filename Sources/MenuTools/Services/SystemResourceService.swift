@@ -453,6 +453,13 @@ final class SystemResourceService {
     private(set) var notificationPermission: SystemResourceNotificationPermission = .notRequested
     private var previousReading: SystemResourceReading?
     private var samplingTask: Task<Void, Never>?
+    /// 面板可见时的高频采样开关。
+    private var panelMonitoring = false
+    /// 后台采样开关（菜单栏显示资源指标或开启告警时）。
+    private var backgroundMonitoring = false
+    private var panelInterval: TimeInterval = SystemResourceSamplingPolicy.panelInterval
+    /// 当前采样档位，供自检与回归使用。
+    private(set) var currentSamplingInterval: TimeInterval?
     /// 当前正在聚合的那一分钟。
     private var currentBucket: SystemResourceHistoryBucket?
 
@@ -489,11 +496,61 @@ final class SystemResourceService {
         ).normalized()
     }
 
-    /// 开始按节奏采样（面板可见时调用；插件关闭时不应调用）。
-    func beginMonitoring(
-        interval: TimeInterval = SystemResourceSamplingPolicy.panelInterval
-    ) {
-        guard samplingTask == nil else { return }
+    /// 面板可见时的高频采样；面板关闭请调用 `endPanelMonitoring()`。
+    func beginMonitoring(interval: TimeInterval = SystemResourceSamplingPolicy.panelInterval) {
+        panelMonitoring = true
+        panelInterval = interval
+        updateSampling()
+    }
+
+    /// 面板关闭：回落到后台档；没有后台需求时完全停止。
+    func endPanelMonitoring() {
+        panelMonitoring = false
+        updateSampling()
+    }
+
+    /// 后台采样：菜单栏显示资源指标或开启告警时为 true，按告警间隔省电采样。
+    func setBackgroundMonitoring(_ enabled: Bool) {
+        backgroundMonitoring = enabled
+        updateSampling()
+    }
+
+    /// 按当前设置刷新后台采样需求（插件启动、告警开关变化、菜单栏选择变化时调用）。
+    func refreshBackgroundSampling(userDefaults: UserDefaults = .standard) {
+        let metric = userDefaults.string(forKey: SettingsKey.menuBarMetric)
+            .flatMap(MenuBarMetric.init(rawValue:))
+        let showsResourceMetric = metric == .cpu || metric == .memory || metric == .disk
+        setBackgroundMonitoring(alertsEnabled || showsResourceMetric)
+    }
+
+    /// 完全停止采样（插件关闭或测试收尾），并清掉快照。
+    func endMonitoring() {
+        panelMonitoring = false
+        backgroundMonitoring = false
+        updateSampling()
+    }
+
+    private func updateSampling() {
+        let interval: TimeInterval?
+        if panelMonitoring {
+            interval = panelInterval
+        } else if backgroundMonitoring {
+            interval = SystemResourceSamplingPolicy.alertInterval
+        } else {
+            interval = nil
+        }
+
+        guard interval != currentSamplingInterval || samplingTask == nil else { return }
+        samplingTask?.cancel()
+        samplingTask = nil
+        currentSamplingInterval = interval
+        guard let interval else {
+            snapshot = nil
+            previousReading = nil
+            flushHistory()
+            return
+        }
+
         refresh()
         samplingTask = Task { @MainActor [weak self] in
             while !Task.isCancelled {
@@ -502,15 +559,6 @@ final class SystemResourceService {
                 self?.refresh()
             }
         }
-    }
-
-    /// 停止采样并清掉快照：插件关闭或面板关闭后不应残留读数。
-    func endMonitoring() {
-        flushHistory()
-        samplingTask?.cancel()
-        samplingTask = nil
-        snapshot = nil
-        previousReading = nil
     }
 
     func refresh(now: Date = Date()) {
@@ -529,6 +577,7 @@ final class SystemResourceService {
     func setAlertsEnabled(_ enabled: Bool) {
         alertsEnabled = enabled
         userDefaults.set(enabled, forKey: SystemResourceAlertSettings.enabledKey)
+        refreshBackgroundSampling(userDefaults: userDefaults)
         if enabled, notificationPermission == .notRequested {
             requestNotificationPermission()
         }

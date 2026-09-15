@@ -95,7 +95,6 @@ final class MenuBarStatusItemController: NSObject {
             )
             : nil
 
-        // 网速优先；没开网速时再显示音量。
         let volumeMode = UserDefaults.standard.string(forKey: AppVolumeService.StorageKey.menuBarDisplayMode)
             .flatMap(AppVolumeMenuBarDisplayMode.init(rawValue:)) ?? .off
         let volumeTitle: String? = BuiltInPluginManager.shared.isEnabled(.appVolume)
@@ -106,7 +105,34 @@ final class MenuBarStatusItemController: NSObject {
                 loudest: AppVolumeService.shared.loudestActiveApp
             )
             : nil
-        let title = trafficTitle ?? volumeTitle
+
+        // 统一选择器决定显示哪一项；未设置（.automatic）时沿用旧行为：网速优先，其次音量。
+        let unified = UserDefaults.standard.string(forKey: SettingsKey.menuBarMetric)
+            .flatMap(MenuBarMetric.init(rawValue:))
+        // 菜单栏显示资源指标时需要后台采样（10 秒档），选择变化时在这里同步。
+        SystemResourceService.shared.refreshBackgroundSampling()
+        let metric = MenuBarMetricResolver.resolve(
+            unified: unified,
+            trafficModeOff: trafficMode == .off,
+            volumeModeOff: volumeMode == .off
+        )
+        let resourceTitle = BuiltInPluginManager.shared.isEnabled(.systemResources)
+            ? SystemResourceMenuBarPresenter.title(
+                snapshot: SystemResourceService.shared.snapshot,
+                metric: metric
+            )
+            : nil
+        let title: String?
+        switch metric {
+        case .networkSpeed:
+            title = trafficTitle
+        case .volume:
+            title = volumeTitle
+        case .cpu, .memory, .disk:
+            title = resourceTitle
+        case .automatic, .off:
+            title = nil
+        }
 
         button.image = NSImage(
             systemSymbolName: iconName,

@@ -480,6 +480,16 @@
 
 /* 設定視窗 */
 "settings.title" = "MenuTools 設定";
+"menubar.metric.title" = "選單列內容";
+"menubar.metric.automatic" = "依模組設定";
+"menubar.metric.automatic.footer" = "沿用各模組自己的設定：網速優先，其次音量；選具體項目後由這裡統一決定。";
+"menubar.metric.networkSpeed" = "網速";
+"menubar.metric.volume" = "音量";
+"menubar.metric.cpu" = "CPU 佔用";
+"menubar.metric.memory" = "記憶體佔用";
+"menubar.metric.disk" = "磁碟佔用";
+"menubar.metric.off" = "不顯示";
+
 "settings.section.icon" = "選單列圖示";
 "settings.menuBar.display" = "顯示方式";
 "settings.menuBar.iconOnly" = "僅圖示";
