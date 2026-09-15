@@ -942,6 +942,10 @@
 "volume.pan.title" = "左右バランス";
 "volume.pan.reset" = "中央";
 "volume.mono.title" = "モノラルにダウンミックス";
+"volume.menuBar.title" = "メニューバー表示";
+"volume.menuBar.off" = "オフ";
+"volume.menuBar.master" = "マスター音量";
+"volume.menuBar.loudest" = "最も音量が大きい App";
 "volume.preset.coverage" = "%d 個の App · %d 個が EQ・チャンネル・デバイスを含む";
 "volume.preset.coverageHint" = "旧バージョンで保存：再保存すると EQ と出力デバイスが含まれます";
 "volume.equalizer.custom" = "カスタム";

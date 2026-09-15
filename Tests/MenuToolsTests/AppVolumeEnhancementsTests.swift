@@ -1,4 +1,5 @@
 import CoreAudio
+import Synchronization
 import Foundation
 import Testing
 @testable import MenuTools
@@ -798,4 +799,43 @@ func presetRoundTripsPanAndMono() throws {
     let session = try #require(service.session(id: "com.apple.Music"))
     #expect(abs(session.pan - 0.8) < 0.0001)
     #expect(session.isMono)
+}
+
+@Test("菜单栏显示模式会持久化，最响 App 取正在发声里音量最高的")
+@MainActor
+func menuBarDisplayModePersistsAndPicksLoudestApp() throws {
+    let defaults = try makeEnhancementDefaults("menuBarMode")
+    let backend = EnhancedFakeAppVolumeBackend()
+    let service = AppVolumeService(backend: backend, userDefaults: defaults)
+    backend.send(candidates: [.music, .podcasts], output: .fixture())
+    service.setEnabled(true)
+
+    service.setVolume(0.30, for: "com.apple.Music")
+    service.setVolume(0.70, for: "com.apple.podcasts")
+
+    let loudest = try #require(service.loudestActiveApp)
+    #expect(loudest.name == "播客")
+    #expect(abs(loudest.volume - 0.70) < 0.001)
+
+    // 模式变化会通知菜单栏刷新
+    let notified = Atomic(false)
+    let token = NotificationCenter.default.addObserver(
+        forName: .appVolumeDidChange,
+        object: service,
+        queue: nil
+    ) { _ in
+        notified.store(true, ordering: .relaxed)
+    }
+    service.setMenuBarDisplayMode(.master)
+    NotificationCenter.default.removeObserver(token)
+    let didNotify = notified.load(ordering: .relaxed)
+    #expect(didNotify)
+
+    let restored = AppVolumeService(backend: EnhancedFakeAppVolumeBackend(), userDefaults: defaults)
+    #expect(restored.menuBarDisplayMode == .master)
+
+    // 没有正在发声的 App 时返回 nil
+    backend.send(candidates: [], output: .fixture())
+    let idleLoudest = service.loudestActiveApp
+    #expect(idleLoudest == nil)
 }

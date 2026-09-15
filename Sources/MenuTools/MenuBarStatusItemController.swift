@@ -33,6 +33,7 @@ final class MenuBarStatusItemController: NSObject {
     private var settingsHostingController: NSHostingController<SettingsView>?
     private var defaultsObserver: NSObjectProtocol?
     private var networkTrafficObserver: NSObjectProtocol?
+    private var appVolumeObserver: NSObjectProtocol?
 
     override init() {
         super.init()
@@ -47,6 +48,15 @@ final class MenuBarStatusItemController: NSObject {
         }
         networkTrafficObserver = NotificationCenter.default.addObserver(
             forName: .networkTrafficSnapshotDidChange,
+            object: nil,
+            queue: .main
+        ) { [weak self] _ in
+            Task { @MainActor [weak self] in
+                self?.updateButton()
+            }
+        }
+        appVolumeObserver = NotificationCenter.default.addObserver(
+            forName: .appVolumeDidChange,
             object: nil,
             queue: .main
         ) { [weak self] _ in
@@ -85,14 +95,27 @@ final class MenuBarStatusItemController: NSObject {
             )
             : nil
 
+        // 网速优先；没开网速时再显示音量。
+        let volumeMode = UserDefaults.standard.string(forKey: AppVolumeService.StorageKey.menuBarDisplayMode)
+            .flatMap(AppVolumeMenuBarDisplayMode.init(rawValue:)) ?? .off
+        let volumeTitle: String? = BuiltInPluginManager.shared.isEnabled(.appVolume)
+            ? AppVolumeMenuBarPresenter.title(
+                mode: volumeMode,
+                masterVolume: AppVolumeService.shared.output.volume,
+                isMuted: AppVolumeService.shared.output.isMuted,
+                loudest: AppVolumeService.shared.loudestActiveApp
+            )
+            : nil
+        let title = trafficTitle ?? volumeTitle
+
         button.image = NSImage(
             systemSymbolName: iconName,
             accessibilityDescription: "MenuTools"
         )
         button.image?.isTemplate = true
-        button.title = trafficTitle ?? (showTitle ? "MenuTools" : "")
+        button.title = title ?? (showTitle ? "MenuTools" : "")
         button.imagePosition = button.title.isEmpty ? .imageOnly : .imageLeft
-        button.toolTip = trafficTitle.map { "MenuTools · \($0)" } ?? "MenuTools"
+        button.toolTip = title.map { "MenuTools · \($0)" } ?? "MenuTools"
         button.setAccessibilityLabel(button.toolTip ?? "MenuTools")
     }
 

@@ -227,6 +227,17 @@ struct AppVolumeSettingsView: View {
                     .accessibilityLabel(L("volume.enabled"))
                 }
 
+                Picker(selection: Binding(
+                    get: { service.menuBarDisplayMode },
+                    set: { service.setMenuBarDisplayMode($0) }
+                )) {
+                    ForEach(AppVolumeMenuBarDisplayMode.allCases, id: \.self) { mode in
+                        Text(L(mode.titleKey)).tag(mode)
+                    }
+                } label: {
+                    Label(L("volume.menuBar.title"), systemImage: "menubar.rectangle")
+                }
+
                 if service.permissionState == .denied {
                     LabeledContent(L("volume.permission.status")) {
                         HStack(spacing: 8) {

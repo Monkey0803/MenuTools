@@ -942,6 +942,10 @@
 "volume.pan.title" = "左右平衡";
 "volume.pan.reset" = "居中";
 "volume.mono.title" = "单声道下混";
+"volume.menuBar.title" = "菜单栏显示";
+"volume.menuBar.off" = "关闭";
+"volume.menuBar.master" = "主音量";
+"volume.menuBar.loudest" = "音量最高的 App";
 "volume.preset.coverage" = "%d 个 App · %d 个含 EQ、声道与设备";
 "volume.preset.coverageHint" = "旧版本保存：重新保存才会包含 EQ 与输出设备";
 "volume.equalizer.custom" = "自定义";

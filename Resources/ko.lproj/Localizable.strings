@@ -942,6 +942,10 @@
 "volume.pan.title" = "좌우 밸런스";
 "volume.pan.reset" = "중앙";
 "volume.mono.title" = "모노 다운믹스";
+"volume.menuBar.title" = "메뉴 막대 표시";
+"volume.menuBar.off" = "끄기";
+"volume.menuBar.master" = "마스터 볼륨";
+"volume.menuBar.loudest" = "볼륨이 가장 큰 App";
 "volume.preset.coverage" = "App %d개 · EQ/채널/기기 포함 %d개";
 "volume.preset.coverageHint" = "이전 버전에서 저장됨: 다시 저장하면 EQ와 출력 기기가 포함됩니다";
 "volume.equalizer.custom" = "사용자화";

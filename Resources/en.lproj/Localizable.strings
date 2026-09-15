@@ -942,6 +942,10 @@
 "volume.pan.title" = "Balance";
 "volume.pan.reset" = "Center";
 "volume.mono.title" = "Mono downmix";
+"volume.menuBar.title" = "Menu bar display";
+"volume.menuBar.off" = "Off";
+"volume.menuBar.master" = "Master volume";
+"volume.menuBar.loudest" = "Loudest app";
 "volume.preset.coverage" = "%d apps · %d with EQ, channels and device";
 "volume.preset.coverageHint" = "Saved by an older version: save again to include EQ and output device";
 "volume.equalizer.custom" = "Custom";

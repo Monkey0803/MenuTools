@@ -416,3 +416,18 @@ func channelMixDownmixesToMono() {
     #expect(AppVolumeChannelMix.monoSample(0.6, channelCount: 3) == 0.2)
     #expect(AppVolumeChannelMix.monoSample(0.4, channelCount: 1) == 0.4)
 }
+
+@Test("菜单栏音量标题按模式给出主音量或最响 App，并夹住百分比")
+func menuBarVolumeTitlesFollowMode() {
+    #expect(AppVolumeMenuBarPresenter.title(mode: .off, masterVolume: 0.42, isMuted: false, loudest: nil) == nil)
+    #expect(AppVolumeMenuBarPresenter.title(mode: .master, masterVolume: 0.42, isMuted: false, loudest: nil) == "🔊 42%")
+    #expect(AppVolumeMenuBarPresenter.title(mode: .master, masterVolume: 0.42, isMuted: true, loudest: nil) == "🔇")
+    #expect(
+        AppVolumeMenuBarPresenter.title(mode: .loudest, masterVolume: 0.1, isMuted: false, loudest: ("音乐", 0.8))
+            == "🔊 音乐 80%"
+    )
+    // 没有正在发声的 App 时退回主音量
+    #expect(AppVolumeMenuBarPresenter.title(mode: .loudest, masterVolume: 0.5, isMuted: false, loudest: nil) == "🔊 50%")
+    #expect(AppVolumeMenuBarPresenter.percent(2) == "100%")
+    #expect(AppVolumeMenuBarPresenter.percent(-1) == "0%")
+}

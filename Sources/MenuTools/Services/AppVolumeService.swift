@@ -66,6 +66,45 @@ extension AppVolumeProfile {
     }
 }
 
+/// 菜单栏标题显示的音量内容。
+enum AppVolumeMenuBarDisplayMode: String, CaseIterable, Sendable {
+    case off
+    case master
+    case loudest
+
+    var titleKey: String { "volume.menuBar.\(rawValue)" }
+}
+
+/// 菜单栏音量标题：关闭 / 主音量 / 音量最高的 App。
+enum AppVolumeMenuBarPresenter {
+    static func title(
+        mode: AppVolumeMenuBarDisplayMode,
+        masterVolume: Double,
+        isMuted: Bool,
+        loudest: (name: String, volume: Double)?
+    ) -> String? {
+        switch mode {
+        case .off:
+            return nil
+        case .master:
+            return masterTitle(volume: masterVolume, isMuted: isMuted)
+        case .loudest:
+            guard let loudest, !loudest.name.isEmpty else {
+                return masterTitle(volume: masterVolume, isMuted: isMuted)
+            }
+            return "🔊 \(loudest.name) \(percent(loudest.volume))"
+        }
+    }
+
+    static func masterTitle(volume: Double, isMuted: Bool) -> String {
+        isMuted ? "🔇" : "🔊 \(percent(volume))"
+    }
+
+    static func percent(_ value: Double) -> String {
+        "\(Int((min(max(value.isFinite ? value : 0, 0), 1) * 100).rounded()))%"
+    }
+}
+
 /// 每 App 的声道处理：左右平衡与单声道下混。
 enum AppVolumeChannelMix {
     static let minimumPan = -1.0
@@ -232,6 +271,11 @@ struct AppVolumeMeter: Equatable, Sendable {
     var cpuLoad: Double = 0
 
     static let empty = Self()
+}
+
+extension Notification.Name {
+    /// 主音量、会话或菜单栏显示模式发生变化。
+    static let appVolumeDidChange = Notification.Name("MenuTools.appVolumeDidChange")
 }
 
 enum AppVolumeRouteStatus: Hashable, Sendable {
@@ -802,6 +846,7 @@ final class AppVolumeService {
     private(set) var isMeetingDuckingActive = false
     private(set) var isAdjustingVolume = false
     private(set) var devicePresetBindings: [String: UUID]
+    private(set) var menuBarDisplayMode: AppVolumeMenuBarDisplayMode
 
     var canUndoLatestAutomation: Bool { latestAutomationUndo != nil }
 
@@ -888,6 +933,8 @@ final class AppVolumeService {
         duckedVolumes = loadedDuckedVolumes
         isMeetingDuckingActive = !loadedDuckedVolumes.isEmpty
         devicePresetBindings = Self.loadDevicePresetBindings(from: userDefaults)
+        menuBarDisplayMode = userDefaults.string(forKey: StorageKey.menuBarDisplayMode)
+            .flatMap(AppVolumeMenuBarDisplayMode.init(rawValue:)) ?? .off
         permissionState = userDefaults.bool(forKey: StorageKey.permissionGranted)
             ? .authorized
             : .notRequested
@@ -1595,6 +1642,26 @@ final class AppVolumeService {
         }
     }
 
+    /// 菜单栏显示模式；改动会立即刷新菜单栏标题。
+    func setMenuBarDisplayMode(_ mode: AppVolumeMenuBarDisplayMode) {
+        guard menuBarDisplayMode != mode else { return }
+        menuBarDisplayMode = mode
+        userDefaults.set(mode.rawValue, forKey: StorageKey.menuBarDisplayMode)
+        notifySnapshotChanged()
+    }
+
+    /// 正在发声的 App 里音量最高的一个，用于菜单栏显示。
+    var loudestActiveApp: (name: String, volume: Double)? {
+        sessions
+            .filter { $0.isRunningOutput }
+            .max { $0.volume < $1.volume }
+            .map { ($0.displayName, $0.volume) }
+    }
+
+    private func notifySnapshotChanged() {
+        NotificationCenter.default.post(name: .appVolumeDidChange, object: self)
+    }
+
     func setInputVolume(_ requestedVolume: Double) {
         let volume = min(max(requestedVolume.isFinite ? requestedVolume : 1, 0), 1)
         do {
@@ -1721,6 +1788,7 @@ final class AppVolumeService {
     }
 
     private func receive(_ snapshot: AppVolumeBackendSnapshot) {
+        defer { notifySnapshotChanged() }
         let previousOutputUID = output.deviceUID
         candidates = snapshot.candidates
         output = snapshot.output
@@ -2195,5 +2263,6 @@ final class AppVolumeService {
         static let duckedVolumes = "appVolume.duckedVolumes.v1"
         static let devicePresetBindings = "appVolume.devicePresetBindings.v1"
         static let customEqualizers = "appVolume.customEqualizers.v1"
+        static let menuBarDisplayMode = "appVolume.menuBarDisplayMode.v1"
     }
 }
