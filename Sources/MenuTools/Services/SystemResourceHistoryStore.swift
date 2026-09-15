@@ -78,6 +78,107 @@ enum SystemResourceHistoryAggregator {
     static func bucketTimestamp(for date: Date) -> Date {
         Date(timeIntervalSince1970: floor(date.timeIntervalSince1970 / 60) * 60)
     }
+
+    /// 把分钟桶合并成更粗的桶（趋势图用）：CPU 与速率取平均，内存取该桶最后一个值。
+    static func aggregated(
+        _ buckets: [SystemResourceHistoryBucket],
+        interval: TimeInterval,
+        since: Date
+    ) -> [SystemResourceHistoryBucket] {
+        guard interval > 0 else { return buckets.filter { $0.timestamp >= since } }
+        var grouped: [TimeInterval: [SystemResourceHistoryBucket]] = [:]
+        for bucket in buckets where bucket.timestamp >= since {
+            let slot = floor(bucket.timestamp.timeIntervalSince1970 / interval) * interval
+            grouped[slot, default: []].append(bucket)
+        }
+        return grouped.keys.sorted().compactMap { slot in
+            guard let items = grouped[slot], !items.isEmpty else { return nil }
+            let count = Double(items.count)
+            let cpu = items.reduce(0) { $0 + $1.cpuUsage } / count
+            let read = items.reduce(0) { $0 + Double($1.diskReadBytesPerSecond) } / count
+            let write = items.reduce(0) { $0 + Double($1.diskWriteBytesPerSecond) } / count
+            let last = items.max { $0.timestamp < $1.timestamp } ?? items[0]
+            return SystemResourceHistoryBucket(
+                timestamp: Date(timeIntervalSince1970: slot),
+                cpuUsage: cpu,
+                memoryUsedBytes: last.memoryUsedBytes,
+                memoryTotalBytes: last.memoryTotalBytes,
+                diskReadBytesPerSecond: Int64(read),
+                diskWriteBytesPerSecond: Int64(write),
+                sampleCount: items.reduce(0) { $0 + $1.sampleCount }
+            )
+        }
+    }
+}
+
+/// 历史趋势的时间范围。
+enum SystemResourceHistoryRange: String, CaseIterable, Equatable, Sendable {
+    case hour
+    case day
+    case week
+    case month
+
+    var titleKey: String { "resource.history.range.\(rawValue)" }
+
+    /// 该范围覆盖的时长。
+    var duration: TimeInterval {
+        switch self {
+        case .hour: return 60 * 60
+        case .day: return 24 * 60 * 60
+        case .week: return 7 * 24 * 60 * 60
+        case .month: return 30 * 24 * 60 * 60
+        }
+    }
+
+    /// 聚合后每个柱子覆盖的秒数（分钟桶之上再合并，控制柱子数量）。
+    var bucketInterval: TimeInterval {
+        switch self {
+        case .hour: return 60
+        case .day: return 5 * 60
+        case .week: return 60 * 60
+        case .month: return 4 * 60 * 60
+        }
+    }
+}
+
+/// 趋势图展示的指标。
+enum SystemResourceHistoryMetric: String, CaseIterable, Equatable, Sendable {
+    case cpu
+    case memory
+    case disk
+
+    var titleKey: String { "resource.history.metric.\(rawValue)" }
+
+    /// 取该桶在此指标下的数值（磁盘为读+写字节/秒，其余为 0…1 比例）。
+    func value(of bucket: SystemResourceHistoryBucket) -> Double {
+        switch self {
+        case .cpu: return min(max(bucket.cpuUsage, 0), 1)
+        case .memory: return bucket.memoryUsage
+        case .disk: return Double(max(bucket.diskReadBytesPerSecond, 0) + max(bucket.diskWriteBytesPerSecond, 0))
+        }
+    }
+
+    /// 比例类指标的满量程为 1，磁盘按当前窗口的最大值归一。
+    var isRatio: Bool { self != .disk }
+}
+
+/// 趋势图的纯布局计算：柱子宽度与悬停命中（可回归）。
+enum SystemResourceHistoryChartLayout {
+    static let minimumBarWidth: CGFloat = 1
+
+    static func barWidth(width: CGFloat, count: Int, spacing: CGFloat = 2) -> CGFloat {
+        guard count > 0, width > 0 else { return minimumBarWidth }
+        let available = width - spacing * CGFloat(count - 1)
+        return max(available / CGFloat(count), minimumBarWidth)
+    }
+
+    /// 悬停位置对应第几个柱子；越界或数量为 0 时返回 nil。
+    static func hoveredIndex(x: CGFloat, width: CGFloat, count: Int) -> Int? {
+        guard count > 0, width > 0, x >= 0, x <= width else { return nil }
+        let slot = width / CGFloat(count)
+        guard slot > 0 else { return nil }
+        return min(max(Int(x / slot), 0), count - 1)
+    }
 }
 
 struct SystemResourceHistoryStorageUsage: Equatable, Sendable {

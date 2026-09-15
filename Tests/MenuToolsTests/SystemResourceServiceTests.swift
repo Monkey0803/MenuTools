@@ -496,15 +496,15 @@ func defaultProcessProviderReadsSelf() {
     #expect((selfSample?.memoryBytes ?? 0) > 0)
 }
 
-@Test("资源设置页有两个一级页且各有文案与图标")
+@Test("资源设置页有概览、进程、历史三个一级页且各有文案与图标")
 func resourceSettingsPagesCoverTasks() {
-    #expect(SystemResourceSettingsPage.allCases == [.overview, .processes])
+    #expect(SystemResourceSettingsPage.allCases == [.overview, .processes, .history])
     for page in SystemResourceSettingsPage.allCases {
         #expect(!page.titleKey.isEmpty)
         #expect(!page.symbol.isEmpty)
         #expect(page.id == page)
     }
-    #expect(Set(SystemResourceSettingsPage.allCases.map(\.titleKey)).count == 2)
+    #expect(Set(SystemResourceSettingsPage.allCases.map(\.titleKey)).count == 3)
 }
 
 @Test("历史聚合在同一分钟内取平均，并对齐到分钟")
@@ -882,4 +882,72 @@ private final class AlertingResourceProvider: SystemResourceProviding, @unchecke
             networkSentBytes: 0
         )
     }
+}
+
+@Test("历史按范围聚合：桶内取平均、内存取最后一个、范围外丢弃")
+func historyAggregatesByRange() {
+    let base = Date(timeIntervalSince1970: 1_800_000_000)
+    func bucket(offset: TimeInterval, cpu: Double, memory: Int64, read: Int64) -> SystemResourceHistoryBucket {
+        SystemResourceHistoryBucket(
+            timestamp: base.addingTimeInterval(offset),
+            cpuUsage: cpu,
+            memoryUsedBytes: memory,
+            memoryTotalBytes: 1_000,
+            diskReadBytesPerSecond: read,
+            diskWriteBytesPerSecond: 0,
+            sampleCount: 1
+        )
+    }
+    let buckets = [
+        bucket(offset: 0, cpu: 0.2, memory: 100, read: 100),
+        bucket(offset: 60, cpu: 0.4, memory: 200, read: 300),
+        bucket(offset: 300, cpu: 0.8, memory: 300, read: 500),
+        bucket(offset: 3_600, cpu: 0.9, memory: 400, read: 700)
+    ]
+
+    // 5 分钟一个桶：前两个合并，第三个单独，第四个超出 since
+    let aggregated = SystemResourceHistoryAggregator.aggregated(
+        buckets,
+        interval: 300,
+        since: base.addingTimeInterval(-1)
+    )
+
+    #expect(aggregated.count == 3)
+    #expect(abs(aggregated[0].cpuUsage - 0.3) < 0.001)
+    #expect(aggregated[0].memoryUsedBytes == 200)   // 取桶内最后一个
+    #expect(aggregated[0].diskReadBytesPerSecond == 200)
+    #expect(aggregated[0].sampleCount == 2)
+    #expect(abs(aggregated[1].cpuUsage - 0.8) < 0.001)
+
+    // since 之后只剩最后一个
+    let recent = SystemResourceHistoryAggregator.aggregated(
+        buckets,
+        interval: 300,
+        since: base.addingTimeInterval(3_000)
+    )
+    #expect(recent.count == 1)
+    #expect(recent[0].memoryUsedBytes == 400)
+}
+
+@Test("范围决定覆盖时长与桶间隔，图表布局能命中悬停柱子")
+func historyRangeAndChartLayout() {
+    #expect(SystemResourceHistoryRange.allCases == [.hour, .day, .week, .month])
+    #expect(SystemResourceHistoryRange.hour.duration == 3_600)
+    #expect(SystemResourceHistoryRange.month.duration == 30 * 24 * 60 * 60)
+    // 桶数量控制在可绘制范围
+    for range in SystemResourceHistoryRange.allCases {
+        let count = range.duration / range.bucketInterval
+        #expect(count <= 300)
+        #expect(count >= 24)
+        #expect(!range.titleKey.isEmpty)
+    }
+
+    // 悬停命中：宽度 300、10 个柱子 → 每个 30pt
+    #expect(SystemResourceHistoryChartLayout.hoveredIndex(x: 0, width: 300, count: 10) == 0)
+    #expect(SystemResourceHistoryChartLayout.hoveredIndex(x: 45, width: 300, count: 10) == 1)
+    #expect(SystemResourceHistoryChartLayout.hoveredIndex(x: 299, width: 300, count: 10) == 9)
+    #expect(SystemResourceHistoryChartLayout.hoveredIndex(x: 300, width: 300, count: 10) == 9)
+    #expect(SystemResourceHistoryChartLayout.hoveredIndex(x: -1, width: 300, count: 10) == nil)
+    #expect(SystemResourceHistoryChartLayout.hoveredIndex(x: 10, width: 300, count: 0) == nil)
+    #expect(SystemResourceHistoryChartLayout.barWidth(width: 300, count: 10) > 1)
 }

@@ -22,6 +22,7 @@
 "resource.page.title" = "시스템 리소스 페이지";
 "resource.page.overview" = "개요";
 "resource.page.processes" = "프로세스";
+"resource.page.history" = "기록";
 "resource.cores" = "코어별 사용률";
 "resource.memory.pressure" = "메모리 압력";
 "resource.memory.wired" = "와이어드";
@@ -54,6 +55,22 @@
 "resource.alert.permission.notRequested" = "알림을 켜면 시스템이 확인합니다";
 "resource.alert.permission.authorized" = "허용됨";
 "resource.alert.permission.denied" = "시스템이 알림을 허용하지 않아 알림이 전달되지 않습니다";
+"resource.history.range" = "기간";
+"resource.history.range.hour" = "1시간";
+"resource.history.range.day" = "1일";
+"resource.history.range.week" = "1주";
+"resource.history.range.month" = "1개월";
+"resource.history.metric" = "지표";
+"resource.history.metric.cpu" = "CPU";
+"resource.history.metric.memory" = "메모리";
+"resource.history.metric.disk" = "디스크 I/O";
+"resource.history.title" = "리소스 기록";
+"resource.history.empty" = "기록이 아직 없습니다. 패널이나 이 페이지를 열어 두면 기록이 시작됩니다";
+"resource.history.average" = "평균";
+"resource.history.peak" = "최대";
+"resource.history.storage" = "사용 공간";
+"resource.history.clear" = "기록 지우기";
+
 "resource.alert.section" = "리소스 알림";
 "resource.alert.enable" = "알림 사용";
 "resource.alert.permission" = "알림 권한";

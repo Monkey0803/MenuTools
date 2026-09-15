@@ -22,6 +22,7 @@
 "resource.page.title" = "システムリソースページ";
 "resource.page.overview" = "概要";
 "resource.page.processes" = "プロセス";
+"resource.page.history" = "履歴";
 "resource.cores" = "コアごとの使用率";
 "resource.memory.pressure" = "メモリプレッシャー";
 "resource.memory.wired" = "ワイヤード";
@@ -54,6 +55,22 @@
 "resource.alert.permission.notRequested" = "通知を有効にするとシステムが確認します";
 "resource.alert.permission.authorized" = "許可済み";
 "resource.alert.permission.denied" = "システムが通知を許可していないため、通知は届きません";
+"resource.history.range" = "期間";
+"resource.history.range.hour" = "1 時間";
+"resource.history.range.day" = "1 日";
+"resource.history.range.week" = "1 週間";
+"resource.history.range.month" = "1 か月";
+"resource.history.metric" = "指標";
+"resource.history.metric.cpu" = "CPU";
+"resource.history.metric.memory" = "メモリ";
+"resource.history.metric.disk" = "ディスク I/O";
+"resource.history.title" = "リソース履歴";
+"resource.history.empty" = "履歴はまだありません。パネルかこのページを開いたままにすると記録が始まります";
+"resource.history.average" = "平均";
+"resource.history.peak" = "ピーク";
+"resource.history.storage" = "使用容量";
+"resource.history.clear" = "履歴を消去";
+
 "resource.alert.section" = "リソース通知";
 "resource.alert.enable" = "通知を有効化";
 "resource.alert.permission" = "通知の許可";

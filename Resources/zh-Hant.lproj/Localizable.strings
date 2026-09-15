@@ -22,6 +22,7 @@
 "resource.page.title" = "系統資源頁面";
 "resource.page.overview" = "概覽";
 "resource.page.processes" = "程序";
+"resource.page.history" = "歷史";
 "resource.cores" = "各核心佔用";
 "resource.memory.pressure" = "記憶體壓力";
 "resource.memory.wired" = "鎖定";
@@ -54,6 +55,22 @@
 "resource.alert.permission.notRequested" = "啟用告警時系統會詢問";
 "resource.alert.permission.authorized" = "已授權";
 "resource.alert.permission.denied" = "系統未允許通知，告警不會送達";
+"resource.history.range" = "時間範圍";
+"resource.history.range.hour" = "1 小時";
+"resource.history.range.day" = "1 天";
+"resource.history.range.week" = "1 週";
+"resource.history.range.month" = "1 個月";
+"resource.history.metric" = "指標";
+"resource.history.metric.cpu" = "CPU";
+"resource.history.metric.memory" = "記憶體";
+"resource.history.metric.disk" = "磁碟讀寫";
+"resource.history.title" = "資源歷史";
+"resource.history.empty" = "還沒有歷史資料，保持開啟面板或設定頁即可開始記錄";
+"resource.history.average" = "平均";
+"resource.history.peak" = "峰值";
+"resource.history.storage" = "佔用空間";
+"resource.history.clear" = "清除歷史";
+
 "resource.alert.section" = "資源告警";
 "resource.alert.enable" = "開啟告警";
 "resource.alert.permission" = "通知授權";

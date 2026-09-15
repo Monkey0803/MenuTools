@@ -22,6 +22,7 @@
 "resource.page.title" = "System resources page";
 "resource.page.overview" = "Overview";
 "resource.page.processes" = "Processes";
+"resource.page.history" = "History";
 "resource.cores" = "Per-core usage";
 "resource.memory.pressure" = "Memory pressure";
 "resource.memory.wired" = "Wired";
@@ -54,6 +55,22 @@
 "resource.alert.permission.notRequested" = "macOS will ask when you enable alerts";
 "resource.alert.permission.authorized" = "Authorized";
 "resource.alert.permission.denied" = "macOS is not allowing notifications, alerts will not be delivered";
+"resource.history.range" = "Range";
+"resource.history.range.hour" = "1 hour";
+"resource.history.range.day" = "1 day";
+"resource.history.range.week" = "1 week";
+"resource.history.range.month" = "1 month";
+"resource.history.metric" = "Metric";
+"resource.history.metric.cpu" = "CPU";
+"resource.history.metric.memory" = "Memory";
+"resource.history.metric.disk" = "Disk I/O";
+"resource.history.title" = "Resource history";
+"resource.history.empty" = "No history yet — keep the panel or this page open to start recording";
+"resource.history.average" = "Average";
+"resource.history.peak" = "Peak";
+"resource.history.storage" = "Storage used";
+"resource.history.clear" = "Clear history";
+
 "resource.alert.section" = "Resource alerts";
 "resource.alert.enable" = "Enable alerts";
 "resource.alert.permission" = "Notification permission";

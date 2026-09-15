@@ -5,6 +5,7 @@ import SwiftUI
 enum SystemResourceSettingsPage: String, CaseIterable, Identifiable {
     case overview
     case processes
+    case history
 
     var id: Self { self }
     var titleKey: String { "resource.page.\(rawValue)" }
@@ -13,6 +14,7 @@ enum SystemResourceSettingsPage: String, CaseIterable, Identifiable {
         switch self {
         case .overview: "gauge.with.dots.needle.67percent"
         case .processes: "list.bullet.rectangle"
+        case .history: "chart.bar.xaxis"
         }
     }
 }
@@ -25,6 +27,9 @@ struct SystemResourceSettingsView: View {
     @State private var processes = SystemProcessResourceService.shared
     @State private var page: SystemResourceSettingsPage = .overview
     @State private var isReleasingMemory = false
+    @State private var historyRange: SystemResourceHistoryRange = .hour
+    @State private var historyMetric: SystemResourceHistoryMetric = .cpu
+    @State private var hoveredHistoryIndex: Int?
 
     var body: some View {
         Form {
@@ -40,19 +45,24 @@ struct SystemResourceSettingsView: View {
                 .focusEffectDisabled()
             }
 
-            if page == .overview {
+            switch page {
+            case .overview:
                 overviewSections
                 alertSection
-            } else {
+            case .processes:
                 processSections
+            case .history:
+                historySections
             }
         }
         .formStyle(.grouped)
         .task {
             resource.beginMonitoring()
             processes.beginMonitoring()
+            resource.loadHistory()
             while !Task.isCancelled {
                 try? await Task.sleep(for: .seconds(30))
+                resource.loadHistory()
             }
             resource.endMonitoring()
             processes.endMonitoring()
@@ -231,6 +241,153 @@ struct SystemResourceSettingsView: View {
         } header: {
             Label(L("resource.process.title"), systemImage: "list.bullet.rectangle")
         }
+    }
+
+    // MARK: - 历史
+
+    @ViewBuilder
+    private var historySections: some View {
+        Section {
+            Picker(L("resource.history.range"), selection: $historyRange) {
+                ForEach(SystemResourceHistoryRange.allCases, id: \.self) { range in
+                    Text(L(range.titleKey)).tag(range)
+                }
+            }
+            .pickerStyle(.segmented)
+            .labelsHidden()
+
+            Picker(L("resource.history.metric"), selection: $historyMetric) {
+                ForEach(SystemResourceHistoryMetric.allCases, id: \.self) { metric in
+                    Text(L(metric.titleKey)).tag(metric)
+                }
+            }
+            .pickerStyle(.segmented)
+            .labelsHidden()
+        }
+
+        Section {
+            if historyBuckets.isEmpty {
+                Text(L("resource.history.empty"))
+                    .foregroundStyle(.secondary)
+            } else {
+                historyChart
+                LabeledContent(L("resource.history.average"), value: historyAverageText)
+                LabeledContent(L("resource.history.peak"), value: historyPeakText)
+            }
+        } header: {
+            Label(L("resource.history.title"), systemImage: "chart.bar.xaxis")
+        }
+
+        Section {
+            LabeledContent(L("resource.history.storage"), value: bytes(resource.historyStorageUsage.totalBytes))
+            Button(L("resource.history.clear"), role: .destructive) {
+                resource.clearHistory()
+            }
+            .disabled(resource.historyBuckets.isEmpty && resource.historyStorageUsage.totalBytes == 0)
+        }
+    }
+
+    private var historyChart: some View {
+        let buckets = historyBuckets
+        let values = buckets.map { historyMetric.value(of: $0) }
+        let maximum = max(values.max() ?? 1, historyMetric.isRatio ? 1 : 0.0001)
+        let hovered = hoveredHistoryIndex.flatMap { $0 < buckets.count ? buckets[$0] : nil }
+
+        return VStack(alignment: .leading, spacing: 6) {
+            Group {
+                if let hovered {
+                    historyHoverDetail(hovered)
+                } else {
+                    Text(historyAverageText)
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                }
+            }
+            .frame(height: 18)
+
+            GeometryReader { geometry in
+                let barWidth = SystemResourceHistoryChartLayout.barWidth(
+                    width: geometry.size.width,
+                    count: buckets.count
+                )
+                HStack(alignment: .bottom, spacing: 2) {
+                    ForEach(Array(buckets.enumerated()), id: \.element.id) { index, bucket in
+                        RoundedRectangle(cornerRadius: 2)
+                            .fill(historyBarColor(index: index))
+                            .frame(
+                                width: barWidth,
+                                height: max(geometry.size.height * (values[index] / maximum), 1)
+                            )
+                            .opacity(hoveredHistoryIndex == nil || hoveredHistoryIndex == index ? 1 : 0.42)
+                            .frame(maxHeight: .infinity, alignment: .bottom)
+                            .help(historyDetailText(bucket))
+                    }
+                }
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .onContinuousHover(coordinateSpace: .local) { phase in
+                    switch phase {
+                    case .active(let location):
+                        let index = SystemResourceHistoryChartLayout.hoveredIndex(
+                            x: location.x,
+                            width: geometry.size.width,
+                            count: buckets.count
+                        )
+                        if index != hoveredHistoryIndex {
+                            hoveredHistoryIndex = index
+                        }
+                    case .ended:
+                        hoveredHistoryIndex = nil
+                    }
+                }
+            }
+            .frame(height: 96)
+        }
+    }
+
+    private func historyBarColor(index: Int) -> Color {
+        let buckets = historyBuckets
+        guard buckets.indices.contains(index) else { return .accentColor }
+        return historyMetric == .cpu && buckets[index].cpuUsage > 0.85 ? .orange : .accentColor
+    }
+
+    private func historyHoverDetail(_ bucket: SystemResourceHistoryBucket) -> some View {
+        Text(historyDetailText(bucket))
+            .font(.caption.monospacedDigit())
+            .foregroundStyle(.secondary)
+    }
+
+    /// 悬停/提示详情：时间 + 同时给出 CPU、内存与磁盘读写。
+    private func historyDetailText(_ bucket: SystemResourceHistoryBucket) -> String {
+        let time = bucket.timestamp.formatted(date: .omitted, time: .shortened)
+        let cpu = percent(bucket.cpuUsage)
+        let memory = percent(bucket.memoryUsage)
+        let disk = "\(rate(bucket.diskReadBytesPerSecond)) / \(rate(bucket.diskWriteBytesPerSecond))"
+        let cpuLabel = L("resource.history.metric.cpu")
+        let memoryLabel = L("resource.history.metric.memory")
+        let diskLabel = L("resource.history.metric.disk")
+        return "\(time)  \(cpuLabel) \(cpu)  \(memoryLabel) \(memory)  \(diskLabel) \(disk)"
+    }
+
+    private var historyBuckets: [SystemResourceHistoryBucket] {
+        SystemResourceHistoryAggregator.aggregated(
+            resource.historyBuckets,
+            interval: historyRange.bucketInterval,
+            since: Date().addingTimeInterval(-historyRange.duration)
+        )
+    }
+
+    private var historyAverageText: String {
+        let buckets = historyBuckets
+        guard !buckets.isEmpty else { return "-" }
+        let values = buckets.map { historyMetric.value(of: $0) }
+        let average = values.reduce(0, +) / Double(values.count)
+        return historyMetric.isRatio ? percent(average) : rate(Int64(average))
+    }
+
+    private var historyPeakText: String {
+        let buckets = historyBuckets
+        guard let peak = buckets.map({ historyMetric.value(of: $0) }).max() else { return "-" }
+        return historyMetric.isRatio ? percent(peak) : rate(Int64(peak))
     }
 
     // MARK: - 告警

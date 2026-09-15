@@ -22,6 +22,7 @@
 "resource.page.title" = "系统资源页面";
 "resource.page.overview" = "概览";
 "resource.page.processes" = "进程";
+"resource.page.history" = "历史";
 "resource.cores" = "各核心占用";
 "resource.memory.pressure" = "内存压力";
 "resource.memory.wired" = "锁定";
@@ -54,6 +55,22 @@
 "resource.alert.permission.notRequested" = "启用告警时系统会询问";
 "resource.alert.permission.authorized" = "已授权";
 "resource.alert.permission.denied" = "系统未允许通知，告警不会送达";
+"resource.history.range" = "时间范围";
+"resource.history.range.hour" = "1 小时";
+"resource.history.range.day" = "1 天";
+"resource.history.range.week" = "1 周";
+"resource.history.range.month" = "1 个月";
+"resource.history.metric" = "指标";
+"resource.history.metric.cpu" = "CPU";
+"resource.history.metric.memory" = "内存";
+"resource.history.metric.disk" = "磁盘读写";
+"resource.history.title" = "资源历史";
+"resource.history.empty" = "还没有历史数据，保持打开面板或设置页即可开始记录";
+"resource.history.average" = "平均";
+"resource.history.peak" = "峰值";
+"resource.history.storage" = "占用空间";
+"resource.history.clear" = "清除历史";
+
 "resource.alert.section" = "资源告警";
 "resource.alert.enable" = "开启告警";
 "resource.alert.permission" = "通知授权";
