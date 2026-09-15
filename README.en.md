@@ -47,6 +47,7 @@ A lightweight system toolkit that lives in the macOS menu bar. MenuTools uses th
 | Balance and mono | Per-app left/right balance (unity at the center) and multi-channel mono downmix. |
 | Output device | Routes a single app to a specific output device and remembers master volume per device. |
 | Presets and profiles | Remembers levels by root app bundle ID (helpers merged into the parent app); presets capture EQ, output device, group, favorites and channel settings together. |
+| Preset sync | Syncs presets, automation rules and custom EQ to other Macs through a passphrase-encrypted file in a shared folder; deletions propagate. |
 | Automation | Applies presets by output device, time range, Focus mode, frontmost app or Wi-Fi name, with a one-step undo. |
 | Meeting ducking | Lowers other apps while meeting audio plays and restores them afterwards. |
 | Input volume | Microphone level and mute, live metering, and a pre-meeting audio check. |

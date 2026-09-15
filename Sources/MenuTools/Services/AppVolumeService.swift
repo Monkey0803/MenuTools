@@ -857,6 +857,10 @@ final class AppVolumeService {
     private(set) var automationRules: [AppVolumeAutomationRule]
     /// 用户保存的 EQ 曲线，可跨 App 复用。
     private(set) var customEqualizers: [AppVolumeCustomEqualizer]
+    /// 已删除预设的墓碑，用于把删除同步给其他设备。
+    private(set) var presetTombstones: [UUID: Date]
+    /// 已删除自定义 EQ 的墓碑。
+    private(set) var equalizerTombstones: [UUID: Date]
     private(set) var appGroupFilter: AppVolumeAppGroup?
     private(set) var sessionSort: AppVolumeSessionSort
     private(set) var searchQuery: String
@@ -952,6 +956,8 @@ final class AppVolumeService {
         presets = Self.loadPresets(from: userDefaults)
         automationRules = Self.loadAutomationRules(from: userDefaults)
         customEqualizers = Self.loadCustomEqualizers(from: userDefaults)
+        presetTombstones = Self.loadTombstones(from: userDefaults, key: StorageKey.presetTombstones)
+        equalizerTombstones = Self.loadTombstones(from: userDefaults, key: StorageKey.equalizerTombstones)
         appGroupFilter = Self.loadAppGroupFilter(from: userDefaults)
         sessionSort = Self.loadSessionSort(from: userDefaults)
         searchQuery = userDefaults.string(forKey: StorageKey.searchQuery) ?? ""
@@ -1323,6 +1329,7 @@ final class AppVolumeService {
     func deleteCustomEqualizer(id: UUID) {
         guard let index = customEqualizers.firstIndex(where: { $0.id == id }) else { return }
         customEqualizers.remove(at: index)
+        recordEqualizerTombstone(id: id)
         persistCustomEqualizers()
     }
 
@@ -1332,6 +1339,47 @@ final class AppVolumeService {
         updateAudioProcessingProfile(for: rootBundleID) { profile in
             profile.equalizer = preset.equalizer
         }
+    }
+
+    // MARK: - 预设跨设备同步
+
+    /// 当前预设状态，用于写入共享文件。
+    func presetSyncDocument(deviceName: String, now: Date = Date()) -> AppVolumePresetSyncDocument {
+        AppVolumePresetSyncDocument.current(
+            deviceName: deviceName,
+            presets: presets,
+            automationRules: automationRules,
+            equalizerPresets: customEqualizers,
+            presetTombstones: Dictionary(uniqueKeysWithValues: presetTombstones.map { ($0.key.uuidString, $0.value) }),
+            equalizerTombstones: Dictionary(
+                uniqueKeysWithValues: equalizerTombstones.map { ($0.key.uuidString, $0.value) }
+            ),
+            updatedAt: now
+        )
+    }
+
+    /// 应用同步结果：整体替换预设、自动化规则、EQ 库与墓碑，并清理指向已删除预设的引用。
+    func applyPresetSyncDocument(_ document: AppVolumePresetSyncDocument) {
+        let resolved = document.resolved()
+        presets = resolved.presets
+        customEqualizers = resolved.equalizerPresets
+        let presetIDs = Set(presets.map(\.id))
+        automationRules = resolved.automationRules.filter { presetIDs.contains($0.presetID) }
+        devicePresetBindings = devicePresetBindings.filter { presetIDs.contains($0.value) }
+        presetTombstones = Dictionary(uniqueKeysWithValues: resolved.presetTombstones.compactMap { key, value in
+            UUID(uuidString: key).map { ($0, value) }
+        })
+        equalizerTombstones = Dictionary(
+            uniqueKeysWithValues: resolved.equalizerTombstones.compactMap { key, value in
+                UUID(uuidString: key).map { ($0, value) }
+            }
+        )
+        persistPresets()
+        persistAutomationRules()
+        persistCustomEqualizers()
+        persistDevicePresetBindings()
+        persistTombstones()
+        notifySnapshotChanged()
     }
 
     func renamePreset(id: UUID, to requestedName: String) {
@@ -1389,6 +1437,10 @@ final class AppVolumeService {
         customEqualizers.append(contentsOf: archive.equalizerPresets
             .map { $0.normalized() }
             .filter { !existingEqualizerIDs.contains($0.id) })
+        // 显式导入代表用户想留下这些条目：清掉同名墓碑，避免下次同步又被删掉。
+        for preset in importedPresets { presetTombstones.removeValue(forKey: preset.id) }
+        for equalizer in archive.equalizerPresets { equalizerTombstones.removeValue(forKey: equalizer.id) }
+        persistTombstones()
         persistPresets()
         persistAutomationRules()
         persistCustomEqualizers()
@@ -1531,9 +1583,21 @@ final class AppVolumeService {
         presets.removeAll { $0.id == id }
         automationRules.removeAll { $0.presetID == id }
         devicePresetBindings = devicePresetBindings.filter { $0.value != id }
+        recordPresetTombstone(id: id)
         persistPresets()
         persistAutomationRules()
         persistDevicePresetBindings()
+    }
+
+    /// 记录删除墓碑：没有它，另一台设备上的旧数据会把删掉的预设"复活"。
+    func recordPresetTombstone(id: UUID, at date: Date = Date()) {
+        presetTombstones[id] = max(presetTombstones[id] ?? .distantPast, date)
+        persistTombstones()
+    }
+
+    func recordEqualizerTombstone(id: UUID, at date: Date = Date()) {
+        equalizerTombstones[id] = max(equalizerTombstones[id] ?? .distantPast, date)
+        persistTombstones()
     }
 
     func applyPreset(id: UUID) {
@@ -2239,6 +2303,23 @@ final class AppVolumeService {
         userDefaults.set(data, forKey: StorageKey.customEqualizers)
     }
 
+    private func persistTombstones() {
+        if let data = try? JSONEncoder().encode(presetTombstones) {
+            userDefaults.set(data, forKey: StorageKey.presetTombstones)
+        }
+        if let data = try? JSONEncoder().encode(equalizerTombstones) {
+            userDefaults.set(data, forKey: StorageKey.equalizerTombstones)
+        }
+    }
+
+    private static func loadTombstones(from userDefaults: UserDefaults, key: String) -> [UUID: Date] {
+        guard let data = userDefaults.data(forKey: key),
+              let decoded = try? JSONDecoder().decode([UUID: Date].self, from: data) else {
+            return [:]
+        }
+        return AppVolumePresetSyncMerge.pruned(decoded)
+    }
+
     private func persistAutomationRules() {
         guard let data = try? JSONEncoder().encode(automationRules) else { return }
         userDefaults.set(data, forKey: StorageKey.automationRules)
@@ -2436,6 +2517,8 @@ final class AppVolumeService {
         static let duckedVolumes = "appVolume.duckedVolumes.v1"
         static let devicePresetBindings = "appVolume.devicePresetBindings.v1"
         static let customEqualizers = "appVolume.customEqualizers.v1"
+        static let presetTombstones = "appVolume.presetTombstones.v1"
+        static let equalizerTombstones = "appVolume.equalizerTombstones.v1"
         static let menuBarDisplayMode = "appVolume.menuBarDisplayMode.v1"
         static let notificationClipping = "appVolume.notificationClipping.v1"
         static let notificationAutomation = "appVolume.notificationAutomation.v1"

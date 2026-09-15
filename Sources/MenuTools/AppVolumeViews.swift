@@ -199,6 +199,9 @@ struct AppVolumeSettingsView: View {
     @State private var editingRule: AppVolumeAutomationRule?
     @State private var didCopyDiagnostic = false
     @State private var isInputLevelMonitoring = false
+    @State private var presetSync = AppVolumePresetSyncService.shared
+    @State private var presetSyncPassphrase = ""
+    @State private var presetSyncConflictCopies: [URL] = []
 
     private var activeSessions: [AppAudioSession] {
         service.filteredSessions.filter(\.isRunningOutput)
@@ -642,6 +645,99 @@ struct AppVolumeSettingsView: View {
             }
 
             Section {
+                Text(L("volume.presetSync.desc"))
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+
+                LabeledContent(L("volume.presetSync.folder")) {
+                    HStack(spacing: 8) {
+                        Text(
+                            presetSync.fileURL?.deletingLastPathComponent().lastPathComponent
+                                ?? L("volume.presetSync.notSet")
+                        )
+                        .foregroundStyle(.secondary)
+                        .lineLimit(1)
+                        Button(L("volume.presetSync.choose"), action: choosePresetSyncFolder)
+                    }
+                }
+
+                HStack(spacing: 8) {
+                    SecureField(L("volume.presetSync.passphrase"), text: $presetSyncPassphrase)
+                    Button(L("volume.presetSync.save")) {
+                        presetSync.storePassphrase(presetSyncPassphrase)
+                        presetSyncPassphrase = ""
+                    }
+                    .disabled(presetSyncPassphrase.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
+                    if presetSync.hasStoredPassphrase {
+                        Button(L("volume.presetSync.clear")) {
+                            presetSync.clearPassphrase()
+                        }
+                    }
+                }
+                if presetSync.hasStoredPassphrase {
+                    Label(L("volume.presetSync.passphraseSaved"), systemImage: "key.fill")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                }
+
+                Toggle(L("volume.presetSync.auto"), isOn: Binding(
+                    get: { presetSync.isEnabled },
+                    set: { _ = presetSync.setEnabled($0) }
+                ))
+                .disabled(!presetSync.hasStoredPassphrase || presetSync.fileURL == nil)
+
+                if presetSync.isEnabled {
+                    Picker(L("volume.presetSync.interval"), selection: Binding(
+                        get: { presetSync.intervalMinutes },
+                        set: { presetSync.setIntervalMinutes($0) }
+                    )) {
+                        ForEach(AppVolumePresetSyncSettings.intervalOptions, id: \.self) { minutes in
+                            Text(L("volume.presetSync.interval.minutes", minutes)).tag(minutes)
+                        }
+                    }
+                }
+
+                HStack(spacing: 8) {
+                    Button(L("volume.presetSync.syncNow"), action: synchronizePresetsNow)
+                        .disabled(
+                            presetSync.isSyncing
+                                || !presetSync.hasStoredPassphrase
+                                || presetSync.fileURL == nil
+                        )
+                    if presetSync.isSyncing {
+                        ProgressView()
+                            .controlSize(.small)
+                    }
+                    Spacer()
+                    Text(presetSyncLastSyncText)
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                }
+
+                if let error = presetSync.lastError {
+                    Text(error)
+                        .font(.caption)
+                        .foregroundStyle(.orange)
+                }
+
+                if !presetSyncConflictCopies.isEmpty {
+                    HStack(spacing: 8) {
+                        Label(
+                            L("volume.presetSync.conflict", presetSyncConflictCopies.count),
+                            systemImage: "exclamationmark.triangle"
+                        )
+                        .foregroundStyle(.orange)
+                        Button(L("volume.presetSync.reveal")) {
+                            NSWorkspace.shared.activateFileViewerSelecting(presetSyncConflictCopies)
+                        }
+                    }
+                }
+            } header: {
+                Label(L("volume.presetSync.title"), systemImage: "arrow.triangle.2.circlepath")
+            }
+            .onAppear(perform: refreshPresetSyncState)
+
+            Section {
                 Button(didCopyDiagnostic ? L("volume.diagnostics.copied") : L("volume.diagnostics.copy")) {
                     didCopyDiagnostic = service.copyDiagnosticReport()
                 }
@@ -779,6 +875,40 @@ struct AppVolumeSettingsView: View {
             string: "x-apple.systempreferences:com.apple.preference.security?Privacy_AudioCapture"
         ) else { return }
         NSWorkspace.shared.open(url)
+    }
+
+    // MARK: - 预设跨设备同步
+
+    private var presetSyncLastSyncText: String {
+        guard let date = presetSync.lastSyncedAt else {
+            return L("volume.presetSync.never")
+        }
+        return L("volume.presetSync.lastSync", date.formatted(date: .abbreviated, time: .shortened))
+    }
+
+    private func refreshPresetSyncState() {
+        presetSyncConflictCopies = presetSync.conflictCopies
+    }
+
+    private func choosePresetSyncFolder() {
+        let panel = NSOpenPanel()
+        panel.title = L("volume.presetSync.choose")
+        panel.canChooseFiles = false
+        panel.canChooseDirectories = true
+        panel.allowsMultipleSelection = false
+        if let url = presetSync.fileURL {
+            panel.directoryURL = url.deletingLastPathComponent()
+        }
+        guard panel.runModal() == .OK, let folder = panel.url else { return }
+        presetSync.setFileURL(folder.appendingPathComponent(AppVolumePresetSyncSettings.fileName))
+        presetSync.clearLastError()
+        refreshPresetSyncState()
+    }
+
+    private func synchronizePresetsNow() {
+        guard let passphrase = presetSync.storedPassphrase() else { return }
+        _ = presetSync.synchronize(passphrase: passphrase)
+        refreshPresetSyncState()
     }
 }
 

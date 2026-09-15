@@ -1109,3 +1109,139 @@ func inputLevelRestoreVerificationReappliesValue() throws {
     let secondWrite = service.applyInputRestore(captured)
     #expect(!secondWrite)
 }
+
+/// 共享文件的内存实现：两台"设备"共用同一个实例。
+private final class InMemorySharedFile: SharedFileStoring, @unchecked Sendable {
+    private var contents: Data?
+    func read(at url: URL) throws -> Data? { contents }
+    func write(_ data: Data, to url: URL) throws { contents = data }
+}
+
+private final class InMemoryPresetSyncPassphraseStore: AppVolumePresetSyncPassphraseStoring, @unchecked Sendable {
+    private var value: String?
+    func passphrase() -> String? { value }
+    func save(_ passphrase: String) { value = passphrase }
+    func clear() { value = nil }
+}
+
+@Test("两台设备经共享文件同步：并集、较新者胜出、删除靠墓碑传播")
+@MainActor
+func presetSyncAcrossTwoDevices() throws {
+    let sharedFile = InMemorySharedFile()
+    let url = URL(fileURLWithPath: "/tmp/mt-volume-presets.mtvolsync")
+
+    let defaultsA = try makeEnhancementDefaults("syncDeviceA")
+    let defaultsB = try makeEnhancementDefaults("syncDeviceB")
+    let serviceA = AppVolumeService(backend: EnhancedFakeAppVolumeBackend(), userDefaults: defaultsA)
+    let serviceB = AppVolumeService(backend: EnhancedFakeAppVolumeBackend(), userDefaults: defaultsB)
+    let syncA = AppVolumePresetSyncService(
+        userDefaults: defaultsA,
+        appVolume: serviceA,
+        passphraseStore: InMemoryPresetSyncPassphraseStore(),
+        fileStore: sharedFile
+    )
+    let syncB = AppVolumePresetSyncService(
+        userDefaults: defaultsB,
+        appVolume: serviceB,
+        passphraseStore: InMemoryPresetSyncPassphraseStore(),
+        fileStore: sharedFile
+    )
+    syncA.setFileURL(url)
+    syncB.setFileURL(url)
+
+    // A 保存预设并写入共享文件，B 同步后拿到
+    let presetA = serviceA.savePreset(named: "通勤", masterVolume: 0.3, appVolumes: ["com.apple.Music": 0.5])
+    #expect(syncA.synchronize(passphrase: "口令"))
+    #expect(syncB.synchronize(passphrase: "口令"))
+    #expect(serviceB.presets.map(\.name) == ["通勤"])
+
+    // B 新增自定义 EQ，A 同步后拿到
+    _ = serviceB.saveCustomEqualizer(named: "夜间", gains: AppVolumeEqualizerPreset.lateNight.gains)
+    #expect(syncB.synchronize(passphrase: "口令"))
+    #expect(syncA.synchronize(passphrase: "口令"))
+    #expect(serviceA.customEqualizers.map(\.name) == ["夜间"])
+    #expect(serviceA.presets.count == 1)
+
+    // B 删除预设并同步，A 同步后同样删除（墓碑传播）
+    serviceB.deletePreset(id: presetA.id)
+    #expect(syncB.synchronize(passphrase: "口令"))
+    #expect(syncA.synchronize(passphrase: "口令"))
+    #expect(serviceA.presets.isEmpty)
+    #expect(serviceA.presetTombstones[presetA.id] != nil)
+}
+
+@Test("口令错误时同步失败并给出原因，不会改动本机预设")
+@MainActor
+func presetSyncReportsWrongPassphrase() throws {
+    let sharedFile = InMemorySharedFile()
+    let url = URL(fileURLWithPath: "/tmp/mt-volume-presets-wrong.mtvolsync")
+    let defaultsA = try makeEnhancementDefaults("syncWrongA")
+    let defaultsB = try makeEnhancementDefaults("syncWrongB")
+    let serviceA = AppVolumeService(backend: EnhancedFakeAppVolumeBackend(), userDefaults: defaultsA)
+    let serviceB = AppVolumeService(backend: EnhancedFakeAppVolumeBackend(), userDefaults: defaultsB)
+    let syncA = AppVolumePresetSyncService(
+        userDefaults: defaultsA,
+        appVolume: serviceA,
+        passphraseStore: InMemoryPresetSyncPassphraseStore(),
+        fileStore: sharedFile
+    )
+    let syncB = AppVolumePresetSyncService(
+        userDefaults: defaultsB,
+        appVolume: serviceB,
+        passphraseStore: InMemoryPresetSyncPassphraseStore(),
+        fileStore: sharedFile
+    )
+    syncA.setFileURL(url)
+    syncB.setFileURL(url)
+
+    _ = serviceA.savePreset(named: "通勤", masterVolume: 0.3, appVolumes: ["com.apple.Music": 0.5])
+    #expect(syncA.synchronize(passphrase: "正确口令"))
+
+    let succeeded = syncB.synchronize(passphrase: "错误口令")
+
+    #expect(!succeeded)
+    #expect(syncB.lastError != nil)
+    #expect(serviceB.presets.isEmpty)
+}
+
+@Test("没有共享文件夹或没有口令时同步会明确报错")
+@MainActor
+func presetSyncRequiresFolderAndPassphrase() throws {
+    let defaults = try makeEnhancementDefaults("syncMissingConfig")
+    let service = AppVolumeService(backend: EnhancedFakeAppVolumeBackend(), userDefaults: defaults)
+    let sync = AppVolumePresetSyncService(
+        userDefaults: defaults,
+        appVolume: service,
+        passphraseStore: InMemoryPresetSyncPassphraseStore(),
+        fileStore: InMemorySharedFile()
+    )
+
+    #expect(!sync.synchronize(passphrase: "口令"))
+    #expect(sync.lastError != nil)
+
+    sync.setFileURL(URL(fileURLWithPath: "/tmp/mt-volume-presets-missing.mtvolsync"))
+    #expect(!sync.synchronize(passphrase: "   "))
+    #expect(sync.lastError != nil)
+
+    // 开启自动同步前必须先有文件夹与已存口令
+    #expect(!sync.setEnabled(true))
+    sync.storePassphrase("口令")
+    #expect(sync.setEnabled(true))
+    #expect(sync.isEnabled)
+}
+
+@Test("墓碑保留 30 天后会被清理")
+func presetTombstonesPruneAfterRetention() {
+    let now = Date(timeIntervalSince1970: 1_800_000_000)
+    let fresh = UUID()
+    let stale = UUID()
+    let tombstones: [UUID: Date] = [
+        fresh: now.addingTimeInterval(-60),
+        stale: now.addingTimeInterval(-AppVolumePresetSyncMerge.tombstoneRetention - 1)
+    ]
+
+    let pruned = AppVolumePresetSyncMerge.pruned(tombstones, now: now)
+
+    #expect(pruned[fresh] != nil)
+    #expect(pruned[stale] == nil)
+}
