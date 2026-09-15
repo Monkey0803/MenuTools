@@ -484,6 +484,43 @@ struct AppVolumeSettingsView: View {
                         .font(.caption)
                         .foregroundStyle(.tint)
                 }
+            Section {
+                if let remaining = service.sleepTimerRemainingMinutes {
+                    LabeledContent(L("volume.sleepTimer.active", remaining)) {
+                        Button(L("volume.sleepTimer.cancel")) {
+                            service.cancelSleepTimer()
+                        }
+                    }
+                } else {
+                    Menu(L("volume.sleepTimer.start")) {
+                        ForEach(AppVolumeSleepTimer.minuteOptions, id: \.self) { minutes in
+                            Button(L("volume.sleepTimer.minutes", minutes)) {
+                                service.startSleepTimer(minutes: minutes)
+                            }
+                        }
+                    }
+                    .frame(maxWidth: 220, alignment: .leading)
+                }
+
+                Text(L("volume.sleepTimer.desc"))
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+
+                if service.sleepTimerDidFinish {
+                    HStack(spacing: 8) {
+                        Label(L("volume.sleepTimer.finished"), systemImage: "moon.zzz.fill")
+                            .foregroundStyle(.secondary)
+                        Button(L("volume.sleepTimer.dismiss")) {
+                            service.acknowledgeSleepTimerFinish()
+                        }
+                        .buttonStyle(.borderless)
+                        .controlSize(.small)
+                    }
+                }
+            } header: {
+                Label(L("volume.sleepTimer.title"), systemImage: "moon.zzz")
+            }
+
             } header: {
                 Label(L("volume.meetingDucking.title"), systemImage: "person.2.wave.2")
             }
@@ -542,6 +579,35 @@ struct AppVolumeSettingsView: View {
                 }
                 .disabled(service.output.deviceUID.isEmpty || service.presets.isEmpty)
 
+                ForEach(service.presetBindings) { binding in
+                    VStack(alignment: .leading, spacing: 2) {
+                        HStack(spacing: 8) {
+                            Image(systemName: binding.isDeviceAvailable ? "hifispeaker.fill" : "questionmark.circle")
+                                .foregroundStyle(binding.isDeviceAvailable ? Color.secondary : Color.orange)
+                            VStack(alignment: .leading, spacing: 1) {
+                                Text(binding.deviceName ?? L("volume.preset.binding.unknownDevice"))
+                                    .lineLimit(1)
+                                Text(binding.presetName)
+                                    .font(.caption)
+                                    .foregroundStyle(.secondary)
+                            }
+                            Spacer(minLength: 8)
+                            Button(L("volume.preset.binding.clear")) {
+                                service.clearPresetBinding(forOutputDeviceUID: binding.deviceUID)
+                            }
+                            .buttonStyle(.borderless)
+                            .controlSize(.small)
+                            .focusable(false)
+                            .focusEffectDisabled()
+                        }
+                        if !binding.isDeviceAvailable {
+                            Text(L("volume.preset.binding.missingHint"))
+                                .font(.caption2)
+                                .foregroundStyle(.secondary)
+                        }
+                    }
+                }
+
                 ForEach(service.presets) { preset in
                     VStack(alignment: .leading, spacing: 4) {
                     HStack {
@@ -573,6 +639,10 @@ struct AppVolumeSettingsView: View {
                     }
                     HStack(spacing: 6) {
                         Text(L("volume.preset.coverage", preset.appVolumes.count, preset.appSettings.count))
+                        let boundDevices = service.boundDeviceNames(forPresetID: preset.id)
+                        if !boundDevices.isEmpty {
+                            Text(L("volume.preset.binding.devices", boundDevices.joined(separator: "、")))
+                        }
                         if preset.needsCoverageUpgrade {
                             Label(L("volume.preset.coverageHint"), systemImage: "exclamationmark.triangle")
                                 .foregroundStyle(.orange)

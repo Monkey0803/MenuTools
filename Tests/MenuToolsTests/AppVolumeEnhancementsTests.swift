@@ -1449,3 +1449,127 @@ func serviceExposesSelfChecks() throws {
     // 没有任何错误时最后一步是 pass
     #expect(steps.last?.status == .pass)
 }
+
+@Test("绑定总览解析设备名、标记未连接设备并可解除")
+@MainActor
+func presetBindingsOverviewResolvesAndClears() throws {
+    let defaults = try makeEnhancementDefaults("bindingsOverview")
+    let backend = EnhancedFakeAppVolumeBackend()
+    let speaker = AudioOutputDevice(id: 11, uid: "speaker", name: "Mac 扬声器", isDefault: true)
+    let headphones = AudioOutputDevice(id: 12, uid: "headphones", name: "AirPods", isDefault: false)
+    backend.outputDevices = [speaker, headphones]
+    let service = AppVolumeService(backend: backend, userDefaults: defaults)
+    backend.send(candidates: [.music], output: .fixture(deviceID: speaker.id, deviceUID: speaker.uid))
+    service.setEnabled(true)
+
+    let preset = service.savePreset(named: "通勤", masterVolume: 0.3, appVolumes: ["com.apple.Music": 0.5])
+    service.bindPreset(preset.id, toOutputDeviceUID: headphones.uid)
+    service.bindPreset(preset.id, toOutputDeviceUID: "ghost-device")
+
+    let bindings = service.presetBindings
+    #expect(bindings.count == 2)
+    #expect(bindings.first { $0.deviceUID == headphones.uid }?.deviceName == "AirPods")
+    // 未连接的设备没有名字，界面会显示占位并把 UID 作为提示
+    let ghost = try #require(bindings.first { $0.deviceUID == "ghost-device" })
+    #expect(ghost.deviceName == nil)
+    #expect(!ghost.isDeviceAvailable)
+    #expect(ghost.presetName == "通勤")
+
+    // 预设行上能列出绑定设备（未连接的用占位文案）
+    let names = service.boundDeviceNames(forPresetID: preset.id)
+    #expect(names.count == 2)
+    #expect(names.contains("AirPods"))
+
+    // 解除一台设备后总览里不再出现
+    service.clearPresetBinding(forOutputDeviceUID: headphones.uid)
+    #expect(service.presetBindings.map(\.deviceUID) == ["ghost-device"])
+    #expect(service.boundPresetID(forOutputDeviceUID: headphones.uid) == nil)
+}
+
+@Test("同一设备改绑会替换旧绑定，删除预设会清掉它的绑定")
+@MainActor
+func presetBindingsReplaceAndCleanUp() throws {
+    let defaults = try makeEnhancementDefaults("bindingsReplace")
+    let backend = EnhancedFakeAppVolumeBackend()
+    let headphones = AudioOutputDevice(id: 12, uid: "headphones", name: "AirPods", isDefault: true)
+    backend.outputDevices = [headphones]
+    let service = AppVolumeService(backend: backend, userDefaults: defaults)
+    backend.send(candidates: [.music], output: .fixture(deviceID: headphones.id, deviceUID: headphones.uid))
+    service.setEnabled(true)
+
+    let first = service.savePreset(named: "通勤", masterVolume: 0.3, appVolumes: [:])
+    let second = service.savePreset(named: "在家", masterVolume: 0.5, appVolumes: [:])
+    service.bindPreset(first.id, toOutputDeviceUID: headphones.uid)
+    service.bindPreset(second.id, toOutputDeviceUID: headphones.uid)
+
+    #expect(service.presetBindings.count == 1)
+    #expect(service.presetBindings.first?.presetID == second.id)
+
+    service.deletePreset(id: second.id)
+    #expect(service.presetBindings.isEmpty)
+    #expect(service.boundDeviceNames(forPresetID: second.id).isEmpty)
+}
+
+@Test("睡眠定时在最后 30 秒线性淡出，到点归零")
+func sleepTimerFadesOnlyInFinalWindow() {
+    let start = Date(timeIntervalSince1970: 1_800_000_000)
+    let timer = AppVolumeSleepTimer(startedAt: start, duration: 600, baseVolume: 0.8)
+
+    // 正常阶段保持原音量
+    #expect(timer.gainScale(at: start) == 1)
+    #expect(timer.volume(at: start.addingTimeInterval(500)) == 0.8)
+    #expect(timer.remainingMinutes(at: start.addingTimeInterval(500)) == 2)
+
+    // 进入最后 30 秒开始线性下降
+    #expect(abs(timer.gainScale(at: start.addingTimeInterval(570)) - 1) < 0.001)
+    #expect(abs(timer.gainScale(at: start.addingTimeInterval(585)) - 0.5) < 0.001)
+    #expect(abs(timer.volume(at: start.addingTimeInterval(585)) - 0.4) < 0.001)
+
+    // 到点归零并标记结束
+    #expect(timer.gainScale(at: start.addingTimeInterval(600)) == 0)
+    #expect(timer.volume(at: timer.endsAt) == 0)
+    #expect(timer.isExpired(at: timer.endsAt))
+    #expect(!timer.isExpired(at: start.addingTimeInterval(599)))
+    #expect(timer.remainingMinutes(at: timer.endsAt) == 0)
+}
+
+@Test("睡眠定时淡出阶段不会超过原音量")
+func sleepTimerNeverExceedsBaseVolume() {
+    let start = Date(timeIntervalSince1970: 1_800_000_000)
+    let timer = AppVolumeSleepTimer(startedAt: start, duration: 120, baseVolume: 1.5)
+
+    // baseVolume 超界时被夹到 1
+    #expect(timer.volume(at: start) == 1)
+    #expect(AppVolumeSleepTimer.minuteOptions.contains(60))
+}
+
+@Test("启动睡眠定时会进入淡出并在结束时静音，取消会恢复原音量")
+@MainActor
+func sleepTimerAppliesFadeAndCancelRestores() throws {
+    let defaults = try makeEnhancementDefaults("sleepTimer")
+    let backend = EnhancedFakeAppVolumeBackend()
+    let service = AppVolumeService(backend: backend, userDefaults: defaults)
+    service.start()
+    backend.send(output: .fixture(volume: 0.8))
+    service.setMasterVolume(0.8)
+
+    service.startSleepTimer(minutes: 10)
+    #expect(service.sleepTimer != nil)
+
+    // 淡出中点：音量减半
+    let start = try #require(service.sleepTimer?.startedAt)
+    service.tickSleepTimer(now: start.addingTimeInterval(600 - 15))
+    #expect(abs((service.output.volume) - 0.4) < 0.01)
+
+    // 取消后恢复原音量
+    service.cancelSleepTimer()
+    #expect(service.sleepTimer == nil)
+    #expect(abs(service.output.volume - 0.8) < 0.01)
+
+    // 走到结束：静音并清掉定时
+    service.startSleepTimer(minutes: 5)
+    let restart = try #require(service.sleepTimer?.startedAt)
+    service.tickSleepTimer(now: restart.addingTimeInterval(300))
+    #expect(service.sleepTimer == nil)
+    #expect(service.output.isMuted)
+}

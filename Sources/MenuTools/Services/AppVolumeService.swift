@@ -66,6 +66,18 @@ extension AppVolumeProfile {
     }
 }
 
+/// 一条「输出设备 → 预设」绑定，供设置页总览。
+struct AppVolumePresetBinding: Identifiable, Equatable, Sendable {
+    var deviceUID: String
+    /// 设备当前是否可见；不可见时为 nil。
+    var deviceName: String?
+    var presetID: UUID
+    var presetName: String
+
+    var id: String { deviceUID }
+    var isDeviceAvailable: Bool { deviceName != nil }
+}
+
 /// 输入电平监控期间会改变输入设备状态：蓝牙耳机会从 A2DP 切到通话档位，
 /// 系统随之改写输入音量。这里记录监控前的状态，停止后恢复回去。
 struct AppVolumeInputLevelRestore: Equatable, Sendable {
@@ -933,6 +945,11 @@ final class AppVolumeService {
     private var notificationTracker = AppVolumeNotificationTracker()
     /// 输入电平监控开始前的输入状态，用于停止后恢复。
     private var inputLevelRestore: AppVolumeInputLevelRestore?
+    /// 睡眠定时（含最后 30 秒淡出）。
+    private(set) var sleepTimer: AppVolumeSleepTimer?
+    private var sleepTimerTask: Task<Void, Never>?
+    /// 定时结束时广播一次，供界面提示。
+    private(set) var sleepTimerDidFinish = false
 
     init(
         backend: AppVolumeRoutingBackend,
@@ -1673,6 +1690,32 @@ final class AppVolumeService {
         devicePresetBindings[outputDeviceUID]
     }
 
+    /// 全部已绑定设备（含当前未连接的），按设备名或 UID 排序。
+    var presetBindings: [AppVolumePresetBinding] {
+        devicePresetBindings.compactMap { deviceUID, presetID in
+            guard let preset = presets.first(where: { $0.id == presetID }) else { return nil }
+            return AppVolumePresetBinding(
+                deviceUID: deviceUID,
+                deviceName: outputDevices.first { $0.uid == deviceUID }?.name,
+                presetID: presetID,
+                presetName: preset.name
+            )
+        }
+        .sorted { ($0.deviceName ?? $0.deviceUID) < ($1.deviceName ?? $1.deviceUID) }
+    }
+
+    /// 某个预设绑定到的设备名（未连接的设备用占位文案）。
+    func boundDeviceNames(forPresetID presetID: UUID) -> [String] {
+        presetBindings
+            .filter { $0.presetID == presetID }
+            .map { $0.deviceName ?? L("volume.preset.binding.unknownDevice") }
+    }
+
+    /// 解除某台设备的绑定。
+    func clearPresetBinding(forOutputDeviceUID deviceUID: String) {
+        bindPreset(nil, toOutputDeviceUID: deviceUID)
+    }
+
     func setMeetingDuckingEnabled(_ enabled: Bool) {
         meetingDuckingEnabled = enabled
         userDefaults.set(enabled, forKey: StorageKey.meetingDuckingEnabled)
@@ -1920,6 +1963,68 @@ final class AppVolumeService {
         userDefaults: UserDefaults
     ) -> Bool {
         userDefaults.object(forKey: key) as? Bool ?? fallback
+    }
+
+    // MARK: - 睡眠定时
+
+    /// 启动睡眠定时：倒数结束前 30 秒线性淡出，到点静音。
+    func startSleepTimer(minutes: Int, now: Date = Date()) {
+        guard minutes > 0 else { return }
+        sleepTimerDidFinish = false
+        sleepTimer = AppVolumeSleepTimer(
+            startedAt: now,
+            duration: TimeInterval(minutes) * 60,
+            baseVolume: output.volume
+        )
+        sleepTimerTask?.cancel()
+        sleepTimerTask = Task { [weak self] in
+            while !Task.isCancelled {
+                try? await Task.sleep(for: .seconds(1))
+                guard !Task.isCancelled else { return }
+                self?.tickSleepTimer()
+            }
+        }
+    }
+
+    /// 取消定时并恢复开始时的音量（已经结束时只清理状态）。
+    func cancelSleepTimer() {
+        sleepTimerTask?.cancel()
+        sleepTimerTask = nil
+        guard let timer = sleepTimer else { return }
+        sleepTimer = nil
+        if !timer.isExpired(at: Date()), output.isMuted || output.volume < timer.baseVolume {
+            setMasterVolume(timer.baseVolume)
+            if output.isMuted { setMasterMuted(false) }
+        }
+    }
+
+    /// 驱动一次淡出计算；可注入时间以便回归。
+    func tickSleepTimer(now: Date = Date()) {
+        guard let timer = sleepTimer else { return }
+        if timer.isExpired(at: now) {
+            sleepTimerTask?.cancel()
+            sleepTimerTask = nil
+            sleepTimer = nil
+            setMasterVolume(0)
+            setMasterMuted(true)
+            sleepTimerDidFinish = true
+            notifySnapshotChanged()
+            return
+        }
+        let volume = timer.volume(at: now)
+        if abs(volume - output.volume) > 0.001 {
+            setMasterVolume(volume)
+        }
+        notifySnapshotChanged()
+    }
+
+    func acknowledgeSleepTimerFinish() {
+        sleepTimerDidFinish = false
+    }
+
+    /// 剩余分钟数（界面显示用）。
+    var sleepTimerRemainingMinutes: Int? {
+        sleepTimer?.remainingMinutes(at: Date())
     }
 
     /// 自检步骤：权限、设备、路由与错误状态的汇总，供诊断页直接展示。
