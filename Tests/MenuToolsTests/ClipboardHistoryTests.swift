@@ -1148,12 +1148,19 @@ func clipboardHistoryDoesNotRetryImagesWithoutContent() async throws {
     )
 
     service.importItems([makeImageHistoryItem()])
+
+    // 首轮识别在机器繁忙时可能要好几秒才起来，这里给足等待预算（否则会误判成「没有触发」）。
     var waited = 0
-    while await attempts.count < 1, waited < 80 {
+    while await attempts.count < 1, waited < 400 {
         try await Task.sleep(for: .milliseconds(25))
         waited += 1
     }
-    try await Task.sleep(for: .milliseconds(600))
+    #expect(await attempts.count == 1)
+
+    // 「无文字」的结果不该进入补试集合：显式走一遍面板刷新入口，确认不会再次识别。
+    try await Task.sleep(for: .milliseconds(200))
+    service.retryFailedImageRecognitions()
+    try await Task.sleep(for: .milliseconds(200))
 
     #expect(await attempts.count == 1)
     #expect(service.items.first?.recognizedText == nil)
