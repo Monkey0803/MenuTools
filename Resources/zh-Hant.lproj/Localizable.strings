@@ -1186,6 +1186,7 @@
 "clipboard.sync.retryInMinutes" = "%d 分鐘後重試";
 "clipboard.sync.error.noFolder" = "尚未選擇共享資料夾";
 "clipboard.sync.error.noPassphrase" = "尚未儲存同步口令";
+"sync.error.conflict" = "共享檔案被其他裝置持續改寫，已把本機合併結果寫到衝突副本 %@";
 "clipboard.sync.error.conflict" = "共享檔案被其他裝置持續改寫，本機結果已存為 %@";
 "clipboard.sync.success" = "置頂歷史和常用片段已同步。";
 "traffic.tabs" = "流量檢視";

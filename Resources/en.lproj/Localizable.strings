@@ -1186,6 +1186,7 @@
 "clipboard.sync.retryInMinutes" = "Retrying in %d minutes";
 "clipboard.sync.error.noFolder" = "No shared folder selected yet";
 "clipboard.sync.error.noPassphrase" = "No sync passphrase saved yet";
+"sync.error.conflict" = "Another device kept rewriting the shared file; this device's merged result was saved as conflict copy %@";
 "clipboard.sync.error.conflict" = "The shared file kept changing on another device. This device's result was saved as %@";
 "clipboard.sync.success" = "Pinned history and snippets synchronized.";
 "traffic.tabs" = "Traffic views";

@@ -1186,6 +1186,7 @@
 "clipboard.sync.retryInMinutes" = "%d분 후에 다시 시도합니다";
 "clipboard.sync.error.noFolder" = "공유 폴더를 선택하지 않았습니다";
 "clipboard.sync.error.noPassphrase" = "동기화 암호가 저장되지 않았습니다";
+"sync.error.conflict" = "다른 기기가 공유 파일을 계속 덮어써서 이 기기의 병합 결과를 충돌 사본 %@(으)로 저장했습니다";
 "clipboard.sync.error.conflict" = "공유 파일이 다른 기기에서 계속 변경되었습니다. 이 기기의 결과는 %@(으)로 저장했습니다";
 "clipboard.sync.success" = "고정 기록과 스니펫을 동기화했습니다.";
 "traffic.tabs" = "트래픽 보기";

@@ -1186,6 +1186,7 @@
 "clipboard.sync.retryInMinutes" = "%d 分後に再試行します";
 "clipboard.sync.error.noFolder" = "共有フォルダーが未選択です";
 "clipboard.sync.error.noPassphrase" = "同期用パスフレーズが未保存です";
+"sync.error.conflict" = "他のデバイスが共有ファイルを書き換え続けたため、このデバイスの統合結果を競合コピー %@ に保存しました";
 "clipboard.sync.error.conflict" = "共有ファイルが他のデバイスで更新され続けています。このデバイスの結果は %@ として保存しました";
 "clipboard.sync.success" = "ピン留め履歴とスニペットを同期しました。";
 "traffic.tabs" = "通信ビュー";
