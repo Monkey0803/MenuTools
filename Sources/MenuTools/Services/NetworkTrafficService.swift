@@ -793,15 +793,8 @@ struct NetworkTrafficHistoryStorageUsage: Equatable, Sendable {
     }
 }
 
-enum NetworkTrafficHistoryStoragePolicy {
-    static let maximumDatabaseBytes: Int64 = 64 * 1_024 * 1_024
-    static let maximumWALBytes: Int64 = 8 * 1_024 * 1_024
-
-    static func maximumPageCount(pageSize: Int64) -> Int64 {
-        guard pageSize > 0 else { return 0 }
-        return maximumDatabaseBytes / pageSize
-    }
-}
+/// 网络流量沿用共享的历史库存储策略。
+typealias NetworkTrafficHistoryStoragePolicy = HistoryStoragePolicy
 
 protocol NetworkTrafficHistoryStoring: AnyObject {
     func load(queryKey: String?) -> [NetworkTrafficHistoryBucket]
@@ -946,33 +939,14 @@ final class NetworkTrafficHistoryStore: NetworkTrafficHistoryStoring {
     }
 
     private func withDatabase<T>(default defaultValue: T, _ body: (OpaquePointer) -> T) -> T {
-        do {
-            try FileManager.default.createDirectory(
-                at: fileURL.deletingLastPathComponent(),
-                withIntermediateDirectories: true
-            )
-        } catch {
-            return defaultValue
+        SQLiteHistoryDatabase.withDatabase(at: fileURL, default: defaultValue) { database in
+            configure(database)
+            return body(database)
         }
-
-        var database: OpaquePointer?
-        let flags = SQLITE_OPEN_CREATE | SQLITE_OPEN_READWRITE | SQLITE_OPEN_FULLMUTEX
-        guard sqlite3_open_v2(fileURL.path, &database, flags, nil) == SQLITE_OK,
-              let database else {
-            if let database { sqlite3_close(database) }
-            return defaultValue
-        }
-        defer { sqlite3_close(database) }
-        configure(database)
-        return body(database)
     }
 
     private func configure(_ database: OpaquePointer) {
-        execute(database, "PRAGMA journal_mode=WAL")
-        execute(database, "PRAGMA synchronous=NORMAL")
-        execute(database, "PRAGMA foreign_keys=ON")
-        execute(database, "PRAGMA max_page_count=\(NetworkTrafficHistoryStoragePolicy.maximumPageCount(pageSize: 4_096))")
-        execute(database, "PRAGMA journal_size_limit=\(NetworkTrafficHistoryStoragePolicy.maximumWALBytes)")
+        SQLiteHistoryDatabase.applyStandardPragmas(database)
         execute(database, """
             CREATE TABLE IF NOT EXISTS app_identities (
                 id TEXT PRIMARY KEY,
@@ -1115,7 +1089,7 @@ final class NetworkTrafficHistoryStore: NetworkTrafficHistoryStoring {
     }
 
     private func execute(_ database: OpaquePointer, _ sql: String) {
-        sqlite3_exec(database, sql, nil, nil, nil)
+        SQLiteHistoryDatabase.execute(database, sql)
     }
 
     private func bind(_ value: String?, to statement: OpaquePointer, column: Int32) {

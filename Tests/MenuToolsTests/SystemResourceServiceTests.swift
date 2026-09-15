@@ -506,3 +506,169 @@ func resourceSettingsPagesCoverTasks() {
     }
     #expect(Set(SystemResourceSettingsPage.allCases.map(\.titleKey)).count == 2)
 }
+
+@Test("历史聚合在同一分钟内取平均，并对齐到分钟")
+func historyAggregatorAveragesWithinMinute() {
+    let bucketDate = SystemResourceHistoryAggregator.bucketTimestamp(for: Date(timeIntervalSince1970: 1_800_000_030))
+    #expect(bucketDate.timeIntervalSince1970 == 1_800_000_000)
+
+    var bucket = SystemResourceHistoryAggregator.merging(
+        existing: nil,
+        snapshot: historySnapshot(cpu: 0.2, memory: 100, read: 1_000, write: 100),
+        timestamp: bucketDate
+    )
+    #expect(bucket.sampleCount == 1)
+    #expect(bucket.cpuUsage == 0.2)
+
+    bucket = SystemResourceHistoryAggregator.merging(
+        existing: bucket,
+        snapshot: historySnapshot(cpu: 0.6, memory: 300, read: 3_000, write: 300),
+        timestamp: bucketDate
+    )
+    #expect(bucket.sampleCount == 2)
+    #expect(abs(bucket.cpuUsage - 0.4) < 0.001)
+    #expect(bucket.diskReadBytesPerSecond == 2_000)
+    // 内存取最后一次读到的值
+    #expect(bucket.memoryUsedBytes == 300)
+    #expect(abs(bucket.memoryUsage - 0.3) < 0.001)
+}
+
+@Test("历史超过保留期会被丢掉")
+func historyAggregatorPrunesOldBuckets() {
+    let now = Date(timeIntervalSince1970: 1_800_000_000)
+    let fresh = SystemResourceHistoryAggregator.merging(
+        existing: nil,
+        snapshot: historySnapshot(cpu: 0.1),
+        timestamp: now.addingTimeInterval(-60)
+    )
+    let stale = SystemResourceHistoryAggregator.merging(
+        existing: nil,
+        snapshot: historySnapshot(cpu: 0.1),
+        timestamp: now.addingTimeInterval(-SystemResourceHistoryAggregator.retentionInterval - 60)
+    )
+
+    let pruned = SystemResourceHistoryAggregator.pruned([fresh, stale], now: now)
+
+    #expect(pruned.count == 1)
+    #expect(pruned.first?.timestamp == fresh.timestamp)
+}
+
+@Test("资源历史库可写入、读取、覆盖同一分钟并清空")
+func resourceHistoryStoreRoundTrip() throws {
+    let directory = FileManager.default.temporaryDirectory
+        .appendingPathComponent("MenuToolsResourceHistory-\(UUID().uuidString)", isDirectory: true)
+    let fileURL = directory.appendingPathComponent("history.sqlite3")
+    defer { try? FileManager.default.removeItem(at: directory) }
+
+    let store = SystemResourceHistoryStore(fileURL: fileURL)
+    let base = Date(timeIntervalSince1970: 1_800_000_000)
+    let first = SystemResourceHistoryAggregator.merging(
+        existing: nil,
+        snapshot: historySnapshot(cpu: 0.25, memory: 200, read: 500, write: 50),
+        timestamp: base
+    )
+    store.save([first])
+
+    let loaded = store.load(since: base.addingTimeInterval(-60))
+    #expect(loaded.count == 1)
+    #expect(abs((loaded.first?.cpuUsage ?? 0) - 0.25) < 0.001)
+
+    // 同一分钟再写：覆盖而不是新增
+    let merged = SystemResourceHistoryAggregator.merging(
+        existing: first,
+        snapshot: historySnapshot(cpu: 0.75, memory: 400, read: 1_500, write: 150),
+        timestamp: base
+    )
+    store.save([merged])
+    let reloaded = store.load(since: base.addingTimeInterval(-60))
+    #expect(reloaded.count == 1)
+    #expect(abs((reloaded.first?.cpuUsage ?? 0) - 0.5) < 0.001)
+    #expect(reloaded.first?.sampleCount == 2)
+
+    // 时间范围过滤
+    #expect(store.load(since: base.addingTimeInterval(60)).isEmpty)
+    #expect(store.storageUsage().totalBytes > 0)
+
+    store.clearAll()
+    #expect(store.load(since: base.addingTimeInterval(-60)).isEmpty)
+}
+
+@Test("资源服务按分钟聚合历史，分钟切换才写库，停止时冲刷")
+@MainActor
+func resourceServiceRecordsHistoryPerMinute() {
+    let provider = CountingResourceProvider()
+    let store = RecordingHistoryStore()
+    let service = SystemResourceService(
+        provider: provider,
+        memoryReleaser: NoopMemoryReleaser(),
+        historyStore: store
+    )
+    let base = Date(timeIntervalSince1970: 1_800_000_000)
+
+    service.refresh(now: base)
+    service.refresh(now: base.addingTimeInterval(2))
+    // 同一分钟：两次采样合并成一条，且还没有写库
+    #expect(service.historyBuckets.count == 1)
+    #expect(service.historyBuckets.first?.sampleCount == 2)
+    #expect(store.savedBatches.isEmpty)
+
+    // 进入下一分钟：上一分钟落库，新桶开始
+    service.refresh(now: base.addingTimeInterval(60))
+    #expect(store.savedBatches.count == 1)
+    #expect(store.savedBatches.first?.first?.sampleCount == 2)
+
+    service.refresh(now: base.addingTimeInterval(120))
+    service.endMonitoring()
+    // 结束时冲刷并停止
+    #expect(!service.isMonitoring)
+    #expect(store.savedBatches.count >= 2)
+
+    service.clearHistory()
+    #expect(service.historyBuckets.isEmpty)
+    #expect(store.didClearAll)
+}
+
+private final class RecordingHistoryStore: SystemResourceHistoryStoring, @unchecked Sendable {
+    var savedBatches: [[SystemResourceHistoryBucket]] = []
+    var didClearAll = false
+    var stored: [SystemResourceHistoryBucket] = []
+
+    func load(since: Date) -> [SystemResourceHistoryBucket] {
+        stored.filter { $0.timestamp >= since }
+    }
+
+    func save(_ buckets: [SystemResourceHistoryBucket]) {
+        savedBatches.append(buckets)
+        stored.append(contentsOf: buckets)
+    }
+
+    func clearAll() {
+        didClearAll = true
+        stored = []
+    }
+
+    func storageUsage() -> SystemResourceHistoryStorageUsage {
+        SystemResourceHistoryStorageUsage(databaseBytes: 0, walBytes: 0, sharedMemoryBytes: 0)
+    }
+}
+
+private func historySnapshot(
+    cpu: Double,
+    memory: Int64 = 0,
+    total: Int64 = 1_000,
+    read: Int64 = 0,
+    write: Int64 = 0
+) -> SystemResourceSnapshot {
+    SystemResourceSnapshot(
+        cpuUsage: cpu,
+        memoryUsedBytes: memory,
+        memoryTotalBytes: total,
+        memoryPressure: .normal,
+        diskAvailableBytes: 0,
+        diskTotalBytes: 0,
+        networkDownloadBytesPerSecond: 0,
+        networkUploadBytesPerSecond: 0,
+        diskReadBytesPerSecond: read,
+        diskWriteBytesPerSecond: write
+    )
+}

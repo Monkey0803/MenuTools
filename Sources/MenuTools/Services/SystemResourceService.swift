@@ -433,10 +433,15 @@ final class SystemResourceService {
 
     private let provider: any SystemResourceProviding
     private let memoryReleaser: any SystemMemoryReleasing
+    private let historyStore: any SystemResourceHistoryStoring
     private var previousReading: SystemResourceReading?
     private var samplingTask: Task<Void, Never>?
+    /// 当前正在聚合的那一分钟。
+    private var currentBucket: SystemResourceHistoryBucket?
 
     private(set) var snapshot: SystemResourceSnapshot?
+    /// 已聚合的资源历史（按分钟一条）。
+    private(set) var historyBuckets: [SystemResourceHistoryBucket] = []
     private(set) var isReleasingMemory = false
     private(set) var lastReleasedMemoryBytes: Int64?
     private(set) var lastMemoryReleaseResult: MemoryReleaseResult?
@@ -445,10 +450,12 @@ final class SystemResourceService {
 
     init(
         provider: any SystemResourceProviding = DefaultSystemResourceProvider(),
-        memoryReleaser: any SystemMemoryReleasing = DefaultSystemMemoryReleaser()
+        memoryReleaser: any SystemMemoryReleasing = DefaultSystemMemoryReleaser(),
+        historyStore: any SystemResourceHistoryStoring = SystemResourceHistoryStore()
     ) {
         self.provider = provider
         self.memoryReleaser = memoryReleaser
+        self.historyStore = historyStore
     }
 
     /// 开始按节奏采样（面板可见时调用；插件关闭时不应调用）。
@@ -468,19 +475,86 @@ final class SystemResourceService {
 
     /// 停止采样并清掉快照：插件关闭或面板关闭后不应残留读数。
     func endMonitoring() {
+        flushHistory()
         samplingTask?.cancel()
         samplingTask = nil
         snapshot = nil
         previousReading = nil
     }
 
-    func refresh() {
+    func refresh(now: Date = Date()) {
         let current = provider.read()
         snapshot = SystemResourceCalculator.snapshot(
             current: current,
             previous: previousReading
         )
         previousReading = current
+        recordHistory(now: now)
+    }
+
+    /// 按分钟聚合历史：同一分钟只在内存里取平均，分钟切换时才写库（避免每 2 秒写一次）。
+    func recordHistory(now: Date = Date()) {
+        guard let snapshot else { return }
+        let bucketDate = SystemResourceHistoryAggregator.bucketTimestamp(for: now)
+        if let currentBucket, currentBucket.timestamp == bucketDate {
+            self.currentBucket = SystemResourceHistoryAggregator.merging(
+                existing: currentBucket,
+                snapshot: snapshot,
+                timestamp: bucketDate
+            )
+            upsertHistory(self.currentBucket)
+            return
+        }
+        flushHistory()
+        currentBucket = SystemResourceHistoryAggregator.merging(
+            existing: nil,
+            snapshot: snapshot,
+            timestamp: bucketDate
+        )
+        upsertHistory(currentBucket)
+    }
+
+    /// 把当前聚合中的桶写库（分钟切换、停止监控、退出时调用）。
+    func flushHistory(now: Date = Date()) {
+        guard let currentBucket else { return }
+        self.currentBucket = nil
+        historyStore.save(SystemResourceHistoryAggregator.pruned(
+            [currentBucket],
+            now: now
+        ))
+    }
+
+    /// 读取最近的历史（首次调用会从库里加载，供趋势图与设置页使用）。
+    @discardableResult
+    func loadHistory(now: Date = Date()) -> [SystemResourceHistoryBucket] {
+        let since = now.addingTimeInterval(-SystemResourceHistoryAggregator.retentionInterval)
+        let stored = historyStore.load(since: since)
+        var merged = stored
+        if let currentBucket, !merged.contains(where: { $0.timestamp == currentBucket.timestamp }) {
+            merged.append(currentBucket)
+        }
+        historyBuckets = merged.sorted { $0.timestamp < $1.timestamp }
+        return historyBuckets
+    }
+
+    func clearHistory() {
+        currentBucket = nil
+        historyBuckets = []
+        historyStore.clearAll()
+    }
+
+    var historyStorageUsage: SystemResourceHistoryStorageUsage {
+        historyStore.storageUsage()
+    }
+
+    private func upsertHistory(_ bucket: SystemResourceHistoryBucket?) {
+        guard let bucket else { return }
+        if let index = historyBuckets.firstIndex(where: { $0.timestamp == bucket.timestamp }) {
+            historyBuckets[index] = bucket
+        } else {
+            historyBuckets.append(bucket)
+            historyBuckets.sort { $0.timestamp < $1.timestamp }
+        }
     }
 
     @discardableResult
