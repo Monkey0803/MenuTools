@@ -1,4 +1,5 @@
 import Foundation
+import SQLite3
 import Testing
 @testable import MenuTools
 
@@ -1260,4 +1261,50 @@ func optionalMetricsReaderIsHonestOnThisMachine() {
     if let temperature = reader.readTemperatureCelsius() {
         #expect(temperature > -40 && temperature < 150)
     }
+}
+
+@Test("共享历史库助手在打开时应用 WAL 与容量上限（同连接断言）")
+func sharedHistoryStorageAppliesPragmas() throws {
+    let directory = FileManager.default.temporaryDirectory
+        .appendingPathComponent("MenuToolsHistoryPragma-\(UUID().uuidString)", isDirectory: true)
+    let fileURL = directory.appendingPathComponent("probe.sqlite3")
+    defer { try? FileManager.default.removeItem(at: directory) }
+
+    // max_page_count / journal_size_limit 都是连接级设置，必须用同一个连接读回来才能证明生效
+    let probed: (journal: String, pages: Int, limit: Int) = SQLiteHistoryDatabase.withDatabase(
+        at: fileURL,
+        default: (journal: "", pages: -1, limit: -1)
+    ) { database in
+        (
+            journal: pragmaText(database, "journal_mode"),
+            pages: pragmaInt(database, "max_page_count"),
+            limit: pragmaInt(database, "journal_size_limit")
+        )
+    }
+
+    #expect(probed.journal == "wal")
+    #expect(probed.pages == Int(HistoryStoragePolicy.maximumPageCount(pageSize: HistoryStoragePolicy.defaultPageSize)))
+    #expect(probed.limit == Int(HistoryStoragePolicy.maximumWALBytes))
+    // 上限对应 64 MB 主库 / 8 MB WAL
+    #expect(probed.pages * Int(HistoryStoragePolicy.defaultPageSize) == Int(HistoryStoragePolicy.maximumDatabaseBytes))
+}
+
+private func pragmaText(_ database: OpaquePointer, _ name: String) -> String {
+    var statement: OpaquePointer?
+    guard sqlite3_prepare_v2(database, "PRAGMA \(name)", -1, &statement, nil) == SQLITE_OK, let statement else {
+        return ""
+    }
+    defer { sqlite3_finalize(statement) }
+    guard sqlite3_step(statement) == SQLITE_ROW, let text = sqlite3_column_text(statement, 0) else { return "" }
+    return String(cString: text)
+}
+
+private func pragmaInt(_ database: OpaquePointer, _ name: String) -> Int {
+    var statement: OpaquePointer?
+    guard sqlite3_prepare_v2(database, "PRAGMA \(name)", -1, &statement, nil) == SQLITE_OK, let statement else {
+        return -1
+    }
+    defer { sqlite3_finalize(statement) }
+    guard sqlite3_step(statement) == SQLITE_ROW else { return -1 }
+    return Int(sqlite3_column_int64(statement, 0))
 }
