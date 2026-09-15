@@ -331,6 +331,7 @@ export SPARKLE_DOWNLOAD_URL_PREFIX="https://your-server/releases/"
 - Bluetooth devices that do not report battery levels cannot be displayed with a percentage.
 - AirPods case battery levels may only be reported when the case is open or the device has just connected.
 - Per-app volume requires System Audio Recording permission. DRM-protected or otherwise untappable audio keeps its original system volume.
+- Balance only affects the first two channels, and mono downmix averages all channels; both need an active route for that app (it shows up under System Audio Recording usage).
 - Empty Trash and screenshot actions depend on macOS Automation and Screen Recording permissions; denied access is reported in the panel.
 - Shortcut conflict detection covers system hotkeys and exclusive Carbon hotkeys registered by other apps; apps using private event taps cannot be fully enumerated through public APIs.
 - Clipboard history works by polling the system pasteboard, so it only records what has already been copied. macOS does not expose the copy source, so "excluded apps" are judged by the frontmost app at copy time.
