@@ -62,6 +62,7 @@ enum SettingsTab: String, CaseIterable, Hashable, Identifiable {
     case screenshot
     case clipboard
     case translation
+    case systemResources
 
     var id: String { rawValue }
 
@@ -78,6 +79,7 @@ enum SettingsTab: String, CaseIterable, Hashable, Identifiable {
         case .screenshot: return "settings.tab.screenshot"
         case .clipboard: return "settings.tab.clipboard"
         case .translation: return "settings.tab.translation"
+        case .systemResources: return "resource.title"
         }
     }
 
@@ -94,6 +96,7 @@ enum SettingsTab: String, CaseIterable, Hashable, Identifiable {
         case .screenshot: return "camera.viewfinder"
         case .clipboard: return "clipboard"
         case .translation: return "character.bubble"
+        case .systemResources: return "cpu"
         }
     }
 
@@ -109,6 +112,7 @@ enum SettingsTab: String, CaseIterable, Hashable, Identifiable {
         case .screenshot: return .screenshot
         case .clipboard: return .clipboard
         case .translation: return .translation
+        case .systemResources: return .systemResources
         }
     }
 
@@ -275,6 +279,8 @@ struct SettingsView: View {
             }
         case .networkTraffic:
             NetworkTrafficSettingsView()
+        case .systemResources:
+            SystemResourceSettingsView()
         case .volume:
             AppVolumeSettingsView()
         case .rightClick:

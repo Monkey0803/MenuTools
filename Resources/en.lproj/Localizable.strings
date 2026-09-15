@@ -18,6 +18,33 @@
 "resource.memoryCritical" = "High memory pressure";
 "resource.releaseMemory" = "Release Memory";
 "resource.releasingMemory" = "Releasing…";
+"resource.showAll" = "Show all";
+"resource.page.title" = "System resources page";
+"resource.page.overview" = "Overview";
+"resource.page.processes" = "Processes";
+"resource.cores" = "Per-core usage";
+"resource.memory.pressure" = "Memory pressure";
+"resource.memory.wired" = "Wired";
+"resource.memory.active" = "Active";
+"resource.memory.compressed" = "Compressed";
+"resource.memory.cached" = "Cached";
+"resource.memory.free" = "Free";
+"resource.pressure.normal" = "Normal";
+"resource.pressure.warning" = "Elevated";
+"resource.pressure.critical" = "Critical";
+"resource.disk.read" = "Disk read";
+"resource.disk.write" = "Disk write";
+"resource.network.download" = "Download";
+"resource.network.upload" = "Upload";
+"resource.process.title" = "Busiest processes";
+"resource.process.search" = "Search process name or PID";
+"resource.process.sort" = "Sort";
+"resource.process.empty" = "No matching process";
+"resource.process.pid" = "PID %d";
+"resource.process.sort.cpu" = "CPU";
+"resource.process.sort.memory" = "Memory";
+"resource.process.sort.disk" = "Disk";
+"resource.process.sort.name" = "Name";
 "resource.loading" = "Reading system resources…";
 
 /* Network Status */

@@ -18,6 +18,33 @@
 "resource.memoryCritical" = "内存压力高";
 "resource.releaseMemory" = "释放内存";
 "resource.releasingMemory" = "释放中…";
+"resource.showAll" = "查看全部";
+"resource.page.title" = "系统资源页面";
+"resource.page.overview" = "概览";
+"resource.page.processes" = "进程";
+"resource.cores" = "各核心占用";
+"resource.memory.pressure" = "内存压力";
+"resource.memory.wired" = "锁定";
+"resource.memory.active" = "活跃";
+"resource.memory.compressed" = "压缩";
+"resource.memory.cached" = "缓存";
+"resource.memory.free" = "空闲";
+"resource.pressure.normal" = "正常";
+"resource.pressure.warning" = "偏高";
+"resource.pressure.critical" = "紧张";
+"resource.disk.read" = "磁盘读取";
+"resource.disk.write" = "磁盘写入";
+"resource.network.download" = "下载";
+"resource.network.upload" = "上传";
+"resource.process.title" = "占用最高的进程";
+"resource.process.search" = "搜索进程名或 PID";
+"resource.process.sort" = "排序";
+"resource.process.empty" = "没有匹配的进程";
+"resource.process.pid" = "PID %d";
+"resource.process.sort.cpu" = "CPU";
+"resource.process.sort.memory" = "内存";
+"resource.process.sort.disk" = "磁盘";
+"resource.process.sort.name" = "名称";
 "resource.loading" = "正在读取系统资源…";
 
 /* 网络状态 */

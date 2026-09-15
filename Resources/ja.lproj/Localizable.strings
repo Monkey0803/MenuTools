@@ -18,6 +18,33 @@
 "resource.memoryCritical" = "メモリ負荷高";
 "resource.releaseMemory" = "メモリを解放";
 "resource.releasingMemory" = "解放中…";
+"resource.showAll" = "すべて表示";
+"resource.page.title" = "システムリソースページ";
+"resource.page.overview" = "概要";
+"resource.page.processes" = "プロセス";
+"resource.cores" = "コアごとの使用率";
+"resource.memory.pressure" = "メモリプレッシャー";
+"resource.memory.wired" = "ワイヤード";
+"resource.memory.active" = "アクティブ";
+"resource.memory.compressed" = "圧縮";
+"resource.memory.cached" = "キャッシュ";
+"resource.memory.free" = "空き";
+"resource.pressure.normal" = "正常";
+"resource.pressure.warning" = "やや高い";
+"resource.pressure.critical" = "ひっ迫";
+"resource.disk.read" = "ディスク読み込み";
+"resource.disk.write" = "ディスク書き込み";
+"resource.network.download" = "ダウンロード";
+"resource.network.upload" = "アップロード";
+"resource.process.title" = "負荷の高いプロセス";
+"resource.process.search" = "プロセス名または PID を検索";
+"resource.process.sort" = "並び順";
+"resource.process.empty" = "一致するプロセスはありません";
+"resource.process.pid" = "PID %d";
+"resource.process.sort.cpu" = "CPU";
+"resource.process.sort.memory" = "メモリ";
+"resource.process.sort.disk" = "ディスク";
+"resource.process.sort.name" = "名前";
 "resource.loading" = "システムリソースを読み込み中…";
 
 /* ネットワーク状態 */

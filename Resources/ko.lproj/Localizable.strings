@@ -18,6 +18,33 @@
 "resource.memoryCritical" = "메모리 압박 높음";
 "resource.releaseMemory" = "메모리 해제";
 "resource.releasingMemory" = "해제 중…";
+"resource.showAll" = "전체 보기";
+"resource.page.title" = "시스템 리소스 페이지";
+"resource.page.overview" = "개요";
+"resource.page.processes" = "프로세스";
+"resource.cores" = "코어별 사용률";
+"resource.memory.pressure" = "메모리 압력";
+"resource.memory.wired" = "와이어드";
+"resource.memory.active" = "활성";
+"resource.memory.compressed" = "압축";
+"resource.memory.cached" = "캐시";
+"resource.memory.free" = "여유";
+"resource.pressure.normal" = "정상";
+"resource.pressure.warning" = "약간 높음";
+"resource.pressure.critical" = "위험";
+"resource.disk.read" = "디스크 읽기";
+"resource.disk.write" = "디스크 쓰기";
+"resource.network.download" = "다운로드";
+"resource.network.upload" = "업로드";
+"resource.process.title" = "부하가 큰 프로세스";
+"resource.process.search" = "프로세스 이름 또는 PID 검색";
+"resource.process.sort" = "정렬";
+"resource.process.empty" = "일치하는 프로세스가 없습니다";
+"resource.process.pid" = "PID %d";
+"resource.process.sort.cpu" = "CPU";
+"resource.process.sort.memory" = "메모리";
+"resource.process.sort.disk" = "디스크";
+"resource.process.sort.name" = "이름";
 "resource.loading" = "시스템 리소스 읽는 중…";
 
 /* 네트워크 상태 */

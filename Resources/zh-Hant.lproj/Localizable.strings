@@ -18,6 +18,33 @@
 "resource.memoryCritical" = "記憶體壓力高";
 "resource.releaseMemory" = "釋放記憶體";
 "resource.releasingMemory" = "釋放中…";
+"resource.showAll" = "查看全部";
+"resource.page.title" = "系統資源頁面";
+"resource.page.overview" = "概覽";
+"resource.page.processes" = "程序";
+"resource.cores" = "各核心佔用";
+"resource.memory.pressure" = "記憶體壓力";
+"resource.memory.wired" = "鎖定";
+"resource.memory.active" = "活躍";
+"resource.memory.compressed" = "壓縮";
+"resource.memory.cached" = "快取";
+"resource.memory.free" = "空閒";
+"resource.pressure.normal" = "正常";
+"resource.pressure.warning" = "偏高";
+"resource.pressure.critical" = "緊張";
+"resource.disk.read" = "磁碟讀取";
+"resource.disk.write" = "磁碟寫入";
+"resource.network.download" = "下載";
+"resource.network.upload" = "上傳";
+"resource.process.title" = "佔用最高的程序";
+"resource.process.search" = "搜尋程序名稱或 PID";
+"resource.process.sort" = "排序";
+"resource.process.empty" = "沒有符合的程序";
+"resource.process.pid" = "PID %d";
+"resource.process.sort.cpu" = "CPU";
+"resource.process.sort.memory" = "記憶體";
+"resource.process.sort.disk" = "磁碟";
+"resource.process.sort.name" = "名稱";
 "resource.loading" = "正在讀取系統資源…";
 
 /* 網路狀態 */

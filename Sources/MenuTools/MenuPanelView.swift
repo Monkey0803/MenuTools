@@ -269,6 +269,7 @@ struct MenuPanelView: View {
     @State private var derivedDataSize: Int64?
     @State private var isCleaningDerivedData = false
     @State private var systemResourceService = SystemResourceService.shared
+    @State private var systemProcessService = SystemProcessResourceService.shared
     @State private var networkService = NetworkStatusService.shared
     @State private var batteryHealthService = BatteryHealthService.shared
     @State private var displayService = DisplayService()
@@ -483,11 +484,13 @@ struct MenuPanelView: View {
         .task {
             guard pluginManager.isEnabled(.systemResources) else { return }
             systemResourceService.beginMonitoring()
+            systemProcessService.beginMonitoring()
             // 面板存续期间保持采样；task 被取消（面板关闭）后立即停止，不留后台采样。
             while !Task.isCancelled {
                 try? await Task.sleep(for: .seconds(30))
             }
             systemResourceService.endMonitoring()
+            systemProcessService.endMonitoring()
         }
         .task {
             guard pluginManager.isEnabled(.systemInsights) else { return }
@@ -763,6 +766,16 @@ struct MenuPanelView: View {
                 Text(L("resource.title"))
                     .font(.caption.weight(.semibold))
                 Spacer()
+                if let openSettingsAction {
+                    Button(L("resource.showAll")) {
+                        openSettingsAction(.systemResources)
+                    }
+                    .buttonStyle(.plain)
+                    .font(.caption2)
+                    .foregroundStyle(.secondary)
+                    .focusable(false)
+                    .focusEffectDisabled()
+                }
                 if let snapshot = systemResourceService.snapshot {
                     HStack(spacing: 8) {
                         Text(memoryPressureLabel(snapshot.memoryPressure))
@@ -822,6 +835,38 @@ struct MenuPanelView: View {
                         title: L("resource.network"),
                         value: "↓\(resourceRate(snapshot.networkDownloadBytesPerSecond))  ↑\(resourceRate(snapshot.networkUploadBytesPerSecond))"
                     )
+                }
+                HStack(spacing: 12) {
+                    resourceMetric(
+                        symbol: "arrow.down.circle",
+                        title: L("resource.disk.read"),
+                        value: resourceRate(snapshot.diskReadBytesPerSecond)
+                    )
+                    resourceMetric(
+                        symbol: "arrow.up.circle",
+                        title: L("resource.disk.write"),
+                        value: resourceRate(snapshot.diskWriteBytesPerSecond)
+                    )
+                }
+                if let detail = snapshot.memoryDetail {
+                    HStack(spacing: 12) {
+                        resourceMetric(
+                            symbol: "lock.fill",
+                            title: L("resource.memory.wired"),
+                            value: resourceBytes(detail.wiredBytes)
+                        )
+                        resourceMetric(
+                            symbol: "arrow.triangle.2.circlepath",
+                            title: L("resource.memory.compressed"),
+                            value: resourceBytes(detail.compressedBytes)
+                        )
+                    }
+                }
+                if snapshot.coreUsages.count > 1 {
+                    resourceCoreBars(snapshot.coreUsages)
+                }
+                if !systemProcessService.visibleUsages.isEmpty {
+                    resourceProcessTopRows
                 }
             } else {
                 Text(L("resource.loading"))
@@ -1229,6 +1274,46 @@ struct MenuPanelView: View {
                 .minimumScaleFactor(0.7)
         }
         .frame(maxWidth: .infinity, alignment: .leading)
+    }
+
+    /// 每核使用率小条（面板里不显示数字，省空间）。
+    private func resourceCoreBars(_ usages: [SystemResourceCoreUsage]) -> some View {
+        HStack(spacing: 3) {
+            ForEach(usages, id: \.index) { core in
+                GeometryReader { geometry in
+                    ZStack(alignment: .bottom) {
+                        RoundedRectangle(cornerRadius: 2)
+                            .fill(Color.primary.opacity(0.08))
+                        RoundedRectangle(cornerRadius: 2)
+                            .fill(core.usage > 0.85 ? Color.orange : Color.accentColor)
+                            .frame(height: max(geometry.size.height * core.usage, 1))
+                    }
+                }
+                .frame(height: 14)
+            }
+        }
+        .accessibilityLabel(L("resource.cores"))
+    }
+
+    /// 占用最高的三个进程。
+    private var resourceProcessTopRows: some View {
+        VStack(alignment: .leading, spacing: 3) {
+            ForEach(systemProcessService.visibleUsages.prefix(3)) { usage in
+                HStack(spacing: 6) {
+                    Text(usage.name)
+                        .font(.caption2)
+                        .lineLimit(1)
+                    Spacer(minLength: 6)
+                    Text("\(Int((min(max(usage.cpuUsage, 0), 9.99) * 100).rounded()))%")
+                        .font(.caption2.monospacedDigit())
+                        .foregroundStyle(.secondary)
+                    Text(resourceBytes(usage.memoryBytes))
+                        .font(.caption2.monospacedDigit())
+                        .foregroundStyle(.tertiary)
+                }
+            }
+        }
+        .accessibilityLabel(L("resource.process.title"))
     }
 
     private func resourceMetric(symbol: String, title: String, value: String) -> some View {

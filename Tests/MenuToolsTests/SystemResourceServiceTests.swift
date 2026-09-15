@@ -495,3 +495,14 @@ func defaultProcessProviderReadsSelf() {
     #expect(selfSample != nil)
     #expect((selfSample?.memoryBytes ?? 0) > 0)
 }
+
+@Test("资源设置页有两个一级页且各有文案与图标")
+func resourceSettingsPagesCoverTasks() {
+    #expect(SystemResourceSettingsPage.allCases == [.overview, .processes])
+    for page in SystemResourceSettingsPage.allCases {
+        #expect(!page.titleKey.isEmpty)
+        #expect(!page.symbol.isEmpty)
+        #expect(page.id == page)
+    }
+    #expect(Set(SystemResourceSettingsPage.allCases.map(\.titleKey)).count == 2)
+}
