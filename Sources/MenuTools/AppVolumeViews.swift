@@ -487,6 +487,7 @@ struct AppVolumeSettingsView: View {
                 .disabled(service.output.deviceUID.isEmpty || service.presets.isEmpty)
 
                 ForEach(service.presets) { preset in
+                    VStack(alignment: .leading, spacing: 4) {
                     HStack {
                         TextField(L("volume.preset.name"), text: Binding(
                             get: { service.presets.first(where: { $0.id == preset.id })?.name ?? preset.name },
@@ -513,6 +514,16 @@ struct AppVolumeSettingsView: View {
                             Image(systemName: "ellipsis.circle")
                         }
                         .menuStyle(.borderlessButton)
+                    }
+                    HStack(spacing: 6) {
+                        Text(L("volume.preset.coverage", preset.appVolumes.count, preset.appSettings.count))
+                        if preset.needsCoverageUpgrade {
+                            Label(L("volume.preset.coverageHint"), systemImage: "exclamationmark.triangle")
+                                .foregroundStyle(.orange)
+                        }
+                    }
+                    .font(.caption2)
+                    .foregroundStyle(.secondary)
                     }
                 }
             } header: {
@@ -1228,6 +1239,7 @@ private struct AppVolumeEqualizerEditor: View {
     let rootBundleID: String
     @State private var showsPresetPicker = false
     @State private var showsOutputPicker = false
+    @State private var customEqualizerName = ""
 
     private var session: AppAudioSession? {
         service.session(id: rootBundleID)
@@ -1374,10 +1386,86 @@ private struct AppVolumeEqualizerEditor: View {
                     .padding(.horizontal, 10)
                     .padding(.vertical, 7)
                 }
+
+                Divider()
+                    .padding(.vertical, 4)
+
+                Text(L("volume.equalizer.custom.library"))
+                    .font(.caption2)
+                    .foregroundStyle(.secondary)
+                    .padding(.horizontal, 10)
+
+                if service.customEqualizers.isEmpty {
+                    Text(L("volume.equalizer.custom.empty"))
+                        .font(.caption2)
+                        .foregroundStyle(.tertiary)
+                        .padding(.horizontal, 10)
+                        .padding(.vertical, 4)
+                } else {
+                    ForEach(service.customEqualizers) { custom in
+                        Button {
+                            service.applyCustomEqualizer(id: custom.id, to: rootBundleID)
+                            showsPresetPicker = false
+                        } label: {
+                            HStack {
+                                Text(custom.name)
+                                    .lineLimit(1)
+                                Spacer()
+                                if equalizer.gains == custom.gains {
+                                    Image(systemName: "checkmark")
+                                        .foregroundStyle(Color.accentColor)
+                                }
+                            }
+                            .contentShape(Rectangle())
+                        }
+                        .buttonStyle(.plain)
+                        .focusable(false)
+                        .focusEffectDisabled()
+                        .padding(.horizontal, 10)
+                        .padding(.vertical, 7)
+                        .contextMenu {
+                            Button(L("volume.equalizer.custom.delete"), role: .destructive) {
+                                service.deleteCustomEqualizer(id: custom.id)
+                            }
+                        }
+                    }
+                }
             }
             .padding(6)
         }
         .frame(width: 190, height: 250)
+        .safeAreaInset(edge: .bottom) {
+            customEqualizerSaver
+        }
+    }
+
+    /// 把当前曲线存进「我的 EQ 预设」。
+    private var customEqualizerSaver: some View {
+        HStack(spacing: 6) {
+            TextField(L("volume.equalizer.custom.name"), text: $customEqualizerName)
+                .textFieldStyle(.roundedBorder)
+                .controlSize(.small)
+                .font(.caption)
+                .onSubmit(saveCustomEqualizer)
+            Button(action: saveCustomEqualizer) {
+                Image(systemName: "plus")
+            }
+            .buttonStyle(.bordered)
+            .controlSize(.small)
+            .focusable(false)
+            .focusEffectDisabled()
+            .disabled(customEqualizerName.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
+            .help(L("volume.equalizer.custom.save"))
+        }
+        .padding(8)
+        .background(.regularMaterial)
+    }
+
+    private func saveCustomEqualizer() {
+        let name = customEqualizerName.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !name.isEmpty else { return }
+        service.saveCustomEqualizer(named: name, gains: equalizer.gains)
+        customEqualizerName = ""
     }
 
     private var outputPicker: some View {

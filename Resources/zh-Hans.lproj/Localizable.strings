@@ -933,6 +933,14 @@
 "volume.equalizer" = "应用均衡器";
 "volume.equalizer.enabled" = "启用均衡器";
 "volume.equalizer.preset" = "预设";
+"volume.equalizer.custom.unnamed" = "自定义 EQ";
+"volume.equalizer.custom.library" = "我的 EQ 预设";
+"volume.equalizer.custom.empty" = "还没有保存的曲线";
+"volume.equalizer.custom.name" = "预设名称";
+"volume.equalizer.custom.save" = "把当前曲线存为预设";
+"volume.equalizer.custom.delete" = "删除";
+"volume.preset.coverage" = "%d 个 App · %d 个含 EQ 与设备";
+"volume.preset.coverageHint" = "旧版本保存：重新保存才会包含 EQ 与输出设备";
 "volume.equalizer.custom" = "自定义";
 "volume.equalizer.preset.flat" = "平坦";
 "volume.equalizer.preset.bassBoost" = "低音增强";

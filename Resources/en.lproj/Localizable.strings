@@ -933,6 +933,14 @@
 "volume.equalizer" = "App Equalizer";
 "volume.equalizer.enabled" = "Enable Equalizer";
 "volume.equalizer.preset" = "Preset";
+"volume.equalizer.custom.unnamed" = "Custom EQ";
+"volume.equalizer.custom.library" = "My EQ presets";
+"volume.equalizer.custom.empty" = "No saved curves yet";
+"volume.equalizer.custom.name" = "Preset name";
+"volume.equalizer.custom.save" = "Save current curve as a preset";
+"volume.equalizer.custom.delete" = "Delete";
+"volume.preset.coverage" = "%d apps · %d with EQ and device";
+"volume.preset.coverageHint" = "Saved by an older version: save again to include EQ and output device";
 "volume.equalizer.custom" = "Custom";
 "volume.equalizer.preset.flat" = "Flat";
 "volume.equalizer.preset.bassBoost" = "Bass Boost";

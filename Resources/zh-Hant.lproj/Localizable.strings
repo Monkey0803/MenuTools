@@ -933,6 +933,14 @@
 "volume.equalizer" = "應用程式等化器";
 "volume.equalizer.enabled" = "啟用等化器";
 "volume.equalizer.preset" = "預設";
+"volume.equalizer.custom.unnamed" = "自訂 EQ";
+"volume.equalizer.custom.library" = "我的 EQ 預設";
+"volume.equalizer.custom.empty" = "還沒有儲存的曲線";
+"volume.equalizer.custom.name" = "預設名稱";
+"volume.equalizer.custom.save" = "把目前曲線存為預設";
+"volume.equalizer.custom.delete" = "刪除";
+"volume.preset.coverage" = "%d 個 App · %d 個含 EQ 與裝置";
+"volume.preset.coverageHint" = "舊版本儲存：重新儲存才會包含 EQ 與輸出裝置";
 "volume.equalizer.custom" = "自訂";
 "volume.equalizer.preset.flat" = "平坦";
 "volume.equalizer.preset.bassBoost" = "低音增強";

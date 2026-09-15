@@ -361,13 +361,129 @@ enum AppVolumeSessionFilter: String, CaseIterable, Codable, Sendable {
     case favorites
 }
 
+/// 预设里保存的单个 App 细节：EQ、输出设备、分组与收藏。
+///
+/// v2 起预设会记录这些内容；v1 预设只有音量，套用时不会改动 EQ 与路由。
+struct AppVolumePresetAppSettings: Codable, Equatable, Sendable {
+    var equalizer: AppVolumeEqualizer
+    var outputDeviceUID: String?
+    var appGroup: AppVolumeAppGroup
+    var isFavorite: Bool
+
+    init(
+        equalizer: AppVolumeEqualizer = .flat,
+        outputDeviceUID: String? = nil,
+        appGroup: AppVolumeAppGroup = .other,
+        isFavorite: Bool = false
+    ) {
+        self.equalizer = equalizer.normalized()
+        let trimmed = outputDeviceUID?.trimmingCharacters(in: .whitespacesAndNewlines)
+        self.outputDeviceUID = (trimmed?.isEmpty ?? true) ? nil : trimmed
+        self.appGroup = appGroup
+        self.isFavorite = isFavorite
+    }
+}
+
 struct AppVolumePreset: Identifiable, Codable, Equatable, Sendable {
+    /// 记录每 App EQ / 输出设备 / 分组 / 收藏的起始版本。
+    static let currentSchemaVersion = 2
+
     var id: UUID
     var name: String
     var masterVolume: Double
     var appVolumes: [String: Double]
+    /// 每 App 细节；v1 预设为空。
+    var appSettings: [String: AppVolumePresetAppSettings] = [:]
     var createdAt: Date
     var updatedAt: Date? = nil
+    var schemaVersion: Int = AppVolumePreset.currentSchemaVersion
+
+    /// v1 预设没有 EQ 与路由信息，界面据此提示重新保存。
+    var needsCoverageUpgrade: Bool { schemaVersion < Self.currentSchemaVersion }
+
+    init(
+        id: UUID,
+        name: String,
+        masterVolume: Double,
+        appVolumes: [String: Double],
+        appSettings: [String: AppVolumePresetAppSettings] = [:],
+        createdAt: Date,
+        updatedAt: Date? = nil,
+        schemaVersion: Int = AppVolumePreset.currentSchemaVersion
+    ) {
+        self.id = id
+        self.name = name
+        self.masterVolume = masterVolume
+        self.appVolumes = appVolumes
+        self.appSettings = appSettings
+        self.createdAt = createdAt
+        self.updatedAt = updatedAt
+        self.schemaVersion = schemaVersion
+    }
+
+    private enum CodingKeys: String, CodingKey {
+        case id
+        case name
+        case masterVolume
+        case appVolumes
+        case appSettings
+        case createdAt
+        case updatedAt
+        case schemaVersion
+    }
+
+    init(from decoder: any Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        id = try container.decode(UUID.self, forKey: .id)
+        name = try container.decode(String.self, forKey: .name)
+        masterVolume = try container.decode(Double.self, forKey: .masterVolume)
+        appVolumes = try container.decodeIfPresent([String: Double].self, forKey: .appVolumes) ?? [:]
+        appSettings = try container.decodeIfPresent([String: AppVolumePresetAppSettings].self, forKey: .appSettings) ?? [:]
+        createdAt = try container.decodeIfPresent(Date.self, forKey: .createdAt) ?? Date()
+        updatedAt = try container.decodeIfPresent(Date.self, forKey: .updatedAt)
+        // 老数据没有版本号，按 v1 处理。
+        schemaVersion = try container.decodeIfPresent(Int.self, forKey: .schemaVersion) ?? 1
+    }
+}
+
+/// 用户自己保存的 EQ 曲线，可以跨 App 复用。
+struct AppVolumeCustomEqualizer: Identifiable, Codable, Equatable, Sendable {
+    static let maximumNameLength = 24
+
+    var id: UUID
+    var name: String
+    var gains: [Double]
+    var createdAt: Date
+    var updatedAt: Date? = nil
+
+    init(
+        id: UUID = UUID(),
+        name: String,
+        gains: [Double],
+        createdAt: Date,
+        updatedAt: Date? = nil
+    ) {
+        self.id = id
+        self.name = name
+        self.gains = gains
+        self.createdAt = createdAt
+        self.updatedAt = updatedAt
+        self = normalized()
+    }
+
+    /// 直接可套用到 App 的均衡器配置（启用并带上曲线）。
+    var equalizer: AppVolumeEqualizer {
+        AppVolumeEqualizer(isEnabled: true, gains: gains)
+    }
+
+    func normalized() -> Self {
+        var copy = self
+        let trimmed = copy.name.trimmingCharacters(in: .whitespacesAndNewlines)
+        let limited = String(trimmed.prefix(Self.maximumNameLength)).trimmingCharacters(in: .whitespacesAndNewlines)
+        copy.name = limited.isEmpty ? L("volume.equalizer.custom.unnamed") : limited
+        copy.gains = copy.equalizer.gains
+        return copy
+    }
 }
 
 struct AppVolumeAutomationRule: Identifiable, Codable, Equatable, Sendable {
@@ -413,14 +529,47 @@ struct AppVolumeAutomationContext: Equatable, Sendable {
 }
 
 struct AppVolumePresetArchive: Codable, Equatable, Sendable {
+    /// v1 只有预设与自动化规则；v2 起带上自定义 EQ 预设。
+    static let currentVersion = 2
+    static let supportedVersions = 1 ... 2
+
     var version: Int
     var presets: [AppVolumePreset]
     var automationRules: [AppVolumeAutomationRule]
+    var equalizerPresets: [AppVolumeCustomEqualizer] = []
+
+    private enum CodingKeys: String, CodingKey {
+        case version
+        case presets
+        case automationRules
+        case equalizerPresets
+    }
+
+    init(
+        version: Int,
+        presets: [AppVolumePreset],
+        automationRules: [AppVolumeAutomationRule],
+        equalizerPresets: [AppVolumeCustomEqualizer] = []
+    ) {
+        self.version = version
+        self.presets = presets
+        self.automationRules = automationRules
+        self.equalizerPresets = equalizerPresets
+    }
+
+    init(from decoder: any Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        version = try container.decode(Int.self, forKey: .version)
+        presets = try container.decodeIfPresent([AppVolumePreset].self, forKey: .presets) ?? []
+        automationRules = try container.decodeIfPresent([AppVolumeAutomationRule].self, forKey: .automationRules) ?? []
+        equalizerPresets = try container.decodeIfPresent([AppVolumeCustomEqualizer].self, forKey: .equalizerPresets) ?? []
+    }
 }
 
 struct AppVolumeConfigurationSnapshot: Codable, Equatable, Sendable {
     var masterVolume: Double
     var appVolumes: [String: Double]
+    var appSettings: [String: AppVolumePresetAppSettings] = [:]
 }
 
 private struct AppVolumeDuckingState: Codable, Equatable, Sendable {
@@ -571,6 +720,8 @@ final class AppVolumeService {
     private(set) var isBoostEnabled: Bool
     private(set) var presets: [AppVolumePreset]
     private(set) var automationRules: [AppVolumeAutomationRule]
+    /// 用户保存的 EQ 曲线，可跨 App 复用。
+    private(set) var customEqualizers: [AppVolumeCustomEqualizer]
     private(set) var appGroupFilter: AppVolumeAppGroup?
     private(set) var sessionSort: AppVolumeSessionSort
     private(set) var searchQuery: String
@@ -652,6 +803,7 @@ final class AppVolumeService {
         sessionFilter = Self.loadSessionFilter(from: userDefaults)
         presets = Self.loadPresets(from: userDefaults)
         automationRules = Self.loadAutomationRules(from: userDefaults)
+        customEqualizers = Self.loadCustomEqualizers(from: userDefaults)
         appGroupFilter = Self.loadAppGroupFilter(from: userDefaults)
         sessionSort = Self.loadSessionSort(from: userDefaults)
         searchQuery = userDefaults.string(forKey: StorageKey.searchQuery) ?? ""
@@ -888,7 +1040,7 @@ final class AppVolumeService {
         }
     }
 
-    func toggleFavorite(for rootBundleID: String) {
+    func setFavorite(_ isFavorite: Bool, for rootBundleID: String) {
         guard let session = session(id: rootBundleID) else { return }
         var profile = profiles[rootBundleID] ?? AppVolumeProfile(
             rootBundleID: rootBundleID,
@@ -899,10 +1051,59 @@ final class AppVolumeService {
             audioBundleIDs: session.audioBundleIDs,
             lastAdjustedAt: session.lastAdjustedAt
         )
-        profile.isFavorite.toggle()
+        guard profile.isFavorite != isFavorite else { return }
+        profile.isFavorite = isFavorite
         profiles[rootBundleID] = profile.normalized(maximumGain: maximumAppGain)
         persistProfiles()
         rebuildSessions()
+    }
+
+    func toggleFavorite(for rootBundleID: String) {
+        guard session(id: rootBundleID) != nil else { return }
+        setFavorite(!(profiles[rootBundleID]?.isFavorite ?? false), for: rootBundleID)
+    }
+
+    // MARK: - 自定义 EQ 预设库
+
+    /// 保存当前曲线为命名 EQ 预设；同名不合并，交给界面去重提示。
+    @discardableResult
+    func saveCustomEqualizer(named name: String, gains: [Double]) -> AppVolumeCustomEqualizer {
+        let preset = AppVolumeCustomEqualizer(name: name, gains: gains, createdAt: Date()).normalized()
+        customEqualizers.append(preset)
+        persistCustomEqualizers()
+        return preset
+    }
+
+    /// 把某个 App 当前使用的曲线存进预设库。
+    @discardableResult
+    func saveCurrentEqualizerAsCustom(named name: String, for rootBundleID: String) -> AppVolumeCustomEqualizer? {
+        guard let equalizer = session(id: rootBundleID)?.equalizer
+            ?? profiles[rootBundleID]?.equalizer else { return nil }
+        return saveCustomEqualizer(named: name, gains: equalizer.gains)
+    }
+
+    func updateCustomEqualizer(id: UUID, named name: String? = nil, gains: [Double]? = nil) {
+        guard let index = customEqualizers.firstIndex(where: { $0.id == id }) else { return }
+        var preset = customEqualizers[index]
+        if let name { preset.name = name }
+        if let gains { preset.gains = gains }
+        preset.updatedAt = Date()
+        customEqualizers[index] = preset.normalized()
+        persistCustomEqualizers()
+    }
+
+    func deleteCustomEqualizer(id: UUID) {
+        guard let index = customEqualizers.firstIndex(where: { $0.id == id }) else { return }
+        customEqualizers.remove(at: index)
+        persistCustomEqualizers()
+    }
+
+    /// 把预设库里的曲线套用到某个 App（同时启用均衡器）。
+    func applyCustomEqualizer(id: UUID, to rootBundleID: String) {
+        guard let preset = customEqualizers.first(where: { $0.id == id }) else { return }
+        updateAudioProcessingProfile(for: rootBundleID) { profile in
+            profile.equalizer = preset.equalizer
+        }
     }
 
     func renamePreset(id: UUID, to requestedName: String) {
@@ -922,24 +1123,30 @@ final class AppVolumeService {
         guard let index = presets.firstIndex(where: { $0.id == id }) else { return }
         if let name { renamePreset(id: id, to: name) }
         presets[index].masterVolume = min(max(masterVolume ?? output.volume, 0), masterVolumeLimit)
-        presets[index].appVolumes = (appVolumes ?? Dictionary(uniqueKeysWithValues: sessions.map {
+        let capturedVolumes = (appVolumes ?? Dictionary(uniqueKeysWithValues: sessions.map {
             ($0.rootBundleID, $0.volume)
         })).mapValues { AppVolumeSafetyPolicy.clamp($0, boostEnabled: isBoostEnabled) }
+        presets[index].appVolumes = capturedVolumes
+        presets[index].appSettings = Dictionary(uniqueKeysWithValues: capturedVolumes.keys.compactMap { identifier in
+            presetAppSettings(for: identifier).map { (identifier, $0) }
+        })
+        presets[index].schemaVersion = AppVolumePreset.currentSchemaVersion
         presets[index].updatedAt = Date()
         persistPresets()
     }
 
     func exportPresets() -> Data? {
         try? JSONEncoder().encode(AppVolumePresetArchive(
-            version: 1,
+            version: AppVolumePresetArchive.currentVersion,
             presets: presets,
-            automationRules: automationRules
+            automationRules: automationRules,
+            equalizerPresets: customEqualizers
         ))
     }
 
     func importPresets(from data: Data) throws {
         guard let archive = try? JSONDecoder().decode(AppVolumePresetArchive.self, from: data),
-              archive.version == 1 else {
+              AppVolumePresetArchive.supportedVersions.contains(archive.version) else {
             throw AppVolumePresetTransferError.invalidArchive
         }
         let existingIDs = Set(presets.map(\.id))
@@ -950,8 +1157,13 @@ final class AppVolumeService {
         automationRules.append(contentsOf: archive.automationRules.filter {
             presetIDs.contains($0.presetID) && !existingRuleIDs.contains($0.id)
         })
+        let existingEqualizerIDs = Set(customEqualizers.map(\.id))
+        customEqualizers.append(contentsOf: archive.equalizerPresets
+            .map { $0.normalized() }
+            .filter { !existingEqualizerIDs.contains($0.id) })
         persistPresets()
         persistAutomationRules()
+        persistCustomEqualizers()
     }
 
     func setMasterVolumeLimit(_ requestedLimit: Double) {
@@ -1068,6 +1280,9 @@ final class AppVolumeService {
             ).normalized(maximumGain: maximumAppGain)
         }
         persistProfiles()
+        let capturedAppSettings = Dictionary(uniqueKeysWithValues: capturedAppVolumes.keys.compactMap { identifier in
+            presetAppSettings(for: identifier).map { (identifier, $0) }
+        })
         let preset = AppVolumePreset(
             id: UUID(),
             name: trimmedName.isEmpty ? L("volume.preset.unnamed") : trimmedName,
@@ -1075,6 +1290,7 @@ final class AppVolumeService {
             appVolumes: capturedAppVolumes.mapValues {
                 AppVolumeSafetyPolicy.clamp($0, boostEnabled: isBoostEnabled)
             },
+            appSettings: capturedAppSettings,
             createdAt: Date()
         )
         presets.append(preset)
@@ -1093,7 +1309,11 @@ final class AppVolumeService {
 
     func applyPreset(id: UUID) {
         guard let preset = presets.first(where: { $0.id == id }) else { return }
-        applyConfiguration(AppVolumeConfigurationSnapshot(masterVolume: preset.masterVolume, appVolumes: preset.appVolumes))
+        applyConfiguration(AppVolumeConfigurationSnapshot(
+            masterVolume: preset.masterVolume,
+            appVolumes: preset.appVolumes,
+            appSettings: preset.appSettings
+        ))
     }
 
     func bindPreset(_ presetID: UUID?, toOutputDeviceUID outputDeviceUID: String) {
@@ -1151,6 +1371,53 @@ final class AppVolumeService {
                 profiles[rootBundleID] = profile.normalized(maximumGain: maximumAppGain)
             }
         }
+        for (rootBundleID, settings) in configuration.appSettings {
+            applyPresetAppSettings(settings, to: rootBundleID)
+        }
+        persistProfiles()
+        rebuildSessions()
+    }
+
+    /// 读取某个 App 当前可用于预设的细节（EQ / 输出设备 / 分组 / 收藏）。
+    private func presetAppSettings(for rootBundleID: String) -> AppVolumePresetAppSettings? {
+        if let session = session(id: rootBundleID) {
+            return AppVolumePresetAppSettings(
+                equalizer: session.equalizer,
+                outputDeviceUID: session.outputDeviceUID,
+                appGroup: session.appGroup,
+                isFavorite: session.isFavorite
+            )
+        }
+        guard let profile = profiles[rootBundleID] else { return nil }
+        return AppVolumePresetAppSettings(
+            equalizer: profile.equalizer,
+            outputDeviceUID: profile.outputDeviceUID,
+            appGroup: profile.appGroup ?? .other,
+            isFavorite: profile.isFavorite
+        )
+    }
+
+    /// 把预设里的 EQ / 输出设备 / 分组 / 收藏写回某个 App；未运行的 App 直接写配置。
+    private func applyPresetAppSettings(_ settings: AppVolumePresetAppSettings, to rootBundleID: String) {
+        if session(id: rootBundleID) != nil {
+            setAppGroup(settings.appGroup, for: rootBundleID)
+            setFavorite(settings.isFavorite, for: rootBundleID)
+            updateAudioProcessingProfile(for: rootBundleID) { profile in
+                profile.equalizer = settings.equalizer
+            }
+            let device = settings.outputDeviceUID.flatMap { uid in
+                outputDevices.first { $0.uid == uid }
+            }
+            setOutputDevice(device, for: rootBundleID)
+            return
+        }
+
+        guard var profile = profiles[rootBundleID] else { return }
+        profile.appGroup = settings.appGroup
+        profile.isFavorite = settings.isFavorite
+        profile.equalizer = settings.equalizer
+        profile.outputDeviceUID = settings.outputDeviceUID
+        profiles[rootBundleID] = profile.normalized(maximumGain: maximumAppGain)
         persistProfiles()
         rebuildSessions()
     }
@@ -1634,6 +1901,11 @@ final class AppVolumeService {
         userDefaults.set(data, forKey: StorageKey.presets)
     }
 
+    private func persistCustomEqualizers() {
+        guard let data = try? JSONEncoder().encode(customEqualizers) else { return }
+        userDefaults.set(data, forKey: StorageKey.customEqualizers)
+    }
+
     private func persistAutomationRules() {
         guard let data = try? JSONEncoder().encode(automationRules) else { return }
         userDefaults.set(data, forKey: StorageKey.automationRules)
@@ -1710,6 +1982,14 @@ final class AppVolumeService {
             return []
         }
         return decoded
+    }
+
+    private static func loadCustomEqualizers(from userDefaults: UserDefaults) -> [AppVolumeCustomEqualizer] {
+        guard let data = userDefaults.data(forKey: StorageKey.customEqualizers),
+              let decoded = try? JSONDecoder().decode([AppVolumeCustomEqualizer].self, from: data) else {
+            return []
+        }
+        return decoded.map { $0.normalized() }
     }
 
     private static func loadAutomationRules(from userDefaults: UserDefaults) -> [AppVolumeAutomationRule] {
@@ -1822,5 +2102,6 @@ final class AppVolumeService {
         static let meetingDuckingFactor = "appVolume.meetingDuckingFactor.v1"
         static let duckedVolumes = "appVolume.duckedVolumes.v1"
         static let devicePresetBindings = "appVolume.devicePresetBindings.v1"
+        static let customEqualizers = "appVolume.customEqualizers.v1"
     }
 }

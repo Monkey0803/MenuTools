@@ -933,6 +933,14 @@
 "volume.equalizer" = "앱 이퀄라이저";
 "volume.equalizer.enabled" = "이퀄라이저 활성화";
 "volume.equalizer.preset" = "프리셋";
+"volume.equalizer.custom.unnamed" = "사용자 EQ";
+"volume.equalizer.custom.library" = "내 EQ 프리셋";
+"volume.equalizer.custom.empty" = "저장된 곡선이 없습니다";
+"volume.equalizer.custom.name" = "프리셋 이름";
+"volume.equalizer.custom.save" = "현재 곡선을 프리셋으로 저장";
+"volume.equalizer.custom.delete" = "삭제";
+"volume.preset.coverage" = "App %d개 · EQ/기기 포함 %d개";
+"volume.preset.coverageHint" = "이전 버전에서 저장됨: 다시 저장하면 EQ와 출력 기기가 포함됩니다";
 "volume.equalizer.custom" = "사용자화";
 "volume.equalizer.preset.flat" = "플랫";
 "volume.equalizer.preset.bassBoost" = "저음 강화";

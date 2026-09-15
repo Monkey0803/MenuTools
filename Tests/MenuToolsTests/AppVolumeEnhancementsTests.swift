@@ -593,3 +593,152 @@ private func makeEnhancementDefaults(_ name: String) throws -> UserDefaults {
     defaults.removePersistentDomain(forName: suiteName)
     return defaults
 }
+
+@Test("套用预设会一并恢复 EQ、输出设备、分组与收藏")
+@MainActor
+func presetAppliesEqualizerDeviceGroupAndFavorite() throws {
+    let defaults = try makeEnhancementDefaults("presetCoverage")
+    let backend = EnhancedFakeAppVolumeBackend()
+    let speaker = AudioOutputDevice(id: 11, uid: "speaker", name: "Mac 扬声器", isDefault: true)
+    let headphones = AudioOutputDevice(id: 12, uid: "headphones", name: "AirPods", isDefault: false)
+    backend.outputDevices = [speaker, headphones]
+    let service = AppVolumeService(backend: backend, userDefaults: defaults)
+    backend.send(candidates: [.music, .podcasts], output: .fixture())
+    service.setEnabled(true)
+
+    service.setEqualizerPreset(.vocalClarity, for: "com.apple.Music")
+    service.setOutputDevice(headphones, for: "com.apple.Music")
+    service.setAppGroup(.meeting, for: "com.apple.Music")
+    service.setFavorite(true, for: "com.apple.Music")
+    service.setVolume(0.42, for: "com.apple.Music")
+
+    let preset = service.savePreset(named: "会议", appVolumes: ["com.apple.Music": 0.42])
+
+    #expect(preset.schemaVersion == AppVolumePreset.currentSchemaVersion)
+    #expect(!preset.needsCoverageUpgrade)
+    let stored = try #require(preset.appSettings["com.apple.Music"])
+    #expect(stored.equalizer.gains == AppVolumeEqualizerPreset.vocalClarity.gains)
+    #expect(stored.outputDeviceUID == "headphones")
+    #expect(stored.appGroup == .meeting)
+    #expect(stored.isFavorite)
+
+    service.setEqualizerPreset(.flat, for: "com.apple.Music")
+    service.setOutputDevice(nil, for: "com.apple.Music")
+    service.setAppGroup(.other, for: "com.apple.Music")
+    service.setFavorite(false, for: "com.apple.Music")
+
+    service.applyPreset(id: preset.id)
+
+    let session = try #require(service.session(id: "com.apple.Music"))
+    #expect(session.equalizer.isEnabled)
+    #expect(session.equalizer.gains == AppVolumeEqualizerPreset.vocalClarity.gains)
+    #expect(session.outputDeviceUID == "headphones")
+    #expect(session.appGroup == .meeting)
+    #expect(session.isFavorite)
+}
+
+@Test("导入的 v1 预设套用后只改音量，不动 EQ")
+@MainActor
+func legacyPresetAppliesVolumeOnly() throws {
+    let defaults = try makeEnhancementDefaults("legacyPreset")
+    let backend = EnhancedFakeAppVolumeBackend()
+    let service = AppVolumeService(backend: backend, userDefaults: defaults)
+    backend.send(candidates: [.music], output: .fixture())
+    service.setEnabled(true)
+
+    // 旧版本导出的归档：只有 masterVolume 与 appVolumes，没有 appSettings
+    let legacyArchive = """
+    {
+      "version": 1,
+      "presets": [{
+        "id": "6B29FC40-CA47-1067-B31D-00DD010662DA",
+        "name": "旧预设",
+        "masterVolume": 0.5,
+        "appVolumes": { "com.apple.Music": 0.3 },
+        "createdAt": 760000000
+      }],
+      "automationRules": []
+    }
+    """
+    try service.importPresets(from: Data(legacyArchive.utf8))
+    let legacy = try #require(service.presets.first)
+    #expect(legacy.needsCoverageUpgrade)
+    #expect(legacy.appSettings.isEmpty)
+
+    service.setEqualizerPreset(.trebleBoost, for: "com.apple.Music")
+    service.applyPreset(id: legacy.id)
+
+    let session = try #require(service.session(id: "com.apple.Music"))
+    // 音量被套用，EQ 保持原样
+    #expect(abs(session.volume - 0.3) < 0.001)
+    #expect(session.equalizer.gains == AppVolumeEqualizerPreset.trebleBoost.gains)
+}
+
+@Test("自定义 EQ 预设可保存、套用、重命名并持久化")
+@MainActor
+func customEqualizerLibraryPersistsAndApplies() throws {
+    let defaults = try makeEnhancementDefaults("customEqualizer")
+    let backend = EnhancedFakeAppVolumeBackend()
+    let service = AppVolumeService(backend: backend, userDefaults: defaults)
+    backend.send(candidates: [.music], output: .fixture())
+    service.setEnabled(true)
+
+    let preset = service.saveCustomEqualizer(named: "深夜", gains: AppVolumeEqualizerPreset.lateNight.gains)
+    #expect(service.customEqualizers.count == 1)
+    #expect(preset.name == "深夜")
+    #expect(preset.gains == AppVolumeEqualizerPreset.lateNight.gains)
+
+    service.applyCustomEqualizer(id: preset.id, to: "com.apple.Music")
+    let session = try #require(service.session(id: "com.apple.Music"))
+    #expect(session.equalizer.isEnabled)
+    #expect(session.equalizer.gains == AppVolumeEqualizerPreset.lateNight.gains)
+
+    service.updateCustomEqualizer(id: preset.id, named: "更深夜")
+    #expect(service.customEqualizers.first?.name == "更深夜")
+
+    let restored = AppVolumeService(backend: EnhancedFakeAppVolumeBackend(), userDefaults: defaults)
+    #expect(restored.customEqualizers.count == 1)
+    #expect(restored.customEqualizers.first?.name == "更深夜")
+    #expect(restored.customEqualizers.first?.gains == AppVolumeEqualizerPreset.lateNight.gains)
+
+    service.deleteCustomEqualizer(id: preset.id)
+    #expect(service.customEqualizers.isEmpty)
+}
+
+@Test("从当前 App 曲线保存自定义 EQ 预设")
+@MainActor
+func customEqualizerCapturesAppCurve() throws {
+    let defaults = try makeEnhancementDefaults("captureCurve")
+    let backend = EnhancedFakeAppVolumeBackend()
+    let service = AppVolumeService(backend: backend, userDefaults: defaults)
+    backend.send(candidates: [.podcasts], output: .fixture())
+    service.setEnabled(true)
+    service.setEqualizerPreset(.podcast, for: "com.apple.podcasts")
+
+    let preset = try #require(service.saveCurrentEqualizerAsCustom(named: "播客", for: "com.apple.podcasts"))
+
+    #expect(preset.gains == AppVolumeEqualizerPreset.podcast.gains)
+    #expect(service.customEqualizers.map(\.name) == ["播客"])
+}
+
+@Test("预设导出包含自定义 EQ，导入端能读回")
+@MainActor
+func presetExportIncludesCustomEqualizers() throws {
+    let defaults = try makeEnhancementDefaults("archiveV2")
+    let service = AppVolumeService(backend: EnhancedFakeAppVolumeBackend(), userDefaults: defaults)
+    _ = service.saveCustomEqualizer(named: "夜间", gains: AppVolumeEqualizerPreset.lateNight.gains)
+
+    let data = try #require(service.exportPresets())
+    let archive = try JSONDecoder().decode(AppVolumePresetArchive.self, from: data)
+    #expect(archive.version == AppVolumePresetArchive.currentVersion)
+    #expect(archive.equalizerPresets.count == 1)
+
+    let target = AppVolumeService(
+        backend: EnhancedFakeAppVolumeBackend(),
+        userDefaults: try makeEnhancementDefaults("archiveV2Target")
+    )
+    try target.importPresets(from: data)
+
+    #expect(target.customEqualizers.count == 1)
+    #expect(target.customEqualizers.first?.gains == AppVolumeEqualizerPreset.lateNight.gains)
+}
