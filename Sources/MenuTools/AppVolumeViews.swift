@@ -286,6 +286,8 @@ struct AppVolumeSettingsView: View {
     @State private var page: AppVolumeSettingsPage = .mixer
     /// 「已记住」分区由用户手动展开；有搜索/筛选时自动展开。
     @State private var showsRememberedSessions = false
+    /// 低频设置（会议闪避、睡眠定时、自检与诊断）默认收起，避免设置页要滚三屏。
+    @State private var showsAdvancedSettings = false
     @State private var presetSync = AppVolumePresetSyncService.shared
     @State private var presetSyncPassphrase = ""
     @State private var presetSyncConflictCopies: [URL] = []
@@ -733,6 +735,12 @@ struct AppVolumeSettingsView: View {
 
             } else {
             Section {
+                Toggle(L("volume.settings.showAdvanced"), isOn: $showsAdvancedSettings)
+            } footer: {
+                Text(L("volume.settings.showAdvancedHint"))
+                    .font(.caption)
+            }
+            Section {
                 HStack(alignment: .center, spacing: 12) {
                     VStack(alignment: .leading, spacing: 2) {
                         Text(L("volume.enabled"))
@@ -856,6 +864,7 @@ struct AppVolumeSettingsView: View {
             } header: {
                 Label(L("volume.hearing.title"), systemImage: "ear")
             }
+            if showsAdvancedSettings {
             Section {
                 Toggle(L("volume.meetingDucking"), isOn: Binding(
                     get: { service.meetingDuckingEnabled },
@@ -915,6 +924,7 @@ struct AppVolumeSettingsView: View {
             } header: {
                 Label(L("volume.sleepTimer.title"), systemImage: "moon.zzz")
             }
+            }
 
             Section {
                 LabeledContent(L("volume.notification.permission.title")) {
@@ -946,6 +956,7 @@ struct AppVolumeSettingsView: View {
                 Task { await service.refreshNotificationPermission() }
             }
 
+            if showsAdvancedSettings {
             Section {
                 ForEach(service.selfCheckSteps) { step in
                     HStack(alignment: .top, spacing: 8) {
@@ -974,6 +985,7 @@ struct AppVolumeSettingsView: View {
                     .foregroundStyle(.secondary)
             } header: {
                 Label(L("volume.diagnostics.title"), systemImage: "stethoscope")
+            }
             }
         }
             }

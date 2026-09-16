@@ -993,6 +993,8 @@
 "volume.page.devices" = "기기";
 "volume.page.scenes" = "장면";
 "volume.page.settings" = "설정";
+"volume.settings.showAdvanced" = "고급 설정 표시";
+"volume.settings.showAdvancedHint" = "회의 중 볼륨 낮추기, 취침 타이머, 자체 점검, 진단은 기본적으로 접혀 있습니다.";
 "volume.empty.idle" = "지금 소리를 내는 App이 없습니다";
 "volume.empty.filtered" = "조건에 맞는 App이 없습니다";
 "volume.remembered.show" = "기억된 App 표시";

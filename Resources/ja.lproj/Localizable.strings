@@ -993,6 +993,8 @@
 "volume.page.devices" = "デバイス";
 "volume.page.scenes" = "シーン";
 "volume.page.settings" = "設定";
+"volume.settings.showAdvanced" = "詳細設定を表示";
+"volume.settings.showAdvancedHint" = "会議中のダッキング・スリープタイマー・セルフチェック・診断は既定で折りたたまれます。";
 "volume.empty.idle" = "再生中の App はありません";
 "volume.empty.filtered" = "条件に一致する App はありません";
 "volume.remembered.show" = "記憶した App を表示";
