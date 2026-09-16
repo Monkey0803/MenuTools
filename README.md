@@ -260,6 +260,17 @@ rm /tmp/menutools-snap-debug        # 关闭（默认不写任何日志）
 
 注意：CGEvent 合成的鼠标事件在 macOS 26 上不会投递给 `NSEvent` 全局监听，拖拽行为无法脚本化验证，只能手动拖一次。逐项验收步骤见 [`docs/window-management-acceptance.md`](docs/window-management-acceptance.md)。
 
+### 系统监控与音频验证
+
+系统监控的采样与音频的单 App 音量控制依赖系统能力，可用独立脚本回归：
+
+```bash
+swift Scripts/test_powersources.swift     # 电源与内存相关信息源可读性
+swift Scripts/test_app_volume_tap.swift   # 单 App 音量依赖的音频 Process Tap
+```
+
+设置页导航改造（系统监控四个子页、音频「显示高级设置」收起低频区块）的逐项验收步骤见 [`docs/system-and-audio-acceptance.md`](docs/system-and-audio-acceptance.md)。
+
 ### 用链接触发窗口操作
 
 菜单栏应用本身没有窗口，但可以用 `menutools://` 链接触发窗口操作，便于 Raycast、快捷指令和脚本调用：

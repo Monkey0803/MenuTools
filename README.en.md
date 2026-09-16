@@ -206,6 +206,17 @@ rm /tmp/menutools-snap-debug        # disable (nothing is logged by default)
 
 Note: CGEvent-synthesized mouse events are not delivered to `NSEvent` global monitors on macOS 26, so drag behaviour cannot be scripted and has to be verified by hand. A step-by-step checklist lives in [`docs/window-management-acceptance.md`](docs/window-management-acceptance.md).
 
+### System Monitor and Audio Verification
+
+System-monitor sampling and per-app volume rely on system capabilities, so standalone scripts cover them:
+
+```bash
+swift Scripts/test_powersources.swift     # power and memory related information sources
+swift Scripts/test_app_volume_tap.swift   # the audio process tap behind per-app volume
+```
+
+The step-by-step checklist for the settings navigation rework (four sub-pages for the system monitor, and the "Show advanced settings" switch on the audio page) lives in [`docs/system-and-audio-acceptance.md`](docs/system-and-audio-acceptance.md).
+
 ### Triggering Window Actions by URL
 
 The menu-bar app has no window of its own, but `menutools://` links can trigger window actions from Raycast, Shortcuts, or scripts:
