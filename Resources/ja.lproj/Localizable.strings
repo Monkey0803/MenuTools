@@ -32,6 +32,10 @@
 "resource.page.overview" = "概要";
 "resource.page.processes" = "プロセス";
 "resource.page.history" = "履歴";
+"resource.page.alerts" = "アラートとセルフチェック";
+"resource.memory.details" = "メモリの内訳";
+"resource.process.showAll" = "すべて表示（%ld 件）";
+"resource.process.showTop" = "上位 %ld 件のみ表示";
 "resource.cores" = "コアごとの使用率";
 "resource.memory.pressure" = "メモリプレッシャー";
 "resource.memory.wired" = "ワイヤード";

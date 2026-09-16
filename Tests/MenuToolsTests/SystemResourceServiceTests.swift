@@ -585,15 +585,16 @@ func defaultProcessProviderReadsSelf() {
     #expect((selfSample?.memoryBytes ?? 0) > 0)
 }
 
-@Test("资源设置页有概览、进程、历史三个一级页且各有文案与图标")
+@Test("资源设置页四个一级页各有文案与图标")
 func resourceSettingsPagesCoverTasks() {
-    #expect(SystemResourceSettingsPage.allCases == [.overview, .processes, .history])
+    // 告警与自检从「概览」拆出来，避免概览页要滚近三屏
+    #expect(SystemResourceSettingsPage.allCases == [.overview, .processes, .history, .alerts])
     for page in SystemResourceSettingsPage.allCases {
         #expect(!page.titleKey.isEmpty)
         #expect(!page.symbol.isEmpty)
         #expect(page.id == page)
     }
-    #expect(Set(SystemResourceSettingsPage.allCases.map(\.titleKey)).count == 3)
+    #expect(Set(SystemResourceSettingsPage.allCases.map(\.titleKey)).count == 4)
 }
 
 @Test("历史聚合在同一分钟内取平均，并对齐到分钟")

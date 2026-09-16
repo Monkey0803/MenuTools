@@ -6,6 +6,7 @@ enum SystemResourceSettingsPage: String, CaseIterable, Identifiable {
     case overview
     case processes
     case history
+    case alerts
 
     var id: Self { self }
     var titleKey: String { "resource.page.\(rawValue)" }
@@ -15,6 +16,7 @@ enum SystemResourceSettingsPage: String, CaseIterable, Identifiable {
         case .overview: "gauge.with.dots.needle.67percent"
         case .processes: "list.bullet.rectangle"
         case .history: "chart.bar.xaxis"
+        case .alerts: "bell.badge"
         }
     }
 }
@@ -47,6 +49,11 @@ struct SystemResourceSettingsView: View {
     @State private var historyRange: SystemResourceHistoryRange = .hour
     @State private var historyMetric: SystemResourceHistoryMetric = .cpu
     @State private var hoveredHistoryIndex: Int?
+    @State private var showsMemoryDetail = false
+    @State private var showsAllProcesses = false
+
+    /// 进程列表默认只渲染前几项：设置页是「看谁占资源」，不是进程管理器。
+    private static let processPreviewLimit = 8
 
     var body: some View {
         GlassEffectContainer(spacing: SystemResourceVisualPolicy.containerSpacing) {
@@ -74,12 +81,13 @@ struct SystemResourceSettingsView: View {
                         switch page {
                         case .overview:
                             overviewSections
-                            alertSection
-                            selfCheckSection
                         case .processes:
                             processSections
                         case .history:
                             historySections
+                        case .alerts:
+                            alertSection
+                            selfCheckSection
                         }
                     }
                     .transaction { transaction in
@@ -128,11 +136,17 @@ struct SystemResourceSettingsView: View {
                 LabeledContent(L("resource.memory.pressure"), value: L(pressureKey(snapshot.memoryPressure)))
 
                 if let detail = snapshot.memoryDetail {
-                    memoryDetailRow(L("resource.memory.wired"), bytes: detail.wiredBytes, total: detail.totalBytes)
-                    memoryDetailRow(L("resource.memory.active"), bytes: detail.activeBytes, total: detail.totalBytes)
-                    memoryDetailRow(L("resource.memory.compressed"), bytes: detail.compressedBytes, total: detail.totalBytes)
-                    memoryDetailRow(L("resource.memory.cached"), bytes: detail.cachedBytes, total: detail.totalBytes)
-                    memoryDetailRow(L("resource.memory.free"), bytes: detail.freeBytes, total: detail.totalBytes)
+                    DisclosureGroup(isExpanded: $showsMemoryDetail) {
+                        memoryDetailRow(L("resource.memory.wired"), bytes: detail.wiredBytes, total: detail.totalBytes)
+                        memoryDetailRow(L("resource.memory.active"), bytes: detail.activeBytes, total: detail.totalBytes)
+                        memoryDetailRow(L("resource.memory.compressed"), bytes: detail.compressedBytes, total: detail.totalBytes)
+                        memoryDetailRow(L("resource.memory.cached"), bytes: detail.cachedBytes, total: detail.totalBytes)
+                        memoryDetailRow(L("resource.memory.free"), bytes: detail.freeBytes, total: detail.totalBytes)
+                    } label: {
+                        Text(L("resource.memory.details"))
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                    }
                 }
 
                 Button {
@@ -288,7 +302,7 @@ struct SystemResourceSettingsView: View {
                 Text(L("resource.process.empty"))
                     .foregroundStyle(.secondary)
             } else {
-                ForEach(processes.visibleUsages) { usage in
+                ForEach(displayedProcesses) { usage in
                     HStack(spacing: 10) {
                         VStack(alignment: .leading, spacing: 1) {
                             Text(usage.name)
@@ -312,9 +326,28 @@ struct SystemResourceSettingsView: View {
                     }
                 }
             }
+                if processes.visibleUsages.count > Self.processPreviewLimit, searchIsEmpty {
+                    Button(showsAllProcesses
+                           ? L("resource.process.showTop", Self.processPreviewLimit)
+                           : L("resource.process.showAll", processes.visibleUsages.count)) {
+                        showsAllProcesses.toggle()
+                    }
+                    .font(.caption)
+                }
         } header: {
             Label(L("resource.process.title"), systemImage: "list.bullet.rectangle")
         }
+    }
+
+    /// 搜索时直接展示全部命中项：搜索的目的就是要看结果。
+    private var displayedProcesses: [SystemProcessResourceUsage] {
+        let usages = processes.visibleUsages
+        guard !showsAllProcesses, searchIsEmpty else { return usages }
+        return Array(usages.prefix(Self.processPreviewLimit))
+    }
+
+    private var searchIsEmpty: Bool {
+        processes.query.normalizedSearchText.isEmpty
     }
 
     // MARK: - 自检

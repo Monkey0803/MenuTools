@@ -32,6 +32,10 @@
 "resource.page.overview" = "概览";
 "resource.page.processes" = "进程";
 "resource.page.history" = "历史";
+"resource.page.alerts" = "告警与自检";
+"resource.memory.details" = "内存明细";
+"resource.process.showAll" = "显示全部 %ld 项";
+"resource.process.showTop" = "只看占用最高的 %ld 项";
 "resource.cores" = "各核心占用";
 "resource.memory.pressure" = "内存压力";
 "resource.memory.wired" = "锁定";

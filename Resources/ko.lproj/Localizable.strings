@@ -32,6 +32,10 @@
 "resource.page.overview" = "개요";
 "resource.page.processes" = "프로세스";
 "resource.page.history" = "기록";
+"resource.page.alerts" = "알림 및 자체 점검";
+"resource.memory.details" = "메모리 세부 정보";
+"resource.process.showAll" = "모두 표시(%ld개)";
+"resource.process.showTop" = "상위 %ld개만 표시";
 "resource.cores" = "코어별 사용률";
 "resource.memory.pressure" = "메모리 압력";
 "resource.memory.wired" = "와이어드";

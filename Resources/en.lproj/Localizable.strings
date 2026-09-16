@@ -32,6 +32,10 @@
 "resource.page.overview" = "Overview";
 "resource.page.processes" = "Processes";
 "resource.page.history" = "History";
+"resource.page.alerts" = "Alerts and self-check";
+"resource.memory.details" = "Memory details";
+"resource.process.showAll" = "Show all %ld";
+"resource.process.showTop" = "Show only the top %ld";
 "resource.cores" = "Per-core usage";
 "resource.memory.pressure" = "Memory pressure";
 "resource.memory.wired" = "Wired";
