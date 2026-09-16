@@ -7,7 +7,7 @@
 "help.settings" = "設定を開く";
 
 /* システムリソース */
-"resource.title" = "システムリソース";
+"resource.title" = "システムモニター";
 "resource.cpu" = "CPU";
 "resource.memory" = "メモリ";
 "resource.disk" = "ディスク";
@@ -17,6 +17,15 @@
 "resource.memoryWarning" = "メモリ負荷";
 "resource.memoryCritical" = "メモリ負荷高";
 "resource.releaseMemory" = "メモリを解放";
+"resource.relieveMemory" = "メモリを回収";
+"resource.relieveMemory.done" = "%@ を回収（プロセスアロケータキャッシュ）";
+"resource.relieveMemory.none" = "回収できるアロケータキャッシュはありません";
+"resource.purgeSystemCache" = "システムファイルキャッシュを消去…";
+"resource.purgeSystemCache.desc" = "管理者パスワードが必要で、システムの認証ダイアログが表示されます。キャンセルしても上の回収には影響しません";
+"resource.purgeSystemCache.done" = "システムファイルキャッシュを消去しました";
+"resource.purgeSystemCache.cancelled" = "キャンセルしました（システムファイルキャッシュは未消去）";
+"status.memoryRelieved" = "%@ を回収";
+"status.memoryRelievedNone" = "回収できるものはありません";
 "resource.releasingMemory" = "解放中…";
 "resource.showAll" = "すべて表示";
 "resource.page.title" = "システムリソースページ";
@@ -119,7 +128,7 @@
 "network.vpnOff" = "VPN 未接続";
 
 /* ネットワーク通信量 */
-"traffic.title" = "ネットワーク通信量";
+"traffic.title" = "ネットワークモニター";
 "traffic.description" = "App ごとのリアルタイム通信速度と今回の累計通信量を表示します。";
 "traffic.refresh" = "ネットワーク通信量を更新";
 "traffic.viewAll" = "すべて表示";
@@ -579,10 +588,10 @@
 
 /* 設定タブ */
 "settings.tab.general" = "一般";
-"settings.tab.rightClick" = "右クリックツール";
+"settings.tab.rightClick" = "Finder コンテキストメニュー";
 
 /* 右クリックツール */
-"rc.title" = "右クリックツール";
+"rc.title" = "Finder コンテキストメニュー";
 "rc.subtitle" = "Finder のコンテキストメニューに表示する項目を選択します。";
 "rc.section.permission" = "権限";
 "rc.permission.title" = "Finder 機能拡張";
@@ -612,10 +621,10 @@
 "space.executionFailed" = "スペースの切替に失敗しました：%@";
 
 /* スムーズスクロール */
-"settings.tab.scroll" = "スムーズスクロール";
+"settings.tab.scroll" = "スクロール";
 "settings.tab.windowManagement" = "ウインドウ管理";
 "settings.tab.appLaunch" = "アプリ起動";
-"settings.tab.screenshot" = "スクリーンショット";
+"settings.tab.screenshot" = "スクリーンショットと注釈";
 "settings.tab.clipboard" = "クリップボード";
 "clipboard.shortcut" = "クリップボードのショートカット";
 "clipboard.shortcutDescription" = "グローバルショートカットでいつでも履歴を開きます。";
@@ -707,7 +716,7 @@
 "appShortcut.empty" = "アプリが見つかりません";
 "appShortcut.emptyBound" = "割り当て済みアプリはありません。「アプリを追加」から設定してください。";
 "appShortcut.launchFailed" = "%@ を起動できません";
-"scroll.title" = "スムーズスクロール";
+"scroll.title" = "スクロール";
 "scroll.subtitle" = "マウスホイールを引き取り、カクつくスクロールを滑らかに補間します。トラックパッドには影響しません。";
 "scroll.enable" = "スムーズスクロールを有効にする";
 "scroll.enable.desc" = "ホイールを引き取るには「アクセシビリティ」の許可が必要です。";
@@ -956,8 +965,8 @@
 "screenshot.region.modeHint" = "範囲をドラッグ · A: ウィンドウ · Esc: キャンセル";
 
 /* App 音量管理 */
-"settings.tab.volume" = "音量";
-"volume.title" = "App 音量";
+"settings.tab.volume" = "オーディオ";
+"volume.title" = "オーディオ";
 "volume.enabled" = "App ごとの音量を有効にする";
 "volume.enabled.desc" = "システムオーディオをキャプチャして、再生中の App を個別に調整します";
 "volume.showAll" = "すべての App 音量を表示";
@@ -967,7 +976,7 @@
 "volume.mute" = "システム出力をミュート";
 "volume.output.unknown" = "現在の出力デバイス";
 "volume.output.fixed" = "この出力デバイスの主音量は調整できません。デバイス本体の音量調整を使用してください。";
-"volume.page.title" = "音量ページ";
+"volume.page.title" = "オーディオのページ";
 "volume.page.mixer" = "ミキサー";
 "volume.page.devices" = "デバイス";
 "volume.page.scenes" = "シーン";
@@ -996,7 +1005,7 @@
 "volume.error.operation" = "%@に失敗しました（エラー %d）";
 "volume.error.presetArchive" = "プリセットのアーカイブを読み取れません";
 "volume.shortcut" = "音量ショートカット";
-"volume.shortcutDescription" = "グローバルショートカットでいつでも音量管理を開きます。";
+"volume.shortcutDescription" = "グローバルショートカットでいつでもオーディオパネルを開きます。";
 "volume.shortcutSave" = "ショートカットを保存";
 "volume.shortcut.showPanel" = "音量パネルを開く";
 "volume.shortcut.increase" = "主音量を上げる";
@@ -1064,6 +1073,8 @@
 "volume.bypass" = "システム本来の音量に戻す";
 "volume.section.presets" = "音量プリセット";
 "volume.preset.name" = "プリセット名";
+"volume.preset.new" = "新規プリセット";
+"volume.preset.empty" = "保存済みのプリセットはありません";
 "volume.preset.save" = "現在の設定を保存";
 "volume.preset.apply" = "適用";
 "volume.preset.delete" = "削除";
@@ -1206,8 +1217,8 @@
 "volume.hud.muted" = "ミュート中";
 
 /* 内蔵機能センター */
-"settings.tab.plugins" = "機能";
-"settings.backToFeatures" = "機能";
+"settings.tab.plugins" = "機能センター";
+"settings.backToFeatures" = "機能センター";
 "settings.sidebar.settings" = "設定";
 "settings.sidebar.enabledFeatures" = "有効な機能";
 "plugin.center.title" = "機能センター";
@@ -1246,15 +1257,15 @@
 "plugin.system-controls.description" = "外観、隠しファイル、Dock、メニューバー、スリープ防止、システム操作。";
 "plugin.system-insights.title" = "システム情報";
 "plugin.system-insights.description" = "ネットワーク、バッテリー、ディスプレイ、ストレージ、Bluetooth 機器の電池残量。";
-"plugin.system-resources.title" = "システムリソース";
+"plugin.system-resources.title" = "システムモニター";
 "plugin.system-resources.description" = "CPU、メモリのプレッシャーと解放、ディスク容量と読み書き、負荷の高いプロセス。";
-"plugin.network-traffic.title" = "ネットワーク通信量";
+"plugin.network-traffic.title" = "ネットワークモニター";
 "plugin.network-traffic.description" = "アップロードとダウンロードの速度、今回の累計通信量を表示します。";
 "plugin.clipboard.title" = "クリップボード";
 "plugin.clipboard.description" = "クリップボード履歴を記録し、固定、コピー、消去操作を提供します。";
-"plugin.app-volume.title" = "App 音量";
-"plugin.app-volume.description" = "システムの主音量と、再生中の App ごとの音量を調整します。";
-"plugin.screenshot.title" = "スクリーンショットと OCR";
+"plugin.app-volume.title" = "オーディオ";
+"plugin.app-volume.description" = "システムとマイクの音量、App ごとの音量とイコライザー、出力先のルーティング、プリセットと自動化、聴力保護。";
+"plugin.screenshot.title" = "スクリーンショットと注釈";
 "plugin.screenshot.description" = "スクリーンショット、スクロールキャプチャ、範囲 OCR、編集、グローバルショートカット。";
 "settings.tab.translation" = "翻訳";
 "plugin.translation.title" = "AI 翻訳";
@@ -1296,9 +1307,9 @@
 "plugin.app-launcher.description" = "よく使う App を登録し、グローバルショートカットですぐに起動します。";
 "plugin.automation.title" = "オートメーション";
 "plugin.automation.description" = "シーンプリセット、集中モード、シーン用グローバルショートカット。";
-"plugin.finder-tools.title" = "Finder ツール";
+"plugin.finder-tools.title" = "Finder コンテキストメニュー";
 "plugin.finder-tools.description" = "Finder のコンテキストメニュー、パス操作、ターミナルで開く機能。";
-"plugin.smooth-scroll.title" = "スムーズスクロール";
+"plugin.smooth-scroll.title" = "スクロール";
 "plugin.smooth-scroll.description" = "マウスホイールの滑らかさ、方向、ゲイン、修飾キーを調整します。";
 "clipboard.archive" = "暗号化アーカイブ";
 "clipboard.archive.passphrase" = "アーカイブのパスフレーズ";

@@ -781,20 +781,20 @@ struct MenuPanelView: View {
                         Text(memoryPressureLabel(snapshot.memoryPressure))
                             .font(.caption2)
                             .foregroundStyle(memoryPressureColor(snapshot.memoryPressure))
-                        if snapshot.memoryPressure.shouldOfferMemoryRelease {
+                        if systemResourceService.shouldOfferMemoryRelease {
                             Button {
-                                guard let result = systemResourceService.releaseMemory() else { return }
+                                let released = systemResourceService.relieveProcessMemory()
                                 flashStatus(
-                                    result.systemCachePurged
-                                        ? L("status.memoryReleased")
-                                        : L("status.memoryReleaseFailed"),
-                                    isError: !result.systemCachePurged
+                                    released > 0
+                                        ? L("status.memoryRelieved", resourceBytes(released))
+                                        : L("status.memoryRelievedNone"),
+                                    isError: false
                                 )
                             } label: {
                                 Label(
                                     systemResourceService.isReleasingMemory
                                         ? L("resource.releasingMemory")
-                                        : L("resource.releaseMemory"),
+                                        : L("resource.relieveMemory"),
                                     systemImage: "arrow.down.circle"
                                 )
                             }
@@ -802,7 +802,7 @@ struct MenuPanelView: View {
                             .controlSize(.mini)
                             .tint(.red)
                             .disabled(systemResourceService.isReleasingMemory)
-                            .help(L("resource.releaseMemory"))
+                            .help(L("resource.relieveMemory"))
                         }
                     }
                 } else {

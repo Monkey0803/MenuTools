@@ -171,6 +171,39 @@ enum AppVolumeIconPolicy {
     }
 }
 
+/// 音量预设区「新建」的展开状态。
+///
+/// 预设页默认只列出已有预设并摆一个「＋」入口，新建表单收起：一进预设页不该先看到一个空白
+/// 新建表单，那会让人把它当成预设列表本身。收起时连名称与 App 选择一起清掉，
+/// 否则上一次勾选的 App 会被悄悄带进下一个预设。
+struct AppVolumePresetCreationDraft: Equatable {
+    /// 新建表单是否已展开；默认收起。
+    private(set) var isExpanded = false
+    /// 输入中的预设名称。
+    var name = ""
+    /// 勾选的 App；空集表示包含当前所有 App。
+    var appIdentifiers: Set<String> = []
+
+    /// 展开且名称非空时才允许保存。
+    var canSave: Bool {
+        isExpanded && !name.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+    }
+
+    /// 展开新建表单，并清掉上一次的残留。
+    mutating func begin() {
+        isExpanded = true
+        name = ""
+        appIdentifiers = []
+    }
+
+    /// 收起并清空；保存与取消共用同一条收尾路径。
+    mutating func finish() {
+        isExpanded = false
+        name = ""
+        appIdentifiers = []
+    }
+}
+
 /// 可由全局快捷键直接唤起的紧凑音量管理面板。
 struct AppVolumeQuickAccessView: View {
     @State private var service = AppVolumeService.shared
@@ -241,8 +274,7 @@ struct AppVolumeSettingsView: View {
     @State private var capturedShortcut: GlobalShortcut?
     @State private var capturedShortcutAction: AppVolumeShortcutAction?
     @State private var shortcutError: String?
-    @State private var presetName = ""
-    @State private var presetAppIdentifiers: Set<String> = []
+    @State private var presetDraft = AppVolumePresetCreationDraft()
     @State private var isImportingPresets = false
     @State private var isExportingPresets = false
     @State private var presetDocument: AppVolumePresetDocument?
@@ -428,32 +460,59 @@ struct AppVolumeSettingsView: View {
                 }
             } else if page == .scenes {
             Section {
-                HStack {
-                    TextField(L("volume.preset.name"), text: $presetName)
-                    Menu(L("volume.preset.includesApps", presetAppIdentifiers.count == 0 ? service.sessions.count : presetAppIdentifiers.count)) {
-                        ForEach(service.sessions) { session in
-                            Toggle(session.displayName, isOn: Binding(
-                                get: { presetAppIdentifiers.isEmpty || presetAppIdentifiers.contains(session.id) },
-                                set: { enabled in
-                                    if presetAppIdentifiers.isEmpty {
-                                        presetAppIdentifiers = Set(service.sessions.map(\.id))
-                                    }
-                                    if enabled { presetAppIdentifiers.insert(session.id) }
-                                    else { presetAppIdentifiers.remove(session.id) }
-                                }
+                presetCreationRow
+
+                if service.presets.isEmpty {
+                    Text(L("volume.preset.empty"))
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                } else {
+                    ForEach(service.presets) { preset in
+                        VStack(alignment: .leading, spacing: 4) {
+                        HStack {
+                            TextField(L("volume.preset.name"), text: Binding(
+                                get: { service.presets.first(where: { $0.id == preset.id })?.name ?? preset.name },
+                                set: { service.renamePreset(id: preset.id, to: $0) }
                             ))
+                            Spacer()
+                            Button(L("volume.preset.apply")) {
+                                service.applyPreset(id: preset.id)
+                            }
+                            Menu {
+                                Button(L("volume.automation.add")) {
+                                    service.addAutomationRule(
+                                        presetID: preset.id,
+                                        outputDeviceUID: service.output.deviceUID.isEmpty ? nil : service.output.deviceUID
+                                    )
+                                }
+                                Button(L("volume.preset.overwrite")) {
+                                    service.overwritePreset(id: preset.id)
+                                }
+                                Button(L("volume.preset.delete"), role: .destructive) {
+                                    service.deletePreset(id: preset.id)
+                                }
+                            } label: {
+                                Image(systemName: "ellipsis.circle")
+                            }
+                            .menuStyle(.borderlessButton)
+                        }
+                        HStack(spacing: 6) {
+                            Text(L("volume.preset.coverage", preset.appVolumes.count, preset.appSettings.count))
+                            let boundDevices = service.boundDeviceNames(forPresetID: preset.id)
+                            if !boundDevices.isEmpty {
+                                Text(L("volume.preset.binding.devices", boundDevices.joined(separator: "、")))
+                            }
+                            if preset.needsCoverageUpgrade {
+                                Label(L("volume.preset.coverageHint"), systemImage: "exclamationmark.triangle")
+                                    .foregroundStyle(.orange)
+                            }
+                        }
+                        .font(.caption2)
+                        .foregroundStyle(.secondary)
                         }
                     }
-                    Button(L("volume.preset.save")) {
-                        let identifiers = presetAppIdentifiers.isEmpty ? Set(service.sessions.map(\.id)) : presetAppIdentifiers
-                        let levels = Dictionary(uniqueKeysWithValues: service.sessions.compactMap { session in
-                            identifiers.contains(session.id) ? (session.id, session.volume) : nil
-                        })
-                        _ = service.savePreset(named: presetName, appVolumes: levels)
-                        presetName = ""
-                    }
-                    .disabled(presetName.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
                 }
+
                 HStack {
                     Button(L("volume.preset.import")) {
                         presetTransferMessage = nil
@@ -507,51 +566,6 @@ struct AppVolumeSettingsView: View {
                                 .font(.caption2)
                                 .foregroundStyle(.secondary)
                         }
-                    }
-                }
-
-                ForEach(service.presets) { preset in
-                    VStack(alignment: .leading, spacing: 4) {
-                    HStack {
-                        TextField(L("volume.preset.name"), text: Binding(
-                            get: { service.presets.first(where: { $0.id == preset.id })?.name ?? preset.name },
-                            set: { service.renamePreset(id: preset.id, to: $0) }
-                        ))
-                        Spacer()
-                        Button(L("volume.preset.apply")) {
-                            service.applyPreset(id: preset.id)
-                        }
-                        Menu {
-                            Button(L("volume.automation.add")) {
-                                service.addAutomationRule(
-                                    presetID: preset.id,
-                                    outputDeviceUID: service.output.deviceUID.isEmpty ? nil : service.output.deviceUID
-                                )
-                            }
-                            Button(L("volume.preset.overwrite")) {
-                                service.overwritePreset(id: preset.id)
-                            }
-                            Button(L("volume.preset.delete"), role: .destructive) {
-                                service.deletePreset(id: preset.id)
-                            }
-                        } label: {
-                            Image(systemName: "ellipsis.circle")
-                        }
-                        .menuStyle(.borderlessButton)
-                    }
-                    HStack(spacing: 6) {
-                        Text(L("volume.preset.coverage", preset.appVolumes.count, preset.appSettings.count))
-                        let boundDevices = service.boundDeviceNames(forPresetID: preset.id)
-                        if !boundDevices.isEmpty {
-                            Text(L("volume.preset.binding.devices", boundDevices.joined(separator: "、")))
-                        }
-                        if preset.needsCoverageUpgrade {
-                            Label(L("volume.preset.coverageHint"), systemImage: "exclamationmark.triangle")
-                                .foregroundStyle(.orange)
-                        }
-                    }
-                    .font(.caption2)
-                    .foregroundStyle(.secondary)
                     }
                 }
             } header: {
@@ -1098,6 +1112,64 @@ struct AppVolumeSettingsView: View {
             string: "x-apple.systempreferences:com.apple.preference.security?Privacy_AudioCapture"
         ) else { return }
         NSWorkspace.shared.open(url)
+    }
+
+    // MARK: - 新建预设
+
+    /// 新建预设入口：默认只显示「＋」，点它才展开表单，不再一进预设页就摆一个空白表单。
+    @ViewBuilder
+    private var presetCreationRow: some View {
+        if presetDraft.isExpanded {
+            HStack {
+                TextField(L("volume.preset.name"), text: $presetDraft.name)
+                Menu(L("volume.preset.includesApps", presetDraft.appIdentifiers.isEmpty ? service.sessions.count : presetDraft.appIdentifiers.count)) {
+                    ForEach(service.sessions) { session in
+                        Toggle(session.displayName, isOn: draftIncludesAppsBinding(session))
+                    }
+                }
+                Button(L("volume.preset.save")) {
+                    saveDraftedPreset()
+                }
+                .disabled(!presetDraft.canSave)
+                Button(L("common.cancel")) {
+                    presetDraft.finish()
+                }
+                .focusable(false)
+                .focusEffectDisabled()
+            }
+        } else {
+            Button {
+                presetDraft.begin()
+            } label: {
+                Label(L("volume.preset.new"), systemImage: "plus")
+            }
+            .focusable(false)
+            .focusEffectDisabled()
+        }
+    }
+
+    /// 新预设的 App 勾选：空集代表「全部 App」，取消第一个勾选时先落成显式集合。
+    private func draftIncludesAppsBinding(_ session: AppAudioSession) -> Binding<Bool> {
+        Binding(
+            get: { presetDraft.appIdentifiers.isEmpty || presetDraft.appIdentifiers.contains(session.id) },
+            set: { enabled in
+                if presetDraft.appIdentifiers.isEmpty {
+                    presetDraft.appIdentifiers = Set(service.sessions.map(\.id))
+                }
+                if enabled { presetDraft.appIdentifiers.insert(session.id) }
+                else { presetDraft.appIdentifiers.remove(session.id) }
+            }
+        )
+    }
+
+    /// 用草稿里的名称与 App 选择保存一个新预设，保存后收起表单。
+    private func saveDraftedPreset() {
+        let identifiers = presetDraft.appIdentifiers.isEmpty ? Set(service.sessions.map(\.id)) : presetDraft.appIdentifiers
+        let levels = Dictionary(uniqueKeysWithValues: service.sessions.compactMap { session in
+            identifiers.contains(session.id) ? (session.id, session.volume) : nil
+        })
+        _ = service.savePreset(named: presetDraft.name, appVolumes: levels)
+        presetDraft.finish()
     }
 
     // MARK: - 预设跨设备同步

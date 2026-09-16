@@ -486,7 +486,8 @@ final class SystemResourceService {
     private(set) var historyBuckets: [SystemResourceHistoryBucket] = []
     private(set) var isReleasingMemory = false
     private(set) var lastReleasedMemoryBytes: Int64?
-    private(set) var lastMemoryReleaseResult: MemoryReleaseResult?
+    /// 最近一次系统文件缓存清理的结果；nil 表示还没试过。
+    private(set) var lastSystemPurgeSucceeded: Bool?
 
     var isMonitoring: Bool { samplingTask != nil }
 
@@ -699,16 +700,29 @@ final class SystemResourceService {
         }
     }
 
+    /// 面板的释放入口是否该出现：只在内存压力临界时提供。
+    var shouldOfferMemoryRelease: Bool {
+        snapshot?.memoryPressure.shouldOfferMemoryRelease == true
+    }
+
+    /// 一键回收：只回收本进程分配器缓存，不需要权限，**不会弹出任何授权对话框**。
     @discardableResult
-    func releaseMemory() -> MemoryReleaseResult? {
-        guard !isReleasingMemory,
-              snapshot?.memoryPressure.shouldOfferMemoryRelease == true else { return nil }
+    func relieveProcessMemory() -> Int64 {
+        guard !isReleasingMemory else { return 0 }
         isReleasingMemory = true
-        let result = memoryReleaser.releaseMemory()
-        lastMemoryReleaseResult = result
-        lastReleasedMemoryBytes = result.processReleasedBytes
+        let released = memoryReleaser.relieveProcessMemory()
+        lastReleasedMemoryBytes = released
         refresh()
         isReleasingMemory = false
-        return result
+        return released
+    }
+
+    /// 清理系统文件缓存：需要管理员授权，会弹一次授权对话框；取消即返回 false。
+    @discardableResult
+    func purgeSystemCache() -> Bool {
+        let succeeded = memoryReleaser.purgeSystemCache()
+        lastSystemPurgeSucceeded = succeeded
+        refresh()
+        return succeeded
     }
 }

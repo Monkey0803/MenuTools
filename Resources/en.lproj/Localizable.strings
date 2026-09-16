@@ -7,7 +7,7 @@
 "help.settings" = "Open Settings";
 
 /* System resources */
-"resource.title" = "System Resources";
+"resource.title" = "System Monitor";
 "resource.cpu" = "CPU";
 "resource.memory" = "Memory";
 "resource.disk" = "Disk";
@@ -17,6 +17,15 @@
 "resource.memoryWarning" = "Memory pressure";
 "resource.memoryCritical" = "High memory pressure";
 "resource.releaseMemory" = "Release Memory";
+"resource.relieveMemory" = "Reclaim available memory";
+"resource.relieveMemory.done" = "Reclaimed %@ (process allocator cache)";
+"resource.relieveMemory.none" = "No reclaimable allocator cache";
+"resource.purgeSystemCache" = "Clear system file cache…";
+"resource.purgeSystemCache.desc" = "Requires an administrator password and shows the system authorization dialog; cancelling does not affect the reclaim above";
+"resource.purgeSystemCache.done" = "System file cache cleared";
+"resource.purgeSystemCache.cancelled" = "Cancelled — system file cache not cleared";
+"status.memoryRelieved" = "Reclaimed %@";
+"status.memoryRelievedNone" = "Nothing to reclaim";
 "resource.releasingMemory" = "Releasing…";
 "resource.showAll" = "Show all";
 "resource.page.title" = "System resources page";
@@ -119,7 +128,7 @@
 "network.vpnOff" = "VPN not connected";
 
 /* Network Traffic */
-"traffic.title" = "Network Traffic";
+"traffic.title" = "Network Monitor";
 "traffic.description" = "View live network speeds and session totals for each app.";
 "traffic.refresh" = "Refresh network traffic";
 "traffic.viewAll" = "View all";
@@ -579,10 +588,10 @@
 
 /* Settings tabs */
 "settings.tab.general" = "General";
-"settings.tab.rightClick" = "Right-Click Tools";
+"settings.tab.rightClick" = "Finder Context Menu";
 
 /* Right-Click Tools */
-"rc.title" = "Right-Click Tools";
+"rc.title" = "Finder Context Menu";
 "rc.subtitle" = "Choose which items appear in the Finder context menu.";
 "rc.section.permission" = "Permission";
 "rc.permission.title" = "Finder Extension";
@@ -612,10 +621,10 @@
 "space.executionFailed" = "Space switch failed: %@";
 
 /* Smooth scrolling */
-"settings.tab.scroll" = "Smooth Scroll";
+"settings.tab.scroll" = "Scrolling";
 "settings.tab.windowManagement" = "Window Management";
 "settings.tab.appLaunch" = "App Launch";
-"settings.tab.screenshot" = "Screenshots";
+"settings.tab.screenshot" = "Screenshot & Annotation";
 "settings.tab.clipboard" = "Clipboard";
 "clipboard.shortcut" = "Clipboard Shortcut";
 "clipboard.shortcutDescription" = "Open clipboard history from anywhere.";
@@ -707,7 +716,7 @@
 "appShortcut.empty" = "No apps found";
 "appShortcut.emptyBound" = "No apps are bound yet. Click “Add App” to get started.";
 "appShortcut.launchFailed" = "Unable to launch %@";
-"scroll.title" = "Smooth Scrolling";
+"scroll.title" = "Scrolling";
 "scroll.subtitle" = "Intercepts the mouse wheel and interpolates jerky scrolls into smooth motion. Affects the mouse only, not the trackpad.";
 "scroll.enable" = "Enable Smooth Scrolling";
 "scroll.enable.desc" = "Requires Accessibility permission for MenuTools to intercept the wheel.";
@@ -956,8 +965,8 @@
 "screenshot.region.modeHint" = "Drag region · A: window mode · Esc: cancel";
 
 /* Per-app volume */
-"settings.tab.volume" = "Volume";
-"volume.title" = "App Volume";
+"settings.tab.volume" = "Audio";
+"volume.title" = "Audio";
 "volume.enabled" = "Enable per-app volume";
 "volume.enabled.desc" = "Capture system audio to adjust each active app independently";
 "volume.showAll" = "Show all app volumes";
@@ -967,7 +976,7 @@
 "volume.mute" = "Mute system output";
 "volume.output.unknown" = "Current output device";
 "volume.output.fixed" = "This output device has no adjustable master volume. Use the device's own volume control.";
-"volume.page.title" = "Volume page";
+"volume.page.title" = "Audio page";
 "volume.page.mixer" = "Mixer";
 "volume.page.devices" = "Devices";
 "volume.page.scenes" = "Scenes";
@@ -996,7 +1005,7 @@
 "volume.error.operation" = "%@ failed (error %d)";
 "volume.error.presetArchive" = "Could not read the preset archive";
 "volume.shortcut" = "Volume Shortcut";
-"volume.shortcutDescription" = "Open the volume manager from anywhere.";
+"volume.shortcutDescription" = "Open the audio panel from anywhere.";
 "volume.shortcutSave" = "Save Shortcut";
 "volume.shortcut.showPanel" = "Open Volume Panel";
 "volume.shortcut.increase" = "Increase Master Volume";
@@ -1064,6 +1073,8 @@
 "volume.bypass" = "Restore original system volume";
 "volume.section.presets" = "Volume Presets";
 "volume.preset.name" = "Preset name";
+"volume.preset.new" = "New preset";
+"volume.preset.empty" = "No presets saved yet";
 "volume.preset.save" = "Save Current Setup";
 "volume.preset.apply" = "Apply";
 "volume.preset.delete" = "Delete";
@@ -1206,8 +1217,8 @@
 "volume.hud.muted" = "Muted";
 
 /* Built-in Feature Center */
-"settings.tab.plugins" = "Features";
-"settings.backToFeatures" = "Features";
+"settings.tab.plugins" = "Feature Center";
+"settings.backToFeatures" = "Feature Center";
 "settings.sidebar.settings" = "Settings";
 "settings.sidebar.enabledFeatures" = "Enabled Features";
 "plugin.center.title" = "Feature Center";
@@ -1246,15 +1257,15 @@
 "plugin.system-controls.description" = "Appearance, hidden files, Dock, menu bar, sleep prevention, and system actions.";
 "plugin.system-insights.title" = "System Insights";
 "plugin.system-insights.description" = "Network, battery, displays, storage, and Bluetooth battery levels.";
-"plugin.system-resources.title" = "System Resources";
+"plugin.system-resources.title" = "System Monitor";
 "plugin.system-resources.description" = "CPU, memory pressure and release, disk capacity and throughput, and the busiest processes.";
-"plugin.network-traffic.title" = "Network Traffic";
+"plugin.network-traffic.title" = "Network Monitor";
 "plugin.network-traffic.description" = "View live upload and download speeds plus session totals.";
 "plugin.clipboard.title" = "Clipboard";
 "plugin.clipboard.description" = "Continuously records clipboard history with pin, copy, and cleanup actions.";
-"plugin.app-volume.title" = "App Volume";
-"plugin.app-volume.description" = "Controls master output and the volume of individual apps that are playing audio.";
-"plugin.screenshot.title" = "Screenshots & OCR";
+"plugin.app-volume.title" = "Audio";
+"plugin.app-volume.description" = "System and microphone volume, per-app volume and EQ, output routing, presets and automation, hearing protection.";
+"plugin.screenshot.title" = "Screenshot & Annotation";
 "plugin.screenshot.description" = "Screenshots, scrolling capture, region OCR, editing, and global shortcuts.";
 "settings.tab.translation" = "Translation";
 "plugin.translation.title" = "AI Translation";
@@ -1296,9 +1307,9 @@
 "plugin.app-launcher.description" = "Favorite apps and launch them instantly with global shortcuts.";
 "plugin.automation.title" = "Automation";
 "plugin.automation.description" = "Scene presets, Focus controls, and global scene shortcuts.";
-"plugin.finder-tools.title" = "Finder Tools";
+"plugin.finder-tools.title" = "Finder Context Menu";
 "plugin.finder-tools.description" = "Finder context menu actions, path tools, and Open in Terminal.";
-"plugin.smooth-scroll.title" = "Smooth Scrolling";
+"plugin.smooth-scroll.title" = "Scrolling";
 "plugin.smooth-scroll.description" = "Smoothness, direction, gain, and modifier controls for mouse wheels.";
 "clipboard.archive" = "Encrypted Archive";
 "clipboard.archive.passphrase" = "Archive passphrase";

@@ -7,7 +7,7 @@
 "help.settings" = "打開設定";
 
 /* 系統資源 */
-"resource.title" = "系統資源";
+"resource.title" = "系統監控";
 "resource.cpu" = "CPU";
 "resource.memory" = "記憶體";
 "resource.disk" = "磁碟";
@@ -17,6 +17,15 @@
 "resource.memoryWarning" = "記憶體有壓力";
 "resource.memoryCritical" = "記憶體壓力高";
 "resource.releaseMemory" = "釋放記憶體";
+"resource.relieveMemory" = "回收可用記憶體";
+"resource.relieveMemory.done" = "已回收 %@（程序分配器快取）";
+"resource.relieveMemory.none" = "暫無可回收的分配器快取";
+"resource.purgeSystemCache" = "清理系統檔案快取…";
+"resource.purgeSystemCache.desc" = "需要管理員密碼，會彈出系統授權對話框；取消不影響上面的回收";
+"resource.purgeSystemCache.done" = "系統檔案快取已清理";
+"resource.purgeSystemCache.cancelled" = "已取消，系統檔案快取未清理";
+"status.memoryRelieved" = "已回收 %@";
+"status.memoryRelievedNone" = "暫無可回收快取";
 "resource.releasingMemory" = "釋放中…";
 "resource.showAll" = "查看全部";
 "resource.page.title" = "系統資源頁面";
@@ -119,7 +128,7 @@
 "network.vpnOff" = "VPN 未連線";
 
 /* 網路流量 */
-"traffic.title" = "網路流量";
+"traffic.title" = "網路監控";
 "traffic.description" = "依 App 查看即時網路速度和本次執行的累計流量。";
 "traffic.refresh" = "重新整理網路流量";
 "traffic.viewAll" = "檢視全部";
@@ -579,10 +588,10 @@
 
 /* 設定標籤 */
 "settings.tab.general" = "一般";
-"settings.tab.rightClick" = "右鍵工具";
+"settings.tab.rightClick" = "Finder 右鍵選單";
 
 /* 右鍵工具 */
-"rc.title" = "右鍵工具";
+"rc.title" = "Finder 右鍵選單";
 "rc.subtitle" = "選擇 Finder 右鍵選單顯示哪些項。";
 "rc.section.permission" = "權限";
 "rc.permission.title" = "Finder 擴充功能";
@@ -612,10 +621,10 @@
 "space.executionFailed" = "空間切換失敗：%@";
 
 /* 平滑捲動 */
-"settings.tab.scroll" = "平滑捲動";
+"settings.tab.scroll" = "捲動增強";
 "settings.tab.windowManagement" = "視窗管理";
 "settings.tab.appLaunch" = "應用程式啟動";
-"settings.tab.screenshot" = "截圖";
+"settings.tab.screenshot" = "截圖與標註";
 "settings.tab.clipboard" = "剪貼簿";
 "clipboard.shortcut" = "剪貼簿快速鍵";
 "clipboard.shortcutDescription" = "透過全域快速鍵隨時開啟剪貼簿歷史。";
@@ -707,7 +716,7 @@
 "appShortcut.empty" = "找不到應用程式";
 "appShortcut.emptyBound" = "尚未綁定應用程式，點擊「新增應用程式」開始設定。";
 "appShortcut.launchFailed" = "無法啟動 %@";
-"scroll.title" = "平滑捲動";
+"scroll.title" = "捲動增強";
 "scroll.subtitle" = "接管滑鼠滾輪，將生硬的捲動插值成順滑捲動。僅作用於滑鼠，不影響觸控板。";
 "scroll.enable" = "啟用平滑捲動";
 "scroll.enable.desc" = "需在「輔助使用」中授權 MenuTools 才能接管滾輪。";
@@ -956,8 +965,8 @@
 "screenshot.region.modeHint" = "拖曳選取區域 · A：視窗模式 · Esc：取消";
 
 /* App 音量管理 */
-"settings.tab.volume" = "音量";
-"volume.title" = "App 音量";
+"settings.tab.volume" = "音訊";
+"volume.title" = "音訊";
 "volume.enabled" = "啟用單 App 音量";
 "volume.enabled.desc" = "透過系統音訊擷取分別調整正在發聲的 App";
 "volume.showAll" = "查看全部 App 音量";
@@ -967,7 +976,7 @@
 "volume.mute" = "靜音系統輸出";
 "volume.output.unknown" = "目前輸出裝置";
 "volume.output.fixed" = "此輸出裝置不提供可調主音量，請使用裝置本身的音量控制。";
-"volume.page.title" = "音量頁面";
+"volume.page.title" = "音訊頁面";
 "volume.page.mixer" = "調音台";
 "volume.page.devices" = "裝置";
 "volume.page.scenes" = "場景";
@@ -996,7 +1005,7 @@
 "volume.error.operation" = "%@失敗（錯誤 %d）";
 "volume.error.presetArchive" = "無法讀取該預設封存檔";
 "volume.shortcut" = "音量快速鍵";
-"volume.shortcutDescription" = "透過全域快速鍵隨時開啟音量管理面板。";
+"volume.shortcutDescription" = "透過全域快速鍵隨時開啟音訊面板。";
 "volume.shortcutSave" = "儲存快速鍵";
 "volume.shortcut.showPanel" = "開啟音量面板";
 "volume.shortcut.increase" = "提高主音量";
@@ -1064,6 +1073,8 @@
 "volume.bypass" = "恢復系統原始音量";
 "volume.section.presets" = "音量預設";
 "volume.preset.name" = "預設名稱";
+"volume.preset.new" = "新增預設";
+"volume.preset.empty" = "尚未儲存任何預設";
 "volume.preset.save" = "儲存目前配置";
 "volume.preset.apply" = "套用";
 "volume.preset.delete" = "刪除";
@@ -1206,8 +1217,8 @@
 "volume.hud.muted" = "已靜音";
 
 /* 內建功能中心 */
-"settings.tab.plugins" = "功能";
-"settings.backToFeatures" = "功能";
+"settings.tab.plugins" = "功能中心";
+"settings.backToFeatures" = "功能中心";
 "settings.sidebar.settings" = "設定";
 "settings.sidebar.enabledFeatures" = "已啟用功能";
 "plugin.center.title" = "功能中心";
@@ -1246,15 +1257,15 @@
 "plugin.system-controls.description" = "外觀、隱藏檔案、Dock、選單列、防止睡眠和系統快捷操作。";
 "plugin.system-insights.title" = "系統資訊";
 "plugin.system-insights.description" = "網路、電池、顯示器、儲存空間和藍牙裝置電量。";
-"plugin.system-resources.title" = "系統資源";
+"plugin.system-resources.title" = "系統監控";
 "plugin.system-resources.description" = "CPU、記憶體壓力與釋放、磁碟容量與讀寫、佔用最高的程序。";
-"plugin.network-traffic.title" = "網路流量";
+"plugin.network-traffic.title" = "網路監控";
 "plugin.network-traffic.description" = "即時查看上傳、下載速度和本次執行的累計流量。";
 "plugin.clipboard.title" = "剪貼簿";
 "plugin.clipboard.description" = "持續記錄剪貼簿歷史，並提供固定、複製和清理操作。";
-"plugin.app-volume.title" = "App 音量";
-"plugin.app-volume.description" = "管理系統主音量，並分別調整正在發聲 App 的音量。";
-"plugin.screenshot.title" = "截圖與 OCR";
+"plugin.app-volume.title" = "音訊";
+"plugin.app-volume.description" = "系統與麥克風音量、單 App 音量與等化器、輸出裝置路由、預設與自動化、聽力保護。";
+"plugin.screenshot.title" = "截圖與標註";
 "plugin.screenshot.description" = "截圖、長截圖、區域 OCR、編輯器和全域快速鍵。";
 "settings.tab.translation" = "翻譯";
 "plugin.translation.title" = "AI 翻譯";
@@ -1296,9 +1307,9 @@
 "plugin.app-launcher.description" = "收藏常用 App，並透過全域快速鍵快速啟動。";
 "plugin.automation.title" = "自動化";
 "plugin.automation.description" = "情境預設、專注模式和情境全域快速鍵。";
-"plugin.finder-tools.title" = "Finder 工具";
+"plugin.finder-tools.title" = "Finder 右鍵選單";
 "plugin.finder-tools.description" = "Finder 右鍵延伸功能、路徑操作和在終端機中開啟。";
-"plugin.smooth-scroll.title" = "平滑捲動";
+"plugin.smooth-scroll.title" = "捲動增強";
 "plugin.smooth-scroll.description" = "為滑鼠滾輪提供平滑、方向、增益和修飾鍵控制。";
 "clipboard.archive" = "加密封存";
 "clipboard.archive.passphrase" = "封存密碼";

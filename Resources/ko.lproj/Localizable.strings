@@ -7,7 +7,7 @@
 "help.settings" = "설정 열기";
 
 /* 시스템 리소스 */
-"resource.title" = "시스템 리소스";
+"resource.title" = "시스템 모니터";
 "resource.cpu" = "CPU";
 "resource.memory" = "메모리";
 "resource.disk" = "디스크";
@@ -17,6 +17,15 @@
 "resource.memoryWarning" = "메모리 압박";
 "resource.memoryCritical" = "메모리 압박 높음";
 "resource.releaseMemory" = "메모리 해제";
+"resource.relieveMemory" = "사용 가능한 메모리 회수";
+"resource.relieveMemory.done" = "%@ 회수(프로세스 할당자 캐시)";
+"resource.relieveMemory.none" = "회수할 수 있는 할당자 캐시가 없습니다";
+"resource.purgeSystemCache" = "시스템 파일 캐시 정리…";
+"resource.purgeSystemCache.desc" = "관리자 암호가 필요하며 시스템 인증 대화상자가 표시됩니다. 취소해도 위의 회수에는 영향이 없습니다";
+"resource.purgeSystemCache.done" = "시스템 파일 캐시를 정리했습니다";
+"resource.purgeSystemCache.cancelled" = "취소했습니다(시스템 파일 캐시 미정리)";
+"status.memoryRelieved" = "%@ 회수";
+"status.memoryRelievedNone" = "회수할 항목이 없습니다";
 "resource.releasingMemory" = "해제 중…";
 "resource.showAll" = "전체 보기";
 "resource.page.title" = "시스템 리소스 페이지";
@@ -119,7 +128,7 @@
 "network.vpnOff" = "VPN 연결 안 됨";
 
 /* 네트워크 트래픽 */
-"traffic.title" = "네트워크 트래픽";
+"traffic.title" = "네트워크 모니터";
 "traffic.description" = "앱별 실시간 네트워크 속도와 세션 누계를 확인합니다.";
 "traffic.refresh" = "네트워크 트래픽 새로 고침";
 "traffic.viewAll" = "모두 보기";
@@ -579,10 +588,10 @@
 
 /* 설정 탭 */
 "settings.tab.general" = "일반";
-"settings.tab.rightClick" = "우클릭 도구";
+"settings.tab.rightClick" = "Finder 상황에 맞는 메뉴";
 
 /* 우클릭 도구 */
-"rc.title" = "우클릭 도구";
+"rc.title" = "Finder 상황에 맞는 메뉴";
 "rc.subtitle" = "Finder 컨텍스트 메뉴에 표시할 항목을 선택합니다.";
 "rc.section.permission" = "권한";
 "rc.permission.title" = "Finder 확장 프로그램";
@@ -612,10 +621,10 @@
 "space.executionFailed" = "공간 전환 실패: %@";
 
 /* 부드러운 스크롤 */
-"settings.tab.scroll" = "부드러운 스크롤";
+"settings.tab.scroll" = "스크롤";
 "settings.tab.windowManagement" = "윈도우 관리";
 "settings.tab.appLaunch" = "앱 실행";
-"settings.tab.screenshot" = "스크린샷";
+"settings.tab.screenshot" = "스크린샷 및 주석";
 "settings.tab.clipboard" = "클립보드";
 "clipboard.shortcut" = "클립보드 단축키";
 "clipboard.shortcutDescription" = "전역 단축키로 언제든지 클립보드 기록을 엽니다.";
@@ -707,7 +716,7 @@
 "appShortcut.empty" = "앱을 찾을 수 없습니다";
 "appShortcut.emptyBound" = "지정된 앱이 없습니다. ‘앱 추가’를 눌러 설정하세요.";
 "appShortcut.launchFailed" = "%@을(를) 실행할 수 없습니다";
-"scroll.title" = "부드러운 스크롤";
+"scroll.title" = "스크롤";
 "scroll.subtitle" = "마우스 휠을 가로채어 뻣뻣한 스크롤을 부드럽게 보간합니다. 트랙패드에는 영향을 주지 않습니다.";
 "scroll.enable" = "부드러운 스크롤 사용";
 "scroll.enable.desc" = "휠을 가로채려면 '손쉬운 사용' 권한이 필요합니다.";
@@ -956,8 +965,8 @@
 "screenshot.region.modeHint" = "영역 드래그 · A: 창 모드 · Esc: 취소";
 
 /* App 볼륨 관리 */
-"settings.tab.volume" = "볼륨";
-"volume.title" = "App 볼륨";
+"settings.tab.volume" = "오디오";
+"volume.title" = "오디오";
 "volume.enabled" = "App별 볼륨 활성화";
 "volume.enabled.desc" = "시스템 오디오를 캡처하여 재생 중인 App을 개별 조절합니다";
 "volume.showAll" = "모든 App 볼륨 보기";
@@ -967,7 +976,7 @@
 "volume.mute" = "시스템 출력 음소거";
 "volume.output.unknown" = "현재 출력 기기";
 "volume.output.fixed" = "이 출력 기기는 마스터 볼륨을 조절할 수 없습니다. 기기 자체의 볼륨 조절을 사용하세요.";
-"volume.page.title" = "볼륨 페이지";
+"volume.page.title" = "오디오 페이지";
 "volume.page.mixer" = "믹서";
 "volume.page.devices" = "기기";
 "volume.page.scenes" = "장면";
@@ -996,7 +1005,7 @@
 "volume.error.operation" = "%@ 실패(오류 %d)";
 "volume.error.presetArchive" = "프리셋 보관 파일을 읽을 수 없습니다";
 "volume.shortcut" = "볼륨 단축키";
-"volume.shortcutDescription" = "전역 단축키로 언제든지 볼륨 관리를 엽니다.";
+"volume.shortcutDescription" = "전역 단축키로 언제든지 오디오 패널을 엽니다.";
 "volume.shortcutSave" = "단축키 저장";
 "volume.shortcut.showPanel" = "음량 패널 열기";
 "volume.shortcut.increase" = "마스터 음량 높이기";
@@ -1064,6 +1073,8 @@
 "volume.bypass" = "시스템 원래 음량으로 복원";
 "volume.section.presets" = "음량 프리셋";
 "volume.preset.name" = "프리셋 이름";
+"volume.preset.new" = "새 프리셋";
+"volume.preset.empty" = "저장된 프리셋이 없습니다";
 "volume.preset.save" = "현재 설정 저장";
 "volume.preset.apply" = "적용";
 "volume.preset.delete" = "삭제";
@@ -1206,8 +1217,8 @@
 "volume.hud.muted" = "음소거됨";
 
 /* 내장 기능 센터 */
-"settings.tab.plugins" = "기능";
-"settings.backToFeatures" = "기능";
+"settings.tab.plugins" = "기능 센터";
+"settings.backToFeatures" = "기능 센터";
 "settings.sidebar.settings" = "설정";
 "settings.sidebar.enabledFeatures" = "활성화된 기능";
 "plugin.center.title" = "기능 센터";
@@ -1246,15 +1257,15 @@
 "plugin.system-controls.description" = "화면 모드, 숨김 파일, Dock, 메뉴 막대, 잠자기 방지 및 시스템 동작.";
 "plugin.system-insights.title" = "시스템 정보";
 "plugin.system-insights.description" = "네트워크, 배터리, 디스플레이, 저장 공간 및 Bluetooth 기기 배터리.";
-"plugin.system-resources.title" = "시스템 리소스";
+"plugin.system-resources.title" = "시스템 모니터";
 "plugin.system-resources.description" = "CPU, 메모리 압력 및 해제, 디스크 용량과 읽기/쓰기, 부하가 큰 프로세스.";
-"plugin.network-traffic.title" = "네트워크 트래픽";
+"plugin.network-traffic.title" = "네트워크 모니터";
 "plugin.network-traffic.description" = "실시간 업로드 및 다운로드 속도와 세션 누계를 확인합니다.";
 "plugin.clipboard.title" = "클립보드";
 "plugin.clipboard.description" = "클립보드 기록을 저장하고 고정, 복사 및 정리 기능을 제공합니다.";
-"plugin.app-volume.title" = "App 음량";
-"plugin.app-volume.description" = "시스템 주 음량과 소리를 재생 중인 각 App의 음량을 조절합니다.";
-"plugin.screenshot.title" = "스크린샷 및 OCR";
+"plugin.app-volume.title" = "오디오";
+"plugin.app-volume.description" = "시스템 및 마이크 음량, App별 음량과 이퀄라이저, 출력 장치 라우팅, 프리셋과 자동화, 청력 보호.";
+"plugin.screenshot.title" = "스크린샷 및 주석";
 "plugin.screenshot.description" = "스크린샷, 스크롤 캡처, 영역 OCR, 편집기 및 전역 단축키.";
 "settings.tab.translation" = "번역";
 "plugin.translation.title" = "AI 번역";
@@ -1296,9 +1307,9 @@
 "plugin.app-launcher.description" = "자주 쓰는 App을 즐겨찾기에 추가하고 전역 단축키로 실행합니다.";
 "plugin.automation.title" = "자동화";
 "plugin.automation.description" = "장면 프리셋, 집중 모드 및 장면 전역 단축키.";
-"plugin.finder-tools.title" = "Finder 도구";
+"plugin.finder-tools.title" = "Finder 상황에 맞는 메뉴";
 "plugin.finder-tools.description" = "Finder 컨텍스트 메뉴, 경로 작업 및 터미널에서 열기.";
-"plugin.smooth-scroll.title" = "부드러운 스크롤";
+"plugin.smooth-scroll.title" = "스크롤";
 "plugin.smooth-scroll.description" = "마우스 휠의 부드러움, 방향, 게인 및 보조 키를 조절합니다.";
 "clipboard.archive" = "암호화 아카이브";
 "clipboard.archive.passphrase" = "아카이브 암호";

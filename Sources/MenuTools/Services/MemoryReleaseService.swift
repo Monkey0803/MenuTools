@@ -1,15 +1,8 @@
 import Darwin
 import Foundation
 
-/// 一次内存释放操作的结果。
-struct MemoryReleaseResult: Equatable, Sendable {
-    /// 是否成功请求系统清理文件缓存。
-    let systemCachePurged: Bool
-    /// 当前进程 malloc 分配器实际归还的缓存字节数。
-    let processReleasedBytes: Int64
-}
-
 protocol SystemMemoryPurgeRunning: Sendable {
+    /// 请求系统清理文件缓存；需要管理员授权。
     func purge() -> Bool
 }
 
@@ -41,12 +34,17 @@ struct DefaultSystemMemoryPurgeRunner: SystemMemoryPurgeRunning {
     }
 }
 
-/// 释放当前进程可以安全回收的 malloc 缓存。
+/// 内存回收能力。
+///
+/// 拆成两条互不影响的路径，避免一键操作动辄弹出管理员授权：
+/// - `relieveProcessMemory()` 只回收当前进程的 malloc 缓存，**不需要任何权限、永不弹授权框**；
+/// - `purgeSystemCache()` 才请求系统清理文件缓存，**需要管理员授权**，会弹一次授权对话框。
 ///
 /// macOS 不允许普通应用强制释放其他应用的匿名内存；系统 purge 只清理可安全回收的
-/// 文件缓存，malloc relief 只处理当前进程的分配器缓存，不会终止进程或删除用户数据。
+/// 文件缓存，malloc relief 只处理当前进程的分配器缓存，都不会终止进程或删除用户数据。
 protocol SystemMemoryReleasing: Sendable {
-    func releaseMemory() -> MemoryReleaseResult
+    func relieveProcessMemory() -> Int64
+    func purgeSystemCache() -> Bool
 }
 
 struct DefaultSystemMemoryReleaser: SystemMemoryReleasing {
@@ -56,12 +54,11 @@ struct DefaultSystemMemoryReleaser: SystemMemoryReleasing {
         self.purgeRunner = purgeRunner
     }
 
-    func releaseMemory() -> MemoryReleaseResult {
-        let systemCachePurged = purgeRunner.purge()
-        let processReleasedBytes = Int64(malloc_zone_pressure_relief(nil, 0))
-        return MemoryReleaseResult(
-            systemCachePurged: systemCachePurged,
-            processReleasedBytes: processReleasedBytes
-        )
+    func relieveProcessMemory() -> Int64 {
+        Int64(malloc_zone_pressure_relief(nil, 0))
+    }
+
+    func purgeSystemCache() -> Bool {
+        purgeRunner.purge()
     }
 }

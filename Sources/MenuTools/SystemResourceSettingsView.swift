@@ -19,6 +19,22 @@ enum SystemResourceSettingsPage: String, CaseIterable, Identifiable {
     }
 }
 
+/// 系统资源页的 Liquid Glass 视觉参数，集中管理以便保持设置页风格一致。
+enum SystemResourceVisualPolicy {
+    static let usesLiquidGlass = true
+    static let containerSpacing: CGFloat = 10
+
+    /// 页面切换只更新选中状态，不让动态 Form 参与隐式布局动画。
+    static func selectionBinding(
+        _ selection: Binding<SystemResourceSettingsPage>
+    ) -> Binding<SystemResourceSettingsPage> {
+        var transaction = Transaction()
+        transaction.animation = nil
+        transaction.disablesAnimations = true
+        return selection.transaction(transaction)
+    }
+}
+
 /// 系统资源模块的设置页：概览与进程排行。
 ///
 /// 采样随页面存续：进入即开始，离开（task 取消）即停止，符合分级采样策略。
@@ -26,15 +42,19 @@ struct SystemResourceSettingsView: View {
     @State private var resource = SystemResourceService.shared
     @State private var processes = SystemProcessResourceService.shared
     @State private var page: SystemResourceSettingsPage = .overview
-    @State private var isReleasingMemory = false
+    @State private var relieveMessage: String?
+    @State private var purgeMessage: String?
     @State private var historyRange: SystemResourceHistoryRange = .hour
     @State private var historyMetric: SystemResourceHistoryMetric = .cpu
     @State private var hoveredHistoryIndex: Int?
 
     var body: some View {
-        Form {
-            Section {
-                Picker(L("resource.page.title"), selection: $page) {
+        GlassEffectContainer(spacing: SystemResourceVisualPolicy.containerSpacing) {
+            VStack(spacing: SystemResourceVisualPolicy.containerSpacing) {
+                Picker(
+                    L("resource.page.title"),
+                    selection: SystemResourceVisualPolicy.selectionBinding($page)
+                ) {
                     ForEach(SystemResourceSettingsPage.allCases) { item in
                         Label(L(item.titleKey), systemImage: item.symbol).tag(item)
                     }
@@ -43,20 +63,36 @@ struct SystemResourceSettingsView: View {
                 .labelsHidden()
                 .focusable(false)
                 .focusEffectDisabled()
-            }
+                .glassEffect(
+                    .regular
+                        .tint(Color.accentColor.opacity(0.18)),
+                    in: .rect(cornerRadius: 10)
+                )
 
-            switch page {
-            case .overview:
-                overviewSections
-                alertSection
-                selfCheckSection
-            case .processes:
-                processSections
-            case .history:
-                historySections
+                Form {
+                    Group {
+                        switch page {
+                        case .overview:
+                            overviewSections
+                            alertSection
+                            selfCheckSection
+                        case .processes:
+                            processSections
+                        case .history:
+                            historySections
+                        }
+                    }
+                    .transaction { transaction in
+                        transaction.animation = nil
+                        transaction.disablesAnimations = true
+                    }
+                }
+                .formStyle(.grouped)
+                .scrollContentBackground(.hidden)
+                .frame(maxWidth: .infinity, maxHeight: .infinity)
             }
+            .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
         }
-        .formStyle(.grouped)
         .task {
             resource.beginMonitoring()
             processes.beginMonitoring()
@@ -99,19 +135,40 @@ struct SystemResourceSettingsView: View {
                     memoryDetailRow(L("resource.memory.free"), bytes: detail.freeBytes, total: detail.totalBytes)
                 }
 
-                if snapshot.memoryPressure.shouldOfferMemoryRelease {
-                    Button {
-                        guard !isReleasingMemory else { return }
-                        isReleasingMemory = true
-                        _ = resource.releaseMemory()
-                        isReleasingMemory = false
-                    } label: {
-                        Label(
-                            resource.isReleasingMemory ? L("resource.releasingMemory") : L("resource.releaseMemory"),
-                            systemImage: "arrow.down.circle"
-                        )
-                    }
-                    .disabled(resource.isReleasingMemory)
+                Button {
+                    let released = resource.relieveProcessMemory()
+                    relieveMessage = released > 0
+                        ? L("resource.relieveMemory.done", bytes(released))
+                        : L("resource.relieveMemory.none")
+                } label: {
+                    Label(
+                        resource.isReleasingMemory ? L("resource.releasingMemory") : L("resource.relieveMemory"),
+                        systemImage: "arrow.down.circle"
+                    )
+                }
+                .disabled(resource.isReleasingMemory)
+                if let relieveMessage {
+                    Text(relieveMessage)
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                }
+
+                // 需要管理员授权：与上面的免权限回收互不影响，取消也不会影响它。
+                Button {
+                    purgeMessage = resource.purgeSystemCache()
+                        ? L("resource.purgeSystemCache.done")
+                        : L("resource.purgeSystemCache.cancelled")
+                } label: {
+                    Label(L("resource.purgeSystemCache"), systemImage: "externaldrive.badge.checkmark")
+                }
+                Text(L("resource.purgeSystemCache.desc"))
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+                    .fixedSize(horizontal: false, vertical: true)
+                if let purgeMessage {
+                    Text(purgeMessage)
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
                 }
             } header: {
                 Label(L("resource.memory"), systemImage: "memorychip")

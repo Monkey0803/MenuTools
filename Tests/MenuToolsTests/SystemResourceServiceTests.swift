@@ -6,15 +6,33 @@ import Testing
 private struct RecordingMemoryReleaser: SystemMemoryReleasing {
     let releasedBytes: Int64
     let recorder: ReleaseRecorder
+    let purgeRunner: RecordingPurgeRunner
 
-    func releaseMemory() -> MemoryReleaseResult {
+    func relieveProcessMemory() -> Int64 {
         recorder.callCount += 1
-        return MemoryReleaseResult(systemCachePurged: true, processReleasedBytes: releasedBytes)
+        return releasedBytes
+    }
+
+    func purgeSystemCache() -> Bool {
+        purgeRunner.purge()
     }
 }
 
 private final class ReleaseRecorder: @unchecked Sendable {
     var callCount = 0
+}
+
+/// 提权通道探针：免权限路径绝不该碰它（碰了就会弹管理员授权框）。
+private final class RecordingPurgeRunner: SystemMemoryPurgeRunning, @unchecked Sendable {
+    let succeeds: Bool
+    var callCount = 0
+
+    init(succeeds: Bool) { self.succeeds = succeeds }
+
+    func purge() -> Bool {
+        callCount += 1
+        return succeeds
+    }
 }
 
 private func reading(
@@ -128,9 +146,9 @@ func memoryReleaseActionIsLimitedToCriticalPressure() {
     #expect(SystemMemoryPressure.critical.shouldOfferMemoryRelease)
 }
 
-@Test("高内存压力点击释放后调用系统释放器并保存结果")
+@Test("一键回收只走免权限路径：不会触碰提权通道，因此不会弹授权框")
 @MainActor
-func memoryReleaseRunsReleaserAndStoresResult() {
+func memoryReliefNeverTouchesPrivilegedPurge() {
     let current = reading(
         time: 2,
         ticks: .init(user: 1, system: 1, idle: 1, nice: 0),
@@ -138,20 +156,91 @@ func memoryReleaseRunsReleaserAndStoresResult() {
         memoryTotal: 10_000
     )
     let recorder = ReleaseRecorder()
+    let purgeRunner = RecordingPurgeRunner(succeeds: true)
     let service = SystemResourceService(
         provider: StubSystemResourceProvider(readings: [current, current]),
-        memoryReleaser: RecordingMemoryReleaser(releasedBytes: 12_345, recorder: recorder)
+        memoryReleaser: RecordingMemoryReleaser(
+            releasedBytes: 12_345,
+            recorder: recorder,
+            purgeRunner: purgeRunner
+        )
     )
 
     service.refresh()
-    service.releaseMemory()
+    #expect(service.shouldOfferMemoryRelease)
 
+    let released = service.relieveProcessMemory()
+
+    #expect(released == 12_345)
     #expect(recorder.callCount == 1)
-    #expect(service.lastMemoryReleaseResult == MemoryReleaseResult(
-        systemCachePurged: true,
-        processReleasedBytes: 12_345
-    ))
+    #expect(service.lastReleasedMemoryBytes == 12_345)
     #expect(!service.isReleasingMemory)
+    // 关键：完全没碰提权通道，也没改动系统缓存清理的状态
+    #expect(purgeRunner.callCount == 0)
+    #expect(service.lastSystemPurgeSucceeded == nil)
+}
+
+@Test("清理系统文件缓存单独走提权通道，成功与取消都如实上报")
+@MainActor
+func systemCachePurgeIsSeparateAndReported() {
+    let current = reading(
+        time: 2,
+        ticks: .init(user: 1, system: 1, idle: 1, nice: 0),
+        memoryUsed: 9_500,
+        memoryTotal: 10_000
+    )
+
+    let grantingRunner = RecordingPurgeRunner(succeeds: true)
+    let grantingService = SystemResourceService(
+        provider: StubSystemResourceProvider(readings: [current, current]),
+        memoryReleaser: RecordingMemoryReleaser(
+            releasedBytes: 0,
+            recorder: ReleaseRecorder(),
+            purgeRunner: grantingRunner
+        )
+    )
+    grantingService.refresh()
+    #expect(grantingService.purgeSystemCache())
+    #expect(grantingRunner.callCount == 1)
+    #expect(grantingService.lastSystemPurgeSucceeded == true)
+
+    let cancellingRunner = RecordingPurgeRunner(succeeds: false)
+    let cancellingService = SystemResourceService(
+        provider: StubSystemResourceProvider(readings: [current, current]),
+        memoryReleaser: RecordingMemoryReleaser(
+            releasedBytes: 0,
+            recorder: ReleaseRecorder(),
+            purgeRunner: cancellingRunner
+        )
+    )
+    cancellingService.refresh()
+    #expect(!cancellingService.purgeSystemCache())
+    #expect(cancellingService.lastSystemPurgeSucceeded == false)
+}
+
+@Test("压力不临界时面板不提供入口，但设置页仍可随时回收")
+@MainActor
+func memoryReliefAvailableFromSettingsRegardlessOfPressure() {
+    let normal = reading(
+        time: 2,
+        ticks: .init(user: 1, system: 1, idle: 1, nice: 0),
+        memoryUsed: 1_000,
+        memoryTotal: 10_000
+    )
+    let recorder = ReleaseRecorder()
+    let service = SystemResourceService(
+        provider: StubSystemResourceProvider(readings: [normal, normal]),
+        memoryReleaser: RecordingMemoryReleaser(
+            releasedBytes: 2_048,
+            recorder: recorder,
+            purgeRunner: RecordingPurgeRunner(succeeds: true)
+        )
+    )
+
+    service.refresh()
+    #expect(!service.shouldOfferMemoryRelease)
+    #expect(service.relieveProcessMemory() == 2_048)
+    #expect(recorder.callCount == 1)
 }
 
 private final class StubSystemResourceProvider: SystemResourceProviding, @unchecked Sendable {
@@ -216,9 +305,8 @@ func resourceMonitoringLifecycle() async throws {
 }
 
 private struct NoopMemoryReleaser: SystemMemoryReleasing {
-    func releaseMemory() -> MemoryReleaseResult {
-        MemoryReleaseResult(systemCachePurged: false, processReleasedBytes: 0)
-    }
+    func relieveProcessMemory() -> Int64 { 0 }
+    func purgeSystemCache() -> Bool { false }
 }
 
 @Test("每核使用率按核心下标配对，计数器回退的核心不出现")

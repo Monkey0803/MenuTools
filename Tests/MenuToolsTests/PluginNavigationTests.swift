@@ -1,3 +1,4 @@
+import SwiftUI
 import Testing
 @testable import MenuTools
 
@@ -66,6 +67,32 @@ func settingsSidebarUsesTransparentLiquidGlassHierarchy() {
     #expect(hovered.backgroundOpacity > idle.backgroundOpacity)
     #expect(selected.showsGlass)
     #expect(selected.tintOpacity == SettingsSidebarVisualPolicy.selectionTintOpacity)
+}
+
+@Test("资源页面切换更新选中项但不向表单传递布局动画")
+@MainActor
+func systemResourcePageSelectionDoesNotAnimateFormLayout() {
+    var page: SystemResourceSettingsPage = .overview
+    var transactions: [Transaction] = []
+    let source = Binding<SystemResourceSettingsPage>(
+        get: { page },
+        set: { value, transaction in
+            page = value
+            transactions.append(transaction)
+        }
+    )
+    let selection = SystemResourceVisualPolicy.selectionBinding(source)
+
+    for destination in [SystemResourceSettingsPage.processes, .history, .overview] {
+        withAnimation(.spring()) {
+            selection.wrappedValue = destination
+        }
+        #expect(page == destination)
+        #expect(selection.wrappedValue == destination)
+    }
+
+    #expect(transactions.count == 3)
+    #expect(transactions.allSatisfy { $0.disablesAnimations && $0.animation == nil })
 }
 
 @Test("菜单面板入场动画总延迟保持短促")
