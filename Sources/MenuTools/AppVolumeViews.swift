@@ -101,6 +101,7 @@ enum AppVolumeSettingsPage: String, CaseIterable, Identifiable {
     case devices
     case scenes
     case settings
+    case advanced
 
     var id: Self { self }
 
@@ -112,6 +113,7 @@ enum AppVolumeSettingsPage: String, CaseIterable, Identifiable {
         case .devices: "hifispeaker.and.homepod"
         case .scenes: "wand.and.stars"
         case .settings: "gearshape"
+        case .advanced: "gearshape.2"
         }
     }
 }
@@ -286,8 +288,6 @@ struct AppVolumeSettingsView: View {
     @State private var page: AppVolumeSettingsPage = .mixer
     /// 「已记住」分区由用户手动展开；有搜索/筛选时自动展开。
     @State private var showsRememberedSessions = false
-    /// 低频设置（会议闪避、睡眠定时、自检与诊断）默认收起，避免设置页要滚三屏。
-    @State private var showsAdvancedSettings = false
     @State private var presetSync = AppVolumePresetSyncService.shared
     @State private var presetSyncPassphrase = ""
     @State private var presetSyncConflictCopies: [URL] = []
@@ -733,13 +733,7 @@ struct AppVolumeSettingsView: View {
             }
             .onAppear(perform: refreshPresetSyncState)
 
-            } else {
-            Section {
-                Toggle(L("volume.settings.showAdvanced"), isOn: $showsAdvancedSettings)
-            } footer: {
-                Text(L("volume.settings.showAdvancedHint"))
-                    .font(.caption)
-            }
+            } else if page == .settings {
             Section {
                 HStack(alignment: .center, spacing: 12) {
                     VStack(alignment: .leading, spacing: 2) {
@@ -864,7 +858,38 @@ struct AppVolumeSettingsView: View {
             } header: {
                 Label(L("volume.hearing.title"), systemImage: "ear")
             }
-            if showsAdvancedSettings {
+
+            Section {
+                LabeledContent(L("volume.notification.permission.title")) {
+                    HStack(spacing: 8) {
+                        Text(L(service.notificationPermission.titleKey))
+                            .foregroundStyle(service.notificationPermission == .denied ? .orange : .secondary)
+                        if service.notificationPermission != .authorized {
+                            Button(L("volume.notification.openSettings"), action: openSystemSettings)
+                        }
+                    }
+                }
+                ForEach(AppVolumeNotificationKind.allCases, id: \.self) { kind in
+                    Toggle(isOn: Binding(
+                        get: { service.notificationPolicy.isEnabled(kind) },
+                        set: { service.setNotificationEnabled($0, for: kind) }
+                    )) {
+                        VStack(alignment: .leading, spacing: 2) {
+                            Text(L(kind.titleKey))
+                            Text(L(kind.detailKey))
+                                .font(.caption)
+                                .foregroundStyle(.secondary)
+                        }
+                    }
+                }
+            } header: {
+                Label(L("volume.notification.title"), systemImage: "bell.badge")
+            }
+            .onAppear {
+                Task { await service.refreshNotificationPermission() }
+            }
+
+            } else {
             Section {
                 Toggle(L("volume.meetingDucking"), isOn: Binding(
                     get: { service.meetingDuckingEnabled },
@@ -924,39 +949,6 @@ struct AppVolumeSettingsView: View {
             } header: {
                 Label(L("volume.sleepTimer.title"), systemImage: "moon.zzz")
             }
-            }
-
-            Section {
-                LabeledContent(L("volume.notification.permission.title")) {
-                    HStack(spacing: 8) {
-                        Text(L(service.notificationPermission.titleKey))
-                            .foregroundStyle(service.notificationPermission == .denied ? .orange : .secondary)
-                        if service.notificationPermission != .authorized {
-                            Button(L("volume.notification.openSettings"), action: openSystemSettings)
-                        }
-                    }
-                }
-                ForEach(AppVolumeNotificationKind.allCases, id: \.self) { kind in
-                    Toggle(isOn: Binding(
-                        get: { service.notificationPolicy.isEnabled(kind) },
-                        set: { service.setNotificationEnabled($0, for: kind) }
-                    )) {
-                        VStack(alignment: .leading, spacing: 2) {
-                            Text(L(kind.titleKey))
-                            Text(L(kind.detailKey))
-                                .font(.caption)
-                                .foregroundStyle(.secondary)
-                        }
-                    }
-                }
-            } header: {
-                Label(L("volume.notification.title"), systemImage: "bell.badge")
-            }
-            .onAppear {
-                Task { await service.refreshNotificationPermission() }
-            }
-
-            if showsAdvancedSettings {
             Section {
                 ForEach(service.selfCheckSteps) { step in
                     HStack(alignment: .top, spacing: 8) {
@@ -985,7 +977,6 @@ struct AppVolumeSettingsView: View {
                     .foregroundStyle(.secondary)
             } header: {
                 Label(L("volume.diagnostics.title"), systemImage: "stethoscope")
-            }
             }
         }
             }

@@ -993,8 +993,7 @@
 "volume.page.devices" = "Devices";
 "volume.page.scenes" = "Scenes";
 "volume.page.settings" = "Settings";
-"volume.settings.showAdvanced" = "Show advanced settings";
-"volume.settings.showAdvancedHint" = "Meeting ducking, sleep timer, self-check and diagnostics are collapsed by default.";
+"volume.page.advanced" = "Advanced";
 "volume.empty.idle" = "No app is playing audio right now";
 "volume.empty.filtered" = "No app matches the filter";
 "volume.remembered.show" = "Show remembered apps";

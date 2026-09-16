@@ -993,8 +993,7 @@
 "volume.page.devices" = "裝置";
 "volume.page.scenes" = "場景";
 "volume.page.settings" = "設定";
-"volume.settings.showAdvanced" = "顯示進階設定";
-"volume.settings.showAdvancedHint" = "會議閃避、睡眠定時、自檢與診斷預設收起，需要時再展開";
+"volume.page.advanced" = "進階";
 "volume.empty.idle" = "還沒有 App 正在發聲";
 "volume.empty.filtered" = "沒有符合的 App";
 "volume.remembered.show" = "顯示已記住的 App";

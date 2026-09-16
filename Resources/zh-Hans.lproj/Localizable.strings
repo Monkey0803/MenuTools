@@ -993,8 +993,7 @@
 "volume.page.devices" = "设备";
 "volume.page.scenes" = "场景";
 "volume.page.settings" = "设置";
-"volume.settings.showAdvanced" = "显示高级设置";
-"volume.settings.showAdvancedHint" = "会议闪避、睡眠定时、自检与诊断默认收起，需要时再展开";
+"volume.page.advanced" = "高级";
 "volume.empty.idle" = "还没有 App 正在发声";
 "volume.empty.filtered" = "没有匹配的 App";
 "volume.remembered.show" = "显示已记住的 App";

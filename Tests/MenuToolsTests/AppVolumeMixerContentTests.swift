@@ -48,9 +48,11 @@ private func mixerSession(_ id: String, active: Bool) -> AppAudioSession {
     )
 }
 
-@Test("音量设置页有四个一级页且默认进入调音台")
+@Test("音量设置页有五个一级页且默认进入调音台")
 func settingsPagesCoverFourTasks() {
-    #expect(AppVolumeSettingsPage.allCases == [.mixer, .devices, .scenes, .settings])
+    // 「高级」是后拆出来的：会议闪避、睡眠定时、自检与诊断从设置页移过去，
+    // 否则设置页要滚近两屏。
+    #expect(AppVolumeSettingsPage.allCases == [.mixer, .devices, .scenes, .settings, .advanced])
     #expect(AppVolumeSettingsPage.allCases.first == .mixer)
 
     for page in AppVolumeSettingsPage.allCases {
@@ -59,7 +61,7 @@ func settingsPagesCoverFourTasks() {
         #expect(page.id == page)
     }
     // 每个页面的文案键唯一
-    #expect(Set(AppVolumeSettingsPage.allCases.map(\.titleKey)).count == 4)
+    #expect(Set(AppVolumeSettingsPage.allCases.map(\.titleKey)).count == 5)
 }
 
 @Test("空态按是否有筛选给出不同文案键")
