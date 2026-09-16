@@ -290,6 +290,8 @@ struct AppVolumeSettingsView: View {
     @State private var showsRememberedSessions = false
     /// 通知的按类型开关默认收起：权限状态常显，四种提醒类型按需展开。
     @State private var showsNotificationKinds = false
+    /// 自检与诊断报告是只读参考信息，默认收起。
+    @State private var showsDiagnostics = false
     @State private var presetSync = AppVolumePresetSyncService.shared
     @State private var presetSyncPassphrase = ""
     @State private var presetSyncConflictCopies: [URL] = []
@@ -957,6 +959,7 @@ struct AppVolumeSettingsView: View {
                 Label(L("volume.sleepTimer.title"), systemImage: "moon.zzz")
             }
             Section {
+                DisclosureGroup(isExpanded: $showsDiagnostics) {
                 ForEach(service.selfCheckSteps) { step in
                     HStack(alignment: .top, spacing: 8) {
                         Image(systemName: step.status.symbolName)
@@ -971,19 +974,22 @@ struct AppVolumeSettingsView: View {
                         Spacer(minLength: 0)
                     }
                 }
-            } header: {
-                Label(L("volume.selfCheck.title"), systemImage: "checklist")
+                } label: {
+                    Label(L("volume.selfCheck.title"), systemImage: "checklist")
+                }
             }
 
             Section {
+                DisclosureGroup(isExpanded: $showsDiagnostics) {
                 Button(didCopyDiagnostic ? L("volume.diagnostics.copied") : L("volume.diagnostics.copy")) {
                     didCopyDiagnostic = service.copyDiagnosticReport()
                 }
                 Text(L("volume.diagnostics.desc"))
                     .font(.caption)
                     .foregroundStyle(.secondary)
-            } header: {
-                Label(L("volume.diagnostics.title"), systemImage: "stethoscope")
+                } label: {
+                    Label(L("volume.diagnostics.title"), systemImage: "stethoscope")
+                }
             }
         }
             }
