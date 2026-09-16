@@ -1112,6 +1112,7 @@
 "volume.menuBar.master" = "主音量";
 "volume.menuBar.loudest" = "音量最高的 App";
 "volume.notification.title" = "事件通知";
+"volume.notification.kinds" = "依類型開關";
 "volume.notification.clipping" = "削波提醒";
 "volume.notification.clipping.desc" = "App 輸出削波時提醒一次";
 "volume.notification.automation" = "自動化提醒";

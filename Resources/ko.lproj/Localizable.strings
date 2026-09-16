@@ -1112,6 +1112,7 @@
 "volume.menuBar.master" = "마스터 볼륨";
 "volume.menuBar.loudest" = "볼륨이 가장 큰 App";
 "volume.notification.title" = "이벤트 알림";
+"volume.notification.kinds" = "유형별 스위치";
 "volume.notification.clipping" = "클리핑 알림";
 "volume.notification.clipping.desc" = "App 출력이 클리핑되면 한 번 알림";
 "volume.notification.automation" = "자동화 알림";

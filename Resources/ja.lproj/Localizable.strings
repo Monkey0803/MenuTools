@@ -1112,6 +1112,7 @@
 "volume.menuBar.master" = "マスター音量";
 "volume.menuBar.loudest" = "最も音量が大きい App";
 "volume.notification.title" = "イベント通知";
+"volume.notification.kinds" = "種類ごとのスイッチ";
 "volume.notification.clipping" = "クリッピング通知";
 "volume.notification.clipping.desc" = "App の出力がクリップしたら 1 回通知";
 "volume.notification.automation" = "自動化通知";

@@ -288,6 +288,8 @@ struct AppVolumeSettingsView: View {
     @State private var page: AppVolumeSettingsPage = .mixer
     /// 「已记住」分区由用户手动展开；有搜索/筛选时自动展开。
     @State private var showsRememberedSessions = false
+    /// 通知的按类型开关默认收起：权限状态常显，四种提醒类型按需展开。
+    @State private var showsNotificationKinds = false
     @State private var presetSync = AppVolumePresetSyncService.shared
     @State private var presetSyncPassphrase = ""
     @State private var presetSyncConflictCopies: [URL] = []
@@ -833,6 +835,43 @@ struct AppVolumeSettingsView: View {
             }
 
             Section {
+                LabeledContent(L("volume.notification.permission.title")) {
+                    HStack(spacing: 8) {
+                        Text(L(service.notificationPermission.titleKey))
+                            .foregroundStyle(service.notificationPermission == .denied ? .orange : .secondary)
+                        if service.notificationPermission != .authorized {
+                            Button(L("volume.notification.openSettings"), action: openSystemSettings)
+                        }
+                    }
+                }
+                DisclosureGroup(isExpanded: $showsNotificationKinds) {
+                    ForEach(AppVolumeNotificationKind.allCases, id: \.self) { kind in
+                        Toggle(isOn: Binding(
+                            get: { service.notificationPolicy.isEnabled(kind) },
+                            set: { service.setNotificationEnabled($0, for: kind) }
+                        )) {
+                            VStack(alignment: .leading, spacing: 2) {
+                                Text(L(kind.titleKey))
+                                Text(L(kind.detailKey))
+                                    .font(.caption)
+                                    .foregroundStyle(.secondary)
+                            }
+                        }
+                    }
+                } label: {
+                    Text(L("volume.notification.kinds"))
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                }
+            } header: {
+                Label(L("volume.notification.title"), systemImage: "bell.badge")
+            }
+            .onAppear {
+                Task { await service.refreshNotificationPermission() }
+            }
+
+            } else {
+            Section {
                 HStack {
                     Text(L("volume.masterLimit"))
                     Slider(value: Binding(
@@ -858,38 +897,6 @@ struct AppVolumeSettingsView: View {
             } header: {
                 Label(L("volume.hearing.title"), systemImage: "ear")
             }
-
-            Section {
-                LabeledContent(L("volume.notification.permission.title")) {
-                    HStack(spacing: 8) {
-                        Text(L(service.notificationPermission.titleKey))
-                            .foregroundStyle(service.notificationPermission == .denied ? .orange : .secondary)
-                        if service.notificationPermission != .authorized {
-                            Button(L("volume.notification.openSettings"), action: openSystemSettings)
-                        }
-                    }
-                }
-                ForEach(AppVolumeNotificationKind.allCases, id: \.self) { kind in
-                    Toggle(isOn: Binding(
-                        get: { service.notificationPolicy.isEnabled(kind) },
-                        set: { service.setNotificationEnabled($0, for: kind) }
-                    )) {
-                        VStack(alignment: .leading, spacing: 2) {
-                            Text(L(kind.titleKey))
-                            Text(L(kind.detailKey))
-                                .font(.caption)
-                                .foregroundStyle(.secondary)
-                        }
-                    }
-                }
-            } header: {
-                Label(L("volume.notification.title"), systemImage: "bell.badge")
-            }
-            .onAppear {
-                Task { await service.refreshNotificationPermission() }
-            }
-
-            } else {
             Section {
                 Toggle(L("volume.meetingDucking"), isOn: Binding(
                     get: { service.meetingDuckingEnabled },

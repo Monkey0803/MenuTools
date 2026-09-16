@@ -1112,6 +1112,7 @@
 "volume.menuBar.master" = "Master volume";
 "volume.menuBar.loudest" = "Loudest app";
 "volume.notification.title" = "Event notifications";
+"volume.notification.kinds" = "Per-type switches";
 "volume.notification.clipping" = "Clipping alerts";
 "volume.notification.clipping.desc" = "Notify once when an app's output clips";
 "volume.notification.automation" = "Automation alerts";
