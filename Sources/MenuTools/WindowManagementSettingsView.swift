@@ -1,6 +1,27 @@
 import AppKit
 import SwiftUI
 
+/// 窗口管理设置页的子页。
+///
+/// 一个页面塞不下（布局列表单独就有 60 项、约 4 屏），按用户任务拆成四页，
+/// 与网络流量设置页用同一套「分段控件 + switch」模式。
+private enum WindowManagementSection: String, CaseIterable {
+    case layouts
+    case snapping
+    case presets
+    case rules
+
+    var titleKey: String { "window.tab.\(rawValue)" }
+    var symbol: String {
+        switch self {
+        case .layouts: return "rectangle.split.2x2"
+        case .snapping: return "arrow.up.left.and.arrow.down.right"
+        case .presets: return "bookmark"
+        case .rules: return "app.badge.checkmark"
+        }
+    }
+}
+
 /// 窗口布局与快捷键设置。
 struct WindowManagementSettingsView: View {
     @Bindable private var shortcutService: WindowShortcutService
@@ -16,6 +37,9 @@ struct WindowManagementSettingsView: View {
     @State private var ruleFirstWindowOnly = false
     @State private var layoutQuery = ""
     @State private var recordingPresetID: UUID?
+    @State private var section: WindowManagementSection = .layouts
+    @State private var expandedGroups: Set<WindowLayoutGroup> = WindowLayoutGrouping.defaultExpandedGroups
+    @State private var snapAreasExpanded = false
 
     init(
         shortcutService: WindowShortcutService = .shared,
@@ -40,20 +64,10 @@ struct WindowManagementSettingsView: View {
 
                 feedbackLine
 
-                GlassEffectContainer(spacing: 4) {
-                    VStack(alignment: .leading, spacing: 12) {
-                        quickAccessShortcutSection
-                        managerOptionsSection
-                        snapAreaSection
-                        layoutSection
-                        windowActionsCard
-                        presetSection
-                        applicationRulesSection
-                        exclusionSection
-                    }
-                }
+                sectionPicker
 
-                // 必须放在滚动内容顶部，确保窗口打开时就已创建并可成为第一响应者。
+                // 必须放在滚动内容顶部，确保窗口打开时就已创建并可成为第一响应者，
+                // 同时不随子页切换销毁——否则切页会中断正在进行的快捷键录制。
                 WindowShortcutCaptureView(isRecording: recordingLayout != nil || isRecordingQuickAccessShortcut || recordingPresetID != nil) { shortcut in
                     if isRecordingQuickAccessShortcut {
                         isRecordingQuickAccessShortcut = false
@@ -90,6 +104,12 @@ struct WindowManagementSettingsView: View {
                 }
                 .frame(width: 1, height: 1)
 
+                // 切换子页时重建内容容器，保证新页从顶部开始；可变状态都声明在本视图上。
+                GlassEffectContainer(spacing: 4) {
+                    sectionContent
+                }
+                .id(section)
+
             }
             .padding(16)
         }
@@ -98,6 +118,59 @@ struct WindowManagementSettingsView: View {
         .onAppear {
             // 清理上一版删除预设后残留的快捷键绑定。
             shortcutService.prunePresetBindings(keeping: Set(windowService.configuration.presets.map(\.id)))
+        }
+    }
+
+    private var sectionPicker: some View {
+        Picker(L("window.tabs"), selection: $section) {
+            ForEach(WindowManagementSection.allCases, id: \.self) { item in
+                Label(L(item.titleKey), systemImage: item.symbol).tag(item)
+            }
+        }
+        .pickerStyle(.segmented)
+        .labelsHidden()
+        .accessibilityLabel(L("window.tabs"))
+    }
+
+    @ViewBuilder
+    private var sectionContent: some View {
+        switch section {
+        case .layouts:
+            layoutsPage
+        case .snapping:
+            snappingPage
+        case .presets:
+            presetsPage
+        case .rules:
+            rulesPage
+        }
+    }
+
+    private var layoutsPage: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            quickAccessShortcutSection
+            layoutSection
+            windowActionsCard
+        }
+    }
+
+    private var snappingPage: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            managerOptionsSection
+            snapAreaSection
+        }
+    }
+
+    private var presetsPage: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            presetSection
+        }
+    }
+
+    private var rulesPage: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            applicationRulesSection
+            exclusionSection
         }
     }
 
@@ -214,14 +287,15 @@ struct WindowManagementSettingsView: View {
                 .font(.caption)
                 .foregroundStyle(.secondary)
 
-            LazyVGrid(
-                columns: [
-                    GridItem(.flexible(), spacing: 10),
-                    GridItem(.flexible(), spacing: 10)
-                ],
-                spacing: 6
-            ) {
-                ForEach(WindowSnapArea.customizable, id: \.self) { area in
+            DisclosureGroup(isExpanded: $snapAreasExpanded) {
+                LazyVGrid(
+                    columns: [
+                        GridItem(.flexible(), spacing: 10),
+                        GridItem(.flexible(), spacing: 10)
+                    ],
+                    spacing: 6
+                ) {
+                    ForEach(WindowSnapArea.customizable, id: \.self) { area in
                     HStack(spacing: 6) {
                         Text(L(area.titleKey))
                             .font(.caption)
@@ -234,10 +308,16 @@ struct WindowManagementSettingsView: View {
                                 Text(L(layout.titleKey)).tag(WindowLayout?.some(layout))
                             }
                         }
-                        .labelsHidden()
-                        .font(.caption)
+                            .labelsHidden()
+                            .font(.caption)
+                        }
                     }
                 }
+                .padding(.top, 6)
+            } label: {
+                Text(L("window.manager.snapAreasAdvanced"))
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
             }
         }
         .modifier(WindowSettingsCard())
@@ -607,6 +687,12 @@ struct WindowManagementSettingsView: View {
                 Text(L("window.manager.layouts"))
                     .font(.subheadline.weight(.semibold))
                 Spacer(minLength: 0)
+                Button(allGroupsExpanded ? L("window.manager.collapseAll") : L("window.manager.expandAll")) {
+                    expandedGroups = allGroupsExpanded ? [] : Set(WindowLayoutGroup.allCases)
+                }
+                .font(.caption2)
+                .buttonStyle(.plain)
+                .foregroundStyle(.tint)
                 Text(L("window.manager.layoutCount", matchedLayoutCount, WindowLayout.allCases.count))
                     .font(.caption2.monospacedDigit())
                     .foregroundStyle(.secondary)
@@ -620,9 +706,8 @@ struct WindowManagementSettingsView: View {
                     .foregroundStyle(.secondary)
                     .padding(.vertical, 6)
             } else {
-                ForEach(matchedSections, id: \.group) { section in
-                    VStack(alignment: .leading, spacing: 6) {
-                        groupHeader(section.group, count: section.layouts.count)
+                ForEach(matchedSections, id: \.group) { filtered in
+                    DisclosureGroup(isExpanded: expansionBinding(filtered.group)) {
                         LazyVGrid(
                             columns: [
                                 GridItem(.flexible(), spacing: 8),
@@ -630,13 +715,42 @@ struct WindowManagementSettingsView: View {
                             ],
                             spacing: 6
                         ) {
-                            ForEach(section.layouts) { layoutRow($0) }
+                            ForEach(filtered.layouts) { layoutRow($0) }
                         }
+                        .padding(.top, 6)
+                    } label: {
+                        groupHeader(filtered.group, count: filtered.layouts.count)
                     }
                 }
             }
         }
         .modifier(WindowSettingsCard())
+    }
+
+    private var allGroupsExpanded: Bool {
+        expandedGroups.count == WindowLayoutGroup.allCases.count
+    }
+
+    /// 分组折叠状态：搜索激活时一律展开（否则会出现搜到了却看不见）。
+    /// 搜索期间不写回手动集合，清空搜索后恢复用户原来的折叠状态。
+    private func expansionBinding(_ group: WindowLayoutGroup) -> Binding<Bool> {
+        Binding(
+            get: {
+                WindowLayoutGrouping.shouldExpand(
+                    group,
+                    query: layoutQuery,
+                    manuallyExpanded: expandedGroups
+                )
+            },
+            set: { isExpanded in
+                guard layoutQuery.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else { return }
+                if isExpanded {
+                    expandedGroups.insert(group)
+                } else {
+                    expandedGroups.remove(group)
+                }
+            }
+        )
     }
 
     private var layoutSearchField: some View {

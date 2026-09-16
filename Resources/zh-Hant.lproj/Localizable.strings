@@ -861,6 +861,14 @@
 "window.manager.layoutSearch" = "搜尋佈局";
 "window.manager.layoutSearchEmpty" = "沒有符合的佈局";
 "window.manager.layoutCount" = "已顯示 %ld / %ld 種";
+"window.tabs" = "視窗管理檢視";
+"window.tab.layouts" = "佈局";
+"window.tab.snapping" = "吸附";
+"window.tab.presets" = "預設";
+"window.tab.rules" = "規則";
+"window.manager.expandAll" = "展開全部";
+"window.manager.collapseAll" = "收起全部";
+"window.manager.snapAreasAdvanced" = "自訂各區域動作";
 "window.manager.actions" = "視窗操作";
 "window.group.basic" = "基礎佈局";
 "window.group.thirds" = "三分之一";

@@ -861,6 +861,14 @@
 "window.manager.layoutSearch" = "レイアウトを検索";
 "window.manager.layoutSearchEmpty" = "該当するレイアウトがありません";
 "window.manager.layoutCount" = "%ld / %ld を表示";
+"window.tabs" = "ウインドウ管理の表示";
+"window.tab.layouts" = "レイアウト";
+"window.tab.snapping" = "吸着";
+"window.tab.presets" = "プリセット";
+"window.tab.rules" = "ルール";
+"window.manager.expandAll" = "すべて展開";
+"window.manager.collapseAll" = "すべて折りたたむ";
+"window.manager.snapAreasAdvanced" = "領域ごとの動作をカスタマイズ";
 "window.manager.actions" = "ウインドウ操作";
 "window.group.basic" = "基本レイアウト";
 "window.group.thirds" = "三分の一";

@@ -861,6 +861,14 @@
 "window.manager.layoutSearch" = "Search layouts";
 "window.manager.layoutSearchEmpty" = "No matching layouts";
 "window.manager.layoutCount" = "Showing %ld of %ld";
+"window.tabs" = "Window management views";
+"window.tab.layouts" = "Layouts";
+"window.tab.snapping" = "Snapping";
+"window.tab.presets" = "Presets";
+"window.tab.rules" = "Rules";
+"window.manager.expandAll" = "Expand all";
+"window.manager.collapseAll" = "Collapse all";
+"window.manager.snapAreasAdvanced" = "Customize per-area actions";
 "window.manager.actions" = "Window actions";
 "window.group.basic" = "Basic layouts";
 "window.group.thirds" = "Thirds";

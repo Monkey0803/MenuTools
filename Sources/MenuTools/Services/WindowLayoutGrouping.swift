@@ -68,6 +68,23 @@ enum WindowLayoutGroup: String, CaseIterable, Identifiable, Sendable {
 }
 
 enum WindowLayoutGrouping {
+    /// 默认展开的分组：只展开最常用的基础布局，其余收起，避免一进页面就要滚很久。
+    static let defaultExpandedGroups: Set<WindowLayoutGroup> = [.basic]
+
+    /// 某个分组当前是否展开。
+    ///
+    /// 搜索激活时一律展开：能被渲染出来的分组本来就已经是「有命中」的（`sections(query:)`
+    /// 会跳过空分组），此时再叠加折叠只会让人搜不到。
+    /// 搜索清空后回到用户手动维护的折叠状态——搜索期间不写回手动集合。
+    static func shouldExpand(
+        _ group: WindowLayoutGroup,
+        query: String,
+        manuallyExpanded: Set<WindowLayoutGroup>
+    ) -> Bool {
+        guard query.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else { return true }
+        return manuallyExpanded.contains(group)
+    }
+
     /// 布局所属分组。
     static func group(containing layout: WindowLayout) -> WindowLayoutGroup? {
         WindowLayoutGroup.allCases.first { $0.layouts.contains(layout) }

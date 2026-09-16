@@ -28,7 +28,7 @@ A lightweight system toolkit that lives in the macOS menu bar. MenuTools uses th
 | System Settings | Opens macOS System Settings. |
 | Screenshot to Clipboard | Captures the screen and copies it directly to the clipboard. |
 
-### Screenshot Tools
+### Screenshot & Annotation
 
 | Feature | Description |
 |---|---|
@@ -37,7 +37,7 @@ A lightweight system toolkit that lives in the macOS menu bar. MenuTools uses th
 | Scrolling screenshot | Samples stable frames while you scroll and stitches them when the shortcut finishes the session. |
 | Screenshot annotation | Includes pen, arrows, shapes, highlight, mosaic, and text tools. |
 
-### App Volume Management
+### Audio
 
 | Feature | Description |
 |---|---|
@@ -88,8 +88,8 @@ A lightweight system toolkit that lives in the macOS menu bar. MenuTools uses th
 | Clipboard Privacy | Pause recording, exclude apps, override recording and retention per bundle ID, and automatically hold back passwords, verification codes, card numbers, and custom keywords with a short expiry. |
 | Clipboard Management | Automatic cleanup by item count, retention days, and storage size, plus passphrase-encrypted archive import/export (`.mtclip`) and shared-folder sync of pinned items and snippets, with an optional automatic interval, a keychain-stored passphrase, and last-sync/error status. |
 | Clipboard Shortcut | A global shortcut opens the clipboard panel and falls back to a monitor listener when exclusive registration is unavailable. |
-| System Resources | Shows CPU, memory pressure, free disk space, and network rates. |
-| Network Traffic | Per-app live upload/download rates, connection details, and 30-day history with interface/protocol filtering, quota alerts, redacted export, and data clearing. |
+| System Monitor | Shows CPU, memory pressure, free disk space, and network rates. |
+| Network Monitor | Per-app live upload/download rates, connection details, and 30-day history with interface/protocol filtering, quota alerts, redacted export, and data clearing. |
 | Check for updates | Checks for new releases and opens the download page when an update is available. |
 
 ### System Information
@@ -159,9 +159,9 @@ open dist/MenuTools.app
 
 The build script compiles the Swift Package, assembles the app bundle, builds the Finder extension, and signs the result. The app is written to `dist/MenuTools.app`.
 
-### Network Traffic Validation
+### Network Monitor Validation
 
-Network Traffic depends on the live output of the system `nettop` command. Run a short smoke test after a change or macOS major-version upgrade:
+Network Monitor depends on the live output of the system `nettop` command. Run a short smoke test after a change or macOS major-version upgrade:
 
 ```bash
 swift Scripts/test_network_traffic.swift --duration 30 --connections --strict
@@ -173,7 +173,7 @@ For an 8-hour stability run without generating extra download traffic:
 swift Scripts/test_network_traffic.swift --duration 28800 --interval 10 --no-download --strict
 ```
 
-The script reports sample duration, process-row counts, non-zero traffic rows, and a final summary. Then cross-check the matching app, rate, and connection details in MenuTools Settings. For item-by-item manual verification use the [Network Traffic runtime acceptance checklist](docs/network-traffic-acceptance.md) (live rates, connection details, filters, history hover, menu bar speed, notification permission, quota alerts, redacted export, data clearing, and plugin ownership).
+The script reports sample duration, process-row counts, non-zero traffic rows, and a final summary. Then cross-check the matching app, rate, and connection details in MenuTools Settings. For item-by-item manual verification use the [Network Monitor runtime acceptance checklist](docs/network-traffic-acceptance.md) (live rates, connection details, filters, history hover, menu bar speed, notification permission, quota alerts, redacted export, data clearing, and plugin ownership).
 
 > Archived baseline: the 8-hour run on 2026-09-11 completed 2857/2857 samples with 0 failures, 72ms average and 133ms worst case.
 
@@ -228,15 +228,15 @@ Some features request permissions the first time they are used:
 | Automation → Finder | Empties the Trash. | Quick Action Center |
 | Automation → System Events | Changes appearance, Dock, and menu bar settings. | Appearance, Dock, and menu bar toggles |
 | Bluetooth | Reads battery levels from connected Bluetooth devices. | Bluetooth battery levels |
-| Notifications | Delivers high-traffic and monthly-quota alerts. | Network Traffic |
+| Notifications | Delivers high-traffic and monthly-quota alerts. | Network Monitor |
 | Screen Recording | Allows screen capture. | Screenshot to Clipboard |
-| Screen Recording | Allows window, area, and scrolling capture. | Screenshot Tools |
+| Screen Recording | Allows window, area, and scrolling capture. | Screenshot & Annotation |
 | System Audio Recording | Captures active app audio and replays it with an independent gain. | Per-app volume management |
 | Accessibility | Reads and sets the position and size of the frontmost window. | Window Management |
 | Accessibility | Receives global keyboard events and triggers scenes. | Global scene shortcuts, Focus |
 | Accessibility | Synthesizes ⌘V to paste back into the previous app. | Clipboard auto-paste |
 
-If permission was denied, enable it again in **System Settings → Privacy & Security**. If notifications were denied, allow them again under **System Settings → Notifications → MenuTools**; the Network Traffic settings page shows the current authorization state and links straight to System Settings when it is denied. Mute, prevent sleep, Night Shift, clipboard history recording, and cleanup features do not require these permissions (clipboard auto-paste does).
+If permission was denied, enable it again in **System Settings → Privacy & Security**. If notifications were denied, allow them again under **System Settings → Notifications → MenuTools**; the Network Monitor settings page shows the current authorization state and links straight to System Settings when it is denied. Mute, prevent sleep, Night Shift, clipboard history recording, and cleanup features do not require these permissions (clipboard auto-paste does).
 
 ## Technical Implementation
 
@@ -251,17 +251,17 @@ If permission was denied, enable it again in **System Settings → Privacy & Sec
 | Bluetooth battery levels | IORegistry for AirPods, private IOBluetooth getters for classic Bluetooth devices, and CoreBluetooth GATT service `180F/2A19` for BLE devices |
 | DerivedData | Background file-system size calculation and cleanup |
 | Quick Action Center | Process commands, Finder AppleScript, System Settings URL, and `screencapture` |
-| Screenshot Tools | ScreenCaptureKit native-pixel capture, frozen selection, window capture, multi-display compositing, Vision motion estimation, PNG stitching, and OCR/QR recognition; captures can be copied to the clipboard or opened in the built-in annotator |
+| Screenshot & Annotation | ScreenCaptureKit native-pixel capture, frozen selection, window capture, multi-display compositing, Vision motion estimation, PNG stitching, and OCR/QR recognition; captures can be copied to the clipboard or opened in the built-in annotator |
 | Clipboard History | One-second `NSPasteboard` polling, SQLite metadata with binary blobs stored separately (schema version guard and migration), passphrase-encrypted archives, scheduled shared-folder sync with a keychain passphrase, Vision OCR/QR recognition behind a process-wide gate with retry and a manual retry action, and synthesized ⌘V paste via CGEvent |
-| App Volume Management | Public Core Audio Process Tap, a private aggregate device, and IOProc routing; routes only apps below 100% and destroys taps to restore original audio on exit or failure |
+| Audio | Public Core Audio Process Tap, a private aggregate device, and IOProc routing; routes only apps below 100% and destroys taps to restore original audio on exit or failure |
 | Network Status | CoreWLAN, interface addresses, VPN state, and on-demand URLSession probes |
-| Network Traffic | `/usr/bin/nettop` process sampling, SQLite/WAL history, diagnostics, quota alerts, and optional redacted exports |
+| Network Monitor | `/usr/bin/nettop` process sampling, SQLite/WAL history, diagnostics, quota alerts, and optional redacted exports |
 | Battery Health | `system_profiler SPPowerDataType -json`, with silent fallback when unavailable |
 | Displays | `NSScreen` and CoreGraphics display mode enumeration and switching |
 | Storage Analysis | Background recursive measurement of selected directories; cleanup keeps directories and never touches Downloads |
 | App Launcher | NSWorkspace app discovery, search, favorites, and launching |
 | Scenes | Composes app launching, appearance, Focus, audio, desktop icons, and prevent-sleep actions |
-| Window Management | Accessibility API for window position, size, and display movement; global NSEvent drag monitoring drives edge snapping and target-frame previews; layout cycling, per-app frame memory, presets, and app rules are persisted; the settings pane and quick-access panel group layouts by family and offer search |
+| Window Management | Accessibility API for window position, size, and display movement; global NSEvent drag monitoring drives edge snapping and target-frame previews; layout cycling, per-app frame memory, presets, and app rules are persisted; the settings pane splits into Layouts / Snapping / Presets / Rules sub-pages, groups layouts by family (only Basic expanded by default) and offers search, and the quick-access panel is searchable too |
 | Focus | Control Center accessibility script with a System Settings fallback |
 | Global shortcuts | NSEvent global/local keyboard monitors, persistent bindings, and conflict detection |
 | Update checks | Sparkle standard updater with Ed25519-signed appcast |
@@ -351,13 +351,13 @@ export SPARKLE_DOWNLOAD_URL_PREFIX="https://your-server/releases/"
 - Fixed-size presets store only a position and size, not a specific display; when applied after a display change they are clamped back into the current display's usable area.
 - Repeating a half-screen shortcut to reach the adjacent display requires at least two displays and is off by default; enable it in Settings.
 - Stashing (pushing a window mostly off-screen at an edge) relies on apps accepting off-screen positions; a few apps clamp the window back on screen, in which case stashing has no effect (`Scripts/test_window_management.swift --interactive` covers this capability).
-- Network Traffic samples processes through the system `/usr/bin/nettop`, so bytes are aggregated per process/app and cannot be split across remote destinations (connection details only cover the current connections and endpoints). Interface filtering uses nettop interface classes (external, wifi, wired, awdl, expensive, loopback), not physical device names, and VPN (utun) tunnels are not listed separately.
+- Network Monitor samples processes through the system `/usr/bin/nettop`, so bytes are aggregated per process/app and cannot be split across remote destinations (connection details only cover the current connections and endpoints). Interface filtering uses nettop interface classes (external, wifi, wired, awdl, expensive, loopback), not physical device names, and VPN (utun) tunnels are not listed separately.
 - History charts, rankings, and today/month totals come from samples accumulated on this Mac: a fresh install has no history until the module has been running for a while. If a major macOS upgrade changes nettop output fields, run `Scripts/test_network_traffic.swift` to validate.
-- High-traffic and monthly-quota alerts require notification permission; when notifications are denied the alerts are silently dropped, and the Network Traffic settings page shows the state with a button that opens System Settings.
+- High-traffic and monthly-quota alerts require notification permission; when notifications are denied the alerts are silently dropped, and the Network Monitor settings page shows the state with a button that opens System Settings.
 
 ## Acknowledgements
 
-The smooth-scrolling design was inspired by the technical approach of [Mos](https://github.com/Caldis/Mos), including event templates, frame-based interpolation, peak filtering, buffer/current easing, and modifier-key controls. MenuTools is an independent implementation and does not copy Mos source code. Mos is licensed under [CC BY-NC 4.0](https://creativecommons.org/licenses/by-nc/4.0/), which is not compatible with this project's MIT license; it is credited here as a source of technical inspiration only.
+The scrolling enhancement was inspired by the technical approach of [Mos](https://github.com/Caldis/Mos), including event templates, frame-based interpolation, peak filtering, buffer/current easing, and modifier-key controls. MenuTools is an independent implementation and does not copy Mos source code. Mos is licensed under [CC BY-NC 4.0](https://creativecommons.org/licenses/by-nc/4.0/), which is not compatible with this project's MIT license; it is credited here as a source of technical inspiration only.
 
 ## License
 

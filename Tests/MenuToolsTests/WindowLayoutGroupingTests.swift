@@ -62,3 +62,36 @@ func sectionsSkipEmptyGroups() {
 
     #expect(WindowLayoutGrouping.sections(query: "不存在的布局", title: titles).isEmpty)
 }
+
+@Test("默认只展开基础布局")
+func defaultExpansionOnlyIncludesBasicGroup() {
+    #expect(WindowLayoutGrouping.defaultExpandedGroups == [.basic])
+}
+
+@Test("搜索时一律展开，清空后回到手动状态")
+func expansionFollowsSearchAndManualState() {
+    // 无搜索：以手动集合为准
+    #expect(!WindowLayoutGrouping.shouldExpand(.thirds, query: "", manuallyExpanded: [.basic]))
+    #expect(WindowLayoutGrouping.shouldExpand(.basic, query: "", manuallyExpanded: [.basic]))
+    #expect(WindowLayoutGrouping.shouldExpand(.thirds, query: "   ", manuallyExpanded: [.thirds]))
+
+    // 搜索激活：即使是用户手动收起的分组也要展开（能被渲染说明它有命中）
+    #expect(WindowLayoutGrouping.shouldExpand(.thirds, query: "第一列三分之一", manuallyExpanded: []))
+    #expect(WindowLayoutGrouping.shouldExpand(.thirds, query: "third", manuallyExpanded: [.basic]))
+
+    // 搜索清空后回到手动状态（搜索期间不写回手动集合）
+    #expect(!WindowLayoutGrouping.shouldExpand(.thirds, query: "", manuallyExpanded: []))
+}
+
+@Test("搜索时渲染出来的分组都处于展开状态")
+func everyFilteredSectionExpandsWhileSearching() {
+    let titles: (WindowLayout) -> String = { $0 == .stashLeft ? "收纳到左边缘" : $0.rawValue }
+    let sections = WindowLayoutGrouping.sections(query: "收纳", title: titles)
+
+    #expect(!sections.isEmpty)
+    for section in sections {
+        #expect(WindowLayoutGrouping.shouldExpand(section.group, query: "收纳", manuallyExpanded: []))
+    }
+    // 没有命中的分组根本不会被渲染
+    #expect(!sections.contains { $0.group == .quarters })
+}

@@ -5,6 +5,7 @@ struct WindowManagementQuickAccessView: View {
     @State private var windowService = WindowManagementService.shared
     @State private var shortcutService = WindowShortcutService.shared
     @State private var errorMessage: String?
+    @State private var query = ""
     let dismiss: () -> Void
 
     var body: some View {
@@ -28,8 +29,10 @@ struct WindowManagementQuickAccessView: View {
                 .font(.caption2)
                 .foregroundStyle(.secondary)
 
+            layoutSearchField
+
             ScrollView {
-                if !windowService.configuration.presets.isEmpty {
+                if !windowService.configuration.presets.isEmpty, trimmedQuery.isEmpty {
                     VStack(alignment: .leading, spacing: 4) {
                         Text(L("window.manager.presets"))
                             .font(.caption2.weight(.semibold))
@@ -41,7 +44,25 @@ struct WindowManagementQuickAccessView: View {
                     .padding(.bottom, 6)
                 }
 
-                ForEach(WindowLayoutGrouping.sections { L($0.titleKey) }, id: \.group) { section in
+                if !trimmedQuery.isEmpty {
+                    if filteredLayouts.isEmpty {
+                        Text(L("window.manager.layoutSearchEmpty"))
+                            .font(.caption2)
+                            .foregroundStyle(.secondary)
+                            .padding(.vertical, 6)
+                    } else {
+                        LazyVGrid(
+                            columns: [
+                                GridItem(.flexible(), spacing: 8),
+                                GridItem(.flexible(), spacing: 8)
+                            ],
+                            spacing: 6
+                        ) {
+                            ForEach(filteredLayouts) { layoutButton($0) }
+                        }
+                    }
+                } else {
+                    ForEach(WindowLayoutGrouping.sections { L($0.titleKey) }, id: \.group) { section in
                     VStack(alignment: .leading, spacing: 5) {
                         HStack(spacing: 5) {
                             Image(systemName: section.group.symbol)
@@ -62,8 +83,9 @@ struct WindowManagementQuickAccessView: View {
                                 layoutButton(layout)
                             }
                         }
+                        }
+                        .padding(.bottom, 6)
                     }
-                    .padding(.bottom, 6)
                 }
             }
 
@@ -76,6 +98,38 @@ struct WindowManagementQuickAccessView: View {
         }
         .padding(14)
         .frame(width: 340, height: 430, alignment: .top)
+    }
+
+    private var trimmedQuery: String {
+        query.trimmingCharacters(in: .whitespacesAndNewlines)
+    }
+
+    private var filteredLayouts: [WindowLayout] {
+        WindowLayoutGrouping.sections(query: trimmedQuery) { L($0.titleKey) }.flatMap(\.layouts)
+    }
+
+    private var layoutSearchField: some View {
+        HStack(spacing: 6) {
+            Image(systemName: "magnifyingglass")
+                .font(.caption2)
+                .foregroundStyle(.secondary)
+            TextField(L("window.manager.layoutSearch"), text: $query)
+                .textFieldStyle(.plain)
+                .font(.caption)
+            if !query.isEmpty {
+                Button {
+                    query = ""
+                } label: {
+                    Image(systemName: "xmark.circle.fill")
+                        .font(.caption2)
+                }
+                .buttonStyle(.plain)
+                .foregroundStyle(.secondary)
+            }
+        }
+        .padding(.horizontal, 8)
+        .padding(.vertical, 5)
+        .background(.quaternary.opacity(0.5), in: .rect(cornerRadius: 7))
     }
 
     private func layoutButton(_ layout: WindowLayout) -> some View {
