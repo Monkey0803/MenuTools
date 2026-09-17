@@ -34,6 +34,7 @@
 "resource.page.history" = "History";
 "resource.page.alerts" = "Alerts and self-check";
 "resource.memory.details" = "Memory details";
+"resource.memory.tools" = "Memory tools";
 "resource.process.showAll" = "Show all %ld";
 "resource.process.showTop" = "Show only the top %ld";
 "resource.cores" = "Per-core usage";

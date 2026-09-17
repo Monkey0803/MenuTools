@@ -54,6 +54,8 @@ struct SystemResourceSettingsView: View {
     /// 概览页的只读明细默认收起：核心占用、温度/GPU 都不影响「一眼看主要指标」。
     @State private var showsCoreDetails = false
     @State private var showsOptionalDetails = false
+    /// 内存维护动作（免权限回收、清系统缓存）属于偶发操作，默认收起。
+    @State private var showsMemoryTools = false
 
     /// 进程列表默认只渲染前几项：设置页是「看谁占资源」，不是进程管理器。
     private static let processPreviewLimit = 8
@@ -158,6 +160,7 @@ struct SystemResourceSettingsView: View {
                     }
                 }
 
+                DisclosureGroup(isExpanded: $showsMemoryTools) {
                 Button {
                     let released = resource.relieveProcessMemory()
                     relieveMessage = released > 0
@@ -190,6 +193,11 @@ struct SystemResourceSettingsView: View {
                     .fixedSize(horizontal: false, vertical: true)
                 if let purgeMessage {
                     Text(purgeMessage)
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                }
+                } label: {
+                    Text(L("resource.memory.tools"))
                         .font(.caption)
                         .foregroundStyle(.secondary)
                 }

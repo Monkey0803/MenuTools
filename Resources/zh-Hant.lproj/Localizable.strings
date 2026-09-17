@@ -34,6 +34,7 @@
 "resource.page.history" = "歷史";
 "resource.page.alerts" = "告警與自檢";
 "resource.memory.details" = "記憶體明細";
+"resource.memory.tools" = "記憶體工具";
 "resource.process.showAll" = "顯示全部 %ld 項";
 "resource.process.showTop" = "只看佔用最高的 %ld 項";
 "resource.cores" = "各核心佔用";

@@ -34,6 +34,7 @@
 "resource.page.history" = "기록";
 "resource.page.alerts" = "알림 및 자체 점검";
 "resource.memory.details" = "메모리 세부 정보";
+"resource.memory.tools" = "메모리 도구";
 "resource.process.showAll" = "모두 표시(%ld개)";
 "resource.process.showTop" = "상위 %ld개만 표시";
 "resource.cores" = "코어별 사용률";
