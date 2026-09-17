@@ -184,12 +184,27 @@ enum ClipboardHistoryEncryption {
     }
 
     static func open(_ data: Data) throws -> Data {
-        guard data.starts(with: magic) else { return data }
-        let box = try AES.GCM.SealedBox(combined: Data(data.dropFirst(magic.count)))
-        return try AES.GCM.open(box, using: key())
+        try open(data, primaryKey: { try key(createIfMissing: false) }, fallbackKey: {
+            try fileBackedKey(createIfMissing: false)
+        })
     }
 
-    private static func key() throws -> SymmetricKey {
+    /// 两种既有密钥都可用于读取；读取失败时绝不生成新密钥。
+    static func open(
+        _ data: Data,
+        primaryKey: () throws -> SymmetricKey,
+        fallbackKey: () throws -> SymmetricKey
+    ) throws -> Data {
+        guard data.starts(with: magic) else { return data }
+        let box = try AES.GCM.SealedBox(combined: Data(data.dropFirst(magic.count)))
+        do {
+            return try AES.GCM.open(box, using: primaryKey())
+        } catch {
+            return try AES.GCM.open(box, using: fallbackKey())
+        }
+    }
+
+    private static func key(createIfMissing: Bool = true) throws -> SymmetricKey {
         let query: [String: Any] = [
             kSecClass as String: kSecClassGenericPassword,
             kSecAttrService as String: service,
@@ -201,7 +216,10 @@ enum ClipboardHistoryEncryption {
         if status == errSecSuccess, let data = result as? Data {
             return SymmetricKey(data: data)
         }
-        guard status == errSecItemNotFound else { return try fileBackedKey() }
+        guard status == errSecItemNotFound else {
+            return try fileBackedKey(createIfMissing: createIfMissing)
+        }
+        guard createIfMissing else { throw ClipboardHistoryPersistenceError.encryptionKeyUnavailable }
         let data = SymmetricKey(size: .bits256).withUnsafeBytes { Data($0) }
         let attributes: [String: Any] = [
             kSecClass as String: kSecClassGenericPassword,
@@ -218,15 +236,16 @@ enum ClipboardHistoryEncryption {
 
     /// 某些无钥匙串权限的运行环境（例如独立测试进程）使用权限收紧的本地密钥文件，
     /// 确保加密数据仍可跨启动恢复；正常 App 运行优先使用钥匙串。
-    private static func fileBackedKey() throws -> SymmetricKey {
+    private static func fileBackedKey(createIfMissing: Bool = true) throws -> SymmetricKey {
         let directory = FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask)[0]
             .appendingPathComponent("MenuTools", isDirectory: true)
         let url = directory.appendingPathComponent("clipboard-history.key")
         let fileManager = FileManager.default
-        try fileManager.createDirectory(at: directory, withIntermediateDirectories: true)
         if let existing = try? Data(contentsOf: url), existing.count == 32 {
             return SymmetricKey(data: existing)
         }
+        guard createIfMissing else { throw ClipboardHistoryPersistenceError.encryptionKeyUnavailable }
+        try fileManager.createDirectory(at: directory, withIntermediateDirectories: true)
         let data = SymmetricKey(size: .bits256).withUnsafeBytes { Data($0) }
         try data.write(to: url, options: .atomic)
         try? fileManager.setAttributes([.posixPermissions: 0o600], ofItemAtPath: url.path)
@@ -242,9 +261,12 @@ enum ClipboardTimestamp {
     }
 }
 
-enum ClipboardHistoryPersistenceError: Error {
+enum ClipboardHistoryPersistenceError: LocalizedError {
     case encryptionKeyUnavailable
     case encryptionFailed
+    case unreadableRecord
+
+    var errorDescription: String? { L("clipboard.error.databaseRead") }
 }
 
 /// 将系统剪贴板项目转换为历史记录内容。
@@ -1570,12 +1592,24 @@ enum ClipboardHistoryPersistence {
     }
 
     static func load(from url: URL) -> [ClipboardHistoryItem] {
+        (try? loadValidated(from: url)) ?? []
+    }
+
+    /// 读取失败不能伪装成空历史，否则下一次保存会覆盖尚可恢复的数据。
+    static func loadValidated(from url: URL) throws -> [ClipboardHistoryItem] {
         if FileManager.default.fileExists(atPath: url.path) {
             if isSQLiteDatabase(at: url) {
                 // 结构版本高于当前 App：既不能读，也不能用旧备份覆盖，交由写入路径报错。
-                guard isSchemaVersionSupported(at: url) else { return [] }
-                if let items = try? loadDatabase(from: url) {
-                    return items
+                guard isSchemaVersionSupported(at: url) else {
+                    throw persistenceError(L("clipboard.error.databaseVersionTooNew"))
+                }
+                do {
+                    return try loadDatabase(from: url)
+                } catch ClipboardHistoryPersistenceError.unreadableRecord {
+                    // 密钥不可用或内容无法解码时，保留原文件；不能拿旧备份替换它。
+                    throw ClipboardHistoryPersistenceError.unreadableRecord
+                } catch {
+                    // 仅结构损坏继续尝试备份恢复。
                 }
                 // 当前数据库损坏时回退到最近一次成功写入的备份，避免把历史误显示为空。
                 let backupURL = backupURL(for: url)
@@ -1584,7 +1618,7 @@ enum ClipboardHistoryPersistence {
                     try? FileManager.default.copyItem(at: backupURL, to: url)
                     return items
                 }
-                return []
+                throw persistenceError(L("clipboard.error.databaseRead"))
             }
             let backupURL = backupURL(for: url)
             if isSQLiteDatabase(at: backupURL), let items = try? loadDatabase(from: backupURL) {
@@ -1592,7 +1626,9 @@ enum ClipboardHistoryPersistence {
                 try? FileManager.default.copyItem(at: backupURL, to: url)
                 return items
             }
-            guard let legacyItems = loadLegacyJSON(from: url) else { return [] }
+            guard let legacyItems = loadLegacyJSON(from: url) else {
+                throw persistenceError(L("clipboard.error.databaseRead"))
+            }
             do {
                 try save(legacyItems, to: url)
             } catch {
@@ -1602,8 +1638,10 @@ enum ClipboardHistoryPersistence {
         }
 
         let legacyURL = url.deletingLastPathComponent().appendingPathComponent("ClipboardHistory.json")
-        guard legacyURL != url,
-              let legacyItems = loadLegacyJSON(from: legacyURL) else { return [] }
+        guard legacyURL != url, FileManager.default.fileExists(atPath: legacyURL.path) else { return [] }
+        guard let legacyItems = loadLegacyJSON(from: legacyURL) else {
+            throw persistenceError(L("clipboard.error.databaseRead"))
+        }
         do {
             try save(legacyItems, to: url)
             let backupURL = legacyURL.appendingPathExtension("migrated")
@@ -1726,13 +1764,24 @@ enum ClipboardHistoryPersistence {
         decoder.dateDecodingStrategy = .millisecondsSince1970
         let blobsDirectory = blobsURL(for: url)
         var items: [ClipboardHistoryItem] = []
-        while sqlite3_step(statement) == SQLITE_ROW {
-            guard let metadata = data(statement, column: 0),
-                  let decryptedMetadata = try? ClipboardHistoryEncryption.open(metadata),
-                  let item = try? decoder.decode(ClipboardHistoryItem.self, from: decryptedMetadata),
-                  let hydrated = hydrate(item, blobsDirectory: blobsDirectory) else { continue }
-            items.append(hydrated)
+        var step = sqlite3_step(statement)
+        while step == SQLITE_ROW {
+            do {
+                guard let metadata = data(statement, column: 0) else {
+                    throw ClipboardHistoryPersistenceError.unreadableRecord
+                }
+                let decryptedMetadata = try ClipboardHistoryEncryption.open(metadata)
+                let item = try decoder.decode(ClipboardHistoryItem.self, from: decryptedMetadata)
+                guard let hydrated = try hydrate(item, blobsDirectory: blobsDirectory) else {
+                    throw ClipboardHistoryPersistenceError.unreadableRecord
+                }
+                items.append(hydrated)
+            } catch {
+                throw ClipboardHistoryPersistenceError.unreadableRecord
+            }
+            step = sqlite3_step(statement)
         }
+        guard step == SQLITE_DONE else { throw persistenceError(L("clipboard.error.databaseRead")) }
         return items
     }
 
@@ -1780,22 +1829,22 @@ enum ClipboardHistoryPersistence {
         return try ClipboardHistoryEncryption.seal(encoder.encode(metadataItem))
     }
 
-    private static func hydrate(_ item: ClipboardHistoryItem, blobsDirectory: URL) -> ClipboardHistoryItem? {
+    private static func hydrate(_ item: ClipboardHistoryItem, blobsDirectory: URL) throws -> ClipboardHistoryItem? {
         let content: ClipboardHistoryContent
         switch item.content {
         case .image:
-            guard let image = readBlob(item.id, "image", blobsDirectory) else { return nil }
+            guard let image = try readBlob(item.id, "image", blobsDirectory) else { return nil }
             content = .image(image)
         case let .richText(richText):
             content = .richText(ClipboardRichText(
                 plainText: richText.plainText,
-                html: readBlob(item.id, "html", blobsDirectory),
-                rtf: readBlob(item.id, "rtf", blobsDirectory)
+                html: try readBlob(item.id, "html", blobsDirectory),
+                rtf: try readBlob(item.id, "rtf", blobsDirectory)
             ))
         case .text, .url, .files:
             content = item.content
         case .pdf:
-            guard let data = readBlob(item.id, "pdf", blobsDirectory) else { return nil }
+            guard let data = try readBlob(item.id, "pdf", blobsDirectory) else { return nil }
             content = .pdf(data)
         }
         return ClipboardHistoryItem(
@@ -1831,9 +1880,10 @@ enum ClipboardHistoryPersistence {
         }
     }
 
-    private static func readBlob(_ itemID: UUID, _ suffix: String, _ directory: URL) -> Data? {
-        guard let data = try? Data(contentsOf: blobURL(itemID, suffix, directory)) else { return nil }
-        return try? ClipboardHistoryEncryption.open(data)
+    private static func readBlob(_ itemID: UUID, _ suffix: String, _ directory: URL) throws -> Data? {
+        let url = blobURL(itemID, suffix, directory)
+        guard FileManager.default.fileExists(atPath: url.path) else { return nil }
+        return try ClipboardHistoryEncryption.open(Data(contentsOf: url))
     }
 
     private static func blobURL(_ itemID: UUID, _ suffix: String, _ directory: URL) -> URL {
@@ -1983,7 +2033,7 @@ final class ClipboardHistoryService {
 
     private var buffer: ClipboardHistoryBuffer
     private let persistenceURL: URL?
-    private let persistenceLoader: @Sendable (URL) async -> [ClipboardHistoryItem]
+    private let persistenceLoader: @Sendable (URL) async throws -> [ClipboardHistoryItem]
     private let pasteboard: NSPasteboard
     private let userDefaults: UserDefaults
     private let frontmostApplicationBundleIdentifierProvider: @MainActor () -> String?
@@ -1994,6 +2044,8 @@ final class ClipboardHistoryService {
     private let sensitiveLifetime: TimeInterval
     private var lastChangeCount: Int = -1
     private var historyMutationGeneration = 0
+    private var persistenceLoadFailed = false
+    private var pendingRecoveryImports: [ClipboardHistoryItem] = []
     private var loadingTask: Task<Void, Never>?
     private var monitoringTask: Task<Void, Never>?
     private var undoExpirationTask: Task<Void, Never>?
@@ -2042,9 +2094,9 @@ final class ClipboardHistoryService {
         frontmostApplicationBundleIdentifierProvider: @escaping @MainActor () -> String? = {
             NSWorkspace.shared.frontmostApplication?.bundleIdentifier
         },
-        persistenceLoader: @escaping @Sendable (URL) async -> [ClipboardHistoryItem] = { url in
-            await Task.detached(priority: .utility) {
-                ClipboardHistoryPersistence.load(from: url)
+        persistenceLoader: @escaping @Sendable (URL) async throws -> [ClipboardHistoryItem] = { url in
+            try await Task.detached(priority: .utility) {
+                try ClipboardHistoryPersistence.loadValidated(from: url)
             }.value
         }
     ) {
@@ -2104,13 +2156,24 @@ final class ClipboardHistoryService {
         let mutationGeneration = historyMutationGeneration
         let persistenceLoader = self.persistenceLoader
         let task = Task { @MainActor [weak self] in
-            let restored = await persistenceLoader(persistenceURL)
+            let restored: [ClipboardHistoryItem]
+            do {
+                restored = try await persistenceLoader(persistenceURL)
+            } catch {
+                guard let self else { return }
+                persistenceLoadFailed = true
+                persistenceErrorMessage = error.localizedDescription
+                loadingTask = nil
+                return
+            }
             guard let self else { return }
             defer {
                 hasLoadedPersistedHistory = true
                 loadingTask = nil
             }
-            guard historyMutationGeneration == mutationGeneration else { return }
+            // 失败后的重试必须先恢复磁盘内容，不能因期间的内存改动跳过恢复。
+            let isRecovering = persistenceLoadFailed
+            guard isRecovering || historyMutationGeneration == mutationGeneration else { return }
 
             var restoredBuffer = ClipboardHistoryBuffer(
                 limit: limit,
@@ -2120,10 +2183,22 @@ final class ClipboardHistoryService {
                 retentionByContentType: retentionByContentType,
                 items: restored
             )
+            if isRecovering {
+                restoredBuffer.applyIncomingState(buffer.items)
+                restoredBuffer.restore(buffer.items)
+                restoredBuffer.applyTombstones(buffer.tombstones)
+            }
             restoredBuffer.applyAutomaticCleanup(now: Date())
             buffer = restoredBuffer
             items = restoredBuffer.items
-            persist()
+            persistenceLoadFailed = false
+            let queuedImports = pendingRecoveryImports
+            pendingRecoveryImports.removeAll()
+            if queuedImports.isEmpty {
+                persist()
+            } else {
+                importItems(queuedImports)
+            }
             items.forEach(scheduleImageTextRecognitionIfNeeded)
         }
         loadingTask = task
@@ -2171,6 +2246,7 @@ final class ClipboardHistoryService {
     }
 
     private func refreshLoadedHistory(frontmostApplicationBundleIdentifier: String? = nil) {
+        guard hasLoadedPersistedHistory else { return }
         let pasteboard = self.pasteboard
         let now = Date()
         currentItemCount = pasteboard.pasteboardItems?.count ?? 0
@@ -2587,6 +2663,11 @@ final class ClipboardHistoryService {
     func importItems(_ importedItems: [ClipboardHistoryItem]) {
         let safeItems = importedItems.filter { !$0.isSensitive }
         guard !safeItems.isEmpty else { return }
+        if persistenceLoadFailed {
+            // 自动同步或归档导入先排队，待旧历史完整恢复后再合并和落盘。
+            pendingRecoveryImports.append(contentsOf: safeItems)
+            return
+        }
         historyMutationGeneration &+= 1
         let tombstones = safeItems.filter { $0.deletedAt != nil }
         let liveItems = safeItems.filter { $0.deletedAt == nil }
@@ -2719,7 +2800,7 @@ final class ClipboardHistoryService {
     }
 
     private func persist() {
-        guard let persistenceURL else { return }
+        guard !persistenceLoadFailed, let persistenceURL else { return }
         do {
             try ClipboardHistoryPersistence.save(buffer.items + buffer.tombstones, to: persistenceURL)
             persistenceErrorMessage = nil

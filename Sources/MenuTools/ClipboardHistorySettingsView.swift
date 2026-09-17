@@ -186,6 +186,10 @@ struct ClipboardHistorySettingsView: View {
 
     private var historyWorkspace: some View {
         VStack(alignment: .leading, spacing: 14) {
+            if let error = historyService.persistenceErrorMessage {
+                Label(error, systemImage: "exclamationmark.triangle")
+                    .foregroundStyle(.orange)
+            }
             searchField
             historyControls
             recognitionFailureHint

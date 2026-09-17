@@ -1,6 +1,7 @@
 import AppKit
 import SQLite3
 import CoreImage
+import CryptoKit
 import CoreImage.CIFilterBuiltins
 import Foundation
 import Testing
@@ -1992,4 +1993,108 @@ func clipboardPDFPasteboardRoundTrips() {
     let pdf = Data("%PDF-1.7 test".utf8)
     #expect(ClipboardHistoryPasteboardWriter.write(.pdf(pdf), to: pasteboard))
     #expect(ClipboardHistoryPasteboardReader.content(from: pasteboard.pasteboardItems ?? []) == .pdf(pdf))
+}
+
+@Test("历史记录解码失败时不覆盖数据库或回退到更旧备份")
+@MainActor
+func historyServicePreservesUnreadableDatabase() async throws {
+    let url = FileManager.default.temporaryDirectory
+        .appendingPathComponent("MenuTools-Clipboard-Unreadable-\(UUID().uuidString).sqlite3")
+    defer { ClipboardHistoryTemporaryDatabase.remove(url) }
+    try ClipboardHistoryPersistence.save([makeTextItem("旧备份")], to: url)
+    try ClipboardHistoryPersistence.save([makeTextItem("需要保护的记录")], to: url)
+    var database: OpaquePointer?
+    #expect(sqlite3_open(url.path, &database) == SQLITE_OK)
+    #expect(sqlite3_exec(database, "UPDATE clipboard_items SET metadata = X'01020304'", nil, nil, nil) == SQLITE_OK)
+    sqlite3_close(database)
+    let original = try Data(contentsOf: url)
+    let backupURL = ClipboardHistoryPersistence.backupURL(for: url)
+    let originalBackup = try Data(contentsOf: backupURL)
+    let pasteboard = NSPasteboard(name: .init("MenuToolsTests.\(UUID().uuidString)"))
+    let service = ClipboardHistoryService(persistenceURL: url, pasteboard: pasteboard)
+
+    await service.loadPersistedHistory()
+    #expect(!service.hasLoadedPersistedHistory)
+    #expect(service.persistenceErrorMessage != nil)
+    service.clearHistory()
+    #expect(try Data(contentsOf: url) == original)
+    #expect(try Data(contentsOf: backupURL) == originalBackup)
+}
+
+@Test("富文本附件解密失败不会当成空附件后重新保存")
+@MainActor
+func historyServicePreservesUnreadableRichTextBlob() async throws {
+    let url = FileManager.default.temporaryDirectory
+        .appendingPathComponent("MenuTools-Clipboard-UnreadableBlob-\(UUID().uuidString).sqlite3")
+    defer { ClipboardHistoryTemporaryDatabase.remove(url) }
+    let item = ClipboardHistoryItem(
+        id: UUID(), content: .richText(.init(plainText: "内容", html: Data("<b>内容</b>".utf8), rtf: nil)),
+        capturedAt: Date(), expiresAt: nil, isPinned: false
+    )
+    try ClipboardHistoryPersistence.save([item], to: url)
+    let blobURL = ClipboardHistoryPersistence.blobsURL(for: url)
+        .appendingPathComponent("\(item.id.uuidString).html")
+    let corrupted = Data("MTCLIPDB1broken".utf8)
+    try corrupted.write(to: blobURL)
+    let original = try Data(contentsOf: url)
+    let service = ClipboardHistoryService(persistenceURL: url)
+
+    await service.loadPersistedHistory()
+    #expect(!service.hasLoadedPersistedHistory)
+    #expect(service.persistenceErrorMessage != nil)
+    #expect(try Data(contentsOf: url) == original)
+    #expect(try Data(contentsOf: blobURL) == corrupted)
+}
+
+@Test("钥匙串恢复可用后仍能读取本地备用密钥加密的历史")
+func historyEncryptionReadsWithExistingFallbackKey() throws {
+    let originalKey = SymmetricKey(size: .bits256)
+    let currentKey = SymmetricKey(size: .bits256)
+    let content = Data("历史不能随密钥来源切换丢失".utf8)
+    let sealed = try AES.GCM.seal(content, using: originalKey)
+    let encrypted = Data("MTCLIPDB1".utf8) + (try #require(sealed.combined))
+    #expect(try ClipboardHistoryEncryption.open(
+        encrypted, primaryKey: { currentKey }, fallbackKey: { originalKey }
+    ) == content)
+    #expect(throws: (any Error).self) {
+        try ClipboardHistoryEncryption.open(
+            encrypted, primaryKey: { currentKey }, fallbackKey: { currentKey }
+        )
+    }
+}
+
+private actor ClipboardHistoryRetryLoader {
+    private var attempts = 0
+    let gate: ClipboardHistoryLoadGate
+    init(items: [ClipboardHistoryItem]) { gate = ClipboardHistoryLoadGate(items: items) }
+    func load() async throws -> [ClipboardHistoryItem] {
+        attempts += 1
+        if attempts == 1 { throw ClipboardHistoryPersistenceError.unreadableRecord }
+        return await gate.load()
+    }
+}
+
+@Test("恢复读取失败后重试会保留之前和期间导入的记录", arguments: [false, true])
+@MainActor
+func historyServiceMergesImportsDuringRecovery(importDuringRetry: Bool) async throws {
+    let url = FileManager.default.temporaryDirectory
+        .appendingPathComponent("MenuTools-Clipboard-Retry-\(UUID().uuidString).sqlite3")
+    defer { ClipboardHistoryTemporaryDatabase.remove(url) }
+    let original = makeTextItem("原历史")
+    let imported = makeTextItem("导入内容")
+    try ClipboardHistoryPersistence.save([original], to: url)
+    let loader = ClipboardHistoryRetryLoader(items: [original])
+    let service = ClipboardHistoryService(persistenceURL: url, persistenceLoader: { _ in try await loader.load() })
+    await service.loadPersistedHistory()
+    if !importDuringRetry { service.importItems([imported]) }
+    let retry = Task { await service.loadPersistedHistory() }
+    await loader.gate.waitUntilLoadStarts()
+    if importDuringRetry { service.importItems([imported]) }
+    await loader.gate.finishLoading()
+    await retry.value
+    service.setLimit(.fifty)
+    #expect(service.hasLoadedPersistedHistory)
+    #expect(service.persistenceErrorMessage == nil)
+    #expect(Set(service.items.map(\.id)) == [original.id, imported.id])
+    #expect(Set(ClipboardHistoryPersistence.load(from: url).map(\.id)) == [original.id, imported.id])
 }
