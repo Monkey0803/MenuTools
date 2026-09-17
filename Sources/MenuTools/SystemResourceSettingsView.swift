@@ -51,6 +51,9 @@ struct SystemResourceSettingsView: View {
     @State private var hoveredHistoryIndex: Int?
     @State private var showsMemoryDetail = false
     @State private var showsAllProcesses = false
+    /// 概览页的只读明细默认收起：核心占用、温度/GPU 都不影响「一眼看主要指标」。
+    @State private var showsCoreDetails = false
+    @State private var showsOptionalDetails = false
 
     /// 进程列表默认只渲染前几项：设置页是「看谁占资源」，不是进程管理器。
     private static let processPreviewLimit = 8
@@ -122,7 +125,13 @@ struct SystemResourceSettingsView: View {
             Section {
                 LabeledContent(L("resource.cpu"), value: percent(snapshot.cpuUsage))
                 if snapshot.coreUsages.count > 1 {
-                    coreBars(snapshot.coreUsages)
+                    DisclosureGroup(isExpanded: $showsCoreDetails) {
+                        coreBars(snapshot.coreUsages)
+                    } label: {
+                        Text(L("resource.cores"))
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                    }
                 }
             } header: {
                 Label(L("resource.cpu"), systemImage: "cpu")
@@ -201,17 +210,19 @@ struct SystemResourceSettingsView: View {
 
             if snapshot.temperatureCelsius != nil || snapshot.gpuUsage != nil {
                 Section {
-                    if let temperature = snapshot.temperatureCelsius {
-                        LabeledContent(
-                            L("resource.temperature"),
-                            value: String(format: "%.0f °C", temperature)
-                        )
+                    DisclosureGroup(isExpanded: $showsOptionalDetails) {
+                        if let temperature = snapshot.temperatureCelsius {
+                            LabeledContent(
+                                L("resource.temperature"),
+                                value: String(format: "%.0f °C", temperature)
+                            )
+                        }
+                        if let gpu = snapshot.gpuUsage {
+                            LabeledContent(L("resource.gpu"), value: percent(gpu))
+                        }
+                    } label: {
+                        Label(L("resource.optional.title"), systemImage: "thermometer.medium")
                     }
-                    if let gpu = snapshot.gpuUsage {
-                        LabeledContent(L("resource.gpu"), value: percent(gpu))
-                    }
-                } header: {
-                    Label(L("resource.optional.title"), systemImage: "thermometer.medium")
                 }
             }
 
@@ -235,9 +246,6 @@ struct SystemResourceSettingsView: View {
 
     private func coreBars(_ usages: [SystemResourceCoreUsage]) -> some View {
         VStack(alignment: .leading, spacing: 6) {
-            Text(L("resource.cores"))
-                .font(.caption)
-                .foregroundStyle(.secondary)
             LazyVGrid(columns: [GridItem(.adaptive(minimum: 54), spacing: 6)], alignment: .leading, spacing: 4) {
                 ForEach(usages, id: \.index) { core in
                     HStack(spacing: 4) {

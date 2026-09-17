@@ -269,7 +269,7 @@ swift Scripts/test_powersources.swift     # 电源与内存相关信息源可读
 swift Scripts/test_app_volume_tap.swift   # 单 App 音量依赖的音频 Process Tap
 ```
 
-设置页导航改造（系统监控四个子页、音频「显示高级设置」收起低频区块）的逐项验收步骤见 [`docs/system-and-audio-acceptance.md`](docs/system-and-audio-acceptance.md)。
+设置页的滚动长度也可回归：`swift Scripts/test_settings_layout.swift` 会逐个切换窗口管理/系统监控/音频三个页面共 13 个子页，测量内容高度并与基线对照。逐项验收步骤见 [`docs/system-and-audio-acceptance.md`](docs/system-and-audio-acceptance.md)。
 
 ### 用链接触发窗口操作
 

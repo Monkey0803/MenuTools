@@ -215,7 +215,7 @@ swift Scripts/test_powersources.swift     # power and memory related information
 swift Scripts/test_app_volume_tap.swift   # the audio process tap behind per-app volume
 ```
 
-The step-by-step checklist for the settings navigation rework (four sub-pages for the system monitor, and the "Show advanced settings" switch on the audio page) lives in [`docs/system-and-audio-acceptance.md`](docs/system-and-audio-acceptance.md).
+Scroll length is regression-tested too: `swift Scripts/test_settings_layout.swift` walks all 13 sub-pages of the window-management, system-monitor and audio pages, measures their content height and compares it against a recorded baseline. The step-by-step checklist lives in [`docs/system-and-audio-acceptance.md`](docs/system-and-audio-acceptance.md).
 
 ### Triggering Window Actions by URL
 
