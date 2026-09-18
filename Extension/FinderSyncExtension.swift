@@ -40,17 +40,37 @@ final class FinderSyncExtension: FIFinderSync {
     }
 
     override func menu(for menuKind: FIMenuKind) -> NSMenu {
+        // Performance tracking
+        RightClickPerformanceMonitor.shared.beginPhase("menu_start")
+        
         let menu = NSMenu(title: "")
         let payload = RightClickClipboardReader.payload()
+        
+        RightClickPerformanceMonitor.shared.endPhase("payload_read")
+        
         let context = menuContext(for: menuKind, payload: payload)
+        
+        RightClickPerformanceMonitor.shared.endPhase("context_build")
+        
         let nodes = RightClickMenuBuilder.nodes(
             config: config, context: context, resources: menuResources(for: payload))
-        guard !nodes.isEmpty else { return menu }
+        
+        RightClickPerformanceMonitor.shared.endPhase("nodes_build")
+        
+        guard !nodes.isEmpty else { 
+            RightClickPerformanceMonitor.shared.report()
+            return menu 
+        }
+        
         // 保留数次菜单的指令快照；旧菜单的 tag 绝不重新映射到新动作。
         registry.prune(keeping: 2048)
         for node in nodes {
             if let item = menuItem(for: node) { menu.addItem(item) }
         }
+        
+        RightClickPerformanceMonitor.shared.endPhase("menu_render")
+        RightClickPerformanceMonitor.shared.report()
+        
         return menu
     }
 

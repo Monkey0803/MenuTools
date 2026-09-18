@@ -72,6 +72,7 @@ enum RightClickCommandHandler {
             } catch is CancellationError {
                 showMessage(L("rc.operation.cancelled"), title: L("rc.title"))
             } catch {
+                RightClickLogger.error("Operation failed: \(error.localizedDescription)")
                 showMessage(error.localizedDescription, title: L("rc.error.title"), error: true)
             }
         }
