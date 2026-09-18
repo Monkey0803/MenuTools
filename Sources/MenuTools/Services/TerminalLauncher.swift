@@ -1,33 +1,11 @@
 import AppKit
 import Foundation
 
-/// 支持的终端 App，按优先级排列
-enum TerminalApp: String, CaseIterable, Identifiable {
-    case terminal = "com.apple.Terminal"
-    case iterm = "com.googlecode.iterm2"
-    case warp = "dev.warp.Warp-Stable"
-    case ghostty = "com.mitchellh.ghostty"
-    case kitty = "net.kovidgoyal.kitty"
-    case alacritty = "org.alacritty"
-
-    var id: String { rawValue }
-
+extension TerminalApp {
     var displayName: String {
         switch self {
         case .terminal: return L("terminal.builtin")
-        case .iterm: return "iTerm2"
-        case .warp: return "Warp"
-        case .ghostty: return "Ghostty"
-        case .kitty: return "kitty"
-        case .alacritty: return "Alacritty"
-        }
-    }
-
-    /// 紧凑展示用短名
-    var shortName: String {
-        switch self {
-        case .terminal: return "Terminal"
-        default: return displayName
+        default: return shortName
         }
     }
 

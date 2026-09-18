@@ -162,7 +162,7 @@ final class MenuBarStatusItemController: NSObject {
             let popover = NSPopover()
             popover.behavior = .transient
             popover.animates = true
-            popover.contentSize = NSSize(width: 352, height: 672)
+            popover.contentSize = NSSize(width: MenuPanelLayout.width, height: MenuPanelLayout.height)
             popover.contentViewController = NSHostingController(
                 rootView: MenuPanelView { [weak self] tab in
                     self?.openSettings(tab)
@@ -178,8 +178,8 @@ final class MenuBarStatusItemController: NSObject {
         }
     }
 
-    /// 供剪贴板插件的全局快捷键直接调出历史记录。
-    func showClipboardHistory() {
+    /// 快捷键可继续顺序粘贴；从主面板打开历史时只展示，不消费待粘贴条目。
+    func showClipboardHistory(advancingSequentialPaste: Bool = true) {
         guard BuiltInPluginManager.shared.isEnabled(.clipboard),
               let button = statusItem?.button else {
             return
@@ -187,7 +187,7 @@ final class MenuBarStatusItemController: NSObject {
 
         ClipboardAutoPasteTargetTracker.shared.rememberFrontmostApplication()
 
-        if ClipboardHistoryService.shared.hasActiveSequentialPaste {
+        if advancingSequentialPaste, ClipboardHistoryService.shared.hasActiveSequentialPaste {
             _ = ClipboardHistoryService.shared.pasteNextSequentialItem()
             return
         }

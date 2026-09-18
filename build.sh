@@ -96,8 +96,8 @@ if [[ ! -d "$SDK" ]]; then
 fi
 echo "==> 编译 Finder 扩展（SDK: $SDK）"
 mkdir -p "$APPEX/Contents/MacOS" "$APPEX/Contents/Resources"
-# 扩展源 + 与主 App 共享的配置模型一起编译；入口 NSExtensionMain
-swiftc Extension/*.swift Sources/MenuTools/RightClickConfig.swift \
+# 扩展源 + 与主 App 共享的配置模型/菜单构建一起编译；入口 NSExtensionMain
+swiftc Extension/*.swift Sources/MenuTools/RightClickApplicationFilter.swift Sources/MenuTools/RightClickConfig.swift Sources/MenuTools/RightClickMenuPolicy.swift Sources/MenuTools/RightClickExtensionSupport.swift Sources/MenuTools/TerminalApp.swift \
     -sdk "$SDK" -target arm64-apple-macos26.0 \
     -framework FinderSync -framework AppKit \
     -Xlinker -e -Xlinker _NSExtensionMain \

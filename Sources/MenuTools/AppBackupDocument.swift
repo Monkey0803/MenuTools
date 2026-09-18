@@ -37,6 +37,7 @@ struct AppBackupSettings: Codable, Equatable, Sendable {
     /// 菜单栏显示内容（跨模块统一选择器）。
     var menuBarMetric: String? = nil
     var networkTrafficMonthlyQuota: Int64? = nil
+
 }
 
 /// 备份文档校验失败的原因。
@@ -132,7 +133,7 @@ struct AppBackupDocument: Codable, Equatable, Sendable {
         for key in rightClick.enabled.keys.sorted() where RightClickItem(rawValue: key) == nil {
             throw AppBackupValidationError.invalidRightClickKey(key)
         }
-
+        _ = try rightClick.validated()
 
         switch (settings.enabledPluginIDs, settings.pluginOrder) {
         case (nil, nil):
@@ -172,7 +173,6 @@ struct AppBackupDocument: Codable, Equatable, Sendable {
            !(0...10_000_000_000_000_000).contains(quota) {
             throw AppBackupValidationError.invalidNetworkTrafficMonthlyQuota(quota)
         }
-
         return self
     }
 

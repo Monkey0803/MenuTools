@@ -317,6 +317,19 @@ func unknownJSONFieldsAreIgnored() throws {
     #expect(reencodedRightClick["unexpectedAction"] == nil)
 }
 
+@Test("设置备份包含完整 Finder 模板应用目录并拒绝非法模板")
+func rightClickBackupValidatesNewConfiguration() throws {
+    var backup = document(settings: .fixture)
+    backup.createdAt = Date(timeIntervalSince1970: 1_700_000_000)
+    backup.rightClick.templates = [.init(id: "custom", name: "README", filename: "README.md", content: "# Test")]
+    backup.rightClick.applications = [.init(id: "app", name: "Editor", path: "/Applications/Editor.app", bundleIdentifier: "com.example.Editor")]
+    backup.rightClick.destinations = [.init(id: "dest", name: "Archive", path: "/tmp/archive")]
+    backup.rightClick.order = ["checksum", "newFile"]
+    #expect(try AppBackupService.decode(AppBackupService.encode(backup)) == backup)
+    backup.rightClick.templates[0].filename = "../outside"
+    #expect(throws: (any Error).self) { try backup.validated() }
+}
+
 private func document(settings: AppBackupSettings) -> AppBackupDocument {
     AppBackupDocument.current(
         settings: settings,

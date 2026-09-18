@@ -21,11 +21,8 @@ enum SystemResourceSettingsPage: String, CaseIterable, Identifiable {
     }
 }
 
-/// 系统资源页的 Liquid Glass 视觉参数，集中管理以便保持设置页风格一致。
+/// 系统资源页的切换策略，防止表单内容继承导航动画。
 enum SystemResourceVisualPolicy {
-    static let usesLiquidGlass = true
-    static let containerSpacing: CGFloat = 10
-
     /// 页面切换只更新选中状态，不让动态 Form 参与隐式布局动画。
     static func selectionBinding(
         _ selection: Binding<SystemResourceSettingsPage>
@@ -61,8 +58,9 @@ struct SystemResourceSettingsView: View {
     private static let processPreviewLimit = 8
 
     var body: some View {
-        GlassEffectContainer(spacing: SystemResourceVisualPolicy.containerSpacing) {
-            VStack(spacing: SystemResourceVisualPolicy.containerSpacing) {
+        Form {
+            // 与音频设置一致：使用分组表单中的首个 Section 承载分类导航。
+            Section {
                 Picker(
                     L("resource.page.title"),
                     selection: SystemResourceVisualPolicy.selectionBinding($page)
@@ -75,37 +73,29 @@ struct SystemResourceSettingsView: View {
                 .labelsHidden()
                 .focusable(false)
                 .focusEffectDisabled()
-                .glassEffect(
-                    .regular
-                        .tint(Color.accentColor.opacity(0.18)),
-                    in: .rect(cornerRadius: 10)
-                )
-
-                Form {
-                    Group {
-                        switch page {
-                        case .overview:
-                            overviewSections
-                        case .processes:
-                            processSections
-                        case .history:
-                            historySections
-                        case .alerts:
-                            alertSection
-                            selfCheckSection
-                        }
-                    }
-                    .transaction { transaction in
-                        transaction.animation = nil
-                        transaction.disablesAnimations = true
-                    }
-                }
-                .formStyle(.grouped)
-                .scrollContentBackground(.hidden)
-                .frame(maxWidth: .infinity, maxHeight: .infinity)
             }
-            .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
+
+            Group {
+                switch page {
+                case .overview:
+                    overviewSections
+                case .processes:
+                    processSections
+                case .history:
+                    historySections
+                case .alerts:
+                    alertSection
+                    selfCheckSection
+                }
+            }
+            .transaction { transaction in
+                transaction.animation = nil
+                transaction.disablesAnimations = true
+            }
         }
+        .formStyle(.grouped)
+        .scrollContentBackground(.hidden)
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
         .task {
             resource.beginMonitoring()
             processes.beginMonitoring()

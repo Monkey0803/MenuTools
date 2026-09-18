@@ -19,15 +19,16 @@ enum MenuPanelEntranceTiming {
 
 /// 卡片错峰入场动画
 private struct Entrance: ViewModifier {
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
     let appeared: Bool
     let index: Int
 
     func body(content: Content) -> some View {
         content
             .opacity(appeared ? 1 : 0)
-            .offset(y: appeared ? 0 : 16)
+            .offset(y: appeared || reduceMotion ? 0 : 16)
             .animation(
-                .spring(response: 0.38, dampingFraction: 0.82)
+                reduceMotion ? nil : .spring(response: 0.38, dampingFraction: 0.82)
                     .delay(MenuPanelEntranceTiming.delay(for: index)),
                 value: appeared
             )
@@ -63,7 +64,7 @@ extension View {
         shape: AnyShape = AnyShape(.rect(cornerRadius: 16))
     ) -> some View {
         modifier(
-            ControlCenterSurface(
+            MenuPanelContentSurface(
                 tint: tint,
                 selected: selected,
                 interactive: interactive,
@@ -258,6 +259,12 @@ struct MenuPanelView: View {
     @AppStorage(SettingsKey.preferredTerminal) private var preferredTerminal = TerminalApp.systemDefault.rawValue
     @AppStorage(SettingsKey.appLanguage) private var appLanguage = AppLanguage.system.rawValue
     @Environment(\.openSettings) private var openSettings
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
+    @Environment(\.accessibilityReduceTransparency) private var reduceTransparency
+    @AppStorage(MenuPanelNavigation.categoryKey) private var selectedCategory = MenuPanelCategory.favorites.rawValue
+    @AppStorage(MenuPanelNavigation.pinsKey) private var pinnedFeatures = ""
+    @Namespace private var panelGlass
+    @FocusState private var categoryHasFocus: Bool
 
     @ObservedObject private var caffeinate = CaffeinateService.shared
     @ObservedObject private var bleMonitor = BLEBatteryMonitor.shared
@@ -312,104 +319,27 @@ struct MenuPanelView: View {
     }
 
     var body: some View {
-        VStack(spacing: 12) {
-            header
-                .entrance(0, appeared: appeared)
-
-            ScrollView(.vertical, showsIndicators: false) {
-                LazyVStack(spacing: 10) {
-                    if pluginManager.isEnabled(.systemControls)
-                        || pluginManager.isEnabled(.finderTools) {
-                        heroTiles
-                            .entrance(1, appeared: appeared)
-                    }
-                    if TranslationPanelEntryPolicy.shouldShow(
-                        isPluginEnabled: pluginManager.isEnabled(.translation)
-                    ) {
-                        translationCard
-                            .entrance(2, appeared: appeared)
-                    }
-                    if !enabledQuickActions.isEmpty {
-                        quickActionsCard
-                            .entrance(2, appeared: appeared)
-                    }
-                    if pluginManager.isEnabled(.automation) {
-                        ScenePresetsCard(activeScene: sceneService.activeScene, apply: applyScene)
-                            .entrance(3, appeared: appeared)
-                        GlobalShortcutCard(service: globalShortcutService, report: flashStatus)
-                            .entrance(4, appeared: appeared)
-                        FocusModeCard(
-                            isEnabled: focusModeService.isEnabled,
-                            isDoNotDisturbEnabled: focusModeService.isDoNotDisturbEnabled,
-                            isBusy: focusModeService.isBusy,
-                            toggle: toggleFocusMode,
-                            toggleDoNotDisturb: toggleDoNotDisturb,
-                            openSettings: openFocusSettings
-                        )
-                        .entrance(5, appeared: appeared)
-                    }
-                    if pluginManager.isEnabled(.systemResources) {
-                        systemResourceCard
-                            .entrance(6, appeared: appeared)
-                    }
-                    if pluginManager.isEnabled(.systemInsights) {
-                        networkCard
-                            .entrance(7, appeared: appeared)
-                        batteryHealthCard
-                            .entrance(8, appeared: appeared)
-                        displayCard
-                            .entrance(9, appeared: appeared)
-                        storageCard
-                            .entrance(10, appeared: appeared)
-                    }
-                    if pluginManager.isEnabled(.networkTraffic) {
-                        networkTrafficCard
-                            .entrance(11, appeared: appeared)
-                    }
-                    if pluginManager.isEnabled(.systemControls) {
-                        quickToggles
-                            .entrance(11, appeared: appeared)
-                    }
-                    if pluginManager.isEnabled(.appVolume) {
-                        AppVolumeCard(service: appVolumeService) {
-                            openSettingsAction?(.volume)
-                        }
-                        .entrance(12, appeared: appeared)
-                    }
-                    if pluginManager.isEnabled(.systemInsights) {
-                        bluetoothCard
-                            .entrance(13, appeared: appeared)
-                    }
-                    if pluginManager.isEnabled(.systemInsights) {
-                        cleanupTiles
-                            .entrance(14, appeared: appeared)
-                    }
-                }
+        GlassEffectContainer(spacing: 12) {
+            VStack(spacing: 12) {
+                header
+                categoryPicker
+                categoryContent
+                footer
             }
-            .scrollContentBackground(.hidden)
-            .background(.clear)
-
-            footer
-                .entrance(15, appeared: appeared)
+            .padding(16)
         }
-        .padding(16)
-        // 菜单栏窗口必须有明确高度，否则 ScrollView 会按全部卡片的理想高度展开，
-        // 在菜单栏屏幕上无法正常显示弹出面板。
-        .frame(width: 320, height: 640)
+        // 固定窗口高度和导航位置，分类切换只替换内容，不改变菜单栏弹层尺寸。
+        .frame(width: MenuPanelLayout.width, height: MenuPanelLayout.height)
+        .defaultFocus($categoryHasFocus, true)
         .background {
-            RoundedRectangle(cornerRadius: 22, style: .continuous)
-                .fill(Color(nsColor: .windowBackgroundColor).opacity(0.82))
-                .overlay {
-                    RoundedRectangle(cornerRadius: 22, style: .continuous)
-                        .fill(.ultraThinMaterial)
-                        .opacity(0.34)
-                }
+            if reduceTransparency {
+                RoundedRectangle(cornerRadius: 22).fill(Color(nsColor: .windowBackgroundColor))
+            } else {
+                RoundedRectangle(cornerRadius: 22).fill(.regularMaterial)
+            }
         }
         .clipShape(RoundedRectangle(cornerRadius: 22, style: .continuous))
-        .overlay {
-            RoundedRectangle(cornerRadius: 22, style: .continuous)
-                .strokeBorder(Color.white.opacity(0.16), lineWidth: 0.7)
-        }
+        .environment(\.menuPanelGroupedSurfaces, true)
         .overlay(alignment: .bottom) {
             if let statusMessage {
                 statusBanner(statusMessage)
@@ -533,6 +463,210 @@ struct MenuPanelView: View {
         }
     }
 
+    // MARK: - 分类导航与常用功能
+
+    private var currentCategory: MenuPanelCategory {
+        MenuPanelNavigation.category(for: selectedCategory)
+    }
+
+    private var pins: [MenuPanelFeature] {
+        MenuPanelNavigation.decodePins(pinnedFeatures)
+    }
+
+    private var categoryItems: [MenuPanelFeature] {
+        MenuPanelNavigation.items(
+            in: currentCategory,
+            enabledPlugins: pluginManager.enabledPluginIDs,
+            pinned: pins
+        )
+    }
+
+    private var categoryPicker: some View {
+        MenuPanelCategoryBar(selection: Binding(
+            get: { currentCategory },
+            set: { category in
+                // 玻璃导航自行处理动画，页面内容只在松手或点击后无动画切换。
+                var transaction = Transaction(animation: nil)
+                transaction.disablesAnimations = true
+                withTransaction(transaction) {
+                    selectedCategory = category.rawValue
+                }
+            }
+        ), glassNamespace: panelGlass)
+        .focused($categoryHasFocus)
+    }
+
+    private var categoryContent: some View {
+        ScrollViewReader { proxy in
+            VStack(spacing: 10) {
+                HStack {
+                    Text(L(currentCategory.titleKey))
+                        .font(.headline)
+                        .accessibilityAddTraits(.isHeader)
+                    Spacer()
+                    if !categoryItems.isEmpty {
+                        Menu {
+                            ForEach(categoryItems) { item in
+                                Button(L(item.titleKey)) {
+                                    proxy.scrollTo(item.id, anchor: .top)
+                                }
+                            }
+                        } label: {
+                            Label(L("panel.jumpTo"), systemImage: "list.bullet")
+                                .font(.caption)
+                        }
+                        .menuStyle(.borderlessButton)
+                        .fixedSize()
+                        .help(L("panel.jumpTo"))
+                    }
+                    favoritesMenu
+                }
+                .frame(height: 28)
+
+                ScrollView(.vertical) {
+                    LazyVStack(spacing: 12) {
+                        if categoryItems.isEmpty {
+                            emptyCategory
+                        } else {
+                            ForEach(Array(categoryItems.enumerated()), id: \.element.id) { index, item in
+                                featureCard(item)
+                                    .id(item.id)
+                                    .contextMenu {
+                                        Button(L(pins.contains(item) ? "panel.unpin" : "panel.pin")) {
+                                            setPinned(!pins.contains(item), feature: item)
+                                        }
+                                    }
+                                    .entrance(index, appeared: appeared || reduceMotion)
+                            }
+                        }
+                    }
+                    .padding(.vertical, 2)
+                }
+                .id(currentCategory)
+                .scrollContentBackground(.hidden)
+                .frame(maxWidth: .infinity, maxHeight: .infinity)
+            }
+        }
+    }
+
+    private var favoritesMenu: some View {
+        Menu {
+            ForEach(MenuPanelCategory.allCases.filter { $0 != .favorites }) { category in
+                let items = MenuPanelNavigation.items(
+                    in: category, enabledPlugins: pluginManager.enabledPluginIDs, pinned: pins
+                )
+                if !items.isEmpty {
+                    Section(L(category.titleKey)) {
+                        ForEach(items) { item in
+                            Toggle(L(item.titleKey), isOn: Binding(
+                                get: { pins.contains(item) },
+                                set: { setPinned($0, feature: item) }
+                            ))
+                        }
+                    }
+                }
+            }
+            Divider()
+            Button(L("panel.resetPins")) {
+                pinnedFeatures = MenuPanelNavigation.encodePins(MenuPanelNavigation.defaultPins)
+            }
+        } label: {
+            Image(systemName: "pin.circle")
+                .font(.body)
+                .frame(width: 26, height: 26)
+        }
+        .menuStyle(.borderlessButton)
+        .menuIndicator(.hidden)
+        .fixedSize()
+        .accessibilityLabel(L("panel.editFavorites"))
+        .help(L("panel.editFavorites"))
+    }
+
+    private func setPinned(_ pinned: Bool, feature: MenuPanelFeature) {
+        var updated = pins.filter { $0 != feature }
+        if pinned { updated.append(feature) }
+        pinnedFeatures = MenuPanelNavigation.encodePins(updated)
+    }
+
+    private var emptyCategory: some View {
+        VStack(spacing: 12) {
+            Image(systemName: currentCategory == .favorites ? "pin" : "square.grid.2x2")
+                .font(.largeTitle)
+                .foregroundStyle(.secondary)
+            Text(L(currentCategory == .favorites ? "panel.emptyFavorites" : "panel.emptyCategory"))
+                .font(.headline)
+            Text(L(currentCategory == .favorites ? "panel.emptyFavoritesHint" : "panel.emptyCategoryHint"))
+                .font(.callout)
+                .foregroundStyle(.secondary)
+                .multilineTextAlignment(.center)
+            Button(L("plugin.center.title")) { showPanelSettings(.plugins) }
+                .buttonStyle(.bordered)
+        }
+        .padding(.horizontal, 12)
+        .padding(.vertical, 40)
+        .frame(maxWidth: .infinity)
+    }
+
+    @ViewBuilder
+    private func featureCard(_ item: MenuPanelFeature) -> some View {
+        switch item {
+        case .hero: heroTiles
+        case .translation: translationCard
+        case .quickActions: quickActionsCard
+        case .scenes: ScenePresetsCard(activeScene: sceneService.activeScene, apply: applyScene)
+        case .shortcuts: GlobalShortcutCard(service: globalShortcutService, report: flashStatus)
+        case .focus:
+            FocusModeCard(
+                isEnabled: focusModeService.isEnabled,
+                isDoNotDisturbEnabled: focusModeService.isDoNotDisturbEnabled,
+                isBusy: focusModeService.isBusy,
+                toggle: toggleFocusMode,
+                toggleDoNotDisturb: toggleDoNotDisturb,
+                openSettings: openFocusSettings
+            )
+        case .resources: systemResourceCard
+        case .network: networkCard
+        case .battery: batteryHealthCard
+        case .display: displayCard
+        case .storage: storageCard
+        case .traffic: networkTrafficCard
+        case .toggles: quickToggles
+        case .volume:
+            AppVolumeCard(service: appVolumeService) { showPanelSettings(.volume) }
+        case .bluetooth: bluetoothCard
+        case .cleanup: cleanupTiles
+        case .clipboard:
+            Button {
+                MenuBarStatusItemController.shared.showClipboardHistory(advancingSequentialPaste: false)
+            } label: {
+                HStack(spacing: 10) {
+                    Image(systemName: "clipboard")
+                        .font(.title3)
+                        .foregroundStyle(.tint)
+                    Text(L("clipboard.history"))
+                        .font(.callout.weight(.medium))
+                    Spacer()
+                    Image(systemName: "chevron.right")
+                        .font(.caption.weight(.semibold))
+                        .foregroundStyle(.secondary)
+                }
+                .padding(14)
+                .contentShape(.rect(cornerRadius: 16))
+            }
+            .buttonStyle(.plain)
+            .controlCenterSurface(interactive: true)
+        }
+    }
+
+    private func showPanelSettings(_ tab: SettingsTab) {
+        if let openSettingsAction {
+            openSettingsAction(tab)
+        } else {
+            NSApp.activate(ignoringOtherApps: true)
+            openSettings()
+        }
+    }
+
     // MARK: - Header
 
     private var header: some View {
@@ -562,13 +696,15 @@ struct MenuPanelView: View {
             } label: {
                 Image(systemName: "power")
                     .font(.callout)
-                    .frame(width: 28, height: 28)
+                    .frame(width: 30, height: 30)
                     .contentShape(.circle)
             }
             .buttonStyle(.plain)
             .focusEffectDisabled()
+            .glassEffect(.regular.interactive(), in: .circle)
+            .glassEffectID("panel.quit", in: panelGlass)
             .foregroundStyle(.secondary)
-                        .controlCenterSurface(interactive: true, shape: AnyShape(Circle()))
+            .accessibilityLabel(L("footer.quit"))
             .help(L("footer.quit"))
             Button {
                 if let openSettingsAction {
@@ -580,13 +716,15 @@ struct MenuPanelView: View {
             } label: {
                 Image(systemName: "gearshape.fill")
                     .font(.callout)
-                    .frame(width: 28, height: 28)
+                    .frame(width: 30, height: 30)
                     .contentShape(.circle)
             }
             .buttonStyle(.plain)
             .focusEffectDisabled()
+            .glassEffect(.regular.interactive(), in: .circle)
+            .glassEffectID("panel.settings", in: panelGlass)
             .foregroundStyle(.secondary)
-            .controlCenterSurface(interactive: true, shape: AnyShape(Circle()))
+            .accessibilityLabel(L("help.settings"))
             .help(L("help.settings"))
         }
     }

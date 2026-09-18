@@ -26,20 +26,28 @@ struct AppVolumeCard: View {
                 .toggleStyle(.switch)
                 .controlSize(.mini)
                 .labelsHidden()
+                .fixedSize()
                 .focusable(false)
                 .focusEffectDisabled()
                 .accessibilityLabel(L("volume.enabled"))
                 Button(action: openDetails) {
                     HStack(spacing: 3) {
-                        Text(L("volume.showAll"))
+                        Text(L("volume.showAll.compact"))
                         Image(systemName: "chevron.right")
                     }
                     .font(.caption2.weight(.medium))
+                    .lineLimit(1)
+                    .fixedSize(horizontal: true, vertical: false)
+                    .padding(.horizontal, 5)
+                    .frame(minHeight: 24)
+                    .contentShape(.rect(cornerRadius: 6))
                 }
                 .buttonStyle(.plain)
-                .controlCenterHover(shape: AnyShape(.circle))
+                .controlCenterHover(shape: AnyShape(.rect(cornerRadius: 6)))
                 .foregroundStyle(.secondary)
+                .fixedSize(horizontal: true, vertical: false)
                 .accessibilityLabel(L("volume.showAll"))
+                .help(L("volume.showAll"))
             }
 
             SystemOutputVolumeRow(service: service, compact: true)

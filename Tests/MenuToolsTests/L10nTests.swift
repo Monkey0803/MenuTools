@@ -174,6 +174,8 @@ enum LocalizationAudit {
         keys.formUnion(RightClickItem.allCases.map(\.titleKey))
         keys.formUnion(RightClickItem.allCases.compactMap(\.subtitleKey))
         keys.formUnion(RightClickItem.Group.allCases.map(\.titleKey))
+        keys.formUnion(RightClickMenuStyle.allCases.map(\.titleKey))
+        keys.formUnion(["rc.menu.root"])
         // 场景与窗口
         keys.formUnion(ScenePreset.allCases.map(\.titleKey))
         keys.formUnion(ScenePreset.allCases.map(\.subtitleKey))
