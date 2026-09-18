@@ -1593,7 +1593,21 @@
 "rc.fileKind.other" = "기타";
 "rc.terminal.default" = "기본 터미널 사용";
 
-/* File info details */
+/* Health Check */
+"settings.tab.healthCheck" = "건강 체크";
+"health.title" = "확장 기능 상태 및 권한";
+"health.extension.enabled" = "Finder 확장 기능 상태";
+"health.extension.desc" = "컨텍스트 메뉴에 항목을 표시하려면 확장 기능을 활성화해야 합니다.";
+"health.appgroup.name" = "App Group 액세스";
+"health.appgroup.desc" = "FinderSync 확장과 프로세스 간 통신에 필요합니다.";
+"health.automation.name" = "접근성 및 자동화";
+"health.automation.desc" = "시스템 설정 → 개인정보 및 보안 → 자동화 → MenuTools 가 필수입니다.";
+"health.logging.name" = "작업 로그";
+"health.logging.desc" = "디버그 로그는 ~/Library/Application Support/com.monkey0803.MenuTools/ 에 저장됩니다.";
+"health.button.openSettings" = "설정 열기";
+"health.button.viewLogs" = "로그 보기";
+
+/* Undo queue */
 "rc.info.bitRate" = "비트レート";
 "rc.info.camera" = "카메라";
 "rc.info.channels" = "채널 수";

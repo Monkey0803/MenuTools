@@ -56,6 +56,7 @@ enum SettingsTab: String, CaseIterable, Hashable, Identifiable {
     case networkTraffic
     case volume
     case rightClick
+    case healthCheck
     case scroll
     case windowManagement
     case appLaunch
@@ -73,6 +74,7 @@ enum SettingsTab: String, CaseIterable, Hashable, Identifiable {
         case .networkTraffic: return "traffic.title"
         case .volume: return "settings.tab.volume"
         case .rightClick: return "settings.tab.rightClick"
+        case .healthCheck: return "settings.tab.healthCheck"
         case .scroll: return "settings.tab.scroll"
         case .windowManagement: return "settings.tab.windowManagement"
         case .appLaunch: return "settings.tab.appLaunch"
@@ -90,6 +92,7 @@ enum SettingsTab: String, CaseIterable, Hashable, Identifiable {
         case .networkTraffic: return "arrow.up.arrow.down.circle"
         case .volume: return "speaker.wave.2.bubble"
         case .rightClick: return "contextualmenu.and.cursorarrow"
+        case .healthCheck: return "checkmark.shield"
         case .scroll: return "computermouse"
         case .windowManagement: return "macwindow.on.rectangle"
         case .appLaunch: return "app.badge"
@@ -106,6 +109,7 @@ enum SettingsTab: String, CaseIterable, Hashable, Identifiable {
         case .networkTraffic: return .networkTraffic
         case .volume: return .appVolume
         case .rightClick: return .finderTools
+        case .healthCheck: return nil
         case .scroll: return .smoothScroll
         case .windowManagement: return .windowManagement
         case .appLaunch: return .appLauncher
@@ -285,6 +289,8 @@ struct SettingsView: View {
             AppVolumeSettingsView()
         case .rightClick:
             RightClickToolsView()
+        case .healthCheck:
+            RightClickHealthCheckView()
         case .scroll:
             ScrollSettingsView()
         case .windowManagement:

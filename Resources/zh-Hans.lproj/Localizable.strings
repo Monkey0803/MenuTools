@@ -1593,7 +1593,21 @@
 "rc.fileKind.other" = "其他";
 "rc.terminal.default" = "使用默认终端";
 
-/* File info details */
+/* Health Check */
+"settings.tab.healthCheck" = "健康检查";
+"health.title" = "扩展状态与权限诊断";
+"health.extension.enabled" = "Finder 扩展状态";
+"health.extension.desc" = "扩展必须启用才能在上下文菜单中显示项目。";
+"health.appgroup.name" = "App Group 访问";
+"health.appgroup.desc" = "用于与 FinderSync 扩展进行进程间通信。";
+"health.automation.name" = "辅助功能与自动化";
+"health.automation.desc" = "系统设置 → 隐私与安全性 → 自动化 → MenuTools 必需。";
+"health.logging.name" = "操作日志";
+"health.logging.desc" = "调试日志存储在 ~/Library/Application Support/com.monkey0803.MenuTools/";
+"health.button.openSettings" = "打开设置";
+"health.button.viewLogs" = "查看日志";
+
+/* Undo queue */
 "rc.info.bitRate" = "比特率";
 "rc.info.camera" = "相机";
 "rc.info.channels" = "声道数";

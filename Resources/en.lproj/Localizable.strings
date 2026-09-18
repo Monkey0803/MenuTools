@@ -1593,6 +1593,20 @@
 "rc.fileKind.other" = "Other";
 "rc.terminal.default" = "Use Default Terminal";
 
+/* Health Check */
+"settings.tab.healthCheck" = "Health Check";
+"health.title" = "Extension Health & Permissions";
+"health.extension.enabled" = "Finder Extension Status";
+"health.extension.desc" = "The extension must be enabled for context menu items to appear.";
+"health.appgroup.name" = "App Group Access";
+"health.appgroup.desc" = "Required for inter-process communication with FinderSync extension.";
+"health.automation.name" = "Accessibility & Automation";
+"health.automation.desc" = "System Settings → Privacy & Security → Automation → MenuTools required.";
+"health.logging.name" = "Operation Logs";
+"health.logging.desc" = "Debug logs stored in ~/Library/Application Support/com.monkey0803.MenuTools/";
+"health.button.openSettings" = "Open Settings";
+"health.button.viewLogs" = "View Logs";
+
 /* Undo queue */
 "rc.undo.queued" = "%@ operation(s) queued for undo.";
 "rc.undo.remaining" = "%d item(s) still pending.";
