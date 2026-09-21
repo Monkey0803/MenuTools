@@ -5,59 +5,63 @@ import FinderSync
 /// 健康检查页面 - 显示扩展状态与权限诊断
 struct RightClickHealthCheckView: View {
     @State private var extensionEnabled = false
-    @State private var appGroupAccessible = false
+    @State private var configurationCommunicationAvailable = false
     @State private var automationPermission = false
     @State private var logFileExists = false
     
-    @AppStorage("rc_logger_enabled") private var loggerEnabled = false
+    /// 日志开关存在共享配置里（扩展进程同样读得到），设置页在「Finder 右键菜单 → 诊断」。
+    private var loggerEnabled: Bool { RightClickLogger.isEnabled }
     
     var body: some View {
-        GroupBox(label: Label("health.title", systemName: "checkmark.shield"))
-            .frame(minWidth: 400)
-            .glassEffect()
-            .padding(.top, 12)
-        
-        VStack(alignment: .leading, spacing: 16) {
-            // 扩展启用状态
-            StatusCard(
-                title: L("health.extension.enabled"),
-                description: L("health.extension.desc"),
-                isHealthy: extensionEnabled,
-                actionButton: openSettingsButton
-            )
-            
-            Divider()
-            
-            // App Group 访问状态
-            StatusCard(
-                title: L("health.appgroup.name"),
-                description: L("health.appgroup.desc"),
-                isHealthy: appGroupAccessible,
-                actionButton: nil
-            )
-            
-            Divider()
-            
-            // 自动化权限
-            StatusCard(
-                title: L("health.automation.name"),
-                description: L("health.automation.desc"),
-                isHealthy: automationPermission,
-                actionButton: nil
-            )
-            
-            Divider()
-            
-            // 日志存储状态
-            StatusCard(
-                title: L("health.logging.name"),
-                description: L("health.logging.desc"),
-                isHealthy: logFileExists || !loggerEnabled,
-                actionButton: showLogsButton
-            )
-            
-            Spacer(minLength: 8)
+        GroupBox {
+            VStack(alignment: .leading, spacing: 16) {
+                // 扩展启用状态
+                StatusCard(
+                    title: L("health.extension.enabled"),
+                    description: L("health.extension.desc"),
+                    isHealthy: extensionEnabled,
+                    actionButton: AnyView(openSettingsButton)
+                )
+
+                Divider()
+
+                // 配置与扩展通信状态；App Group 不可用时会走本地存储与通知回退。
+                StatusCard(
+                    title: L("health.appgroup.name"),
+                    description: L("health.appgroup.desc"),
+                    isHealthy: configurationCommunicationAvailable,
+                    actionButton: nil
+                )
+
+                Divider()
+
+                // 自动化权限
+                StatusCard(
+                    title: L("health.automation.name"),
+                    description: L("health.automation.desc"),
+                    isHealthy: automationPermission,
+                    actionButton: nil
+                )
+
+                Divider()
+
+                // 日志存储状态
+                StatusCard(
+                    title: L("health.logging.name"),
+                    description: L("health.logging.desc"),
+                    isHealthy: logFileExists || !loggerEnabled,
+                    actionButton: AnyView(showLogsButton)
+                )
+
+                Spacer(minLength: 8)
+            }
+            .padding(.vertical, 4)
+        } label: {
+            Label(L("health.title"), systemImage: "checkmark.shield")
         }
+        .glassEffect()
+        .padding(SettingsScrollLayout.contentInsets())
+        .frame(width: SettingsLayout.width, height: SettingsLayout.height, alignment: .top)
         .onAppear(perform: diagnose)
     }
     
@@ -65,26 +69,23 @@ struct RightClickHealthCheckView: View {
     
     private func diagnose() {
         // 扩展启用状态
-        extensionEnabled = FIFinderSyncController.default().isExtensionEnabled
+        extensionEnabled = FIFinderSyncController.isExtensionEnabled
         
-        // App Group 访问（简化为检查目录是否存在）
-        let appSupport = FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask).first!
-        let directory = appSupport.appendingPathComponent("com.monkey0803.MenuTools")
-        appGroupAccessible = FileManager.default.fileExists(atPath: directory.path)
+        // App Group 必须真的可写；自签名包可能遇到 EPERM，此时配置会回退到本地目录，
+        // 并由分布式通知把变更同步给 Finder 扩展。
+        configurationCommunicationAvailable = RightClickConfigStore.isWritableDirectory(
+            RightClickConfigStore.resolveBaseDirectory()
+        )
         
         // 自动化权限检查
         automationPermission = checkAutomationPermission()
         
         // 日志文件存在性
-        let logFile = directory.appendingPathComponent("operations.log")
-        logFileExists = FileManager.default.fileExists(atPath: logFile.path)
+        logFileExists = FileManager.default.fileExists(atPath: RightClickLogger.logFile.path)
     }
     
     private func checkAutomationPermission() -> Bool {
-        let options = [
-            kAXTrustedCheckOptionPrompt.takeUnretainedValue() as String: false
-        ]
-        return AXIsProcessTrustedWithOptions(options as CFDictionary)
+        AXIsProcessTrusted()
     }
     
     private var openSettingsButton: some View {
@@ -97,9 +98,7 @@ struct RightClickHealthCheckView: View {
     
     private var showLogsButton: some View {
         Button(L("health.button.viewLogs")) {
-            let directory = FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask).first!
-                .appendingPathComponent("com.monkey0803.MenuTools")
-            NSWorkspace.shared.open(directory)
+            NSWorkspace.shared.open(RightClickLogger.logDirectory)
         }
         .buttonStyle(.bordered)
         .controlSize(.small)
@@ -139,14 +138,6 @@ private struct StatusCard: View {
         .padding(12)
         .background(isHealthy ? Color.green.opacity(0.05) : Color.red.opacity(0.05))
         .cornerRadius(8)
-    }
-}
-
-// MARK: - Localization Extensions
-
-extension String {
-    init(literal key: String, systemName iconName: String) {
-        self = String(localized: key, bundle: .main, value: "", comment: "")
     }
 }
 

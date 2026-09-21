@@ -178,13 +178,16 @@ struct RightClickConfig: Codable, Equatable, Sendable {
     var destinations: [RightClickDestination]
     var directoryListing: RightClickDirectoryListingOptions
     var menuStyle: RightClickMenuStyle
+    /// 操作日志开关。放在共享配置里，沙盒扩展才读得到（它读不到主 App 的 UserDefaults）。
+    var loggerEnabled: Bool
 
     init(
         enabled: [String: Bool], order: [String] = [],
         templates: [RightClickTemplate] = RightClickTemplate.builtIns,
         applications: [RightClickApplication] = [], destinations: [RightClickDestination] = [],
         directoryListing: RightClickDirectoryListingOptions = .default,
-        menuStyle: RightClickMenuStyle = .nested
+        menuStyle: RightClickMenuStyle = .nested,
+        loggerEnabled: Bool = false
     ) {
         self.enabled = enabled
         self.order = order
@@ -193,10 +196,11 @@ struct RightClickConfig: Codable, Equatable, Sendable {
         self.destinations = destinations
         self.directoryListing = directoryListing
         self.menuStyle = menuStyle
+        self.loggerEnabled = loggerEnabled
     }
 
     private enum CodingKeys: String, CodingKey {
-        case enabled, order, templates, applications, destinations, directoryListing, menuStyle
+        case enabled, order, templates, applications, destinations, directoryListing, menuStyle, loggerEnabled
     }
 
     init(from decoder: any Decoder) throws {
@@ -211,6 +215,8 @@ struct RightClickConfig: Codable, Equatable, Sendable {
             ? container.decode(RightClickDirectoryListingOptions.self, forKey: .directoryListing) : .default
         menuStyle = try container.contains(.menuStyle)
             ? container.decode(RightClickMenuStyle.self, forKey: .menuStyle) : .nested
+        loggerEnabled = try container.contains(.loggerEnabled)
+            ? container.decode(Bool.self, forKey: .loggerEnabled) : false
     }
 
     static let `default` = RightClickConfig(

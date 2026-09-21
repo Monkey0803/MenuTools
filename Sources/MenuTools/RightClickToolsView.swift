@@ -1,4 +1,5 @@
 import SwiftUI
+import Combine
 import FinderSync
 import UniformTypeIdentifiers
 
@@ -14,6 +15,46 @@ struct RightClickToolsView: View {
         .publisher(for: Notification.Name(RightClickConfigStore.didChangeNotification))
 
     var body: some View {
+        VStack(alignment: .leading, spacing: 0) {
+            fixedHeader
+                .padding(.horizontal, SettingsScrollLayout.contentPadding)
+                .padding(.top, SettingsScrollLayout.contentPadding)
+            ScrollView {
+                VStack(alignment: .leading, spacing: 16) {
+                    switch page {
+                    case 1: templates
+                    case 2: favorites
+                    default: menuItems
+                    }
+                }
+                // 留白必须加在内容内部，否则滚动条会压在右侧开关上
+                .padding(SettingsScrollLayout.contentInsets())
+                .frame(maxWidth: .infinity, alignment: .leading)
+            }
+        }
+        .frame(width: SettingsLayout.width, height: SettingsLayout.height)
+        .onReceive(refreshTimer) { _ in extensionEnabled = FIFinderSyncController.isExtensionEnabled }
+        .onReceive(configChanges) { config = RightClickConfigNotification.applying($0, to: config) }
+        .sheet(item: $templateDraft) { draft in
+            RightClickTemplateEditor(template: draft) { edited in
+                var next = config
+                if let index = next.templates.firstIndex(where: { $0.id == edited.id }) { next.templates[index] = edited }
+                else { next.templates.append(edited) }
+                do {
+                    try RightClickConfigStore.save(next)
+                    config = next
+                    return nil
+                } catch { return error.localizedDescription }
+            }
+        }
+        .alert(L("rc.error.title"), isPresented: Binding(
+            get: { errorMessage != nil }, set: { if !$0 { errorMessage = nil } }
+        )) { Button(L("rc.button.ok")) { errorMessage = nil } }
+        message: { Text(errorMessage ?? "") }
+    }
+
+    /// 顶部标题、扩展状态与分页选择器固定不滚动。
+    private var fixedHeader: some View {
         VStack(alignment: .leading, spacing: 16) {
             HStack(spacing: 12) {
                 Image(systemName: "contextualmenu.and.cursorarrow").font(.title).foregroundStyle(.teal)
@@ -36,35 +77,7 @@ struct RightClickToolsView: View {
                 Text(L("rc.settings.templates")).tag(1)
                 Text(L("rc.settings.favorites")).tag(2)
             }.pickerStyle(.segmented)
-            ScrollView {
-                VStack(alignment: .leading, spacing: 16) {
-                    switch page {
-                    case 1: templates
-                    case 2: favorites
-                    default: menuItems
-                    }
-                }.frame(maxWidth: .infinity, alignment: .leading)
-            }
         }
-        .padding(20).frame(width: SettingsLayout.width, height: SettingsLayout.height)
-        .onReceive(refreshTimer) { _ in extensionEnabled = FIFinderSyncController.isExtensionEnabled }
-        .onReceive(configChanges) { config = RightClickConfigNotification.applying($0, to: config) }
-        .sheet(item: $templateDraft) { draft in
-            RightClickTemplateEditor(template: draft) { edited in
-                var next = config
-                if let index = next.templates.firstIndex(where: { $0.id == edited.id }) { next.templates[index] = edited }
-                else { next.templates.append(edited) }
-                do {
-                    try RightClickConfigStore.save(next)
-                    config = next
-                    return nil
-                } catch { return error.localizedDescription }
-            }
-        }
-        .alert(L("rc.error.title"), isPresented: Binding(
-            get: { errorMessage != nil }, set: { if !$0 { errorMessage = nil } }
-        )) { Button(L("rc.button.ok")) { errorMessage = nil } }
-        message: { Text(errorMessage ?? "") }
     }
 
     private var menuItems: some View {
@@ -144,6 +157,22 @@ struct RightClickToolsView: View {
                         }
                     ))
                     Text(L("rc.settings.listingIgnoreHint"))
+                        .font(.caption2).foregroundStyle(.secondary)
+                }.padding(.vertical, 4)
+            }
+            GroupBox(L("rc.settings.diagnostics")) {
+                VStack(alignment: .leading, spacing: 8) {
+                    Toggle(L("rc.settings.logger"), isOn: Binding(
+                        get: { config.loggerEnabled },
+                        set: { value in
+                            var next = config
+                            next.loggerEnabled = value
+                            guard save(next) else { return }
+                            // 开关存在共享配置里，扩展进程由配置广播同步（沙盒读不到 App 的 defaults）
+                            RightClickLogger.apply(next)
+                        }
+                    ))
+                    Text(L("rc.settings.loggerHint"))
                         .font(.caption2).foregroundStyle(.secondary)
                 }.padding(.vertical, 4)
             }

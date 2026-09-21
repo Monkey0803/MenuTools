@@ -197,15 +197,16 @@ grep PERF ops.log
 
 ### 启用/禁用日志记录
 
-通过代码或设置开关控制：
+开关在**设置 → Finder 右键菜单 → 诊断 → 记录操作日志**，保存在右键配置
+（`RightClickConfig.loggerEnabled`）里，随配置广播同步给扩展：
 
 ```swift
-RightClickLogger.enable()
-RightClickLogger.disable()
-
-// 读取最近 10 条日志
-let recentLogs = RightClickLogger.readRecent(count: 10)
+RightClickLogger.apply(config)          // 配置变化后同步开关（冷启动与广播都会调用）
+let recent = RightClickLogger.readRecent(count: 10)
 ```
+
+> 不要再用 `UserDefaults` 存日志开关：Finder 扩展是沙盒进程，读不到主 App 的
+> defaults，开关必须走共享配置这条通道，两个进程才看到同一个值。
 
 ### 性能监控输出
 
@@ -222,10 +223,74 @@ grep "Menu total:" ~/Library/Application\ Support/com.monkey0803.MenuTools/opera
 
 ### 诊断问题流程
 
-1. **扩展未显示**: 打开健康检查页面，确认 `Finder Extension Status` 为 Enabled
+1. **扩展未显示**: 打开「设置 → Finder 右键菜单」，看页首的扩展状态提示（`已启用/未启用 Finder 扩展`）；未启用就点「打开设置」到系统设置的扩展列表里打开
 2. **权限拒绝**: 检查 `Automation Permission` 状态
 3. **操作失败**: 查看日志中的 `ERROR` 级别消息
 4. **响应慢**: 分析 `PERF` 日志找出耗时最长阶段
+
+---
+
+## 🧵 Finder 扩展的线程模型与调试
+
+这一节来自一次真实排查，扩展"看不到菜单"的坑几乎都在这里。
+
+### Finder 在后台线程调用 `menu(for:)`
+
+Finder 通过 XPC 在**非主线程**上请求菜单（栈里是
+`-[FIFinderSyncExtension requestMenuItemsForTarget:selectedItems:menu:result:]` →
+`__NSXPCCONNECTION_IS_CALLING_OUT_TO_EXPORTED_OBJECT__`）。因此：
+
+- **不要**在 `menu(for:)` 里用 `MainActor.assumeIsolated`——它会在 XPC 线程上直接
+  `dispatch_assert_queue_fail` 崩掉扩展（栈见 `~/Library/Logs/DiagnosticReports/RightClickTools-*.ips`），
+  表现是 Finder 日志里 `extension connection was interrupted!`、右键菜单里什么都没有；
+- 性能埋点、日志这类跨线程状态用共享文件里的 `RightClickLockedState`（`NSLock` 保护）；
+- 配置快照在 `menu(for:)` 入口读一次（`configState.read()`），tag 表用
+  `registryState.mutate { $0.register(...) }`；
+- 只在 `queue: .main` 的回调（配置广播观察者、`asyncAfter` 重投、菜单点击）里才用
+  主 actor 假设，并且弹窗先 `DispatchQueue.main.async` 再 `assumeIsolated`。
+
+### 菜单出现在哪里
+
+扩展返回的菜单被 Finder 放在右键菜单的**「快速操作」**小节下；「嵌套/分组」样式会再套一层
+子菜单，它的标题是 `rc.menu.root`（当前为 `MenuTools`）——排查"看不到 MenuTools"时先确认
+这一项的名字，而不是找扩展名。
+
+在**窗口空白处/桌面**右键时，Finder 会调用扩展、扩展也会正常返回节点，但 Finder 不渲染
+FinderSync 项（同一份菜单里 Keka 等其它扩展同样不出现）。这是系统行为，不是扩展的 bug。
+
+### 安装位置决定扩展版本
+
+Finder 只加载 **/Applications** 里那份 `.app` 的扩展；只产出 `dist/` 会出现
+"改了扩展却看不到效果"，而且设置页会一直显示 `未启用 Finder 扩展`（它查的是当前进程所在
+副本的扩展状态）。`build.sh` 因此默认在构建后安装到 `/Applications`：
+
+```bash
+./build.sh                # 构建 + 安装到 /Applications + 重启 Finder 扩展
+./build.sh --no-install   # 只构建到 dist/（调试主程序 UI 时用）
+
+# 同一 extension identifier 注册了两份时 Finder 可能完全不加载扩展，查/清：
+pluginkit -m -A -D -v -i com.qoder.menutools.finder-sync
+pluginkit -r dist/MenuTools.app/Contents/PlugIns/RightClickTools.appex
+```
+
+### 看扩展里的日志
+
+沙盒扩展写不了仓库目录，App Group 也常因签名方式被 EPERM 拒绝，所以临时诊断用统一日志：
+
+```swift
+import os
+private let logger = Logger(subsystem: "com.qoder.menutools.finder-sync", category: "menu")
+logger.notice("PROBE \(line, privacy: .public)")
+```
+
+```bash
+# 扩展自己的诊断输出
+log show --last 5m --style compact --predicate 'subsystem == "com.qoder.menutools.finder-sync"'
+# Finder 侧：扩展连接是否被打断
+log show --last 5m --style compact --predicate 'process == "Finder"' | grep -i "finder-sync"
+```
+
+正式的操作日志（开关见上文）落在扩展容器里的 `Library/Application Support/com.monkey0803.MenuTools/operations.log`。
 
 ---
 

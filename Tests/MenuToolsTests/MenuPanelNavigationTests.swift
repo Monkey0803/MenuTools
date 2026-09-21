@@ -60,3 +60,9 @@ func menuPanelGlassDragClampsAndRestoresCenter() {
     }
     #expect(MenuPanelCategoryDragLayout.category(at: .nan, width: 0) == .favorites)
 }
+
+@Test("直达功能入口只用箭头指示展开状态且展开时朝上")
+func menuPanelJumpMenuIndicatorFollowsExpansion() {
+    #expect(MenuPanelJumpMenuPolicy.indicatorSymbolName(isExpanded: false) == "chevron.down")
+    #expect(MenuPanelJumpMenuPolicy.indicatorSymbolName(isExpanded: true) == "chevron.up")
+}

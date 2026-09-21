@@ -296,6 +296,7 @@ struct MenuPanelView: View {
     @State private var statusIsError = false
     @State private var appeared = false
     @State private var tooltipWidth: CGFloat = 0
+    @State private var isJumpMenuExpanded = false
 
     init(openSettingsAction: ((SettingsTab) -> Void)? = nil) {
         self.openSettingsAction = openSettingsAction
@@ -505,19 +506,28 @@ struct MenuPanelView: View {
                         .accessibilityAddTraits(.isHeader)
                     Spacer()
                     if !categoryItems.isEmpty {
-                        Menu {
-                            ForEach(categoryItems) { item in
-                                Button(L(item.titleKey)) {
-                                    proxy.scrollTo(item.id, anchor: .top)
-                                }
-                            }
+                        Button {
+                            isJumpMenuExpanded.toggle()
                         } label: {
-                            Label(L("panel.jumpTo"), systemImage: "list.bullet")
-                                .font(.caption)
+                            HStack(spacing: 3) {
+                                Text(L("panel.jumpTo"))
+                                Image(systemName: MenuPanelJumpMenuPolicy.indicatorSymbolName(
+                                    isExpanded: isJumpMenuExpanded
+                                ))
+                                .font(.system(size: 9, weight: .semibold))
+                                .contentTransition(.symbolEffect(.replace))
+                                .animation(.smooth(duration: 0.2), value: isJumpMenuExpanded)
+                            }
+                            .font(.caption)
                         }
-                        .menuStyle(.borderlessButton)
+                        .buttonStyle(.plain)
+                        .foregroundStyle(.secondary)
                         .fixedSize()
                         .help(L("panel.jumpTo"))
+                        .accessibilityLabel(L("panel.jumpTo"))
+                        .popover(isPresented: $isJumpMenuExpanded, arrowEdge: .bottom) {
+                            jumpMenuList(proxy)
+                        }
                     }
                     favoritesMenu
                 }
@@ -547,6 +557,28 @@ struct MenuPanelView: View {
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
             }
         }
+    }
+
+    /// 直达功能列表。系统 `Menu` 的箭头方向不可控，这里改用弹窗，入口箭头才能随展开状态翻转。
+    private func jumpMenuList(_ proxy: ScrollViewProxy) -> some View {
+        VStack(alignment: .leading, spacing: 1) {
+            ForEach(categoryItems) { item in
+                Button {
+                    isJumpMenuExpanded = false
+                    proxy.scrollTo(item.id, anchor: .top)
+                } label: {
+                    Text(L(item.titleKey))
+                        .font(.callout)
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                        .padding(.horizontal, 8)
+                        .padding(.vertical, 4)
+                        .contentShape(.rect)
+                }
+                .buttonStyle(.plain)
+            }
+        }
+        .padding(6)
+        .frame(minWidth: 160, alignment: .leading)
     }
 
     private var favoritesMenu: some View {

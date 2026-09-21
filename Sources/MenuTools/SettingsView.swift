@@ -13,6 +13,28 @@ enum SettingsLayout {
     static let windowHeight: CGFloat = 620
 }
 
+/// 设置页滚动区域的留白策略。
+///
+/// macOS 的滚动条是**覆盖在内容之上**绘制的：横向留白必须加在 `ScrollView` 的
+/// **内容内部**（`ScrollView { content.padding(...) }`）。若把留白加在 `ScrollView`
+/// 外层，滚动条会画在滚动内容最右侧，压住开关、按钮等控件。
+enum SettingsScrollLayout {
+    /// 覆盖式滚动条的占位宽度；内容右侧留白不得小于它。
+    static let scrollIndicatorGutter: CGFloat = 16
+    /// 设置页内容四周的标准留白。
+    static let contentPadding: CGFloat = 20
+
+    /// `ScrollView` 内容应使用的留白：右侧至少让出滚动条槽位。
+    static func contentInsets(padding: CGFloat = contentPadding) -> EdgeInsets {
+        EdgeInsets(
+            top: padding,
+            leading: padding,
+            bottom: padding,
+            trailing: max(padding, scrollIndicatorGutter)
+        )
+    }
+}
+
 /// 设置窗口宽度固定，侧边栏作为一级导航始终保留，不提供折叠入口。
 enum SettingsSidebarPolicy {
     static let allowsCollapsing = false

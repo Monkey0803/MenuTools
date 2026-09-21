@@ -1520,6 +1520,9 @@
 "rc.settings.listingDepth" = "최대 깊이: %d";
 "rc.settings.listingIgnore" = "제외 패턴";
 "rc.settings.listingIgnoreHint" = ".git, *.tmp, build/** 같은 glob 패턴을 쉼표로 구분합니다.";
+"rc.settings.diagnostics" = "진단";
+"rc.settings.logger" = "작업 로그 기록";
+"rc.settings.loggerHint" = "오른쪽 클릭 메뉴 구성과 작업을 로그로 기록합니다(응용 프로그램 지원 폴더).";
 "rc.config.field.directoryListing" = "디렉터리 목록 옵션";
 "rc.error.invalidCommand" = "작업 정보가 유효하지 않습니다. Finder 메뉴를 다시 여세요.";
 "rc.error.disabled" = "설정에서 이 작업이 꺼져 있습니다.";
@@ -1599,12 +1602,12 @@
 "health.title" = "확장 기능 상태 및 권한";
 "health.extension.enabled" = "Finder 확장 기능 상태";
 "health.extension.desc" = "컨텍스트 메뉴에 항목을 표시하려면 확장 기능을 활성화해야 합니다.";
-"health.appgroup.name" = "App Group 액세스";
-"health.appgroup.desc" = "FinderSync 확장과 프로세스 간 통신에 필요합니다.";
+"health.appgroup.name" = "설정 및 확장 기능 통신";
+"health.appgroup.desc" = "App Group을 우선 사용하며 사용할 수 없으면 로컬 저장소와 알림으로 안전하게 대체됩니다.";
 "health.automation.name" = "접근성 및 자동화";
 "health.automation.desc" = "시스템 설정 → 개인정보 및 보안 → 자동화 → MenuTools 가 필수입니다.";
 "health.logging.name" = "작업 로그";
-"health.logging.desc" = "디버그 로그는 ~/Library/Application Support/com.monkey0803.MenuTools/ 에 저장됩니다.";
+"health.logging.desc" = "로그는 MenuTools에서 현재 사용할 수 있는 설정 디렉터리에 저장됩니다. ‘로그 보기’를 클릭해 열 수 있습니다.";
 "health.button.openSettings" = "설정 열기";
 "health.button.viewLogs" = "로그 보기";
 
@@ -1623,7 +1626,7 @@
 "rc.info.volume" = "볼륨";
 
 /* Menu structure */
-"rc.menu.root" = "루트 메뉴";
+"rc.menu.root" = "MenuTools";
 "rc.menuStyle.flat" = "플랫";
 "rc.menuStyle.grouped" = "그룹화";
 "rc.menuStyle.nested" = "중첩";

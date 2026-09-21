@@ -1,72 +1,64 @@
 import Foundation
-import XCTest
+import Testing
 @testable import MenuTools
 
-final class RightClickPerformanceMonitorTests: XCTestCase {
-    
-    private var monitor: RightClickPerformanceMonitor!
-    
-    override func setUp() {
-        super.setUp()
-        monitor = RightClickPerformanceMonitor.shared
-        // Reset state
-        _ = type(of: monitor).shared
-    }
-    
-    override func tearDown() {
-        monitor = nil
-        super.tearDown()
-    }
-    
-    func test_begin_phase_sets_start_time() throws {
-        XCTAssertNil(monitor.phaseTimes["test"])
-        monitor.beginPhase("test")
-        // Internal state should be set, but we can't directly verify it
-        // Just ensure no crash
-    }
-    
-    func test_end_phase_records_elapsed_time() throws {
+@MainActor
+@Suite("右键菜单构建性能监控")
+struct RightClickPerformanceMonitorTests {
+    @Test("endPhase 记录该阶段的耗时")
+    func recordsElapsedTimeForPhase() async throws {
+        let monitor = RightClickPerformanceMonitor()
         monitor.beginPhase("phase1")
-        
         try await Task.sleep(for: .milliseconds(50))
-        
         monitor.endPhase("phase1")
-        
-        guard let elapsed = monitor.phaseTimes["phase1"] else {
-            XCTFail("Elapsed time should be recorded")
-            return
+
+        let elapsed = try #require(monitor.recordedPhaseTimes["phase1"])
+        #expect(elapsed >= 45, "阶段耗时 \(elapsed)ms 应接近 50ms")
+    }
+
+    @Test("没有 beginPhase 时 endPhase 不记录")
+    func endPhaseWithoutBeginRecordsNothing() {
+        let monitor = RightClickPerformanceMonitor()
+        monitor.endPhase("ghost")
+
+        #expect(monitor.recordedPhaseTimes["ghost"] == nil)
+    }
+
+    @Test("report 汇总后清空分段记录")
+    func reportClearsRecordedPhases() {
+        let monitor = RightClickPerformanceMonitor()
+        monitor.beginPhase("only")
+        monitor.endPhase("only")
+        #expect(monitor.recordedPhaseTimes.count == 1)
+
+        monitor.report()
+
+        #expect(monitor.recordedPhaseTimes.isEmpty)
+    }
+
+    @Test("report 完成一次测量后不沿用旧菜单的起始时间")
+    func reportResetsMeasurementSession() {
+        let monitor = RightClickPerformanceMonitor()
+        monitor.beginPhase("first")
+        monitor.endPhase("first")
+        monitor.report()
+
+        // 第二次菜单尚未开始时不能写入任何阶段数据；否则会把上一轮的时间混入本轮。
+        monitor.endPhase("stale")
+        #expect(monitor.recordedPhaseTimes["stale"] == nil)
+    }
+
+    @Test("汇总通过注入的上报器输出，扩展可转交给主 App")
+    func reportUsesInjectedReporter() {
+        let records = RightClickLockedState([String]())
+        let monitor = RightClickPerformanceMonitor { message in
+            records.mutate { $0.append(message) }
         }
-        
-        // Should be at least 50ms with some tolerance
-        XCTAssertTrue(elapsed >= 45, "Elapsed time \(elapsed) should be close to 50ms")
-    }
-    
-    func test_slow_phase_triggers_warning() throws {
-        // Simulate a very slow phase (>100ms)
-        monitor.beginPhase("slow")
-        
-        try await Task.sleep(for: .milliseconds(150))
-        
-        monitor.endPhase("slow")
-        
-        // Warning would be logged, we just check it was recorded
-        XCTAssertGreaterThan(monitor.phaseTimes.count, 0)
-    }
-    
-    func test_multiple_phases_independent() throws {
-        monitor.beginPhase("fast")
-        monitor.endPhase("fast")
-        
-        try await Task.sleep(for: .milliseconds(100))
-        
-        monitor.beginPhase("slow")
-        monitor.endPhase("slow")
-        
-        XCTAssertEqual(monitor.phaseTimes.count, 2)
-        
-        let fastTime = monitor.phaseTimes["fast"] ?? 0
-        let slowTime = monitor.phaseTimes["slow"] ?? 0
-        
-        XCTAssertGreaterThan(slowTime, fastTime * 2)
+        monitor.beginPhase("menu_start")
+        monitor.endPhase("menu_render")
+        monitor.report()
+
+        #expect(records.read().count == 1)
+        #expect(records.read()[0].contains("Menu total:"))
     }
 }

@@ -108,6 +108,19 @@ func rightClickConfigurationPreservesEmptyTemplates() throws {
     #expect(try JSONDecoder().decode(RightClickConfig.self, from: data).templates.isEmpty)
 }
 
+@Test("日志开关随配置同步到扩展")
+func rightClickConfigurationCarriesLoggerFlag() throws {
+    // 扩展是沙盒进程，读不到主 App 的 UserDefaults；开关必须走共享配置这条既有通道。
+    let enabled = RightClickConfig(enabled: [:], loggerEnabled: true)
+    let json = try JSONEncoder().encode(enabled)
+    #expect(try JSONDecoder().decode(RightClickConfig.self, from: json).loggerEnabled)
+    #expect(RightClickConfigStore.decode(String(data: json, encoding: .utf8))?.loggerEnabled == true)
+
+    // 旧配置没有这个字段时默认关闭，不影响既有用户。
+    let legacy = Data(#"{"enabled":{},"templates":[]}"#.utf8)
+    #expect(try JSONDecoder().decode(RightClickConfig.self, from: legacy).loggerEnabled == false)
+}
+
 @Test("通知拒绝未知菜单项与类型错误")
 func rightClickNotificationRejectsInvalidConfiguration() {
     for json in [#"{"enabled":{"invalid":true}}"#, #"{"enabled":[],"templates":[]}"#, #"{"enabled":{},"templates":null}"#] {

@@ -1520,6 +1520,9 @@
 "rc.settings.listingDepth" = "Maximum depth: %d";
 "rc.settings.listingIgnore" = "Ignore patterns";
 "rc.settings.listingIgnoreHint" = "Separate glob patterns with commas, for example .git, *.tmp, build/**.";
+"rc.settings.diagnostics" = "Diagnostics";
+"rc.settings.logger" = "Log operations";
+"rc.settings.loggerHint" = "Write menu building and command dispatch to a log file in Application Support for troubleshooting.";
 "rc.config.field.directoryListing" = "Directory listing options";
 "rc.error.invalidCommand" = "The action is no longer valid. Reopen the Finder context menu.";
 "rc.error.disabled" = "This action is disabled in settings.";
@@ -1599,12 +1602,12 @@
 "health.title" = "Extension Health & Permissions";
 "health.extension.enabled" = "Finder Extension Status";
 "health.extension.desc" = "The extension must be enabled for context menu items to appear.";
-"health.appgroup.name" = "App Group Access";
-"health.appgroup.desc" = "Required for inter-process communication with FinderSync extension.";
+"health.appgroup.name" = "Configuration & Extension Communication";
+"health.appgroup.desc" = "Uses App Group when available and safely falls back to local storage plus notifications.";
 "health.automation.name" = "Accessibility & Automation";
 "health.automation.desc" = "System Settings → Privacy & Security → Automation → MenuTools required.";
 "health.logging.name" = "Operation Logs";
-"health.logging.desc" = "Debug logs stored in ~/Library/Application Support/com.monkey0803.MenuTools/";
+"health.logging.desc" = "Logs are stored in MenuTools' active configuration directory. Choose View Logs to open it.";
 "health.button.openSettings" = "Open Settings";
 "health.button.viewLogs" = "View Logs";
 
@@ -1627,7 +1630,7 @@
 "rc.info.volume" = "Volume";
 
 /* Menu structure */
-"rc.menu.root" = "Root menu";
+"rc.menu.root" = "MenuTools";
 "rc.menuStyle.flat" = "Flat";
 "rc.menuStyle.grouped" = "Grouped";
 "rc.menuStyle.nested" = "Nested";

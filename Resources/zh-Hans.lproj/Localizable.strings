@@ -1520,6 +1520,9 @@
 "rc.settings.listingDepth" = "最大深度：%d";
 "rc.settings.listingIgnore" = "忽略规则";
 "rc.settings.listingIgnoreHint" = "使用逗号分隔 glob 规则，例如 .git、*.tmp、build/**。";
+"rc.settings.diagnostics" = "诊断";
+"rc.settings.logger" = "记录操作日志";
+"rc.settings.loggerHint" = "开启后右键菜单的构建与操作会写入日志，排查问题用；日志保存在应用支持目录。";
 "rc.config.field.directoryListing" = "目录清单选项";
 "rc.error.invalidCommand" = "操作信息已失效，请重新打开 Finder 右键菜单。";
 "rc.error.disabled" = "此操作已在设置中关闭。";
@@ -1599,12 +1602,12 @@
 "health.title" = "扩展状态与权限诊断";
 "health.extension.enabled" = "Finder 扩展状态";
 "health.extension.desc" = "扩展必须启用才能在上下文菜单中显示项目。";
-"health.appgroup.name" = "App Group 访问";
-"health.appgroup.desc" = "用于与 FinderSync 扩展进行进程间通信。";
+"health.appgroup.name" = "配置与扩展通信";
+"health.appgroup.desc" = "优先使用 App Group；不可用时会通过本地存储和通知安全降级。";
 "health.automation.name" = "辅助功能与自动化";
 "health.automation.desc" = "系统设置 → 隐私与安全性 → 自动化 → MenuTools 必需。";
 "health.logging.name" = "操作日志";
-"health.logging.desc" = "调试日志存储在 ~/Library/Application Support/com.monkey0803.MenuTools/";
+"health.logging.desc" = "日志保存在 MenuTools 当前可用的配置目录中；可点击“查看日志”打开。";
 "health.button.openSettings" = "打开设置";
 "health.button.viewLogs" = "查看日志";
 
@@ -1623,7 +1626,7 @@
 "rc.info.volume" = "卷标";
 
 /* Menu structure */
-"rc.menu.root" = "根菜单";
+"rc.menu.root" = "MenuTools";
 "rc.menuStyle.flat" = "扁平";
 "rc.menuStyle.grouped" = "分组";
 "rc.menuStyle.nested" = "嵌套";

@@ -1,15 +1,31 @@
 #!/bin/zsh
 # 构建 MenuTools.app —— 编译 SPM 可执行文件并打包成 .app Bundle
+#
+# 构建完成后默认会**安装到 /Applications**：Finder 只加载 /Applications 里那份
+# Finder 扩展（appex），只产出 dist 会出现"改了扩展却看不到效果"。用
+# `./build.sh --no-install` 可以只构建不安装。
 set -euo pipefail
 
 SCRIPT_DIR="${0:A:h}"
 cd "$SCRIPT_DIR"
 
-CONFIG="${1:-release}"
+# 参数：release/debug（可选）+ --no-install（可选），顺序不限
+CONFIG="release"
+DO_INSTALL=1
+for arg in "$@"; do
+    case "$arg" in
+        --no-install) DO_INSTALL=0 ;;
+        release|debug) CONFIG="$arg" ;;
+        *) echo "未知参数：$arg（可用：release|debug --no-install）" >&2; exit 2 ;;
+    esac
+done
+
 APP_NAME="MenuTools"
 BUILD_DIR=".build/$CONFIG"
 OUT_DIR="$SCRIPT_DIR/dist"
 APP_BUNDLE="$OUT_DIR/$APP_NAME.app"
+INSTALL_DIR="/Applications"
+INSTALL_APP="$INSTALL_DIR/$APP_NAME.app"
 
 # 菜单栏应用不会随着 .app 文件替换而自动重新加载，先结束同路径的旧实例，
 # 否则菜单栏仍可能连接到旧进程，导致重新构建后的点击行为看起来没有变化。
@@ -97,7 +113,10 @@ fi
 echo "==> 编译 Finder 扩展（SDK: $SDK）"
 mkdir -p "$APPEX/Contents/MacOS" "$APPEX/Contents/Resources"
 # 扩展源 + 与主 App 共享的配置模型/菜单构建一起编译；入口 NSExtensionMain
-swiftc Extension/*.swift Sources/MenuTools/RightClickApplicationFilter.swift Sources/MenuTools/RightClickConfig.swift Sources/MenuTools/RightClickMenuPolicy.swift Sources/MenuTools/RightClickExtensionSupport.swift Sources/MenuTools/TerminalApp.swift \
+# 性能监控与日志被 FinderSyncExtension 直接调用，必须一并编入扩展。
+# 与主程序一致开启 Swift 6 语言模式：扩展已按严格并发检查收敛，新代码不得回退。
+swiftc Extension/*.swift Sources/MenuTools/RightClickApplicationFilter.swift Sources/MenuTools/RightClickConfig.swift Sources/MenuTools/RightClickMenuPolicy.swift Sources/MenuTools/RightClickExtensionSupport.swift Sources/MenuTools/TerminalApp.swift Sources/MenuTools/Services/RightClickPerformanceMonitor.swift Sources/MenuTools/Services/RightClickLogger.swift \
+    -swift-version 6 \
     -sdk "$SDK" -target arm64-apple-macos26.0 \
     -framework FinderSync -framework AppKit \
     -Xlinker -e -Xlinker _NSExtensionMain \
@@ -129,13 +148,39 @@ codesign --force --deep "${SIGN_ARG[@]}" "$APP_BUNDLE/Contents/Frameworks/Sparkl
 codesign --force "${SIGN_ARG[@]}" --entitlements Extension/RightClickTools.entitlements "$APPEX"
 codesign --force "${SIGN_ARG[@]}" --entitlements Resources/MenuTools.entitlements "$APP_BUNDLE"
 
-# 清理残留的旧扩展进程：替换 App 后 Finder 可能同时连着新旧两个实例，导致右键菜单出现两个 MenuTools
-if pgrep -f "RightClickTools.appex" >/dev/null 2>&1; then
-    echo "==> 清理旧 Finder 扩展进程并重启 Finder"
-    pkill -f "RightClickTools.appex" || true
+if [[ "$DO_INSTALL" == "1" ]]; then
+    if [[ ! -w "$INSTALL_DIR" ]]; then
+        echo "错误：$INSTALL_DIR 不可写，无法安装扩展；可用 ./build.sh --no-install 只构建" >&2
+        exit 1
+    fi
+    echo "==> 安装到 $INSTALL_APP"
+    # 先结束 /Applications 里的旧实例，否则替换 bundle 后菜单栏仍连着旧进程
+    pkill -f "$INSTALL_APP/Contents/MacOS/$APP_NAME" || true
+    sleep 1
+    rm -rf "$INSTALL_APP"
+    ditto "$APP_BUNDLE" "$INSTALL_APP"
+    if codesign --verify --deep --strict "$INSTALL_APP" 2>/dev/null; then
+        echo "    签名校验通过"
+    else
+        echo "    警告：签名校验未通过，扩展可能不被系统加载" >&2
+    fi
+    # 同一 extension identifier 同时注册 dist 与 /Applications 两份时，
+    # Finder 可能直接不加载扩展；这里把 dist 那份从 pkd 数据库里摘掉。
+    pluginkit -r "$APP_BUNDLE/Contents/PlugIns/$EXT_NAME.appex" >/dev/null 2>&1 || true
+    echo "==> 重启 Finder 扩展进程与 Finder"
+    pkill -f "$EXT_NAME.appex" || true
     killall Finder 2>/dev/null || true
+    LAUNCH_APP="$INSTALL_APP"
+else
+    # 不安装时仍需清理旧扩展进程：替换 dist 后 Finder 可能同时连着新旧实例
+    if pgrep -f "$EXT_NAME.appex" >/dev/null 2>&1; then
+        echo "==> 清理旧 Finder 扩展进程并重启 Finder"
+        pkill -f "$EXT_NAME.appex" || true
+        killall Finder 2>/dev/null || true
+    fi
+    LAUNCH_APP="$APP_BUNDLE"
 fi
 
-echo "==> 启动：$APP_BUNDLE"
-open "$APP_BUNDLE"
-echo "==> 完成：$APP_BUNDLE"
+echo "==> 启动：$LAUNCH_APP"
+open "$LAUNCH_APP"
+echo "==> 完成：$LAUNCH_APP"

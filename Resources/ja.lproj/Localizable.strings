@@ -1520,6 +1520,9 @@
 "rc.settings.listingDepth" = "最大階層：%d";
 "rc.settings.listingIgnore" = "除外パターン";
 "rc.settings.listingIgnoreHint" = ".git、*.tmp、build/** のような glob パターンをカンマで区切ります。";
+"rc.settings.diagnostics" = "診断";
+"rc.settings.logger" = "操作ログを記録";
+"rc.settings.loggerHint" = "右クリックメニューの構築と操作をログに記録します（アプリケーションサポート内）。";
 "rc.config.field.directoryListing" = "ディレクトリ一覧オプション";
 "rc.error.invalidCommand" = "操作情報が無効です。Finder のメニューを開き直してください。";
 "rc.error.disabled" = "この操作は設定で無効になっています。";
@@ -1599,12 +1602,12 @@
 "health.title" = "拡張機能の状態と権限";
 "health.extension.enabled" = "Finder 拡張機能の状態";
 "health.extension.desc" = "コンテキストメニューに項目を表示するには拡張機能が有効である必要があります。";
-"health.appgroup.name" = "App Group アクセス";
-"health.appgroup.desc" = "FinderSync 拡張機能とのプロセス間通信に必要です。";
+"health.appgroup.name" = "設定と拡張機能の通信";
+"health.appgroup.desc" = "App Group を優先し、利用できない場合はローカル保存と通知に安全にフォールバックします。";
 "health.automation.name" = "アクセシビリティと自動化";
 "health.automation.desc" = "システム設定 → プライバシーとセキュリティ → 自動化 → MenuTools が必須です。";
 "health.logging.name" = "操作ログ";
-"health.logging.desc" = "デバッグログは ~/Library/Application Support/com.monkey0803.MenuTools/ に保存されます。";
+"health.logging.desc" = "ログは MenuTools の現在利用可能な設定ディレクトリに保存されます。「ログを表示」で開けます。";
 "health.button.openSettings" = "設定を開く";
 "health.button.viewLogs" = "ログを表示";
 
@@ -1623,7 +1626,7 @@
 "rc.info.volume" = "ボリューム";
 
 /* Menu structure */
-"rc.menu.root" = "ルートメニュー";
+"rc.menu.root" = "MenuTools";
 "rc.menuStyle.flat" = "フラット";
 "rc.menuStyle.grouped" = "グループ化";
 "rc.menuStyle.nested" = "ネスト";

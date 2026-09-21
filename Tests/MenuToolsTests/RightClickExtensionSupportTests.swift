@@ -4,6 +4,37 @@ import Testing
 
 // MARK: - 菜单 tag 快照
 
+@Test("共享状态在并发读写时不会丢失更新")
+func rightClickSharedStateSerializesConcurrentAccess() async {
+    // 扩展的配置快照由主队列的配置广播写，tag 表由 Finder 的 XPC 线程在构建菜单时写，
+    // 两个线程会同时读写同一份状态，这里用锁保证不丢更新。
+    let state = RightClickLockedState(0)
+    let rounds = 500
+
+    await withTaskGroup(of: Void.self) { group in
+        for _ in 0..<4 {
+            group.addTask {
+                for _ in 0..<rounds {
+                    state.mutate { $0 += 1 }
+                }
+            }
+        }
+    }
+
+    #expect(state.read() == 4 * rounds)
+}
+
+@Test("共享状态支持读改写并返回结果")
+func rightClickSharedStateReturnsMutationResult() {
+    let state = RightClickLockedState(RightClickCommandRegistry())
+
+    let tag = state.mutate { $0.register(.init(action: "checksum", paths: ["/tmp/a"])) }
+    state.mutate { $0.prune(keeping: 1) }
+
+    #expect(state.read().count == 1)
+    #expect(state.read().command(forTag: tag)?.action == "checksum")
+}
+
 @Test("命令注册表为每个菜单项分配唯一 tag 并可按 tag 取回")
 func rightClickCommandRegistryAssignsTags() {
     var registry = RightClickCommandRegistry()

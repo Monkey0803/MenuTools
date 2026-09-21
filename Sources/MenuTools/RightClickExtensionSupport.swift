@@ -169,6 +169,24 @@ enum RightClickMenuBuilder {
 
 // MARK: - 菜单 tag 快照
 
+/// 跨线程共享的可变状态。
+///
+/// 扩展里有两条线程：Finder 在 **XPC 线程**上调用 `menu(for:)` 构建菜单，主队列负责
+/// 配置广播与点击派发。配置快照与 tag 表被两边同时读写，所以统一用锁串行化。
+final class RightClickLockedState<Value>: @unchecked Sendable {
+    private let lock = NSLock()
+    private var value: Value
+
+    init(_ value: Value) { self.value = value }
+
+    func read() -> Value { lock.withLock { value } }
+
+    @discardableResult
+    func mutate<Result>(_ body: (inout Value) -> Result) -> Result {
+        lock.withLock { body(&value) }
+    }
+}
+
 /// 菜单打开时把指令快照绑定到 tag，点击期间 Finder 选择变化也不会误操作其他文件。
 struct RightClickCommandRegistry {
     private var commands: [Int: RightClickCommand] = [:]

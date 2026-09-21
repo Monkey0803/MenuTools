@@ -50,6 +50,18 @@ func settingsSidebarIsPersistent() {
     #expect(!SettingsSidebarPolicy.allowsCollapsing)
 }
 
+@Test("设置页滚动内容为滚动条预留右侧空间，避免遮挡开关")
+func settingsScrollContentReservesScrollIndicatorGutter() {
+    let standard = SettingsScrollLayout.contentInsets()
+    #expect(standard.leading == SettingsScrollLayout.contentPadding)
+    #expect(standard.trailing >= SettingsScrollLayout.scrollIndicatorGutter)
+
+    // 即使调用方传入更小的留白，右侧仍要让出滚动条槽位
+    let compact = SettingsScrollLayout.contentInsets(padding: 8)
+    #expect(compact.leading == 8)
+    #expect(compact.trailing >= SettingsScrollLayout.scrollIndicatorGutter)
+}
+
 @Test("设置侧边栏使用透明 Liquid Glass 导航层次")
 func settingsSidebarUsesTransparentLiquidGlassHierarchy() {
     #expect(!SettingsSidebarVisualPolicy.usesSystemListBackground)

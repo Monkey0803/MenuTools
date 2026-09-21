@@ -27,6 +27,12 @@ enum RightClickCommandHandler {
         ) { _ in
             MainActor.assumeIsolated { RightClickConfigStore.broadcast(RightClickConfigStore.load()) }
         })
+        observerTokens.append(center.addObserver(
+            forName: Notification.Name(RightClickLogger.forwardedNotification), object: nil, queue: .main
+        ) { note in
+            // 通知内容先由 logger 解码并做长度/级别校验，避免把外部输入直接写进日志。
+            RightClickLogger.receiveForwardedPayload(note.object as? String)
+        })
         RightClickConfigStore.broadcast(RightClickConfigStore.load())
     }
 

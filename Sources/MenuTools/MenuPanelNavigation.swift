@@ -69,6 +69,14 @@ enum MenuPanelFeature: String, CaseIterable, Identifiable {
     }
 }
 
+/// 直达功能入口的展开指示器：收起朝下、展开朝上。
+/// 入口只保留这一个箭头图标，不再叠加 `list.bullet`，避免同一控件出现两个图标。
+enum MenuPanelJumpMenuPolicy {
+    static func indicatorSymbolName(isExpanded: Bool) -> String {
+        isExpanded ? "chevron.up" : "chevron.down"
+    }
+}
+
 enum MenuPanelNavigation {
     static let categoryKey = "panel.selectedCategory.v1"
     static let pinsKey = "panel.pinnedFeatures.v1"
