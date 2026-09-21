@@ -42,6 +42,19 @@ enum QuickActionError: LocalizedError, Equatable {
     }
 }
 
+enum QuickActionScript {
+    static let emptyTrash = """
+    tell application "Finder"
+        if (count of items of trash) is 0 then return
+        try
+            empty trash
+        on error originalMessage number originalNumber
+            if (count of items of trash) is not 0 then error originalMessage number originalNumber
+        end try
+    end tell
+    """
+}
+
 @MainActor
 protocol QuickActionProcessRunning {
     func run(executable: String, arguments: [String]) throws
@@ -155,7 +168,7 @@ final class QuickActionService {
             try run(action, executable: Self.cgSessionPath, arguments: ["-suspend"])
         case .emptyTrash:
             do {
-                try scriptRunner.run(source: "tell application \"Finder\" to empty trash")
+                try scriptRunner.run(source: QuickActionScript.emptyTrash)
             } catch let error as QuickActionError {
                 throw error
             } catch {

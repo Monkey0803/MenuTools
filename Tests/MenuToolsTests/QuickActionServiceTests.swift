@@ -61,14 +61,16 @@ func lockScreenUsesCGSession() throws {
 }
 
 @MainActor
-@Test("清空废纸篓通过 Finder AppleScript 执行")
-func emptyTrashUsesFinderScript() throws {
+@Test("清空废纸篓跳过空状态并在 Finder 报错后复核结果")
+func emptyTrashVerifiesFinderResult() throws {
     let scripts = RecordingQuickActionScriptRunner()
     let service = QuickActionService(scriptRunner: scripts)
 
     try service.perform(.emptyTrash)
 
-    #expect(scripts.sources == ["tell application \"Finder\" to empty trash"])
+    let source = try #require(scripts.sources.first)
+    #expect(source.contains("if (count of items of trash) is 0 then return"))
+    #expect(source.contains("if (count of items of trash) is not 0 then error originalMessage number originalNumber"))
 }
 
 @MainActor
