@@ -19,6 +19,27 @@ enum WindowManagementQuickAccessPresentationPolicy {
     }
 }
 
+/// 状态项是快捷弹窗的锚点：展示期间标题里不带 App 名，宽度才不会随名字长度变化。
+/// 名字只影响宽度、不影响数值，百分比依旧实时跟随音量。
+enum MenuBarStatusItemTitlePolicy {
+    static func showsAppName(isQuickAccessPresented: Bool) -> Bool {
+        !isQuickAccessPresented
+    }
+}
+
+/// 状态项标题排版：宽度必须恒定，否则锚定其上的弹窗会跟着位移、菜单栏也会重排。
+enum MenuBarStatusItemTitleLayout {
+    /// 等宽数字字体：`1` 与 `0` 等宽，百分比位数变化不会改变标题宽度。
+    /// 用计算属性而非 `static let`：NSFont 不是 Sendable，避免全局共享状态检查报错。
+    static var font: NSFont {
+        NSFont.monospacedDigitSystemFont(ofSize: NSFont.systemFontSize, weight: .regular)
+    }
+
+    static func width(of title: String) -> CGFloat {
+        (title as NSString).size(withAttributes: [.font: font]).width
+    }
+}
+
 /// 使用 AppKit 直接管理菜单栏入口，避免 SwiftUI MenuBarExtra 在部分 macOS 版本上丢失鼠标点击。
 @MainActor
 final class MenuBarStatusItemController: NSObject {
@@ -80,6 +101,12 @@ final class MenuBarStatusItemController: NSObject {
         updateButton()
     }
 
+    /// 弹窗（含主面板）都锚定在状态项上：展示期间标题不带 App 名，宽度才不会变。
+    private var isQuickAccessPresented: Bool {
+        [popover, clipboardPopover, appVolumePopover, windowManagementPopover]
+            .contains { $0?.isShown == true }
+    }
+
     private func updateButton() {
         guard let button = statusItem?.button else { return }
 
@@ -97,12 +124,17 @@ final class MenuBarStatusItemController: NSObject {
 
         let volumeMode = UserDefaults.standard.string(forKey: AppVolumeService.StorageKey.menuBarDisplayMode)
             .flatMap(AppVolumeMenuBarDisplayMode.init(rawValue:)) ?? .off
+        // 面板展示期间状态项是弹窗锚点，标题不带 App 名，宽度才不会随名字变化。
+        let showsAppName = MenuBarStatusItemTitlePolicy.showsAppName(
+            isQuickAccessPresented: isQuickAccessPresented
+        )
         let volumeTitle: String? = BuiltInPluginManager.shared.isEnabled(.appVolume)
             ? AppVolumeMenuBarPresenter.title(
                 mode: volumeMode,
                 masterVolume: AppVolumeService.shared.output.volume,
                 isMuted: AppVolumeService.shared.output.isMuted,
-                loudest: AppVolumeService.shared.loudestActiveApp
+                loudest: AppVolumeService.shared.loudestActiveApp,
+                showsAppName: showsAppName
             )
             : nil
 
@@ -139,8 +171,13 @@ final class MenuBarStatusItemController: NSObject {
             accessibilityDescription: "MenuTools"
         )
         button.image?.isTemplate = true
-        button.title = title ?? (showTitle ? "MenuTools" : "")
-        button.imagePosition = button.title.isEmpty ? .imageOnly : .imageLeft
+        // 用等宽数字字体设置标题：数字宽度一致，标题宽度才不会随音量数值变化。
+        let displayTitle = title ?? (showTitle ? "MenuTools" : "")
+        button.attributedTitle = NSAttributedString(
+            string: displayTitle,
+            attributes: [.font: MenuBarStatusItemTitleLayout.font]
+        )
+        button.imagePosition = displayTitle.isEmpty ? .imageOnly : .imageLeft
         button.toolTip = title.map { "MenuTools · \($0)" } ?? "MenuTools"
         button.setAccessibilityLabel(button.toolTip ?? "MenuTools")
     }
@@ -171,6 +208,7 @@ final class MenuBarStatusItemController: NSObject {
             return popover
         }
         self.popover = popover
+        popover.delegate = self
 
         popover.show(relativeTo: button.bounds, of: button, preferredEdge: .minY)
         if let window = popover.contentViewController?.view.window {
@@ -216,6 +254,7 @@ final class MenuBarStatusItemController: NSObject {
             return popover
         }
         self.clipboardPopover = clipboardPopover
+        clipboardPopover.delegate = self
         clipboardPopover.show(relativeTo: button.bounds, of: button, preferredEdge: .minY)
         if let window = clipboardPopover.contentViewController?.view.window {
             Self.configurePopoverWindow(window)
@@ -250,6 +289,7 @@ final class MenuBarStatusItemController: NSObject {
             return popover
         }
         self.appVolumePopover = appVolumePopover
+        appVolumePopover.delegate = self
         appVolumePopover.show(relativeTo: button.bounds, of: button, preferredEdge: .minY)
         if let window = appVolumePopover.contentViewController?.view.window {
             Self.configurePopoverWindow(window)
@@ -292,6 +332,7 @@ final class MenuBarStatusItemController: NSObject {
             return popover
         }
         self.windowManagementPopover = windowManagementPopover
+        windowManagementPopover.delegate = self
         windowManagementPopover.show(relativeTo: button.bounds, of: button, preferredEdge: .minY)
         if let window = windowManagementPopover.contentViewController?.view.window {
             Self.configurePopoverWindow(window)
@@ -365,5 +406,16 @@ final class MenuBarStatusItemController: NSObject {
         window.orderFrontRegardless()
         NSApp.activate(ignoringOtherApps: true)
         window.makeKey()
+    }
+}
+
+extension MenuBarStatusItemController: NSPopoverDelegate {
+    /// 弹窗展示期间标题不带 App 名（宽度恒定），关闭后恢复显示名字。
+    func popoverDidShow(_ notification: Notification) {
+        updateButton()
+    }
+
+    func popoverDidClose(_ notification: Notification) {
+        updateButton()
     }
 }

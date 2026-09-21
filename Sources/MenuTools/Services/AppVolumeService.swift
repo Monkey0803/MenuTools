@@ -119,20 +119,19 @@ enum AppVolumeMenuBarDisplayMode: String, CaseIterable, Sendable {
 /// 标题宽度必须稳定：状态项用可变宽度，音量弹窗锚在它上面，
 /// 一旦百分比位数或 App 名长度变化，按钮宽度就会变，弹窗随之抖动。
 enum AppVolumeMenuBarPresenter {
-    /// 百分比固定三位宽（`  5%` / ` 47%` / `100%`）。
+    /// 百分比固定三位宽（`␣␣5%` / `␣47%` / `100%`）。
     static let percentWidth = 3
     /// App 名截断上限，保证「音量最高的 App」模式下宽度有上界。
     static let maximumAppNameLength = 10
-    /// 静音时使用的等宽占位（图空格，宽度与数字相同，不会被布局裁掉）。
-    private static var mutedPlaceholder: String {
-        String(repeating: "\u{2007}", count: percentWidth + 1)
-    }
+    /// 补齐用的图空格（U+2007）：宽度与数字相同，普通空格更窄会让标题宽度随位数变化。
+    private static let padCharacter = "\u{2007}"
 
     static func title(
         mode: AppVolumeMenuBarDisplayMode,
         masterVolume: Double,
         isMuted: Bool,
-        loudest: (name: String, volume: Double)?
+        loudest: (name: String, volume: Double)?,
+        showsAppName: Bool = true
     ) -> String? {
         switch mode {
         case .off:
@@ -143,20 +142,30 @@ enum AppVolumeMenuBarPresenter {
             guard let loudest, !loudest.name.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else {
                 return masterTitle(volume: masterVolume, isMuted: isMuted)
             }
+            // 面板展示期间不带 App 名：名字长度会让状态项变宽，而弹窗锚在状态项上。
+            // 百分比仍然跟随最响 App 的音量实时变化。
+            guard showsAppName else { return outputTitle(volume: loudest.volume) }
             return "🔊 \(displayName(loudest.name)) \(percent(loudest.volume))"
         }
     }
 
     static func masterTitle(volume: Double, isMuted: Bool) -> String {
-        // 静音也用等宽占位，切换静音时标题宽度不变
-        isMuted ? "🔇 \(mutedPlaceholder)" : "🔊 \(percent(volume))"
+        // 静音只换图标、照常显示百分比：宽度与正常状态完全一致（🔊/🔇 实测等宽）。
+        isMuted ? "🔇 \(percent(volume))" : outputTitle(volume: volume)
     }
 
-    /// 固定宽度百分比。
+    /// 只有图标与百分比、不含 App 名的标题。
+    static func outputTitle(volume: Double) -> String {
+        "🔊 \(percent(volume))"
+    }
+
+    /// 固定宽度百分比：位数不足时用图空格补齐，保证标题宽度恒定。
     static func percent(_ value: Double) -> String {
         let clamped = min(max(value.isFinite ? value : 0, 0), 1)
         let rounded = Int((clamped * 100).rounded())
-        return String(format: "%\(percentWidth)d%%", rounded)
+        let digits = "\(rounded)"
+        let padding = String(repeating: padCharacter, count: max(0, percentWidth - digits.count))
+        return padding + digits + "%"
     }
 
     /// 截断过长的 App 名，保证标题宽度有上界。
@@ -290,10 +299,24 @@ struct AppVolumeEqualizer: Codable, Equatable, Sendable {
     }
 }
 
-enum AppVolumeHearingSafetyPolicy {
-    static func isHeadphone(deviceName: String) -> Bool {
-        let value = deviceName.lowercased()
-        return ["airpods", "headphone", "headset", "耳机", "耳機"].contains(where: value.contains)
+/// 听力保护上限与主音量滑杆的关系。
+///
+/// 主音量会被夹到上限（`setMasterVolume`），所以滑杆上界必须等于上限：
+/// 否则拖过头时滑块还在跟手、数值却停在 60%，使用者会以为"加不上去了"是坏了。
+enum AppVolumeMasterLimitPolicy {
+    /// 上限的合法下限，与 `setMasterVolumeLimit` 的夹取范围一致。
+    static let minimumLimit = 0.1
+
+    static func sliderUpperBound(limit: Double) -> Double {
+        let value = limit.isFinite ? limit : 1
+        return min(max(value, minimumLimit), 1)
+    }
+
+    /// 音量已经顶到上限（且上限不是 100%）：此时应当说明为什么加不上去。
+    static func isAtLimit(volume: Double, limit: Double) -> Bool {
+        let bound = sliderUpperBound(limit: limit)
+        guard bound < 1 else { return false }
+        return volume >= bound - 0.001
     }
 }
 
@@ -462,7 +485,6 @@ struct SystemOutputVolumeState: Equatable, Sendable {
     var isMuted: Bool
     var canSetVolume: Bool
     var canSetMute: Bool
-
     static let unavailable = Self(
         deviceID: kAudioObjectUnknown,
         deviceUID: "",
@@ -925,7 +947,8 @@ final class AppVolumeService {
     private(set) var sessionSort: AppVolumeSessionSort
     private(set) var searchQuery: String
     private(set) var masterVolumeLimit: Double
-    private(set) var limitsHeadphoneVolume: Bool
+    /// 音量被外部改到上限以上时是否自动拉回（对所有输出设备生效）。
+    private(set) var enforcesMasterVolumeLimit: Bool
     private(set) var hearingWarningMessage: String? = nil
     private(set) var meetingCheck: AppVolumeMeetingCheck? = nil
     private(set) var automationExecutions: [AppVolumeAutomationExecution]
@@ -1029,7 +1052,7 @@ final class AppVolumeService {
         sessionSort = Self.loadSessionSort(from: userDefaults)
         searchQuery = userDefaults.string(forKey: StorageKey.searchQuery) ?? ""
         masterVolumeLimit = Self.loadMasterVolumeLimit(from: userDefaults)
-        limitsHeadphoneVolume = userDefaults.object(forKey: StorageKey.limitsHeadphoneVolume) as? Bool ?? true
+        enforcesMasterVolumeLimit = Self.loadEnforcesMasterVolumeLimit(from: userDefaults)
         let loadedAutomationExecutions = Self.loadAutomationExecutions(from: userDefaults)
         let loadedDuckedVolumes = Self.loadDuckedVolumes(
             from: userDefaults,
@@ -1591,15 +1614,15 @@ final class AppVolumeService {
     }
 
     func setMasterVolumeLimit(_ requestedLimit: Double) {
-        masterVolumeLimit = min(max(requestedLimit.isFinite ? requestedLimit : 1, 0.1), 1)
+        masterVolumeLimit = AppVolumeMasterLimitPolicy.sliderUpperBound(limit: requestedLimit)
         userDefaults.set(masterVolumeLimit, forKey: StorageKey.masterVolumeLimit)
         if output.volume > masterVolumeLimit { setMasterVolume(masterVolumeLimit) }
     }
 
-    func setLimitsHeadphoneVolume(_ enabled: Bool) {
-        limitsHeadphoneVolume = enabled
-        userDefaults.set(enabled, forKey: StorageKey.limitsHeadphoneVolume)
-        enforceHeadphoneVolumeLimitIfNeeded()
+    func setEnforcesMasterVolumeLimit(_ enabled: Bool) {
+        enforcesMasterVolumeLimit = enabled
+        userDefaults.set(enabled, forKey: StorageKey.enforcesMasterVolumeLimit)
+        enforceMasterVolumeLimitIfNeeded()
     }
 
     func recordHearingExposure(now: Date = .now) {
@@ -2280,9 +2303,10 @@ final class AppVolumeService {
         }
         if previousOutputUID != output.deviceUID {
             refreshOutputDevices()
-            enforceHeadphoneVolumeLimitIfNeeded()
             applyBoundPreset(forOutputDeviceUID: output.deviceUID)
         }
+        // 外部（键盘音量键、其他 App）调高音量也要拉回上限，不只是切设备那一下。
+        enforceMasterVolumeLimitIfNeeded()
         rebuildSessions()
         applyLevels(snapshot.levels)
         updateMeetingDucking()
@@ -2507,10 +2531,12 @@ final class AppVolumeService {
         input.peakLevel = min(max(input.peakLevel.isFinite ? input.peakLevel : 0, 0), 1)
     }
 
-    private func enforceHeadphoneVolumeLimitIfNeeded() {
-        guard limitsHeadphoneVolume,
+    /// 上限对所有输出设备都是硬顶：外部（键盘音量键、其他 App）把音量改高也要拉回，
+    /// 否则滑杆量程（0…上限）表示不了当前值，滑块就会顶在末端而数字显示更大的值。
+    private func enforceMasterVolumeLimitIfNeeded() {
+        guard enforcesMasterVolumeLimit,
               !isApplyingHearingLimit,
-              AppVolumeHearingSafetyPolicy.isHeadphone(deviceName: output.deviceName),
+              output.canSetVolume, // 不可调音量的设备上强制只会每秒重试失败
               output.volume > masterVolumeLimit else { return }
         isApplyingHearingLimit = true
         defer { isApplyingHearingLimit = false }
@@ -2667,6 +2693,21 @@ final class AppVolumeService {
         return min(max(value.isFinite ? value : 1, 0.1), 1)
     }
 
+    /// 从“仅耳机”迁移到“所有输出”的上限策略时，保留用户曾手动关闭自动拉回的选择。
+    /// 新键一旦存在就始终优先，避免旧键在后续启动时覆盖新的设置。
+    private static func loadEnforcesMasterVolumeLimit(from userDefaults: UserDefaults) -> Bool {
+        if let enabled = userDefaults.object(forKey: StorageKey.enforcesMasterVolumeLimit) as? Bool {
+            return enabled
+        }
+        guard let legacyEnabled = userDefaults.object(
+            forKey: StorageKey.legacyLimitsHeadphoneVolume
+        ) as? Bool else {
+            return true
+        }
+        userDefaults.set(legacyEnabled, forKey: StorageKey.enforcesMasterVolumeLimit)
+        return legacyEnabled
+    }
+
     private static func loadPresets(from userDefaults: UserDefaults) -> [AppVolumePreset] {
         guard let data = userDefaults.data(forKey: StorageKey.presets),
               let decoded = try? JSONDecoder().decode([AppVolumePreset].self, from: data) else {
@@ -2787,7 +2828,9 @@ final class AppVolumeService {
         static let sessionSort = "appVolume.sessionSort.v1"
         static let searchQuery = "appVolume.searchQuery.v1"
         static let masterVolumeLimit = "appVolume.masterVolumeLimit.v1"
-        static let limitsHeadphoneVolume = "appVolume.limitsHeadphoneVolume.v1"
+        static let enforcesMasterVolumeLimit = "appVolume.enforcesMasterVolumeLimit.v1"
+        /// v1.1.4 前的“耳机连接时自动应用上限”设置，只在首次迁移时读取。
+        static let legacyLimitsHeadphoneVolume = "appVolume.limitsHeadphoneVolume.v1"
         static let automationExecutions = "appVolume.automationExecutions.v1"
         static let meetingDuckingEnabled = "appVolume.meetingDuckingEnabled.v1"
         static let meetingDuckingFactor = "appVolume.meetingDuckingFactor.v1"

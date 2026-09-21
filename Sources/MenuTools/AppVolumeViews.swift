@@ -271,6 +271,20 @@ struct AppVolumeQuickAccessView: View {
                     .foregroundStyle(.orange)
                     .lineLimit(2)
             }
+
+            // 自动拉回启用且主音量顶到上限时说明原因，避免"拖不动"看起来像坏了。
+            if service.enforcesMasterVolumeLimit,
+               AppVolumeMasterLimitPolicy.isAtLimit(
+                volume: service.output.volume,
+                limit: service.masterVolumeLimit
+            ) {
+                Label(
+                    L("volume.masterLimit.hint", "\(Int((service.masterVolumeLimit * 100).rounded()))%"),
+                    systemImage: "ear"
+                )
+                .font(.caption2)
+                .foregroundStyle(.secondary)
+            }
         }
         .padding(14)
         .frame(width: 300, height: 360, alignment: .top)
@@ -892,9 +906,9 @@ struct AppVolumeSettingsView: View {
                         .font(.caption.monospacedDigit())
                         .foregroundStyle(.secondary)
                 }
-                Toggle(L("volume.masterLimit.headphones"), isOn: Binding(
-                    get: { service.limitsHeadphoneVolume },
-                    set: { service.setLimitsHeadphoneVolume($0) }
+                Toggle(L("volume.masterLimit.autoApply"), isOn: Binding(
+                    get: { service.enforcesMasterVolumeLimit },
+                    set: { service.setEnforcesMasterVolumeLimit($0) }
                 ))
                 if let warning = service.hearingWarningMessage {
                     HStack {
@@ -1400,11 +1414,30 @@ private struct SystemOutputVolumeRow: View {
                 }
             }
 
+            if isAtMasterLimit {
+                Image(systemName: "ear")
+                    .font(.caption2)
+                    .foregroundStyle(.secondary)
+                    .help(masterLimitHint)
+                    .frame(height: controlHeight)
+            }
+
             Text("\(Int((service.output.volume * 100).rounded()))%")
                 .font(.caption2.monospacedDigit())
                 .foregroundStyle(.secondary)
                 .frame(width: 34, height: controlHeight, alignment: .trailing)
         }
+    }
+
+    private var isAtMasterLimit: Bool {
+        service.enforcesMasterVolumeLimit && AppVolumeMasterLimitPolicy.isAtLimit(
+            volume: service.output.volume,
+            limit: service.masterVolumeLimit
+        )
+    }
+
+    private var masterLimitHint: String {
+        L("volume.masterLimit.hint", "\(Int((service.masterVolumeLimit * 100).rounded()))%")
     }
 
     private var controlHeight: CGFloat? {
@@ -1422,7 +1455,7 @@ private struct SystemOutputVolumeRow: View {
         Slider(value: Binding(
             get: { service.output.volume },
             set: { service.setMasterVolume($0) }
-        ), in: 0...1)
+        ), in: 0...AppVolumeMasterLimitPolicy.sliderUpperBound(limit: service.masterVolumeLimit))
         .disabled(!service.output.canSetVolume)
         .accessibilityLabel(L("volume.master"))
     }

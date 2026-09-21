@@ -21,6 +21,12 @@ func windowManagementQuickAccessDoesNotToggleVisiblePopover() {
     #expect(!WindowManagementQuickAccessPresentationPolicy.shouldShow(isShown: true))
 }
 
+@Test("面板展示期间状态项标题不显示 App 名，保证宽度不变")
+func menuBarStatusItemTitleDropsAppNameWhilePresented() {
+    #expect(MenuBarStatusItemTitlePolicy.showsAppName(isQuickAccessPresented: false))
+    #expect(!MenuBarStatusItemTitlePolicy.showsAppName(isQuickAccessPresented: true))
+}
+
 @Test("菜单栏弹层窗口使用透明底板")
 @MainActor
 func menuBarPopoverWindowUsesTransparentBacking() {

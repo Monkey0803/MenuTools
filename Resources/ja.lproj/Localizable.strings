@@ -1157,7 +1157,8 @@
 "volume.muteFiltered" = "表示中の App をミュート";
 "volume.restoreFiltered" = "表示中の App を元に戻す";
 "volume.masterLimit" = "マスター音量の上限";
-"volume.masterLimit.headphones" = "ヘッドホン接続時に上限を自動適用";
+"volume.masterLimit.autoApply" = "上限を超えた音量を自動的に戻す";
+"volume.masterLimit.hint" = "聴力保護の上限に達しています（%@）";
 "volume.hearing.title" = "聴力保護";
 "volume.meetingDucking" = "会議中は他の再生中 App を小さくする";
 "volume.meetingDucking.keepVolume" = "残す音量";

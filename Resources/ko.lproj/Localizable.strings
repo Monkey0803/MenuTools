@@ -1157,7 +1157,8 @@
 "volume.muteFiltered" = "현재 목록 음소거";
 "volume.restoreFiltered" = "현재 목록 복원";
 "volume.masterLimit" = "최대 마스터 음량";
-"volume.masterLimit.headphones" = "헤드폰 연결 시 상한 자동 적용";
+"volume.masterLimit.autoApply" = "상한을 넘은 음량을 자동으로 되돌림";
+"volume.masterLimit.hint" = "청력 보호 한도에 도달했습니다(%@)";
 "volume.hearing.title" = "청력 보호";
 "volume.meetingDucking" = "회의 중 다른 재생 앱 음량 낮추기";
 "volume.meetingDucking.keepVolume" = "유지할 음량";

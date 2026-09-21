@@ -1157,7 +1157,8 @@
 "volume.muteFiltered" = "静音当前列表";
 "volume.restoreFiltered" = "恢复当前列表";
 "volume.masterLimit" = "最大主音量";
-"volume.masterLimit.headphones" = "耳机连接时自动应用上限";
+"volume.masterLimit.autoApply" = "音量超过上限时自动拉回";
+"volume.masterLimit.hint" = "已到听力保护上限（%@）";
 "volume.hearing.title" = "听力保护";
 "volume.meetingDucking" = "会议时压低其他正在发声的 App";
 "volume.meetingDucking.keepVolume" = "保留音量";

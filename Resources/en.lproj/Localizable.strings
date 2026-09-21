@@ -1157,7 +1157,8 @@
 "volume.muteFiltered" = "Mute listed apps";
 "volume.restoreFiltered" = "Restore listed apps";
 "volume.masterLimit" = "Maximum master volume";
-"volume.masterLimit.headphones" = "Apply the limit automatically when headphones connect";
+"volume.masterLimit.autoApply" = "Pull the volume back when it exceeds the limit";
+"volume.masterLimit.hint" = "Hearing protection limit reached (%@)";
 "volume.hearing.title" = "Hearing protection";
 "volume.meetingDucking" = "Lower other playing apps during meetings";
 "volume.meetingDucking.keepVolume" = "Keep volume";

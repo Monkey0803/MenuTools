@@ -1,3 +1,4 @@
+import AppKit
 import Foundation
 import Testing
 @testable import MenuTools
@@ -338,7 +339,9 @@ private final class FakeAppVolumeRoutingBackend: AppVolumeRoutingBackend {
         removed.append(rootBundleID)
     }
 
-    func setMasterVolume(_ volume: Double) throws {}
+    var masterVolumeSets: [Double] = []
+
+    func setMasterVolume(_ volume: Double) throws { masterVolumeSets.append(volume) }
     func setMasterMuted(_ muted: Bool) throws {}
 
     func send(candidates: [AppAudioProcessCandidate]) {
@@ -348,6 +351,10 @@ private final class FakeAppVolumeRoutingBackend: AppVolumeRoutingBackend {
                 output: .fixture
             )
         )
+    }
+
+    func send(output: SystemOutputVolumeState) {
+        onSnapshot?(AppVolumeBackendSnapshot(candidates: [], output: output))
     }
 }
 
@@ -374,6 +381,22 @@ private extension AppAudioProcessCandidate {
 }
 
 private extension SystemOutputVolumeState {
+    /// 用于验证上限强制条件的输出设备。
+    static func limitFixture(
+        volume: Double,
+        canSetVolume: Bool = true
+    ) -> SystemOutputVolumeState {
+        SystemOutputVolumeState(
+            deviceID: 100,
+            deviceUID: "test-headphone",
+            deviceName: "WH-1000XM3",
+            volume: volume,
+            isMuted: false,
+            canSetVolume: canSetVolume,
+            canSetMute: true
+        )
+    }
+
     static let fixture = SystemOutputVolumeState(
         deviceID: 99,
         deviceName: "Mac 扬声器",
@@ -424,46 +447,163 @@ func channelMixDownmixesToMono() {
 
 @Test("菜单栏音量标题按模式给出主音量或最响 App，并夹住百分比")
 func menuBarVolumeTitlesFollowMode() {
+    let pad = "\u{2007}" // 图空格：与数字等宽
     #expect(AppVolumeMenuBarPresenter.title(mode: .off, masterVolume: 0.42, isMuted: false, loudest: nil) == nil)
-    // 百分比固定三位宽，避免调音量时标题宽度变化
-    #expect(AppVolumeMenuBarPresenter.title(mode: .master, masterVolume: 0.42, isMuted: false, loudest: nil) == "🔊  42%")
+    // 百分比补到三位宽，且补齐用图空格，避免调音量时标题宽度变化
+    #expect(AppVolumeMenuBarPresenter.title(mode: .master, masterVolume: 0.42, isMuted: false, loudest: nil) == "🔊 \(pad)42%")
     #expect(
         AppVolumeMenuBarPresenter.title(mode: .loudest, masterVolume: 0.1, isMuted: false, loudest: ("音乐", 0.8))
-            == "🔊 音乐  80%"
+            == "🔊 音乐 \(pad)80%"
     )
     // 没有正在发声的 App 时退回主音量
-    #expect(AppVolumeMenuBarPresenter.title(mode: .loudest, masterVolume: 0.5, isMuted: false, loudest: nil) == "🔊  50%")
+    #expect(AppVolumeMenuBarPresenter.title(mode: .loudest, masterVolume: 0.5, isMuted: false, loudest: nil) == "🔊 \(pad)50%")
     #expect(AppVolumeMenuBarPresenter.percent(2) == "100%")
-    #expect(AppVolumeMenuBarPresenter.percent(-1) == "  0%")
-    #expect(AppVolumeMenuBarPresenter.percent(0.05) == "  5%")
+    #expect(AppVolumeMenuBarPresenter.percent(-1) == "\(pad)\(pad)0%")
+    #expect(AppVolumeMenuBarPresenter.percent(0.05) == "\(pad)\(pad)5%")
+    // 静音仍给出真实百分比（只有图标变静音），宽度与正常状态严格一致
+    #expect(AppVolumeMenuBarPresenter.masterTitle(volume: 0.42, isMuted: true) == "🔇 \(pad)42%")
 }
 
-@Test("菜单栏音量标题宽度稳定：位数、静音与长名字都不会改变宽度")
-func menuBarVolumeTitleWidthIsStable() {
-    // 同一模式下不同音量长度一致（弹窗锚在状态项上，宽度变化会带着弹窗抖）
-    let lengths = [0.0, 0.05, 0.42, 0.999, 1.0].map {
-        AppVolumeMenuBarPresenter.title(mode: .master, masterVolume: $0, isMuted: false, loudest: nil)?.count
+@Test("面板展示期间标题不带 App 名")
+func menuBarTitleDropsAppNameWhilePanelShown() {
+    let shown = AppVolumeMenuBarPresenter.title(
+        mode: .loudest, masterVolume: 0.1, isMuted: false, loudest: ("Chrome", 0.56), showsAppName: false
+    )
+    let hidden = AppVolumeMenuBarPresenter.title(
+        mode: .loudest, masterVolume: 0.1, isMuted: false, loudest: ("Chrome", 0.56), showsAppName: true
+    )
+    #expect(shown == "🔊 \(AppVolumeMenuBarPresenter.percent(0.56))")
+    #expect(shown?.contains("Chrome") == false)
+    #expect(hidden?.contains("Chrome") == true)
+    // 不带名字时仍然跟随最响 App 的音量，而不是退回主音量
+    #expect(
+        AppVolumeMenuBarPresenter.title(
+            mode: .loudest, masterVolume: 0.1, isMuted: false, loudest: ("Chrome", 1.0), showsAppName: false
+        ) == "🔊 100%"
+    )
+}
+
+@Test("面板展示期间菜单栏标题宽度严格一致")
+func menuBarTitleWidthIsStableWhilePanelShown() {
+    func widths(_ titles: [String?]) -> Set<Int> {
+        Set(titles.compactMap { $0 }.map { Int((MenuBarStatusItemTitleLayout.width(of: $0) * 1000).rounded()) })
     }
-    #expect(Set(lengths.compactMap { $0 }).count == 1)
+
+    // 弹窗锚在状态项上：这些标题会在拖拽音量时互相切换，宽度必须完全一样
+    let whilePresented = [
+        AppVolumeMenuBarPresenter.title(mode: .loudest, masterVolume: 0.42, isMuted: false, loudest: ("Chrome", 0.56), showsAppName: false),
+        AppVolumeMenuBarPresenter.title(mode: .loudest, masterVolume: 0.42, isMuted: false, loudest: ("音乐", 1.0), showsAppName: false),
+        AppVolumeMenuBarPresenter.title(mode: .loudest, masterVolume: 0.42, isMuted: false, loudest: nil, showsAppName: false),
+        AppVolumeMenuBarPresenter.title(mode: .master, masterVolume: 0.05, isMuted: false, loudest: nil, showsAppName: false),
+        AppVolumeMenuBarPresenter.title(mode: .master, masterVolume: 1.0, isMuted: false, loudest: nil, showsAppName: false),
+        AppVolumeMenuBarPresenter.title(mode: .master, masterVolume: 0.42, isMuted: true, loudest: nil, showsAppName: false),
+    ]
+    #expect(widths(whilePresented).count == 1)
+}
+
+@Test("菜单栏音量标题宽度稳定：位数、静音与同名 App 都不会改变宽度")
+func menuBarVolumeTitleWidthIsStable() {
+    func width(_ title: String?) -> Int? {
+        title.map { Int((MenuBarStatusItemTitleLayout.width(of: $0) * 1000).rounded()) }
+    }
+
+    // 各挡音量实测等宽（弹窗锚在状态项上，宽度变化会带着弹窗抖）
+    let widths = [0.0, 0.05, 0.42, 0.999, 1.0].map {
+        width(AppVolumeMenuBarPresenter.title(mode: .master, masterVolume: $0, isMuted: false, loudest: nil))
+    }
+    #expect(Set(widths.compactMap { $0 }).count == 1)
 
     // 静音与正常状态等宽
     let muted = AppVolumeMenuBarPresenter.title(mode: .master, masterVolume: 0.5, isMuted: true, loudest: nil)
     let normal = AppVolumeMenuBarPresenter.title(mode: .master, masterVolume: 0.5, isMuted: false, loudest: nil)
-    #expect(muted?.count == normal?.count)
+    #expect(width(muted) == width(normal))
 
-    // 最响 App：同一 App 调音量长度不变
+    // 最响 App：同一 App 调音量宽度不变
     let quiet = AppVolumeMenuBarPresenter.title(mode: .loudest, masterVolume: 0.1, isMuted: false, loudest: ("Chrome", 0.09))
     let loud = AppVolumeMenuBarPresenter.title(mode: .loudest, masterVolume: 0.1, isMuted: false, loudest: ("Chrome", 1.0))
-    #expect(quiet?.count == loud?.count)
+    #expect(width(quiet) == width(loud))
 
     // 超长 App 名会被截断，宽度有上界
     let longName = String(repeating: "超长名字", count: 6)
-    let truncated = try? #require(
-        AppVolumeMenuBarPresenter.title(mode: .loudest, masterVolume: 0.5, isMuted: false, loudest: (longName, 0.8))
-    )
-    #expect(truncated?.contains("…") == true)
+    let truncated = AppVolumeMenuBarPresenter.title(
+        mode: .loudest,
+        masterVolume: 0.5,
+        isMuted: false,
+        loudest: (longName, 0.8)
+    ) ?? ""
+    #expect(truncated.contains("…"))
 
     // 长名字与截断后的上限一致，不会无限变宽
     let bounded = "🔊 ".count + AppVolumeMenuBarPresenter.maximumAppNameLength + 1 + 4
-    #expect((truncated?.count ?? 0) <= bounded)
+    #expect(truncated.count <= bounded)
+}
+
+@Test("主音量滑杆上界跟随听力保护上限")
+func masterVolumeSliderBoundFollowsLimit() {
+    // 滑杆上界必须等于上限：否则拖过头时滑块还在动、数值却停住，看起来像坏了。
+    #expect(AppVolumeMasterLimitPolicy.sliderUpperBound(limit: 0.6) == 0.6)
+    #expect(AppVolumeMasterLimitPolicy.sliderUpperBound(limit: 1) == 1)
+    #expect(AppVolumeMasterLimitPolicy.sliderUpperBound(limit: 0.02) == AppVolumeMasterLimitPolicy.minimumLimit)
+    #expect(AppVolumeMasterLimitPolicy.sliderUpperBound(limit: .nan) == 1)
+    #expect(AppVolumeMasterLimitPolicy.sliderUpperBound(limit: 1.5) == 1)
+}
+
+@Test("只有顶到上限时才提示加不上去")
+func masterVolumeLimitHintOnlyWhenCapped() {
+    #expect(AppVolumeMasterLimitPolicy.isAtLimit(volume: 0.6, limit: 0.6))
+    #expect(!AppVolumeMasterLimitPolicy.isAtLimit(volume: 0.59, limit: 0.6))
+    // 上限是 100% 时不提示
+    #expect(!AppVolumeMasterLimitPolicy.isAtLimit(volume: 1, limit: 1))
+    #expect(!AppVolumeMasterLimitPolicy.isAtLimit(volume: 0.4, limit: 1))
+}
+
+@Test("全局主音量上限会自动拉回，但要求设备可调音量")
+@MainActor
+func masterVolumeLimitAutomaticallyPullsBackVolume() throws {
+    let defaults = try makeVolumeDefaults("masterLimitScope")
+    let backend = FakeAppVolumeRoutingBackend()
+    let service = AppVolumeService(backend: backend, userDefaults: defaults)
+    service.start()
+    service.setEnforcesMasterVolumeLimit(true)
+    service.setMasterVolumeLimit(0.6)
+
+    // 音量高于上限 → 拉回上限
+    backend.masterVolumeSets.removeAll()
+    backend.send(output: .limitFixture(volume: 0.9, canSetVolume: true))
+    #expect(backend.masterVolumeSets.last == 0.6)
+
+    // 不可调音量的输出 → 不做无意义的反复强制
+    backend.masterVolumeSets.removeAll()
+    backend.send(output: .limitFixture(volume: 0.9, canSetVolume: false))
+    #expect(backend.masterVolumeSets.isEmpty)
+
+    // 关掉自动拉回 → 不再强制（此时允许外部把音量调到上限以上）
+    service.setEnforcesMasterVolumeLimit(false)
+    backend.masterVolumeSets.removeAll()
+    backend.send(output: .limitFixture(volume: 0.9, canSetVolume: true))
+    #expect(backend.masterVolumeSets.isEmpty)
+}
+
+@Test("旧版耳机上限开关会迁移到新的自动拉回开关")
+@MainActor
+func legacyHeadphoneLimitPreferenceMigratesToAutomaticLimit() throws {
+    let defaults = try makeVolumeDefaults("legacyHeadphoneLimit")
+    defaults.set(false, forKey: "appVolume.limitsHeadphoneVolume.v1")
+
+    let migrated = AppVolumeService(
+        backend: FakeAppVolumeRoutingBackend(),
+        userDefaults: defaults
+    )
+
+    #expect(!migrated.enforcesMasterVolumeLimit)
+    #expect(
+        defaults.object(forKey: AppVolumeService.StorageKey.enforcesMasterVolumeLimit) as? Bool == false
+    )
+
+    defaults.set(true, forKey: AppVolumeService.StorageKey.enforcesMasterVolumeLimit)
+    let current = AppVolumeService(
+        backend: FakeAppVolumeRoutingBackend(),
+        userDefaults: defaults
+    )
+    #expect(current.enforcesMasterVolumeLimit)
 }
