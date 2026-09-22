@@ -1234,6 +1234,7 @@
 
 /* Built-in Feature Center */
 "settings.tab.plugins" = "Feature Center";
+"settings.tab.runtimeStatus" = "Permissions & Runtime";
 "settings.backToFeatures" = "Feature Center";
 "settings.sidebar.settings" = "Settings";
 "settings.sidebar.enabledFeatures" = "Enabled Features";
@@ -1265,6 +1266,28 @@
 "plugin.permission.notifications" = "Notifications";
 "plugin.permission.screenRecording" = "Screen Recording";
 "plugin.permission.systemAudioRecording" = "System Audio Recording";
+"runtime.title" = "Permissions & Runtime";
+"runtime.description" = "Review system permissions, plugin runtime results, and items that need attention. Refresh after changing a permission.";
+"runtime.refresh" = "Refresh";
+"runtime.summary.running" = "Running";
+"runtime.summary.attention" = "Needs Attention";
+"runtime.summary.disabled" = "Disabled";
+"runtime.section.permissions" = "System Permissions";
+"runtime.section.plugins" = "Plugin Runtime";
+"runtime.permission.granted" = "Granted";
+"runtime.permission.denied" = "Not Granted";
+"runtime.permission.notDetermined" = "Not Granted Yet";
+"runtime.permission.requiresVerification" = "Verify in System Settings";
+"runtime.openSettings" = "Open Settings";
+"runtime.openCenter" = "Runtime Status";
+"runtime.openFeature" = "Feature Settings";
+"runtime.plugin.disabled" = "Disabled";
+"runtime.plugin.running" = "Running normally";
+"runtime.plugin.stopped" = "Not running";
+"runtime.plugin.failed" = "Failed to start";
+"runtime.plugin.requiresPermissions" = "Permissions required";
+"runtime.plugin.failedDetail" = "Failed to start: %@";
+"runtime.plugin.permissionsDetail" = "Missing: %@";
 "plugin.category.system" = "System";
 "plugin.category.productivity" = "Productivity";
 "plugin.category.media" = "Media";
@@ -1272,7 +1295,7 @@
 "plugin.system-controls.title" = "System Controls";
 "plugin.system-controls.description" = "Appearance, hidden files, Dock, menu bar, sleep prevention, and system actions.";
 "plugin.system-insights.title" = "System Insights";
-"plugin.system-insights.description" = "Network, battery, displays, storage, and Bluetooth battery levels.";
+"plugin.system-insights.description" = "Network, battery, displays, and Bluetooth battery levels.";
 "plugin.system-resources.title" = "System Monitor";
 "plugin.system-resources.description" = "CPU, memory pressure and release, disk capacity and throughput, and the busiest processes.";
 "plugin.network-traffic.title" = "Network Monitor";
@@ -1638,3 +1661,28 @@
 /* Settings */
 "rc.settings.menuStyle" = "Menu style";
 "rc.settings.menuStyleHint" = "Choose how items are organized in the right-click menu.";</arg>
+
+"plugin.system-storage.title" = "System Storage";
+"plugin.system-storage.description" = "Disk capacity, analyzed directories, and audited DerivedData cleanup.";
+"storage.module.title" = "System Storage";
+"storage.module.overview" = "Disk overview";
+"storage.module.analyzedDirectories" = "Analyzed directories";
+"storage.module.about" = "About";
+"storage.module.scope" = "Only user directories that MenuTools can reliably inspect are counted. Caches, logs, and downloads are view-only; macOS manages system data and other apps’ private data.";
+"storage.used" = "Used";
+"storage.free" = "Available";
+"storage.total" = "Total";
+"storage.freeOf" = "%@ available of %@";
+"storage.openSettings" = "Open System Storage settings";
+"storage.cleaning" = "Cleaning…";
+"storage.manualReview" = "Review this location manually in Finder or its app.";
+"storage.derivedData.detail" = "Xcode build products. Safe to clean after closing Xcode.";
+"storage.caches.detail" = "A cache location shared by multiple apps; bulk deletion is unavailable.";
+"storage.logs.detail" = "A log location shared by multiple apps; bulk deletion is unavailable.";
+"storage.downloads.detail" = "Personal downloads are never cleaned automatically.";
+
+"storage.xcodeRunning" = "Quit Xcode before cleaning DerivedData.";
+
+"storage.confirm.detail" = "Only this directory’s contents will be removed.\nPath: %@\nEstimated space to free: %@";
+"storage.openFinder" = "Show in Finder";
+"storage.unsafePath" = "The cleanup path did not pass safety validation.";

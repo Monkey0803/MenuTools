@@ -5,6 +5,7 @@ enum BuiltInPluginID: String, CaseIterable, Codable, Hashable, Identifiable, Sen
     case systemControls = "system-controls"
     case systemInsights = "system-insights"
     case systemResources = "system-resources"
+    case systemStorage = "system-storage"
     case networkTraffic = "network-traffic"
     case clipboard
     case translation

@@ -1234,6 +1234,7 @@
 
 /* 내장 기능 센터 */
 "settings.tab.plugins" = "기능 센터";
+"settings.tab.runtimeStatus" = "권한 및 실행 상태";
 "settings.backToFeatures" = "기능 센터";
 "settings.sidebar.settings" = "설정";
 "settings.sidebar.enabledFeatures" = "활성화된 기능";
@@ -1265,6 +1266,28 @@
 "plugin.permission.notifications" = "알림";
 "plugin.permission.screenRecording" = "화면 기록";
 "plugin.permission.systemAudioRecording" = "시스템 오디오 기록";
+"runtime.title" = "권한 및 실행 상태";
+"runtime.description" = "시스템 권한, 기능 실행 결과 및 조치가 필요한 이유를 한곳에서 확인합니다. 권한을 변경한 후 새로 고치세요.";
+"runtime.refresh" = "새로 고침";
+"runtime.summary.running" = "실행 중";
+"runtime.summary.attention" = "조치 필요";
+"runtime.summary.disabled" = "비활성화됨";
+"runtime.section.permissions" = "시스템 권한";
+"runtime.section.plugins" = "기능 실행 상태";
+"runtime.permission.granted" = "허용됨";
+"runtime.permission.denied" = "허용되지 않음";
+"runtime.permission.notDetermined" = "아직 허용되지 않음";
+"runtime.permission.requiresVerification" = "시스템 설정에서 확인";
+"runtime.openSettings" = "설정 열기";
+"runtime.openCenter" = "실행 상태";
+"runtime.openFeature" = "기능 설정";
+"runtime.plugin.disabled" = "비활성화됨";
+"runtime.plugin.running" = "정상 실행 중";
+"runtime.plugin.stopped" = "실행되지 않음";
+"runtime.plugin.failed" = "시작 실패";
+"runtime.plugin.requiresPermissions" = "권한 필요";
+"runtime.plugin.failedDetail" = "시작 실패: %@";
+"runtime.plugin.permissionsDetail" = "누락: %@";
 "plugin.category.system" = "시스템";
 "plugin.category.productivity" = "생산성";
 "plugin.category.media" = "미디어";
@@ -1272,7 +1295,7 @@
 "plugin.system-controls.title" = "시스템 제어";
 "plugin.system-controls.description" = "화면 모드, 숨김 파일, Dock, 메뉴 막대, 잠자기 방지 및 시스템 동작.";
 "plugin.system-insights.title" = "시스템 정보";
-"plugin.system-insights.description" = "네트워크, 배터리, 디스플레이, 저장 공간 및 Bluetooth 기기 배터리.";
+"plugin.system-insights.description" = "네트워크, 배터리, 디스플레이 및 Bluetooth 기기 배터리.";
 "plugin.system-resources.title" = "시스템 모니터";
 "plugin.system-resources.description" = "CPU, 메모리 압력 및 해제, 디스크 용량과 읽기/쓰기, 부하가 큰 프로세스.";
 "plugin.network-traffic.title" = "네트워크 모니터";
@@ -1638,3 +1661,28 @@
 /* Undo queue */
 "rc.undo.queued" = "%@개 작업이 취소 대기 큐에 등록되었습니다.";
 "rc.undo.remaining" = "%d개가 아직 처리 중입니다.";
+
+"plugin.system-storage.title" = "시스템 저장 공간";
+"plugin.system-storage.description" = "디스크 용량, 분석한 디렉터리 및 검증된 DerivedData 정리입니다.";
+"storage.module.title" = "시스템 저장 공간";
+"storage.module.overview" = "디스크 개요";
+"storage.module.analyzedDirectories" = "분석한 디렉터리";
+"storage.module.about" = "안내";
+"storage.module.scope" = "MenuTools가 안정적으로 읽을 수 있는 사용자 디렉터리만 집계합니다. 캐시, 로그, 다운로드는 보기 전용이며 시스템 데이터와 다른 App의 개인 데이터는 macOS가 관리합니다.";
+"storage.used" = "사용됨";
+"storage.free" = "사용 가능";
+"storage.total" = "전체";
+"storage.freeOf" = "사용 가능 %@ / %@";
+"storage.openSettings" = "시스템 저장 공간 설정 열기";
+"storage.cleaning" = "정리 중…";
+"storage.manualReview" = "Finder 또는 해당 App에서 직접 검토하세요.";
+"storage.derivedData.detail" = "Xcode 빌드 산출물입니다. Xcode를 종료한 뒤 안전하게 정리할 수 있습니다.";
+"storage.caches.detail" = "여러 App이 공유하는 캐시 위치이므로 일괄 삭제할 수 없습니다.";
+"storage.logs.detail" = "여러 App이 공유하는 로그 위치이므로 일괄 삭제할 수 없습니다.";
+"storage.downloads.detail" = "개인 다운로드는 자동으로 정리하지 않습니다。";
+
+"storage.xcodeRunning" = "DerivedData를 정리하기 전에 Xcode를 종료하세요.";
+
+"storage.confirm.detail" = "이 디렉터리의 내용만 삭제하고 디렉터리 자체는 유지합니다.\n경로: %@\n예상 확보 공간: %@";
+"storage.openFinder" = "Finder에서 보기";
+"storage.unsafePath" = "정리 경로가 안전성 검사를 통과하지 못했습니다.";

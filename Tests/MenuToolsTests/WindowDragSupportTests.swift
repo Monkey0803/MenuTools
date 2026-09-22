@@ -261,10 +261,13 @@ func urlSchemeParsesWindowActions() throws {
     // 与 Rectangle 的 execute-action 习惯一致
     #expect(action("menutools://action?name=maximize") == .layout(.maximize))
     #expect(action("menutools://preset?name=%E5%BC%80%E5%8F%91") == .preset("开发"))
+    #expect(action("menutools://settings?tab=runtime-status") == .settings(.runtimeStatus))
+    #expect(action("menutools://settings?tab=system-storage") == .settings(.systemStorage))
 
     #expect(action("menutools://window?layout=nonsense") == nil)
     #expect(action("menutools://window") == nil)
     #expect(action("menutools://preset?name=") == nil)
+    #expect(action("menutools://settings?tab=unknown") == nil)
     #expect(action("menutools://unknown?layout=left-half") == nil)
     #expect(action("https://example.com/window?layout=left-half") == nil)
 }

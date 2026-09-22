@@ -1234,6 +1234,7 @@
 
 /* 內建功能中心 */
 "settings.tab.plugins" = "功能中心";
+"settings.tab.runtimeStatus" = "權限與執行狀態";
 "settings.backToFeatures" = "功能中心";
 "settings.sidebar.settings" = "設定";
 "settings.sidebar.enabledFeatures" = "已啟用功能";
@@ -1265,6 +1266,28 @@
 "plugin.permission.notifications" = "通知";
 "plugin.permission.screenRecording" = "螢幕錄製";
 "plugin.permission.systemAudioRecording" = "系統音訊錄製";
+"runtime.title" = "權限與執行狀態";
+"runtime.description" = "集中查看系統授權、功能執行結果與需要處理的原因。授權變更後請重新整理。";
+"runtime.refresh" = "重新整理";
+"runtime.summary.running" = "執行中";
+"runtime.summary.attention" = "需處理";
+"runtime.summary.disabled" = "已停用";
+"runtime.section.permissions" = "系統權限";
+"runtime.section.plugins" = "功能執行狀態";
+"runtime.permission.granted" = "已授權";
+"runtime.permission.denied" = "未授權";
+"runtime.permission.notDetermined" = "尚未授權";
+"runtime.permission.requiresVerification" = "需在系統設定中確認";
+"runtime.openSettings" = "開啟設定";
+"runtime.openCenter" = "執行狀態";
+"runtime.openFeature" = "功能設定";
+"runtime.plugin.disabled" = "已停用";
+"runtime.plugin.running" = "執行正常";
+"runtime.plugin.stopped" = "尚未執行";
+"runtime.plugin.failed" = "啟動失敗";
+"runtime.plugin.requiresPermissions" = "需要權限";
+"runtime.plugin.failedDetail" = "啟動失敗：%@";
+"runtime.plugin.permissionsDetail" = "缺少：%@";
 "plugin.category.system" = "系統";
 "plugin.category.productivity" = "效率";
 "plugin.category.media" = "媒體";
@@ -1272,7 +1295,7 @@
 "plugin.system-controls.title" = "系統控制";
 "plugin.system-controls.description" = "外觀、隱藏檔案、Dock、選單列、防止睡眠和系統快捷操作。";
 "plugin.system-insights.title" = "系統資訊";
-"plugin.system-insights.description" = "網路、電池、顯示器、儲存空間和藍牙裝置電量。";
+"plugin.system-insights.description" = "網路、電池、顯示器和藍牙裝置電量。";
 "plugin.system-resources.title" = "系統監控";
 "plugin.system-resources.description" = "CPU、記憶體壓力與釋放、磁碟容量與讀寫、佔用最高的程序。";
 "plugin.network-traffic.title" = "網路監控";
@@ -1640,3 +1663,28 @@
 /* Undo queue */
 "rc.undo.queued" = "%@ 項操作已排隊等待復原。";
 "rc.undo.remaining" = "%d 項仍在處理中。";
+
+"plugin.system-storage.title" = "系統儲存空間";
+"plugin.system-storage.description" = "磁碟容量、可分析目錄與已審核的 DerivedData 清理。";
+"storage.module.title" = "系統儲存空間";
+"storage.module.overview" = "磁碟總覽";
+"storage.module.analyzedDirectories" = "可分析目錄";
+"storage.module.about" = "說明";
+"storage.module.scope" = "僅統計 MenuTools 可以可靠讀取的使用者目錄。快取、日誌和下載僅供查看，系統資料及其他 App 的私有資料由 macOS 管理。";
+"storage.used" = "已使用";
+"storage.free" = "可用";
+"storage.total" = "總容量";
+"storage.freeOf" = "可用 %@ / %@";
+"storage.openSettings" = "打開系統儲存空間設定";
+"storage.cleaning" = "正在清理…";
+"storage.manualReview" = "請在 Finder 或對應 App 中手動處理。";
+"storage.derivedData.detail" = "Xcode 建置產物；關閉 Xcode 後可安全清理。";
+"storage.caches.detail" = "多個 App 共用的快取目錄，不提供批量刪除。";
+"storage.logs.detail" = "多個 App 共用的日誌目錄，不提供批量刪除。";
+"storage.downloads.detail" = "個人下載檔案，不提供自動清理。";
+
+"storage.xcodeRunning" = "Xcode 正在執行，請結束後再清理 DerivedData。";
+
+"storage.confirm.detail" = "只會刪除目錄內容，目錄本身會保留。\n路徑：%@\n預計釋放：%@";
+"storage.openFinder" = "在 Finder 中查看";
+"storage.unsafePath" = "清理路徑未通過安全驗證。";

@@ -21,22 +21,7 @@ enum XcodeCleanerService {
 
     /// 递归统计 DerivedData 占用的磁盘容量（字节）；目录不存在时返回 0
     nonisolated static func directorySize() -> Int64 {
-        let fileManager = FileManager.default
-        guard fileManager.fileExists(atPath: derivedDataURL.path),
-              let enumerator = fileManager.enumerator(
-                at: derivedDataURL,
-                includingPropertiesForKeys: [.totalFileAllocatedSizeKey, .fileAllocatedSizeKey],
-                options: [],
-                errorHandler: nil
-              ) else {
-            return 0
-        }
-        var total: Int64 = 0
-        for case let url as URL in enumerator {
-            let values = try? url.resourceValues(forKeys: [.totalFileAllocatedSizeKey, .fileAllocatedSizeKey])
-            total += Int64(values?.totalFileAllocatedSize ?? values?.fileAllocatedSize ?? 0)
-        }
-        return total
+        StorageAnalysisCalculator.directorySize(at: derivedDataURL)
     }
 
     /// 清空 DerivedData 目录内容（保留目录本身）；个别条目被占用时继续删其余项

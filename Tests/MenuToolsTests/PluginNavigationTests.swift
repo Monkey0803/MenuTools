@@ -8,6 +8,7 @@ func settingsTabsFollowEnabledPlugins() {
 
     #expect(tabs.contains(.general))
     #expect(tabs.contains(.plugins))
+    #expect(tabs.contains(.runtimeStatus))
     #expect(tabs.contains(.volume))
     #expect(tabs.contains(.screenshot))
     #expect(!tabs.contains(.rightClick))
@@ -24,7 +25,7 @@ func unavailableSettingsTabFallsBackToPluginCenter() {
 
 @Test("侧边栏固定设置与已启用功能分组互不混合")
 func sidebarSeparatesPrimaryAndFeatureDestinations() {
-    #expect(SettingsTab.primaryTabs == [.general, .plugins])
+    #expect(SettingsTab.primaryTabs == [.general, .plugins, .runtimeStatus])
     #expect(SettingsTab.enabledFeatureTabs(enabledPluginIDs: [.appVolume, .windowManagement]) == [
         .volume,
         .windowManagement
@@ -111,4 +112,13 @@ func systemResourcePageSelectionDoesNotAnimateFormLayout() {
 func menuPanelEntranceDelayIsBounded() {
     #expect(MenuPanelEntranceTiming.delay(for: 0) == 0)
     #expect(MenuPanelEntranceTiming.delay(for: 15) <= 0.18)
+}
+
+@Test("系统存储模块独立控制面板与设置入口")
+func systemStorageModuleOwnsStorageDestinations() {
+    #expect(MenuPanelFeature.storage.isAvailable(enabledPlugins: [.systemStorage]))
+    #expect(!MenuPanelFeature.storage.isAvailable(enabledPlugins: [.systemInsights]))
+    #expect(MenuPanelFeature.cleanup.isAvailable(enabledPlugins: [.systemStorage]))
+    #expect(!MenuPanelFeature.cleanup.isAvailable(enabledPlugins: [.systemInsights]))
+    #expect(SettingsTab.enabledFeatureTabs(enabledPluginIDs: [.systemStorage]) == [.systemStorage])
 }

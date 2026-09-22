@@ -75,6 +75,7 @@ struct SettingsSidebarItemStyle: Equatable, Sendable {
 enum SettingsTab: String, CaseIterable, Hashable, Identifiable {
     case general
     case plugins
+    case runtimeStatus
     case networkTraffic
     case volume
     case rightClick
@@ -86,6 +87,7 @@ enum SettingsTab: String, CaseIterable, Hashable, Identifiable {
     case clipboard
     case translation
     case systemResources
+    case systemStorage
 
     var id: String { rawValue }
 
@@ -93,6 +95,7 @@ enum SettingsTab: String, CaseIterable, Hashable, Identifiable {
         switch self {
         case .general: return "settings.tab.general"
         case .plugins: return "settings.tab.plugins"
+        case .runtimeStatus: return "settings.tab.runtimeStatus"
         case .networkTraffic: return "traffic.title"
         case .volume: return "settings.tab.volume"
         case .rightClick: return "settings.tab.rightClick"
@@ -104,6 +107,7 @@ enum SettingsTab: String, CaseIterable, Hashable, Identifiable {
         case .clipboard: return "settings.tab.clipboard"
         case .translation: return "settings.tab.translation"
         case .systemResources: return "resource.title"
+        case .systemStorage: return "storage.module.title"
         }
     }
 
@@ -111,6 +115,7 @@ enum SettingsTab: String, CaseIterable, Hashable, Identifiable {
         switch self {
         case .general: return "gearshape"
         case .plugins: return "puzzlepiece.extension"
+        case .runtimeStatus: return "checkmark.shield"
         case .networkTraffic: return "arrow.up.arrow.down.circle"
         case .volume: return "speaker.wave.2.bubble"
         case .rightClick: return "contextualmenu.and.cursorarrow"
@@ -122,12 +127,13 @@ enum SettingsTab: String, CaseIterable, Hashable, Identifiable {
         case .clipboard: return "clipboard"
         case .translation: return "character.bubble"
         case .systemResources: return "cpu"
+        case .systemStorage: return "internaldrive.fill"
         }
     }
 
     var pluginID: BuiltInPluginID? {
         switch self {
-        case .general, .plugins: return nil
+        case .general, .plugins, .runtimeStatus: return nil
         case .networkTraffic: return .networkTraffic
         case .volume: return .appVolume
         case .rightClick: return .finderTools
@@ -139,10 +145,11 @@ enum SettingsTab: String, CaseIterable, Hashable, Identifiable {
         case .clipboard: return .clipboard
         case .translation: return .translation
         case .systemResources: return .systemResources
+        case .systemStorage: return .systemStorage
         }
     }
 
-    static let primaryTabs: [SettingsTab] = [.general, .plugins]
+    static let primaryTabs: [SettingsTab] = [.general, .plugins, .runtimeStatus]
 
     static func enabledFeatureTabs(
         enabledPluginIDs: Set<BuiltInPluginID>
@@ -303,10 +310,16 @@ struct SettingsView: View {
             PluginCenterView(manager: pluginManager) { tab in
                 selectedTab = tab
             }
+        case .runtimeStatus:
+            RuntimeStatusCenterView(manager: pluginManager) { tab in
+                selectedTab = tab
+            }
         case .networkTraffic:
             NetworkTrafficSettingsView()
         case .systemResources:
             SystemResourceSettingsView()
+        case .systemStorage:
+            SystemStorageSettingsView()
         case .volume:
             AppVolumeSettingsView()
         case .rightClick:

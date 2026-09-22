@@ -34,7 +34,7 @@ enum MenuPanelFeature: String, CaseIterable, Identifiable {
         switch self {
         case .toggles: "plugin.system-controls.title"
         case .resources: "resource.title"
-        case .storage: "storage.title"
+        case .storage: "storage.module.title"
         case .cleanup: "cleanup.derivedData"
         case .volume: "volume.title"
         case .bluetooth: "bt.device"
@@ -56,7 +56,8 @@ enum MenuPanelFeature: String, CaseIterable, Identifiable {
         let supportingPlugins: Set<BuiltInPluginID> = switch self {
         case .toggles: [.systemControls]
         case .resources: [.systemResources]
-        case .storage, .cleanup, .bluetooth, .display, .battery, .network: [.systemInsights]
+        case .storage, .cleanup: [.systemStorage]
+        case .bluetooth, .display, .battery, .network: [.systemInsights]
         case .volume: [.appVolume]
         case .traffic: [.networkTraffic]
         case .hero: [.systemControls, .finderTools]

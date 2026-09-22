@@ -273,15 +273,13 @@ struct MenuPanelView: View {
 @State private var isDarkMode = AppearanceService.isDarkMode
     @State private var btDevices: [BluetoothDeviceBattery] = []
     @State private var toggles = SystemToggleStates()
-    @State private var derivedDataSize: Int64?
-    @State private var isCleaningDerivedData = false
     @State private var systemResourceService = SystemResourceService.shared
     @State private var systemProcessService = SystemProcessResourceService.shared
     @State private var networkService = NetworkStatusService.shared
     @State private var batteryHealthService = BatteryHealthService.shared
     @State private var displayService = DisplayService()
     @State private var storageAnalysisService = StorageAnalysisService()
-    @State private var storageCategoryToConfirm: StorageCategory?
+    @State private var storageCleanupPreview: StorageCleanupPreview?
     @State private var quickActionService = QuickActionService()
     @State private var screenshotService = ScreenshotService.shared
     @State private var activeQuickAction: QuickAction?
@@ -391,9 +389,6 @@ struct MenuPanelView: View {
             if pluginManager.isEnabled(.systemControls) {
                 refreshToggles()
             }
-            if pluginManager.isEnabled(.systemInsights) {
-                refreshDerivedDataSize()
-            }
             if pluginManager.isEnabled(.appLauncher) || pluginManager.isEnabled(.automation) {
                 appLauncherService.refresh()
             }
@@ -428,13 +423,20 @@ struct MenuPanelView: View {
             networkService.refresh()
             batteryHealthService.refresh()
             displayService.refresh()
-            storageAnalysisService.refresh()
             while !Task.isCancelled {
                 try? await Task.sleep(for: .seconds(30))
                 guard !Task.isCancelled else { return }
                 networkService.refresh()
                 batteryHealthService.refresh()
                 displayService.refresh()
+            }
+        }
+        .task {
+            guard pluginManager.isEnabled(.systemStorage) else { return }
+            storageAnalysisService.refresh()
+            while !Task.isCancelled {
+                try? await Task.sleep(for: .seconds(30))
+                guard !Task.isCancelled else { return }
                 storageAnalysisService.refresh()
             }
         }
@@ -447,20 +449,21 @@ struct MenuPanelView: View {
             }
         }
         .alert(L("storage.confirm.title"), isPresented: Binding(
-            get: { storageCategoryToConfirm != nil },
-            set: { if !$0 { storageCategoryToConfirm = nil } }
-        )) {
+            get: { storageCleanupPreview != nil },
+            set: { if !$0 { storageCleanupPreview = nil } }
+        ), presenting: storageCleanupPreview) { preview in
+            Button(L("storage.openFinder")) {
+                NSWorkspace.shared.activateFileViewerSelecting([preview.directoryURL])
+            }
             Button(L("storage.clean"), role: .destructive) {
-                if let category = storageCategoryToConfirm {
-                    storageCategoryToConfirm = nil
-                    cleanStorage(category)
-                }
+                storageCleanupPreview = nil
+                cleanStorage(preview)
             }
             Button(L("update.cancel"), role: .cancel) {
-                storageCategoryToConfirm = nil
+                storageCleanupPreview = nil
             }
-        } message: {
-            Text(L("storage.confirm.message"))
+        } message: { preview in
+            Text(L("storage.confirm.detail", preview.path, formattedStorage(preview.reclaimableBytes)))
         }
     }
 
@@ -1342,20 +1345,42 @@ struct MenuPanelView: View {
 
     private var storageCard: some View {
         VStack(alignment: .leading, spacing: 9) {
-            infoCardHeader(symbol: "internaldrive.fill", title: L("storage.title")) {
-                Button {
-                    storageAnalysisService.refresh()
-                } label: {
-                    Image(systemName: "arrow.clockwise")
-                        .font(.caption)
+            infoCardHeader(symbol: "internaldrive.fill", title: L("storage.module.title")) {
+                HStack(spacing: 9) {
+                    Button {
+                        openSettingsAction?(.systemStorage)
+                    } label: {
+                        Image(systemName: "gearshape")
+                            .font(.caption)
+                    }
+                    .buttonStyle(.plain)
+                    .controlCenterHover(shape: AnyShape(.circle))
+                    .foregroundStyle(.secondary)
+                    .accessibilityLabel(L("storage.openSettings"))
+
+                    Button {
+                        storageAnalysisService.refresh()
+                    } label: {
+                        Image(systemName: "arrow.clockwise")
+                            .font(.caption)
+                    }
+                    .buttonStyle(.plain)
+                    .controlCenterHover(shape: AnyShape(.circle))
+                    .foregroundStyle(.secondary)
+                    .accessibilityLabel(L("storage.refresh"))
                 }
-                .buttonStyle(.plain)
-                .controlCenterHover(shape: AnyShape(.circle))
-                .foregroundStyle(.secondary)
-                .accessibilityLabel(L("storage.refresh"))
             }
 
             if let snapshot = storageAnalysisService.snapshot {
+                HStack(spacing: 5) {
+                    Image(systemName: "internaldrive")
+                        .font(.caption2)
+                        .foregroundStyle(.secondary)
+                    Text(L("storage.freeOf", formattedStorage(snapshot.volume.availableBytes), formattedStorage(snapshot.volume.totalBytes)))
+                        .font(.caption2)
+                        .foregroundStyle(.secondary)
+                    Spacer()
+                }
                 ForEach(snapshot.entries) { entry in
                     HStack(spacing: 8) {
                         Image(systemName: entry.category.symbol)
@@ -1371,7 +1396,7 @@ struct MenuPanelView: View {
                             .foregroundStyle(.secondary)
                         if entry.category.isSafeToClean && entry.bytes > 0 {
                             Button {
-                                storageCategoryToConfirm = entry.category
+                                storageCleanupPreview = storageAnalysisService.cleanupPreview(for: entry)
                             } label: {
                                 if storageAnalysisService.cleaningCategory == entry.category {
                                     ProgressView().controlSize(.mini)
@@ -1405,7 +1430,7 @@ struct MenuPanelView: View {
         .frame(maxWidth: .infinity, alignment: .leading)
         .controlCenterSurface(tint: .indigo)
         .accessibilityElement(children: .contain)
-        .accessibilityLabel(L("storage.title"))
+        .accessibilityLabel(L("storage.module.title"))
     }
 
     private func formattedStorage(_ bytes: Int64) -> String {
@@ -1756,17 +1781,22 @@ struct MenuPanelView: View {
 
     private var cleanupTiles: some View {
         HStack(spacing: 12) {
-            if pluginManager.isEnabled(.systemInsights) {
-                Button(action: cleanDerivedData) {
+            if pluginManager.isEnabled(.systemStorage) {
+                Button(action: requestDerivedDataCleanup) {
                     cleanupTileLabel(
                         symbol: "hammer.fill",
                         title: L("cleanup.derivedData"),
                         subtitle: derivedDataSubtitle,
-                        showProgress: isCleaningDerivedData
+                        showProgress: storageAnalysisService.cleaningCategory == .derivedData
                     )
                 }
                 .buttonStyle(.plain)
-                .disabled(isCleaningDerivedData || derivedDataSize == 0)
+                .disabled(
+                    storageAnalysisService.cleaningCategory == .derivedData
+                        || storageAnalysisService.cleaningCategory != nil
+                        || derivedDataBytes == nil
+                        || derivedDataBytes == 0
+                )
                 .controlCenterSurface(interactive: true, shape: AnyShape(.rect(cornerRadius: 16)))
             }
         }
@@ -1801,9 +1831,13 @@ struct MenuPanelView: View {
     }
 
     private var derivedDataSubtitle: String {
-        if isCleaningDerivedData { return L("cleanup.cleaning") }
-        guard let size = derivedDataSize else { return L("cleanup.calculating") }
+        if storageAnalysisService.cleaningCategory == .derivedData { return L("cleanup.cleaning") }
+        guard let size = derivedDataBytes else { return L("cleanup.calculating") }
         return size == 0 ? L("cleanup.cleared") : XcodeCleanerService.formatted(size)
+    }
+
+    private var derivedDataBytes: Int64? {
+        storageAnalysisService.snapshot?.entries.first { $0.category == .derivedData }?.bytes
     }
 
     // MARK: - 状态提示 / 底部
@@ -1951,11 +1985,11 @@ struct MenuPanelView: View {
         }
     }
 
-    private func cleanStorage(_ category: StorageCategory) {
+    private func cleanStorage(_ preview: StorageCleanupPreview) {
         Task {
             do {
-                try await storageAnalysisService.clean(category)
-                flashStatus(L("storage.cleaned", L(category.titleKey)), isError: false)
+                try await storageAnalysisService.clean(preview.category)
+                flashStatus(L("status.freed", formattedStorage(preview.reclaimableBytes)), isError: false)
             } catch {
                 flashStatus(error.localizedDescription, isError: true)
             }
@@ -1972,37 +2006,9 @@ struct MenuPanelView: View {
         )
     }
 
-    private func refreshDerivedDataSize() {
-        Task {
-            let size = await Task.detached(priority: .utility) {
-                XcodeCleanerService.directorySize()
-            }.value
-            withAnimation(.smooth(duration: 0.3)) {
-                derivedDataSize = size
-            }
-        }
-    }
-
-    private func cleanDerivedData() {
-        guard !isCleaningDerivedData else { return }
-        let sizeBefore = derivedDataSize ?? 0
-        isCleaningDerivedData = true
-        Task {
-            do {
-                try await Task.detached(priority: .userInitiated) {
-                    try XcodeCleanerService.clean()
-                }.value
-                isCleaningDerivedData = false
-                withAnimation(.smooth(duration: 0.3)) {
-                    derivedDataSize = 0
-                }
-                flashStatus(L("status.freed", XcodeCleanerService.formatted(sizeBefore)), isError: false)
-            } catch {
-                isCleaningDerivedData = false
-                flashStatus(error.localizedDescription, isError: true)
-            }
-            refreshDerivedDataSize()
-        }
+    private func requestDerivedDataCleanup() {
+        guard let bytes = derivedDataBytes else { return }
+        storageCleanupPreview = StorageCleanupPreview(category: .derivedData, reclaimableBytes: bytes)
     }
 
     private func checkForUpdate() {

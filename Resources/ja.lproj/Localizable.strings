@@ -1234,6 +1234,7 @@
 
 /* 内蔵機能センター */
 "settings.tab.plugins" = "機能センター";
+"settings.tab.runtimeStatus" = "権限と実行状態";
 "settings.backToFeatures" = "機能センター";
 "settings.sidebar.settings" = "設定";
 "settings.sidebar.enabledFeatures" = "有効な機能";
@@ -1265,6 +1266,28 @@
 "plugin.permission.notifications" = "通知";
 "plugin.permission.screenRecording" = "画面収録";
 "plugin.permission.systemAudioRecording" = "システムオーディオ収録";
+"runtime.title" = "権限と実行状態";
+"runtime.description" = "システム権限、機能の実行結果、対応が必要な理由をまとめて確認します。権限を変更した後は更新してください。";
+"runtime.refresh" = "更新";
+"runtime.summary.running" = "実行中";
+"runtime.summary.attention" = "要対応";
+"runtime.summary.disabled" = "無効";
+"runtime.section.permissions" = "システム権限";
+"runtime.section.plugins" = "機能の実行状態";
+"runtime.permission.granted" = "許可済み";
+"runtime.permission.denied" = "未許可";
+"runtime.permission.notDetermined" = "未許可";
+"runtime.permission.requiresVerification" = "システム設定で確認";
+"runtime.openSettings" = "設定を開く";
+"runtime.openCenter" = "実行状態";
+"runtime.openFeature" = "機能設定";
+"runtime.plugin.disabled" = "無効";
+"runtime.plugin.running" = "正常に実行中";
+"runtime.plugin.stopped" = "未実行";
+"runtime.plugin.failed" = "起動失敗";
+"runtime.plugin.requiresPermissions" = "権限が必要";
+"runtime.plugin.failedDetail" = "起動失敗：%@";
+"runtime.plugin.permissionsDetail" = "不足：%@";
 "plugin.category.system" = "システム";
 "plugin.category.productivity" = "効率化";
 "plugin.category.media" = "メディア";
@@ -1272,7 +1295,7 @@
 "plugin.system-controls.title" = "システムコントロール";
 "plugin.system-controls.description" = "外観、隠しファイル、Dock、メニューバー、スリープ防止、システム操作。";
 "plugin.system-insights.title" = "システム情報";
-"plugin.system-insights.description" = "ネットワーク、バッテリー、ディスプレイ、ストレージ、Bluetooth 機器の電池残量。";
+"plugin.system-insights.description" = "ネットワーク、バッテリー、ディスプレイ、Bluetooth 機器の電池残量。";
 "plugin.system-resources.title" = "システムモニター";
 "plugin.system-resources.description" = "CPU、メモリのプレッシャーと解放、ディスク容量と読み書き、負荷の高いプロセス。";
 "plugin.network-traffic.title" = "ネットワークモニター";
@@ -1638,3 +1661,28 @@
 /* Undo queue */
 "rc.undo.queued" = "%@ 件の操作が取り消し待ちにキュー登録されました。";
 "rc.undo.remaining" = "%d 件がまだ処理中です。";
+
+"plugin.system-storage.title" = "システムストレージ";
+"plugin.system-storage.description" = "ディスク容量、分析対象フォルダ、確認済みの DerivedData クリーンアップ。";
+"storage.module.title" = "システムストレージ";
+"storage.module.overview" = "ディスクの概要";
+"storage.module.analyzedDirectories" = "分析対象フォルダ";
+"storage.module.about" = "説明";
+"storage.module.scope" = "MenuTools が確実に読み取れるユーザーフォルダのみを集計します。キャッシュ、ログ、ダウンロードは表示のみで、システムデータと他の App の個人データは macOS が管理します。";
+"storage.used" = "使用済み";
+"storage.free" = "空き";
+"storage.total" = "合計";
+"storage.freeOf" = "空き %@ / %@";
+"storage.openSettings" = "システムストレージ設定を開く";
+"storage.cleaning" = "クリーンアップ中…";
+"storage.manualReview" = "Finder または対応する App で手動で確認してください。";
+"storage.derivedData.detail" = "Xcode のビルド生成物です。Xcode を終了後、安全に削除できます。";
+"storage.caches.detail" = "複数の App が共有するキャッシュのため、一括削除はできません。";
+"storage.logs.detail" = "複数の App が共有するログのため、一括削除はできません。";
+"storage.downloads.detail" = "個人のダウンロードは自動で削除されません。";
+
+"storage.xcodeRunning" = "DerivedData をクリーンアップする前に Xcode を終了してください。";
+
+"storage.confirm.detail" = "このディレクトリの内容だけを削除し、ディレクトリ自体は残します。\nパス: %@\n解放予定: %@";
+"storage.openFinder" = "Finder で表示";
+"storage.unsafePath" = "クリーンアップパスの安全性を確認できませんでした。";

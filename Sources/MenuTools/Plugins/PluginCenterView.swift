@@ -101,17 +101,27 @@ struct PluginCenterView: View {
 
             Spacer(minLength: 12)
 
-            Menu {
-                Button(L("plugin.enableAll"), systemImage: "checkmark.circle", action: enableAll)
-                Button(L("plugin.disableAll"), systemImage: "xmark.circle", action: disableAll)
-            } label: {
-                Image(systemName: "ellipsis.circle")
-                    .font(.title3)
-                    .frame(width: 28, height: 28)
+            HStack(spacing: 8) {
+                Button {
+                    openSettings(.runtimeStatus)
+                } label: {
+                    Label(L("runtime.openCenter"), systemImage: "checkmark.shield")
+                }
+                .buttonStyle(.bordered)
+                .controlSize(.small)
+
+                Menu {
+                    Button(L("plugin.enableAll"), systemImage: "checkmark.circle", action: enableAll)
+                    Button(L("plugin.disableAll"), systemImage: "xmark.circle", action: disableAll)
+                } label: {
+                    Image(systemName: "ellipsis.circle")
+                        .font(.title3)
+                        .frame(width: 28, height: 28)
+                }
+                .menuStyle(.borderlessButton)
+                .help(L("plugin.actions"))
+                .accessibilityLabel(L("plugin.actions"))
             }
-            .menuStyle(.borderlessButton)
-            .help(L("plugin.actions"))
-            .accessibilityLabel(L("plugin.actions"))
         }
         .padding(16)
         .background(.quaternary.opacity(0.7), in: RoundedRectangle(cornerRadius: 12))

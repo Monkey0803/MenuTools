@@ -50,13 +50,18 @@ enum BuiltInPluginCatalog {
                 }
             ),
             // 本机资源（CPU / 内存 / 磁盘 / 进程）独立成插件：
-            // 「系统信息」只管网络、电池、显示器、存储与蓝牙设备电量。
+            // 「系统信息」只管网络、电池、显示器与蓝牙设备电量。
             registration(
                 id: .systemResources,
                 category: .system,
                 symbol: "cpu",
                 start: { SystemResourceService.shared.refreshBackgroundSampling() },
                 stop: { SystemResourceService.shared.endMonitoring() }
+            ),
+            registration(
+                id: .systemStorage,
+                category: .system,
+                symbol: "internaldrive.fill"
             ),
             registration(
                 id: .networkTraffic,

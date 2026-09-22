@@ -1234,6 +1234,7 @@
 
 /* 内置功能中心 */
 "settings.tab.plugins" = "功能中心";
+"settings.tab.runtimeStatus" = "权限与运行状态";
 "settings.backToFeatures" = "功能中心";
 "settings.sidebar.settings" = "设置";
 "settings.sidebar.enabledFeatures" = "已启用功能";
@@ -1265,6 +1266,28 @@
 "plugin.permission.notifications" = "通知";
 "plugin.permission.screenRecording" = "屏幕录制";
 "plugin.permission.systemAudioRecording" = "系统音频录制";
+"runtime.title" = "权限与运行状态";
+"runtime.description" = "集中查看系统授权、插件运行结果和需要处理的原因。授权变化后请刷新。";
+"runtime.refresh" = "刷新";
+"runtime.summary.running" = "运行中";
+"runtime.summary.attention" = "需处理";
+"runtime.summary.disabled" = "已停用";
+"runtime.section.permissions" = "系统权限";
+"runtime.section.plugins" = "功能运行状态";
+"runtime.permission.granted" = "已授权";
+"runtime.permission.denied" = "未授权";
+"runtime.permission.notDetermined" = "尚未授权";
+"runtime.permission.requiresVerification" = "需在系统设置中确认";
+"runtime.openSettings" = "打开设置";
+"runtime.openCenter" = "运行状态";
+"runtime.openFeature" = "功能设置";
+"runtime.plugin.disabled" = "已停用";
+"runtime.plugin.running" = "运行正常";
+"runtime.plugin.stopped" = "尚未运行";
+"runtime.plugin.failed" = "启动失败";
+"runtime.plugin.requiresPermissions" = "需要权限";
+"runtime.plugin.failedDetail" = "启动失败：%@";
+"runtime.plugin.permissionsDetail" = "缺少：%@";
 "plugin.category.system" = "系统";
 "plugin.category.productivity" = "效率";
 "plugin.category.media" = "媒体";
@@ -1272,7 +1295,7 @@
 "plugin.system-controls.title" = "系统控制";
 "plugin.system-controls.description" = "外观、隐藏文件、Dock、菜单栏、防休眠和系统快捷操作。";
 "plugin.system-insights.title" = "系统信息";
-"plugin.system-insights.description" = "网络、电池、显示器、存储和蓝牙设备电量。";
+"plugin.system-insights.description" = "网络、电池、显示器和蓝牙设备电量。";
 "plugin.system-resources.title" = "系统监控";
 "plugin.system-resources.description" = "CPU、内存压力与释放、磁盘容量与读写、占用最高的进程。";
 "plugin.network-traffic.title" = "网络监控";
@@ -1638,3 +1661,28 @@
 /* Undo queue */
 "rc.undo.queued" = "%@ 项操作已排队等待撤销。";
 "rc.undo.remaining" = "%d 项仍在处理中。";
+
+"plugin.system-storage.title" = "系统存储";
+"plugin.system-storage.description" = "磁盘容量、可分析目录与经过审核的 DerivedData 清理。";
+"storage.module.title" = "系统存储";
+"storage.module.overview" = "磁盘总览";
+"storage.module.analyzedDirectories" = "可分析目录";
+"storage.module.about" = "说明";
+"storage.module.scope" = "仅统计 MenuTools 可以可靠读取的用户目录。缓存、日志和下载仅供查看，系统数据及其他 App 的私有数据由 macOS 管理。";
+"storage.used" = "已使用";
+"storage.free" = "可用";
+"storage.total" = "总容量";
+"storage.freeOf" = "可用 %@ / %@";
+"storage.openSettings" = "打开系统存储设置";
+"storage.cleaning" = "正在清理…";
+"storage.manualReview" = "请在 Finder 或对应 App 中手动处理。";
+"storage.derivedData.detail" = "Xcode 构建产物；关闭 Xcode 后可安全清理。";
+"storage.caches.detail" = "多个 App 共享的缓存目录，不提供批量删除。";
+"storage.logs.detail" = "多个 App 共享的日志目录，不提供批量删除。";
+"storage.downloads.detail" = "个人下载文件，不提供自动清理。";
+
+"storage.xcodeRunning" = "Xcode 正在运行，请退出后再清理 DerivedData。";
+
+"storage.confirm.detail" = "只会删除目录内容，目录本身会保留。\n路径：%@\n预计释放：%@";
+"storage.openFinder" = "在 Finder 中查看";
+"storage.unsafePath" = "清理路径未通过安全校验。";

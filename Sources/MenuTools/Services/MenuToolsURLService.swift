@@ -34,6 +34,7 @@ enum WindowLayoutURLName {
 enum MenuToolsURLAction: Equatable {
     case layout(WindowLayout)
     case preset(String)
+    case settings(SettingsTab)
 }
 
 /// `menutools://` 链接解析。
@@ -43,6 +44,7 @@ enum MenuToolsURLAction: Equatable {
 ///     menutools://window?layout=left-half
 ///     menutools://action?name=left-half      # 与 Rectangle 的 execute-action 习惯一致
 ///     menutools://preset?name=开发
+///     menutools://settings?tab=runtime-status
 enum MenuToolsURL {
     static let scheme = "menutools"
 
@@ -64,6 +66,12 @@ enum MenuToolsURL {
             guard let name = value("name")?.trimmingCharacters(in: .whitespacesAndNewlines),
                   !name.isEmpty else { return nil }
             return .preset(name)
+        case "settings":
+            guard let raw = value("tab") else { return nil }
+            guard let tab = SettingsTab.allCases.first(where: {
+                WindowLayoutURLName.kebab($0.rawValue) == raw.lowercased()
+            }) else { return nil }
+            return .settings(tab)
         default:
             return nil
         }
@@ -86,6 +94,8 @@ enum MenuToolsURLActionHandler {
             }
             WindowManagementService.shared.rememberFrontmostExternalApplication()
             try? WindowManagementService.shared.apply(preset)
+        case let .settings(tab):
+            MenuBarStatusItemController.shared.showSettings(tab)
         }
     }
 }

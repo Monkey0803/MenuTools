@@ -371,6 +371,11 @@ final class MenuBarStatusItemController: NSObject {
         }
     }
 
+    /// 供 `menutools://settings` 深链及外部自动化跳转到指定设置页。
+    func showSettings(_ tab: SettingsTab = .general) {
+        openSettings(tab)
+    }
+
     private func presentSettingsWindow(initialTab: SettingsTab) {
         if let window = settingsWindowController?.window {
             settingsHostingController?.rootView = SettingsView(initialTab: initialTab)
