@@ -82,7 +82,7 @@
 
 ---
 
-# P1：1.1.5 内建议完成（已完成 6/11，见各条状态）
+# P1：1.1.5 内建议完成（11/11 全部完成，见各条状态）
 
 ## 失败路径与信任
 
@@ -113,6 +113,8 @@
 - **成本**：小。
 
 ### P1-4 快捷操作中心与窗口管理都缺全局快捷键入口/失败反馈
+
+> **状态：已完成（`1dbe509`、`6d568c3`）**。窗口布局与预设快捷键失败改走统一 HUD；自动应用规则不再用 `try?` 吞错，失败记入 `ruleErrorMessage`；运行状态中心新增「全局快捷键」汇总：一次列出窗口布局/预设/快速面板、场景、启动器、截图、剪贴板、音量共 8 类绑定并标出重复按键，入口分散的问题由此有了统一查看点，每行还可跳转到所属模块设置页。补 4 条用例。
 - **证据**：
   - 快捷操作（锁屏/清空废纸篓/重启 Finder/刷新 DNS/打开设置页/截图）**没有任何全局快捷键**：`GlobalShortcutService` 不覆盖 `QuickAction`
   - 窗口布局快捷键失败只写 `WindowShortcutService.swift:444,460` 的 `lastError`，唯一消费点是设置页在屏时的 `WindowManagementSettingsView.swift:659`；自动应用规则更是 `try? self.apply(layout)`（`WindowManagementService.swift:848`）完全吞错
@@ -123,6 +125,8 @@
 ## 可发现性
 
 ### P1-5 应用快速启动器：TODO 声称的三项能力在界面上不存在
+
+> **状态：已完成（`c9d3aed`）**。主面板新增 App 启动器卡片：搜索启动、收藏、最近使用；每行可一键收藏/取消，收藏写入偏好并在新实例恢复（此前 `toggleFavorite` 在 Sources 里零调用，收藏集合永远为空）。补 3 条用例。
 - **证据**：
   - `TODO.md:31-34` 声明「从菜单栏搜索并启动应用 / 支持收藏常用应用 / 显示最近使用」
   - `Sources/MenuTools/Services/AppLauncherService.swift:122-129` 的 `toggleFavorite` 在 `Sources/` 内**零调用**（对比 `AppVolumeViews.swift:1569`、`ClipboardSnippetSettingsSection.swift:195` 都调了各自的），因此 `favoritePaths` **永远为空**
@@ -135,6 +139,8 @@
 - **成本**：中。
 
 ### P1-6 窗口管理在主面板没有任何入口
+
+> **状态：已完成（`f88c2a8`）**。`MenuPanelFeature` 新增窗口管理（工具分类，依赖窗口管理插件），面板卡片直接展开快速面板；快速面板补键盘操作（搜索框回车套用首个匹配、Esc 关闭）。补 1 条用例。
 - **证据**：`MenuPanelNavigation.swift:16-20` 无窗口管理；`MenuPanelView` 无相关卡片；唯一弹面板入口 `MenuBarStatusItemController.swift:300` 的 `showWindowManagement()` 仅被 `WindowShortcutService.swift:167` 的默认闭包调用，而 `loadQuickAccessBinding` **无默认值**（`WindowShortcutService.swift:500-503`，默认 nil）；状态栏只处理左键（`MenuBarStatusItemController.swift:96-98`），无右键菜单。
 - **影响**：60 种布局/预设/规则是旗舰能力，默认安装下**鼠标不可达**，必须先知道并手动配一个全局快捷键。与「菜单栏优先」定位直接冲突。
 - **附带**：快速面板本身缺键盘操作——`WindowManagementQuickAccessView.swift` 全文无 `.onSubmit`/`keyboardShortcut`/Esc，搜索框回车无效。
@@ -151,6 +157,8 @@
 ## 安全
 
 ### P1-8 Finder 右键命令通道无来源校验，本机任意进程可伪造命令
+
+> **状态：已完成（`9a7e953`）**。新增 0600 权限的通道令牌（宿主激活时创建、扩展投递前读取），命令载荷带 `channelToken`，宿主在入队前校验，缺失/不匹配一律丢弃（fail closed），比较为常量时间。新增 `Scripts/test_rightclick_channel.swift`：真机投递无令牌/错误令牌/正确令牌三条命令，前两条被拒、第三条正常执行，退出码 0。补 3 条用例。
 - **证据**：
   - `Sources/MenuTools/RightClickConfig.swift:621-628` —— 发送就是裸 `DistributedNotificationCenter.postNotificationName`
   - `Sources/MenuTools/Services/RightClickCommandHandler.swift:16-24` —— 以 `object: nil` 监听，**不校验发送者身份**
@@ -175,6 +183,8 @@
 - **成本**：小～中。
 
 ### P1-10 主线程同步采样：面板打开时每 2 秒在主线程做 IOKit / getifaddrs / 全量进程枚举 / 同步子进程
+
+> **状态：已完成（`d8e7a0c`）**。`refreshInBackground()` 用 `Task.detached` 在后台读取，主线程只做合并/历史/告警；新增在途合并与采样代次（停止或换档后丢弃在途读数，避免停用后回填旧快照）。补 2 条用例，含「读取不在主线程」断言。
 - **证据**：
   - `Sources/MenuTools/Services/SystemResourceService.swift:574-580` → `:583-592` 的 `refresh()` 在 `@MainActor` 上直接调 `provider.read()`；`:246-272` 内含 `host_statistics64`、`IOServiceMatching("IOBlockStorageDriver")` 遍历、`getifaddrs`、`URL.resourceValues`
   - `Sources/MenuTools/Services/SystemProcessResourceService.swift:213-224` 同样主线程 2 秒采样；`:127-161` 对每个 pid 做 `proc_listpids` + `proc_pid_rusage` + `proc_name`
