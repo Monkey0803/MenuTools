@@ -6,11 +6,10 @@ import UniformTypeIdentifiers
 /// Finder 右键配置：菜单排序、文件模板及常用应用 / 目录。
 struct RightClickToolsView: View {
     @State private var config = RightClickConfigStore.load()
-    @State private var extensionEnabled = FIFinderSyncController.isExtensionEnabled
+    @StateObject private var extensionStatus = FinderSyncExtensionStatusService()
     @State private var page = 0
     @State private var templateDraft: RightClickTemplate?
     @State private var errorMessage: String?
-    private let refreshTimer = Timer.publish(every: 2, on: .main, in: .common).autoconnect()
     private let configChanges = DistributedNotificationCenter.default()
         .publisher(for: Notification.Name(RightClickConfigStore.didChangeNotification))
 
@@ -33,7 +32,10 @@ struct RightClickToolsView: View {
             }
         }
         .frame(width: SettingsLayout.width, height: SettingsLayout.height)
-        .onReceive(refreshTimer) { _ in extensionEnabled = FIFinderSyncController.isExtensionEnabled }
+        .onAppear(perform: refreshExtensionStatus)
+        .onReceive(NotificationCenter.default.publisher(for: NSApplication.didBecomeActiveNotification)) { _ in
+            refreshExtensionStatus()
+        }
         .onReceive(configChanges) { config = RightClickConfigNotification.applying($0, to: config) }
         .sheet(item: $templateDraft) { draft in
             RightClickTemplateEditor(template: draft) { edited in
@@ -64,20 +66,51 @@ struct RightClickToolsView: View {
                 }
                 Spacer()
             }
-            HStack {
-                Label(L(extensionEnabled ? "rc.permission.enabled" : "rc.permission.disabled"),
-                      systemImage: extensionEnabled ? "checkmark.circle.fill" : "exclamationmark.triangle.fill")
-                    .foregroundStyle(extensionEnabled ? .green : .orange)
-                Text(L("rc.permission.title")).foregroundStyle(.secondary)
-                Spacer()
-                Button(L("rc.permission.openSettings")) { FIFinderSyncController.showExtensionManagementInterface() }
-            }.font(.caption)
+            VStack(alignment: .leading, spacing: 6) {
+                HStack {
+                    Label(
+                        L(extensionStatusTitleKey),
+                        systemImage: extensionStatusIcon
+                    )
+                    .foregroundStyle(extensionStatusColor)
+                    Text(L("rc.permission.title")).foregroundStyle(.secondary)
+                    Spacer()
+                    Button(L("rc.permission.refresh"), action: refreshExtensionStatus)
+                    Button(L("rc.permission.openSettings")) {
+                        FIFinderSyncController.showExtensionManagementInterface()
+                    }
+                }
+                Text(L("rc.permission.managementHint"))
+                    .foregroundStyle(.secondary)
+            }
+            .font(.caption)
             Picker(L("rc.settings.page"), selection: $page) {
                 Text(L("rc.settings.menu")).tag(0)
                 Text(L("rc.settings.templates")).tag(1)
                 Text(L("rc.settings.favorites")).tag(2)
             }.pickerStyle(.segmented)
         }
+    }
+
+    private func refreshExtensionStatus() {
+        extensionStatus.refresh(finderAPIEnabled: FIFinderSyncController.isExtensionEnabled)
+    }
+
+    private var extensionStatusTitleKey: String {
+        switch extensionStatus.state {
+        case .enabled: "rc.permission.enabled"
+        case .registered: "rc.permission.registered"
+        case .disabled: "rc.permission.disabled"
+        case .unknown: "rc.permission.unknown"
+        }
+    }
+
+    private var extensionStatusIcon: String {
+        extensionStatus.state.isAvailable ? "checkmark.circle.fill" : "exclamationmark.triangle.fill"
+    }
+
+    private var extensionStatusColor: Color {
+        extensionStatus.state.isAvailable ? .green : .orange
     }
 
     private var menuItems: some View {

@@ -602,8 +602,12 @@
 "rc.permission.title" = "Finder 확장 프로그램";
 "rc.permission.enabled" = "활성화됨";
 "rc.permission.disabled" = "비활성화됨";
-"rc.permission.desc" = "시스템 설정에서 MenuTools 우클릭 도구를 활성화하세요. 위치: 로그인 항목 및 확장 프로그램 > Finder 확장 프로그램.";
-"rc.permission.openSettings" = "설정 열기";
+"rc.permission.desc" = "시스템 설정에서 MenuTools 우클릭 도구를 관리하세요.";
+"rc.permission.openSettings" = "확장 프로그램 관리";
+"rc.permission.registered" = "macOS에 등록됨";
+"rc.permission.unknown" = "macOS 확인 대기 중";
+"rc.permission.refresh" = "새로 고침";
+"rc.permission.managementHint" = "macOS 26/27에서는 이 Finder 확장 프로그램 관리 화면이 파일 제공자로 표시됩니다. 변경 후 이 화면으로 돌아와 새로 고침하세요.";
 "rc.group.directory" = "디렉터리 작업";
 "rc.group.copy" = "복사 항목";
 "rc.item.newFolder" = "새 폴더";
@@ -1631,7 +1635,7 @@
 "health.automation.desc" = "시스템 설정 → 개인정보 및 보안 → 자동화 → MenuTools 가 필수입니다.";
 "health.logging.name" = "작업 로그";
 "health.logging.desc" = "로그는 MenuTools에서 현재 사용할 수 있는 설정 디렉터리에 저장됩니다. ‘로그 보기’를 클릭해 열 수 있습니다.";
-"health.button.openSettings" = "설정 열기";
+"health.button.openSettings" = "확장 프로그램 관리";
 "health.button.viewLogs" = "로그 보기";
 
 /* Undo queue */

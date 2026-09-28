@@ -602,8 +602,12 @@
 "rc.permission.title" = "Finder 擴充功能";
 "rc.permission.enabled" = "已啟用";
 "rc.permission.disabled" = "未啟用";
-"rc.permission.desc" = "在系統設定中打開 MenuTools 右鍵工具。入口：登入項目與擴充功能 > Finder 擴充功能。";
-"rc.permission.openSettings" = "打開設定";
+"rc.permission.desc" = "在系統設定中管理 MenuTools 右鍵工具。";
+"rc.permission.openSettings" = "管理擴充功能";
+"rc.permission.registered" = "已在系統中註冊";
+"rc.permission.unknown" = "等待系統確認";
+"rc.permission.refresh" = "重新整理";
+"rc.permission.managementHint" = "macOS 26/27 會將此 Finder 擴充功能管理入口顯示為「檔案提供者」。切換後返回此頁並重新整理。";
 "rc.group.directory" = "目錄操作";
 "rc.group.copy" = "複製選單項";
 "rc.item.newFolder" = "新增檔案夾";
@@ -1631,7 +1635,7 @@
 "health.automation.desc" = "系統設定 → 隱私與安全性 → 自動化 → MenuTools 必需。";
 "health.logging.name" = "操作日誌";
 "health.logging.desc" = "日誌保存在 MenuTools 目前可用的設定目錄中；可點擊「查看日誌」開啟。";
-"health.button.openSettings" = "開啟設定";
+"health.button.openSettings" = "管理擴充功能";
 "health.button.viewLogs" = "檢視日誌";
 
 /* Undo queue */

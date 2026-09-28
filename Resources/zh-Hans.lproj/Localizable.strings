@@ -602,8 +602,12 @@
 "rc.permission.title" = "Finder 扩展";
 "rc.permission.enabled" = "已启用";
 "rc.permission.disabled" = "未启用";
-"rc.permission.desc" = "在系统设置中打开 MenuTools 右键工具。入口：登录项与扩展 > Finder 扩展。";
-"rc.permission.openSettings" = "打开设置";
+"rc.permission.desc" = "在系统设置中管理 MenuTools 右键工具。";
+"rc.permission.openSettings" = "管理扩展";
+"rc.permission.registered" = "已在系统中注册";
+"rc.permission.unknown" = "等待系统确认";
+"rc.permission.refresh" = "刷新";
+"rc.permission.managementHint" = "macOS 26/27 会将此 Finder 扩展管理入口显示为“文件提供程序”。切换后返回此页并点击刷新。";
 "rc.group.directory" = "目录操作";
 "rc.group.copy" = "复制菜单项";
 "rc.item.newFolder" = "新建文件夹";
@@ -1631,7 +1635,7 @@
 "health.automation.desc" = "系统设置 → 隐私与安全性 → 自动化 → MenuTools 必需。";
 "health.logging.name" = "操作日志";
 "health.logging.desc" = "日志保存在 MenuTools 当前可用的配置目录中；可点击“查看日志”打开。";
-"health.button.openSettings" = "打开设置";
+"health.button.openSettings" = "管理扩展";
 "health.button.viewLogs" = "查看日志";
 
 /* Undo queue */

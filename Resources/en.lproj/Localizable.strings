@@ -602,8 +602,12 @@
 "rc.permission.title" = "Finder Extension";
 "rc.permission.enabled" = "Enabled";
 "rc.permission.disabled" = "Not Enabled";
-"rc.permission.desc" = "Enable MenuTools Right-Click Tools in System Settings > Login Items & Extensions > Finder Extensions.";
-"rc.permission.openSettings" = "Open Settings";
+"rc.permission.desc" = "Manage MenuTools Right-Click Tools in System Settings.";
+"rc.permission.openSettings" = "Manage Extension";
+"rc.permission.registered" = "Registered with macOS";
+"rc.permission.unknown" = "Waiting for macOS";
+"rc.permission.refresh" = "Refresh";
+"rc.permission.managementHint" = "On macOS 26/27, this Finder extension management page is shown as File Providers. Return here and refresh after changing it.";
 "rc.group.directory" = "Directory Actions";
 "rc.group.copy" = "Copy Items";
 "rc.item.newFolder" = "New Folder";
@@ -1631,7 +1635,7 @@
 "health.automation.desc" = "System Settings → Privacy & Security → Automation → MenuTools required.";
 "health.logging.name" = "Operation Logs";
 "health.logging.desc" = "Logs are stored in MenuTools' active configuration directory. Choose View Logs to open it.";
-"health.button.openSettings" = "Open Settings";
+"health.button.openSettings" = "Manage Extension";
 "health.button.viewLogs" = "View Logs";
 
 /* Undo queue */

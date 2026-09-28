@@ -4,7 +4,7 @@ import FinderSync
 
 /// 健康检查页面 - 显示扩展状态与权限诊断
 struct RightClickHealthCheckView: View {
-    @State private var extensionEnabled = false
+    @StateObject private var extensionStatus = FinderSyncExtensionStatusService()
     @State private var configurationCommunicationAvailable = false
     @State private var automationPermission = false
     @State private var logFileExists = false
@@ -19,7 +19,7 @@ struct RightClickHealthCheckView: View {
                 StatusCard(
                     title: L("health.extension.enabled"),
                     description: L("health.extension.desc"),
-                    isHealthy: extensionEnabled,
+                    isHealthy: extensionStatus.state.isAvailable,
                     actionButton: AnyView(openSettingsButton)
                 )
 
@@ -69,7 +69,7 @@ struct RightClickHealthCheckView: View {
     
     private func diagnose() {
         // 扩展启用状态
-        extensionEnabled = FIFinderSyncController.isExtensionEnabled
+        extensionStatus.refresh(finderAPIEnabled: FIFinderSyncController.isExtensionEnabled)
         
         // App Group 必须真的可写；自签名包可能遇到 EPERM，此时配置会回退到本地目录，
         // 并由分布式通知把变更同步给 Finder 扩展。
@@ -90,7 +90,7 @@ struct RightClickHealthCheckView: View {
     
     private var openSettingsButton: some View {
         Button(L("health.button.openSettings")) {
-            NSWorkspace.shared.open(URL(string: "x-apple.systemsettings:preferences/?ID=com.apple.preference.security?Privacy_Automation")!)
+            FIFinderSyncController.showExtensionManagementInterface()
         }
         .buttonStyle(.borderedProminent)
         .controlSize(.small)

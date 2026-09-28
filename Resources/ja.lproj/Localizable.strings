@@ -602,8 +602,12 @@
 "rc.permission.title" = "Finder 機能拡張";
 "rc.permission.enabled" = "有効";
 "rc.permission.disabled" = "未有効";
-"rc.permission.desc" = "システム設定で MenuTools 右クリックツールを有効にしてください。場所：ログイン項目と機能拡張 > Finder 機能拡張。";
-"rc.permission.openSettings" = "設定を開く";
+"rc.permission.desc" = "システム設定で MenuTools の右クリックツールを管理します。";
+"rc.permission.openSettings" = "機能拡張を管理";
+"rc.permission.registered" = "macOS に登録済み";
+"rc.permission.unknown" = "macOS の確認待ち";
+"rc.permission.refresh" = "更新";
+"rc.permission.managementHint" = "macOS 26/27 では、この Finder 機能拡張の管理画面は「ファイルプロバイダ」と表示されます。変更後にこの画面へ戻り、更新してください。";
 "rc.group.directory" = "ディレクトリ操作";
 "rc.group.copy" = "コピー項目";
 "rc.item.newFolder" = "新規フォルダ";
@@ -1631,7 +1635,7 @@
 "health.automation.desc" = "システム設定 → プライバシーとセキュリティ → 自動化 → MenuTools が必須です。";
 "health.logging.name" = "操作ログ";
 "health.logging.desc" = "ログは MenuTools の現在利用可能な設定ディレクトリに保存されます。「ログを表示」で開けます。";
-"health.button.openSettings" = "設定を開く";
+"health.button.openSettings" = "機能拡張を管理";
 "health.button.viewLogs" = "ログを表示";
 
 /* Undo queue */
