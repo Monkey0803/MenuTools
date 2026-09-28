@@ -204,7 +204,8 @@ func memoryReliefNeverTouchesPrivilegedPurge() {
             releasedBytes: 12_345,
             recorder: recorder,
             purgeRunner: purgeRunner
-        )
+        ),
+        historyStore: RecordingHistoryStore()
     )
 
     service.refresh()
@@ -238,7 +239,8 @@ func systemCachePurgeIsSeparateAndReported() {
             releasedBytes: 0,
             recorder: ReleaseRecorder(),
             purgeRunner: grantingRunner
-        )
+        ),
+        historyStore: RecordingHistoryStore()
     )
     grantingService.refresh()
     #expect(grantingService.purgeSystemCache())
@@ -252,7 +254,8 @@ func systemCachePurgeIsSeparateAndReported() {
             releasedBytes: 0,
             recorder: ReleaseRecorder(),
             purgeRunner: cancellingRunner
-        )
+        ),
+        historyStore: RecordingHistoryStore()
     )
     cancellingService.refresh()
     #expect(!cancellingService.purgeSystemCache())
@@ -275,7 +278,8 @@ func memoryReliefAvailableFromSettingsRegardlessOfPressure() {
             releasedBytes: 2_048,
             recorder: recorder,
             purgeRunner: RecordingPurgeRunner(succeeds: true)
-        )
+        ),
+        historyStore: RecordingHistoryStore()
     )
 
     service.refresh()
@@ -329,7 +333,11 @@ func resourceSamplingPolicyIntervals() {
 @MainActor
 func resourceMonitoringLifecycle() async throws {
     let provider = CountingResourceProvider()
-    let service = SystemResourceService(provider: provider, memoryReleaser: NoopMemoryReleaser())
+    let service = SystemResourceService(
+        provider: provider,
+        memoryReleaser: NoopMemoryReleaser(),
+        historyStore: RecordingHistoryStore()
+    )
 
     #expect(!service.isMonitoring)
     #expect(service.snapshot == nil)
