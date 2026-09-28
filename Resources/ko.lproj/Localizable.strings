@@ -1458,6 +1458,7 @@
 "panel.category.tools" = "도구";
 "panel.navigation" = "기능 카테고리";
 "panel.jumpTo" = "기능으로 이동";
+"panel.windowManagement.hint" = "레이아웃·스냅·프리셋";
 "panel.editFavorites" = "즐겨찾기 편집";
 "panel.pin" = "즐겨찾기에 추가";
 "panel.unpin" = "즐겨찾기에서 제거";

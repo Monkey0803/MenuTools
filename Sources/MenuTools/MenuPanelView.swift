@@ -673,6 +673,32 @@ struct MenuPanelView: View {
             }
             .buttonStyle(.plain)
             .controlCenterSurface(interactive: true)
+        case .windowManagement:
+            // 60 种布局是旗舰能力，此前默认安装下鼠标完全不可达（只能靠手动配置全局快捷键）。
+            Button {
+                MenuBarStatusItemController.shared.showWindowManagement()
+            } label: {
+                HStack(spacing: 10) {
+                    Image(systemName: "macwindow.on.rectangle")
+                        .font(.title3)
+                        .foregroundStyle(.tint)
+                    VStack(alignment: .leading, spacing: 2) {
+                        Text(L("plugin.window-management.title"))
+                            .font(.callout.weight(.medium))
+                        Text(L("panel.windowManagement.hint"))
+                            .font(.caption2)
+                            .foregroundStyle(.secondary)
+                    }
+                    Spacer()
+                    Image(systemName: "chevron.right")
+                        .font(.caption.weight(.semibold))
+                        .foregroundStyle(.secondary)
+                }
+                .padding(14)
+                .contentShape(.rect(cornerRadius: 16))
+            }
+            .buttonStyle(.plain)
+            .controlCenterSurface(interactive: true)
         }
     }
 

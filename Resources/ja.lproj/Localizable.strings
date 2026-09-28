@@ -1458,6 +1458,7 @@
 "panel.category.tools" = "ツール";
 "panel.navigation" = "機能カテゴリ";
 "panel.jumpTo" = "機能へ移動";
+"panel.windowManagement.hint" = "レイアウト・スナップ・プリセット";
 "panel.editFavorites" = "よく使う機能を編集";
 "panel.pin" = "よく使う機能に追加";
 "panel.unpin" = "よく使う機能から削除";

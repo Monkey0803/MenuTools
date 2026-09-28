@@ -9,6 +9,12 @@ struct WindowManagementQuickAccessView: View {
     let dismiss: () -> Void
 
     var body: some View {
+        content
+            // Esc 关闭快速面板（此前没有任何键盘退出方式）。
+            .onExitCommand(perform: dismiss)
+    }
+
+    private var content: some View {
         VStack(alignment: .leading, spacing: 10) {
             HStack(spacing: 7) {
                 Image(systemName: "macwindow.on.rectangle")
@@ -116,6 +122,12 @@ struct WindowManagementQuickAccessView: View {
             TextField(L("window.manager.layoutSearch"), text: $query)
                 .textFieldStyle(.plain)
                 .font(.caption)
+                // 此前搜索框回车无效，用户只能点选；现在回车直接套用第一个匹配的布局。
+                .onSubmit {
+                    if let first = filteredLayouts.first {
+                        apply(first)
+                    }
+                }
             if !query.isEmpty {
                 Button {
                     query = ""

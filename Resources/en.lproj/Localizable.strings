@@ -1458,6 +1458,7 @@
 "panel.category.tools" = "Tools";
 "panel.navigation" = "Feature categories";
 "panel.jumpTo" = "Jump to";
+"panel.windowManagement.hint" = "Layouts, snapping and presets";
 "panel.editFavorites" = "Edit favorites";
 "panel.pin" = "Add to favorites";
 "panel.unpin" = "Remove from favorites";

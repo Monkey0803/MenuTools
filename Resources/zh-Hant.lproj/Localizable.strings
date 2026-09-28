@@ -1458,6 +1458,7 @@
 "panel.category.tools" = "工具";
 "panel.navigation" = "功能分類";
 "panel.jumpTo" = "前往功能";
+"panel.windowManagement.hint" = "佈局、吸附與預設，點開即用";
 "panel.editFavorites" = "編輯常用";
 "panel.pin" = "加入常用";
 "panel.unpin" = "從常用移除";

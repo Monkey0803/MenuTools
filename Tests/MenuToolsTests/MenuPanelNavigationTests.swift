@@ -66,3 +66,19 @@ func menuPanelJumpMenuIndicatorFollowsExpansion() {
     #expect(MenuPanelJumpMenuPolicy.indicatorSymbolName(isExpanded: false) == "chevron.down")
     #expect(MenuPanelJumpMenuPolicy.indicatorSymbolName(isExpanded: true) == "chevron.up")
 }
+
+@Test("窗口管理有主面板入口，且只依赖窗口管理插件")
+func windowManagementFeatureIsReachableFromPanel() {
+    #expect(MenuPanelFeature.windowManagement.category == .tools)
+    #expect(MenuPanelFeature.windowManagement.titleKey == "plugin.window-management.title")
+    #expect(MenuPanelFeature.windowManagement.isAvailable(enabledPlugins: [.windowManagement]))
+    #expect(!MenuPanelFeature.windowManagement.isAvailable(enabledPlugins: [.screenshot]))
+
+    // 默认启用全部模块时，它必须出现在「工具」分类里（此前旗舰能力在面板完全不可达）。
+    let items = MenuPanelNavigation.items(
+        in: .tools,
+        enabledPlugins: Set(BuiltInPluginID.allCases),
+        pinned: []
+    )
+    #expect(items.contains(.windowManagement))
+}
