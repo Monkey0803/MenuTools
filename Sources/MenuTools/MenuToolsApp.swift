@@ -93,6 +93,9 @@ struct MenuToolsApp: App {
         MenuBarStatusItemController.shared.start()
         // 所有可选功能统一由插件管理器启动，禁用后不会创建对应后台监听。
         BuiltInPluginManager.shared.startEnabledPlugins()
+        // 迁移到 SQLite 时留下的旧 JSON 与 .migrated 安全备份已过保留期就直接清掉，
+        // 否则会在数据目录里长期占上百 MB（本机实测 112 MB）。
+        MigrationResidueCleaner.cleanExpiredInDefaultDirectory()
     }
 
     var body: some Scene {
