@@ -81,6 +81,50 @@ private enum ScreenshotEditorDraft {
 /// 截图应用内编辑器，参考 Snapzy 的标注工具组织方式实现。
 ///
 /// 编辑结果由本应用直接合成 PNG，不会打开 Preview 或其它系统编辑器。
+/// 标注器里按钮与菜单项的快捷键。
+///
+/// 此前 `ScreenshotEditorView` 内 `keyboardShortcut` 命中 0、`accessibilityLabel` 命中 0：
+/// 键盘用户只能靠鼠标点，VoiceOver 读到的是一串没有名字的图形按钮。
+/// 这里把「动作 → 文案键 → 快捷键」收敛到一处，界面提示与无障碍标签共用同一个文案键，
+/// 避免两者各写一份后逐渐不一致。
+enum ScreenshotEditorShortcutAction: String, CaseIterable {
+    case undo
+    case copyRecognizedText
+    case clearAnnotations
+    case save
+    case cancel
+
+    var titleKey: String {
+        switch self {
+        case .undo: return "screenshot.editor.undo"
+        case .copyRecognizedText: return "screenshot.ocr.copy"
+        case .clearAnnotations: return "screenshot.editor.clear"
+        case .save: return "screenshot.editor.save"
+        case .cancel: return "update.cancel"
+        }
+    }
+
+    var key: KeyEquivalent {
+        switch self {
+        case .undo: return "z"
+        case .copyRecognizedText: return "c"
+        case .clearAnnotations: return .delete
+        case .save: return "s"
+        case .cancel: return .escape
+        }
+    }
+
+    /// Esc 是系统约定的取消键，不带修饰键；其余一律带修饰键，避免抢走文本工具的输入。
+    var modifiers: EventModifiers {
+        switch self {
+        case .undo, .save: return .command
+        case .copyRecognizedText: return [.command, .shift]
+        case .clearAnnotations: return .command
+        case .cancel: return []
+        }
+    }
+}
+
 struct ScreenshotEditorView: View {
     let session: ScreenshotEditorSession
     let onSave: (Data) throws -> Void
@@ -201,6 +245,7 @@ struct ScreenshotEditorView: View {
                 Label(L(tool.titleKey), systemImage: tool.symbol)
             }
             .help(L("screenshot.editor.tool"))
+            .accessibilityLabel(L("screenshot.editor.tool"))
 
             Button {
                 isColorPalettePresented.toggle()
@@ -224,11 +269,13 @@ struct ScreenshotEditorView: View {
                 colorPalette
             }
             .help(L("screenshot.editor.color"))
+            .accessibilityLabel(L("screenshot.editor.color"))
 
             if tool != .text && tool != .mosaic && tool != .crop {
                 Slider(value: $lineWidth, in: 2...16, step: 1)
                     .frame(width: 80)
                     .help(L("screenshot.editor.width"))
+                    .accessibilityLabel(L("screenshot.editor.width"))
             }
 
             Button {
@@ -238,6 +285,7 @@ struct ScreenshotEditorView: View {
             }
             .buttonStyle(.borderless)
             .help(L("screenshot.editor.rotateLeft"))
+            .accessibilityLabel(L("screenshot.editor.rotateLeft"))
 
             Button {
                 rotateImage(clockwise: true)
@@ -246,6 +294,7 @@ struct ScreenshotEditorView: View {
             }
             .buttonStyle(.borderless)
             .help(L("screenshot.editor.rotateRight"))
+            .accessibilityLabel(L("screenshot.editor.rotateRight"))
 
             Button {
                 recognizeText()
@@ -254,6 +303,10 @@ struct ScreenshotEditorView: View {
             }
             .disabled(sourceImage == nil)
             .help(L("screenshot.ocr.copy"))
+            .keyboardShortcut(
+                ScreenshotEditorShortcutAction.copyRecognizedText.key,
+                modifiers: ScreenshotEditorShortcutAction.copyRecognizedText.modifiers
+            )
 
             Spacer()
 
@@ -263,6 +316,10 @@ struct ScreenshotEditorView: View {
                 Label(L("screenshot.editor.undo"), systemImage: "arrow.uturn.backward")
             }
             .disabled(annotations.isEmpty)
+            .keyboardShortcut(
+                ScreenshotEditorShortcutAction.undo.key,
+                modifiers: ScreenshotEditorShortcutAction.undo.modifiers
+            )
 
             Button {
                 commitTextEditing()
@@ -272,18 +329,30 @@ struct ScreenshotEditorView: View {
                 Label(L("screenshot.editor.clear"), systemImage: "trash")
             }
             .disabled(annotations.isEmpty && draft == nil)
+            .keyboardShortcut(
+                ScreenshotEditorShortcutAction.clearAnnotations.key,
+                modifiers: ScreenshotEditorShortcutAction.clearAnnotations.modifiers
+            )
 
             Button(L("update.cancel"), role: .cancel) {
                 cancelTextEditing()
                 onCancel()
                 dismiss()
             }
+            .keyboardShortcut(
+                ScreenshotEditorShortcutAction.cancel.key,
+                modifiers: ScreenshotEditorShortcutAction.cancel.modifiers
+            )
 
             Button(L("screenshot.editor.save"), systemImage: "checkmark.circle.fill") {
                 commitTextEditing()
                 save()
             }
             .buttonStyle(.borderedProminent)
+            .keyboardShortcut(
+                ScreenshotEditorShortcutAction.save.key,
+                modifiers: ScreenshotEditorShortcutAction.save.modifiers
+            )
         }
         .padding(12)
     }
