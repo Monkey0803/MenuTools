@@ -250,6 +250,7 @@
 | P2-19 | `dcb5199` | 百分比口径统一为 `SystemResourcePercent`（满载显示 100%，与菜单栏同源）；历史柱支持左右方向键并对 VoiceOver 可读；每核条补行级标签；补 2 条用例 |
 | P2-20 | `89bae5e` | 深链扩展场景与快捷操作；补上该文件的首批测试（4 条）；顺带修复 kebab 把连续大写拆开的真 bug（`flushDNS` → `flush-d-n-s`）；README 同步 |
 | P2-21 | `0dba6c8` | 新增 `SettingsStatusMessage` + `SettingsStatusBanner`（绿/红/灰）并在翻译、存储、截图、资源四页落地；网络监控的「服务不可用+重试」banner 保留（不同语义）；补 2 条用例 |
+| P2-10 | `d628eb7` | 标注器新增 `ScreenshotEditorShortcutAction`（⌘Z/⇧⌘C/⌘⌫/⌘S/Esc）并给旋转、取色、线宽、工具菜单补无障碍标签；补 1 条用例 |
 
 ---
 
