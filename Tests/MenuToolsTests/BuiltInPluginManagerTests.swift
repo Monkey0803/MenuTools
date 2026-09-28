@@ -414,3 +414,50 @@ private extension BuiltInPluginManifest {
         )
     }
 }
+
+@Test("内置插件依赖图：依赖都存在且无环")
+@MainActor
+func builtInPluginDependencyGraphIsValid() throws {
+    let registrations = BuiltInPluginCatalog.registrations()
+    let ids = Set(registrations.map(\.manifest.id))
+
+    // 依赖必须指向真实存在的插件
+    for registration in registrations {
+        for dependency in registration.manifest.dependencies {
+            #expect(ids.contains(dependency), "\(registration.manifest.id.rawValue) 依赖了不存在的插件")
+            #expect(dependency != registration.manifest.id, "插件不应依赖自己")
+        }
+    }
+
+    // 拓扑排序能走完即无环（同时验证依赖先于被依赖者启动的约束可实现）
+    var remaining = Dictionary(uniqueKeysWithValues: registrations.map { ($0.manifest.id, $0.manifest.dependencies) })
+    var resolved: Set<BuiltInPluginID> = []
+    while !remaining.isEmpty {
+        let ready = remaining.filter { $0.value.isSubset(of: resolved) }.map(\.key)
+        #expect(!ready.isEmpty, "依赖图存在环：\(remaining.keys.map(\.rawValue).sorted())")
+        guard !ready.isEmpty else { return }
+        for id in ready {
+            resolved.insert(id)
+            remaining.removeValue(forKey: id)
+        }
+    }
+    #expect(resolved == ids)
+}
+
+@Test("自动化声明了对启动器与系统控制插件的真实依赖")
+@MainActor
+func automationDeclaresEvidencedDependencies() {
+    let registrations = BuiltInPluginCatalog.registrations()
+    let automation = registrations.first { $0.manifest.id == .automation }
+    #expect(automation?.manifest.dependencies == [.appLauncher, .systemControls])
+
+    // 依赖关系必须能从管理器里查出来，界面才能提示「停了会影响谁」
+    let defaults = UserDefaults(suiteName: "PluginDependents.\(UUID().uuidString)") ?? .standard
+    let manager = BuiltInPluginManager(
+        registrations: BuiltInPluginCatalog.registrations(),
+        userDefaults: defaults
+    )
+    #expect(manager.dependents(of: .appLauncher).contains(.automation))
+    #expect(manager.dependents(of: .systemControls).contains(.automation))
+    #expect(manager.dependents(of: .translation).isEmpty)
+}

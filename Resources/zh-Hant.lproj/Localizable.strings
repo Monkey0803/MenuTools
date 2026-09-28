@@ -1297,6 +1297,9 @@
 "plugin.error.unknownPlugin" = "未註冊的功能：%@";
 "plugin.error.dependencyCycle" = "功能相依形成循環：%@";
 "plugin.error.requiredBy" = "功能仍被 %@ 依賴";
+"plugin.dependencies" = "依賴：%@";
+"plugin.dependents" = "被 %@ 依賴：停用會被拒絕，請先停用依賴它的外掛。";
+"plugin.finderTools.systemHint" = "注意：Finder 擴充功能無法由應用程式自行卸載。停用只會停止命令處理，擴充功能在系統設定中仍為啟用；要徹底移除請在「系統設定 → 一般 → 登入項目與擴充功能 → Finder 擴充功能」中關閉。";
 "plugin.state.running" = "執行中";
 "plugin.state.failed" = "啟動失敗";
 "plugin.permissions" = "需要：%@";

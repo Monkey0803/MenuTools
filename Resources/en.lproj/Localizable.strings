@@ -1297,6 +1297,9 @@
 "plugin.error.unknownPlugin" = "Unknown plugin: %@";
 "plugin.error.dependencyCycle" = "Plugin dependency cycle: %@";
 "plugin.error.requiredBy" = "Plugin is still required by %@";
+"plugin.dependencies" = "Requires: %@";
+"plugin.dependents" = "Required by %@: turning it off is refused until those are off.";
+"plugin.finderTools.systemHint" = "Note: a Finder extension cannot be uninstalled by the app. Turning this off only stops command handling; the extension stays enabled in System Settings. To remove it entirely, turn it off in System Settings > General > Login Items & Extensions > Finder Extensions.";
 "plugin.state.running" = "Running";
 "plugin.state.failed" = "Failed";
 "plugin.permissions" = "Requires: %@";

@@ -266,9 +266,7 @@ final class BuiltInPluginManager {
                 throw error
             }
         } else {
-            if let dependent = enabledPluginIDs.first(where: { candidate in
-                candidate != id && registrations[candidate]?.manifest.dependencies.contains(id) == true
-            }) {
+            if let dependent = dependents(of: id).first(where: { enabledPluginIDs.contains($0) }) {
                 throw BuiltInPluginManagerError.requiredBy(dependent)
             }
             if states[id] == .running {
@@ -278,6 +276,13 @@ final class BuiltInPluginManager {
             enabledPluginIDs.remove(id)
             persist()
             lastErrorMessage = nil
+        }
+    }
+
+    /// 依赖 `id` 的插件（按用户排序）。界面据此提示「停用会影响谁」，停用拦截也用它，避免两处规则漂移。
+    func dependents(of id: BuiltInPluginID) -> [BuiltInPluginID] {
+        orderedPluginIDs.filter { candidate in
+            candidate != id && registrations[candidate]?.manifest.dependencies.contains(id) == true
         }
     }
 

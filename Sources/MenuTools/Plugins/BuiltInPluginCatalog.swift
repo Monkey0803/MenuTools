@@ -150,11 +150,15 @@ enum BuiltInPluginCatalog {
                 start: { AppShortcutService.shared.start() },
                 stop: { AppShortcutService.shared.stop() }
             ),
+            // 场景与全局快捷键对这两者有真实依赖：
+            //  - 「工作模式」打开收藏 App 需要启动器插件（停用后该动作会静默变成空操作）；
+            //  - 场景的防休眠由系统控制插件的 stop 收尾（停用会静默取消正在生效的防休眠）。
             registration(
                 id: .automation,
                 category: .productivity,
                 symbol: "wand.and.stars",
                 permissions: [.accessibility, .automation],
+                dependencies: [.appLauncher, .systemControls],
                 start: { GlobalShortcutService.shared.start() },
                 stop: { GlobalShortcutService.shared.stop() }
             ),

@@ -1297,6 +1297,9 @@
 "plugin.error.unknownPlugin" = "등록되지 않은 기능: %@";
 "plugin.error.dependencyCycle" = "기능 의존성이 순환합니다: %@";
 "plugin.error.requiredBy" = "기능이 아직 %@에 의해 필요합니다";
+"plugin.dependencies" = "의존: %@";
+"plugin.dependents" = "%@이(가) 의존합니다: 해당 플러그인을 끄기 전에는 비활성화할 수 없습니다.";
+"plugin.finderTools.systemHint" = "참고: Finder 확장은 앱에서 제거할 수 없습니다. 끄면 명령 처리만 중단되고 시스템 설정에서는 계속 활성화되어 있습니다. 완전히 제거하려면 시스템 설정 > 일반 > 로그인 항목 및 확장 프로그램 > Finder 확장 프로그램에서 끄세요.";
 "plugin.state.running" = "실행 중";
 "plugin.state.failed" = "시작 실패";
 "plugin.permissions" = "필요 권한: %@";

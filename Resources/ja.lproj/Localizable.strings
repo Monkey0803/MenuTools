@@ -1297,6 +1297,9 @@
 "plugin.error.unknownPlugin" = "未登録の機能：%@";
 "plugin.error.dependencyCycle" = "機能の依存関係が循環しています：%@";
 "plugin.error.requiredBy" = "機能は依然として %@ から必要とされています";
+"plugin.dependencies" = "依存先：%@";
+"plugin.dependents" = "%@ が依存しています：先にそちらを無効にするまで停止できません。";
+"plugin.finderTools.systemHint" = "注意：Finder 拡張はアプリ側からアンインストールできません。オフにしてもコマンド処理が止まるだけで、システム設定では有効のままです。完全に削除するには「システム設定 → 一般 → ログイン項目と機能拡張 → Finder 機能拡張」でオフにしてください。";
 "plugin.state.running" = "実行中";
 "plugin.state.failed" = "起動失敗";
 "plugin.permissions" = "必要：%@";

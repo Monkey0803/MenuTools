@@ -1297,6 +1297,9 @@
 "plugin.error.unknownPlugin" = "未注册插件：%@";
 "plugin.error.dependencyCycle" = "插件依赖形成循环：%@";
 "plugin.error.requiredBy" = "插件仍被 %@ 依赖";
+"plugin.dependencies" = "依赖：%@";
+"plugin.dependents" = "被 %@ 依赖：停用会被拒绝，请先停用依赖它的插件。";
+"plugin.finderTools.systemHint" = "注意：Finder 扩展无法由应用自行卸载。停用只会停止命令处理，扩展在系统设置里仍是启用状态；要彻底移除请在「系统设置 → 通用 → 登录项与扩展 → 访达扩展」中关闭。";
 "plugin.state.running" = "运行中";
 "plugin.state.failed" = "启动失败";
 "plugin.permissions" = "需要：%@";

@@ -257,6 +257,7 @@
 | P2-13 | `6c8cd8a` | 按文档建议只做「检测 + 提示」：持续无声 5 秒且 tap 在跑、未静音、音量不为 0 时提示可能是受保护音源（DRM），不改动音频行为；补 2 条用例。**遗留**：真实 DRM 音源下 tap 是否只出静音仍未真机验证（需要真实受保护音源投放），已在 README 已知限制里标注 |
 | P2-16 | `5d9cad0` | 共享配置新增 `language` 字段 + `RightClickConfigLanguage`（归一化/首选语言解析/带锁 Bundle 缓存）；扩展改为按配置语言取文案，主程序启动与语言切换时发布；**真机端到端验证**：临时设为 en 后配置出现 `"language": "en"`，还原 system 后回到 nil；补 3 条用例 |
 | P2-17 | `d2a8e8c` | 剪贴板展示结果按 `changeCount` 缓存（含「空剪贴板」也缓存）、终端安装状态进程内只查一次、剪贴板图片解码加 20MB 上限；补 2 条用例。**未做**：逐个选中项的 `resourceValues`（isDirectory 判定是菜单语义所需，按数量截断会改变行为） |
+| P2-22 | 本次提交 | 声明有证据的依赖（`.automation` → `.appLauncher` + `.systemControls`）；manager 新增 `dependents(of:)` 并让停用拦截与界面共用同一规则；插件中心渲染「依赖 / 被依赖」与 `.finderTools` 的系统扩展诚实提示；补 2 条用例（依赖图合法无环、依赖可查）。**勘误**：文档说依赖机制「永不可达」只对生产环境成立——它早已被 `BuiltInPluginManagerTests` 覆盖 |
 
 ---
 

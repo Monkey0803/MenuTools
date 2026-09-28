@@ -171,6 +171,14 @@ struct PluginCenterView: View {
         .padding(.vertical, 50)
     }
 
+    /// 插件名列表，用于「依赖 / 被依赖」提示。
+    private func dependencyNames(_ ids: [BuiltInPluginID]) -> String {
+        let names = ids.compactMap { id in
+            BuiltInPluginCatalog.registrations().first { $0.manifest.id == id }?.manifest.titleKey
+        }
+        return names.map { L($0) }.joined(separator: "、")
+    }
+
     private func pluginRow(_ manifest: BuiltInPluginManifest) -> some View {
         HStack(spacing: 12) {
             pluginRowContent(manifest)
@@ -232,6 +240,32 @@ struct PluginCenterView: View {
                     Text(permissionDescription(manifest.requiredPermissions))
                         .font(.caption2)
                         .foregroundStyle(.orange)
+                }
+
+                // 依赖与连锁影响：此前这两条信息在界面上完全不可见，
+                // 用户只能遇到「停用被拒」却不知道原因。
+                if !manifest.dependencies.isEmpty {
+                    Text(L("plugin.dependencies", dependencyNames(
+                        // Set 的顺序不确定，按 allCases 顺序展示，文案才稳定
+                        BuiltInPluginID.allCases.filter(manifest.dependencies.contains)
+                    )))
+                        .font(.caption2)
+                        .foregroundStyle(.secondary)
+                }
+                let dependents = manager.dependents(of: manifest.id)
+                if !dependents.isEmpty {
+                    Text(L("plugin.dependents", dependencyNames(dependents)))
+                        .font(.caption2)
+                        .foregroundStyle(.orange)
+                }
+
+                // Finder 扩展没法由 App 自行卸载：停用只停止命令处理，系统里仍是启用状态。
+                // 说清楚比让用户以为「关了还在」更可信。
+                if manifest.id == .finderTools {
+                    Text(L("plugin.finderTools.systemHint"))
+                        .font(.caption2)
+                        .foregroundStyle(.secondary)
+                        .fixedSize(horizontal: false, vertical: true)
                 }
             }
 
