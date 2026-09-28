@@ -726,6 +726,10 @@
 "appShortcut.currentBinding" = "当前快捷键";
 "appShortcut.save" = "保存绑定";
 "appShortcut.search" = "搜索已安装的应用";
+"appLauncher.favorites" = "收藏";
+"appLauncher.recent" = "最近使用";
+"appLauncher.favorite.add" = "加入收藏";
+"appLauncher.favorite.remove" = "取消收藏";
 "appShortcut.empty" = "未找到应用";
 "appShortcut.emptyBound" = "暂未绑定应用，点击“添加应用”开始设置。";
 "appShortcut.launchFailed" = "无法启动 %@";

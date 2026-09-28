@@ -726,6 +726,10 @@
 "appShortcut.currentBinding" = "Current Shortcut";
 "appShortcut.save" = "Save Binding";
 "appShortcut.search" = "Search installed apps";
+"appLauncher.favorites" = "Favorites";
+"appLauncher.recent" = "Recently used";
+"appLauncher.favorite.add" = "Add to favorites";
+"appLauncher.favorite.remove" = "Remove from favorites";
 "appShortcut.empty" = "No apps found";
 "appShortcut.emptyBound" = "No apps are bound yet. Click “Add App” to get started.";
 "appShortcut.launchFailed" = "Unable to launch %@";

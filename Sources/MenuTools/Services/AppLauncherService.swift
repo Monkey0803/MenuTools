@@ -51,6 +51,26 @@ enum AppLauncherCatalog {
     }
 }
 
+/// 启动器面板的展示规则（纯函数，便于回归）。
+enum AppLauncherPanelPolicy {
+    static let recentLimit = 5
+
+    /// 有搜索词时只列结果；没有搜索词时才展示「收藏 / 最近使用」分组。
+    static func showsRecents(query: String) -> Bool {
+        query.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+    }
+
+    /// 最近使用：按记录顺序保留仍然存在的条目，最多 limit 条。
+    /// 过滤掉已被删除的 App，避免面板里出现点不动的空行。
+    static func recentPaths(
+        _ paths: [String],
+        exists: (String) -> Bool,
+        limit: Int = AppLauncherPanelPolicy.recentLimit
+    ) -> [String] {
+        Array(paths.filter(exists).prefix(max(limit, 0)))
+    }
+}
+
 @MainActor
 @Observable
 final class AppLauncherService {

@@ -673,6 +673,8 @@ struct MenuPanelView: View {
             }
             .buttonStyle(.plain)
             .controlCenterSurface(interactive: true)
+        case .appLauncher:
+            AppLauncherCard(service: appLauncherService)
         case .windowManagement:
             // 60 种布局是旗舰能力，此前默认安装下鼠标完全不可达（只能靠手动配置全局快捷键）。
             Button {

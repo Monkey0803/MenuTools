@@ -726,6 +726,10 @@
 "appShortcut.currentBinding" = "현재 단축키";
 "appShortcut.save" = "지정 저장";
 "appShortcut.search" = "설치된 앱 검색";
+"appLauncher.favorites" = "즐겨찾기";
+"appLauncher.recent" = "최근 사용";
+"appLauncher.favorite.add" = "즐겨찾기에 추가";
+"appLauncher.favorite.remove" = "즐겨찾기에서 제거";
 "appShortcut.empty" = "앱을 찾을 수 없습니다";
 "appShortcut.emptyBound" = "지정된 앱이 없습니다. ‘앱 추가’를 눌러 설정하세요.";
 "appShortcut.launchFailed" = "%@을(를) 실행할 수 없습니다";

@@ -19,6 +19,7 @@ enum MenuPanelFeature: String, CaseIterable, Identifiable {
     case network, traffic
     case hero, translation, clipboard, quickActions, scenes, shortcuts, focus
     case windowManagement
+    case appLauncher
 
     var id: String { rawValue }
 
@@ -28,7 +29,7 @@ enum MenuPanelFeature: String, CaseIterable, Identifiable {
         case .volume, .bluetooth, .display, .battery: .devices
         case .network, .traffic: .network
         case .hero, .translation, .clipboard, .quickActions, .scenes, .shortcuts, .focus: .tools
-        case .windowManagement: .tools
+        case .windowManagement, .appLauncher: .tools
         }
     }
 
@@ -52,6 +53,7 @@ enum MenuPanelFeature: String, CaseIterable, Identifiable {
         case .shortcuts: "shortcut.title"
         case .focus: "focus.title"
         case .windowManagement: "plugin.window-management.title"
+        case .appLauncher: "plugin.app-launcher.title"
         }
     }
 
@@ -69,6 +71,7 @@ enum MenuPanelFeature: String, CaseIterable, Identifiable {
         case .quickActions: [.systemControls, .finderTools, .screenshot]
         case .scenes, .shortcuts, .focus: [.automation]
         case .windowManagement: [.windowManagement]
+        case .appLauncher: [.appLauncher]
         }
         return !supportingPlugins.isDisjoint(with: enabledPlugins)
     }

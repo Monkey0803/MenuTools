@@ -82,3 +82,18 @@ func windowManagementFeatureIsReachableFromPanel() {
     )
     #expect(items.contains(.windowManagement))
 }
+
+@Test("应用启动器有主面板入口，且只依赖启动器插件")
+func appLauncherFeatureIsReachableFromPanel() {
+    #expect(MenuPanelFeature.appLauncher.category == .tools)
+    #expect(MenuPanelFeature.appLauncher.titleKey == "plugin.app-launcher.title")
+    #expect(MenuPanelFeature.appLauncher.isAvailable(enabledPlugins: [.appLauncher]))
+    #expect(!MenuPanelFeature.appLauncher.isAvailable(enabledPlugins: [.clipboard]))
+
+    let items = MenuPanelNavigation.items(
+        in: .tools,
+        enabledPlugins: Set(BuiltInPluginID.allCases),
+        pinned: []
+    )
+    #expect(items.contains(.appLauncher))
+}

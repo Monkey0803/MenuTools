@@ -726,6 +726,10 @@
 "appShortcut.currentBinding" = "現在のショートカット";
 "appShortcut.save" = "割り当てを保存";
 "appShortcut.search" = "インストール済みアプリを検索";
+"appLauncher.favorites" = "お気に入り";
+"appLauncher.recent" = "最近使用したアプリ";
+"appLauncher.favorite.add" = "お気に入りに追加";
+"appLauncher.favorite.remove" = "お気に入りから削除";
 "appShortcut.empty" = "アプリが見つかりません";
 "appShortcut.emptyBound" = "割り当て済みアプリはありません。「アプリを追加」から設定してください。";
 "appShortcut.launchFailed" = "%@ を起動できません";

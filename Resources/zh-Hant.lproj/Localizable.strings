@@ -726,6 +726,10 @@
 "appShortcut.currentBinding" = "目前快捷鍵";
 "appShortcut.save" = "儲存綁定";
 "appShortcut.search" = "搜尋已安裝的應用程式";
+"appLauncher.favorites" = "收藏";
+"appLauncher.recent" = "最近使用";
+"appLauncher.favorite.add" = "加入收藏";
+"appLauncher.favorite.remove" = "取消收藏";
 "appShortcut.empty" = "找不到應用程式";
 "appShortcut.emptyBound" = "尚未綁定應用程式，點擊「新增應用程式」開始設定。";
 "appShortcut.launchFailed" = "無法啟動 %@";
