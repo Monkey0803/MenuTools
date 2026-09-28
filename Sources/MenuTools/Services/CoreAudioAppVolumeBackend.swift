@@ -553,6 +553,26 @@ final class CoreAudioAppVolumeBackend: AppVolumeRoutingBackend {
     }
 }
 
+/// 均衡器配置的滚动保留窗口（纯逻辑，便于回归）。
+///
+/// IOProc 用**不持有所有权**的裸指针读取当前配置，因此刚发布的那份必须一直活着。
+/// 但每次拖动 EQ 滑杆都会生成一份新配置：无限保留会让长会话内存单调增长
+/// （导出值与实际生效值必须区分开，所以不能复用同一块内存）。
+enum AppVolumeEqualizerRetention {
+    /// 保留份数：当前一份 + 上一份。上一份是替换瞬间 IOProc 可能仍在使用的对象。
+    static let defaultLimit = 2
+
+    static func retained<T>(_ values: [T], limit: Int, appending value: T) -> [T] {
+        var updated = values
+        updated.append(value)
+        let effectiveLimit = max(1, limit)
+        if updated.count > effectiveLimit {
+            updated.removeFirst(updated.count - effectiveLimit)
+        }
+        return updated
+    }
+}
+
 enum AppVolumeRouteFailurePolicy {
     static let consecutiveFailureLimit = 8
 
@@ -783,7 +803,11 @@ enum AppVolumeRenderCore {
     }
 }
 
-private final class AppVolumeRouteState: @unchecked Sendable {
+/// 单条路由的运行时状态。
+///
+/// 刻意保持模块内可见（而非 private）：滚动保留窗口这类「不该无限增长」的不变量
+/// 必须能被单元测试直接验证，否则只能靠人工观察内存。
+final class AppVolumeRouteState: @unchecked Sendable {
     let targetGain: Atomic<Float>
     let currentGain: Atomic<Float>
     let peakLevel: Atomic<Float>
@@ -803,6 +827,9 @@ private final class AppVolumeRouteState: @unchecked Sendable {
     private var currentEqualizer = AppVolumeEqualizer.flat
     private var sampleRate = 48_000.0
     private var retainedEqualizerConfigurations: [AppVolumeEqualizerConfiguration] = []
+
+    /// 当前保留的配置份数；仅用于回归验证不会无限增长。
+    var retainedEqualizerCount: Int { retainedEqualizerConfigurations.count }
 
     init(gain: Float) {
         targetGain = Atomic(gain)
@@ -855,7 +882,12 @@ private final class AppVolumeRouteState: @unchecked Sendable {
             equalizer: normalizedEqualizer,
             sampleRate: sampleRate
         )
-        retainedEqualizerConfigurations.append(configuration)
+        // 滚动保留最近两份：既不无限增长，也不让 IOProc 读到已释放的内存。
+        retainedEqualizerConfigurations = AppVolumeEqualizerRetention.retained(
+            retainedEqualizerConfigurations,
+            limit: AppVolumeEqualizerRetention.defaultLimit,
+            appending: configuration
+        )
         equalizerConfiguration.store(
             Unmanaged.passUnretained(configuration).toOpaque(),
             ordering: .releasing

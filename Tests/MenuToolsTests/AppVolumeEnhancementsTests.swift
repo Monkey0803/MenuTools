@@ -2108,3 +2108,32 @@ func routeFailureGateRebuildsWhenTargetChanges() {
         )
     )
 }
+
+@Test("均衡器配置只保留最近几份，不会随拖动无限增长")
+func equalizerConfigurationRetentionIsBounded() {
+    var retained: [Int] = []
+    for value in 1 ... 500 {
+        retained = AppVolumeEqualizerRetention.retained(retained, limit: 2, appending: value)
+    }
+    #expect(retained == [499, 500])
+
+    // 未超过上限时不裁剪
+    #expect(AppVolumeEqualizerRetention.retained([1], limit: 2, appending: 2) == [1, 2])
+    // 上限至少 2：IOProc 用不持有所有权的指针读取，替换瞬间可能还拿着上一份
+    #expect(AppVolumeEqualizerRetention.defaultLimit >= 2)
+    // 非法上限也不会丢掉刚发布的那一份
+    #expect(AppVolumeEqualizerRetention.retained([1, 2], limit: 0, appending: 3) == [3])
+}
+
+@Test("反复设置均衡器不会让配置数组持续增长")
+func equalizerBackendDoesNotGrowForever() {
+    let state = AppVolumeRouteState(gain: 1)
+    let bandCount = AppVolumeEqualizer.bandFrequencies.count
+    for step in 1 ... 200 {
+        // 每帧给一个不同的增益：模拟拖动滑杆
+        var gains = Array(repeating: 0.0, count: bandCount)
+        gains[0] = Double(step) / 100
+        state.setEqualizer(AppVolumeEqualizer(isEnabled: true, gains: gains), sampleRate: 48_000)
+    }
+    #expect(state.retainedEqualizerCount <= AppVolumeEqualizerRetention.defaultLimit)
+}
