@@ -31,6 +31,8 @@ enum QuickAction: String, CaseIterable, Identifiable, Equatable {
 enum QuickActionError: LocalizedError, Equatable {
     case executionFailed(QuickAction, String)
     case openingFailed(QuickAction)
+    /// 系统上找不到任何可用锁屏通道（不是执行失败，而是能力缺失）。
+    case lockUnsupported
 
     var errorDescription: String? {
         switch self {
@@ -38,7 +40,98 @@ enum QuickActionError: LocalizedError, Equatable {
             return L("quickAction.error", L(action.titleKey), reason)
         case let .openingFailed(action):
             return L("quickAction.openFailed", L(action.titleKey))
+        case .lockUnsupported:
+            return L("quickAction.lockUnsupported")
         }
+    }
+}
+
+/// 锁屏通道。macOS 26 起 `User.menu` 里的 `CGSession` 已被移除，必须优先走
+/// `login.framework` 的私有入口；老系统才回退到 `CGSession`。
+enum ScreenLockChannel: Equatable, Sendable {
+    /// 私有 `SACLockScreenImmediate`：不需要任何权限，现代 macOS 可用。
+    case loginFramework
+    /// 旧版 Menu Extra 的 `CGSession -suspend`：只在老系统上存在。
+    case legacyCGSession
+}
+
+enum ScreenLockError: LocalizedError, Equatable {
+    case channelUnavailable
+    case lockFailed(Int32)
+
+    var errorDescription: String? {
+        switch self {
+        case .channelUnavailable:
+            return L("quickAction.lockUnsupported")
+        case let .lockFailed(status):
+            return L("quickAction.lockFailed", Int(status))
+        }
+    }
+}
+
+/// login.framework 的二进制位于 dyld 共享缓存：**文件路径不存在也能 dlopen 成功**，
+/// 所以可用性只能按「符号能否解析」判断。放文件级是为了能在 nonisolated 探测里引用。
+private let screenLockLoginFrameworkPath = "/System/Library/PrivateFrameworks/login.framework/Versions/A/login"
+private let screenLockSymbolName = "SACLockScreenImmediate"
+
+@MainActor
+protocol ScreenLockRunning {
+    /// 按优先级给出可用通道；一个都没有时返回 nil，由调用方给出可读原因。
+    func availableChannel() -> ScreenLockChannel?
+    func lock(using channel: ScreenLockChannel) throws
+}
+
+@MainActor
+final class DefaultScreenLockRunner: ScreenLockRunning {
+    static let legacyCGSessionPath = "/System/Library/CoreServices/Menu Extras/User.menu/Contents/Resources/CGSession"
+
+    private let legacyPath: String
+    private let processRunner: any QuickActionProcessRunning
+    private let isExecutableFile: (String) -> Bool
+    private let isLoginFrameworkAvailable: () -> Bool
+
+    init(
+        legacyCGSessionPath: String = DefaultScreenLockRunner.legacyCGSessionPath,
+        processRunner: any QuickActionProcessRunning = DefaultQuickActionProcessRunner(),
+        isExecutableFile: @escaping (String) -> Bool = { FileManager.default.isExecutableFile(atPath: $0) },
+        isLoginFrameworkAvailable: @escaping () -> Bool = DefaultScreenLockRunner.probeLoginFramework
+    ) {
+        self.legacyPath = legacyCGSessionPath
+        self.processRunner = processRunner
+        self.isExecutableFile = isExecutableFile
+        self.isLoginFrameworkAvailable = isLoginFrameworkAvailable
+    }
+
+    func availableChannel() -> ScreenLockChannel? {
+        if isLoginFrameworkAvailable() { return .loginFramework }
+        if isExecutableFile(legacyPath) { return .legacyCGSession }
+        return nil
+    }
+
+    func lock(using channel: ScreenLockChannel) throws {
+        switch channel {
+        case .loginFramework:
+            guard let handle = dlopen(screenLockLoginFrameworkPath, RTLD_NOW) else {
+                throw ScreenLockError.channelUnavailable
+            }
+            defer { dlclose(handle) }
+            guard let symbol = dlsym(handle, screenLockSymbolName) else {
+                throw ScreenLockError.channelUnavailable
+            }
+            let lockScreen = unsafeBitCast(symbol, to: (@convention(c) () -> Int32).self)
+            let status = lockScreen()
+            guard status == 0 else { throw ScreenLockError.lockFailed(status) }
+        case .legacyCGSession:
+            guard isExecutableFile(legacyPath) else { throw ScreenLockError.channelUnavailable }
+            try processRunner.run(executable: legacyPath, arguments: ["-suspend"])
+        }
+    }
+
+    /// 只探测符号可解析性，**不调用**，避免探测本身触发锁屏。
+    nonisolated static func probeLoginFramework() -> Bool {
+        guard let handle = dlopen(screenLockLoginFrameworkPath, RTLD_NOW) else { return false }
+        defer { dlclose(handle) }
+        return dlsym(handle, screenLockSymbolName) != nil
     }
 }
 
@@ -145,27 +238,39 @@ private final class DefaultQuickActionWorkspace: QuickActionWorkspaceOpening {
 /// 快捷操作中心的系统能力边界。
 @MainActor
 final class QuickActionService {
-    private static let cgSessionPath = "/System/Library/CoreServices/Menu Extras/User.menu/Contents/Resources/CGSession"
     private static let systemSettingsURL = URL(string: "x-apple.systempreferences:")!
 
     private let processRunner: any QuickActionProcessRunning
     private let scriptRunner: any QuickActionScriptRunning
     private let workspace: any QuickActionWorkspaceOpening
+    private let screenLocker: any ScreenLockRunning
 
     init(
         processRunner: any QuickActionProcessRunning = DefaultQuickActionProcessRunner(),
         scriptRunner: any QuickActionScriptRunning = DefaultQuickActionScriptRunner(),
-        workspace: any QuickActionWorkspaceOpening = DefaultQuickActionWorkspace()
+        workspace: any QuickActionWorkspaceOpening = DefaultQuickActionWorkspace(),
+        screenLocker: (any ScreenLockRunning)? = nil
     ) {
         self.processRunner = processRunner
         self.scriptRunner = scriptRunner
         self.workspace = workspace
+        // 旧版 CGSession 通道要走同一个进程执行器，便于测试与统一错误包装。
+        self.screenLocker = screenLocker ?? DefaultScreenLockRunner(processRunner: processRunner)
     }
 
     func perform(_ action: QuickAction) throws {
         switch action {
         case .lockScreen:
-            try run(action, executable: Self.cgSessionPath, arguments: ["-suspend"])
+            guard let channel = screenLocker.availableChannel() else {
+                throw QuickActionError.lockUnsupported
+            }
+            do {
+                try screenLocker.lock(using: channel)
+            } catch let error as QuickActionError {
+                throw error
+            } catch {
+                throw QuickActionError.executionFailed(action, error.localizedDescription)
+            }
         case .emptyTrash:
             do {
                 try scriptRunner.run(source: QuickActionScript.emptyTrash)

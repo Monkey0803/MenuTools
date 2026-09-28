@@ -329,8 +329,10 @@ rm /tmp/menutools-snap-debug        # 关闭（默认不写任何日志）
 
 ```bash
 swift Scripts/test_powersources.swift     # 电源与内存相关信息源可读性
+swift Scripts/test_memory_metrics.swift   # 内存口径对照：已用（活跃+常驻+压缩）vs 旧口径 total-free，附分区求和校验
 swift Scripts/test_app_volume_tap.swift   # 单 App 音量依赖的音频 Process Tap（会打印真实输入/输出缓冲布局）
 swift Scripts/test_audio_device_channels.swift  # 每个设备当前的输入/输出声道数（定位「输出 1 声道」这类接管失败）
+swift Scripts/test_screen_lock.swift      # 锁屏通道路径探测（默认不锁屏；加 --lock 才会真的锁）
 ```
 
 设置页的滚动长度也可回归：`swift Scripts/test_settings_layout.swift` 会逐个切换窗口管理/系统监控/音频三个页面共 13 个子页，测量内容高度并与基线对照。逐项验收步骤见 [`docs/system-and-audio-acceptance.md`](docs/system-and-audio-acceptance.md)。
@@ -396,6 +398,8 @@ export SPARKLE_DOWNLOAD_URL_PREFIX="https://your-server/releases/"
 ## ⚠️ 已知限制
 
 - 夜览与经典蓝牙耳机电量依赖系统私有 API，系统大版本升级后可能失效（代码已做能力检查，失效时静默降级不会崩溃；`Scripts/` 内有验证脚本可快速回归）
+- 「锁定屏幕」依赖 `login.framework` 的私有符号 `SACLockScreenImmediate`：macOS 26 起系统已移除旧版 `CGSession` 路径，因此改用该符号（不需要任何权限）；符号缺失时会明确提示「此系统没有可用的锁屏通道」，用 `swift Scripts/test_screen_lock.swift` 可回归
+- 内存「已用」按活跃 + 常驻 + 压缩统计，**不含**文件缓存（这是 macOS 的通行口径）；因此数值会明显低于 `total - free` 那种算法，与活动监视器的「已用内存」同量级
 - 不上报电量的蓝牙设备（部分白牌耳机）无法显示电量
 - AirPods 充电盒电量仅在开盖/刚连接时由系统上报
 - 单 App 音量需要系统音频录制权限；DRM 或无法被公开 Process Tap 捕获的音源会保持系统原始音量

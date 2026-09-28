@@ -334,6 +334,8 @@
 "quickAction.success" = "実行しました：%@";
 "quickAction.error" = "%@に失敗：%@";
 "quickAction.openFailed" = "%@を開けません";
+"quickAction.lockUnsupported" = "このシステムには使用できる画面ロック経路がありません";
+"quickAction.lockFailed" = "画面ロックに失敗しました（ステータス %d）";
 
 /* スクリーンショット */
 "screenshot.section.capture" = "スクリーンショット設定";

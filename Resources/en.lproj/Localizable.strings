@@ -334,6 +334,8 @@
 "quickAction.success" = "Executed: %@";
 "quickAction.error" = "%@ failed: %@";
 "quickAction.openFailed" = "Could not open %@";
+"quickAction.lockUnsupported" = "No screen lock channel is available on this system";
+"quickAction.lockFailed" = "Screen lock failed (status %d)";
 
 /* Screenshots */
 "screenshot.section.capture" = "Screenshot Settings";

@@ -334,6 +334,8 @@
 "quickAction.success" = "已執行：%@";
 "quickAction.error" = "%@失敗：%@";
 "quickAction.openFailed" = "無法開啟：%@";
+"quickAction.lockUnsupported" = "此系統沒有可用的鎖屏通道";
+"quickAction.lockFailed" = "鎖屏失敗（狀態 %d）";
 
 /* 截圖 */
 "screenshot.section.capture" = "截圖設定";
