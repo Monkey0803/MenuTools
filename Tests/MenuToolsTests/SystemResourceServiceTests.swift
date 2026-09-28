@@ -139,6 +139,47 @@ func calculatorClassifiesMemoryPressure() {
     #expect(SystemResourceCalculator.snapshot(current: critical, previous: nil).memoryPressure == .critical)
 }
 
+@Test("内存已用口径不含文件缓存：按活跃 + 常驻 + 压缩计算")
+func memoryUsedExcludesFileCache() {
+    // 文件缓存再大也不计入「已用」，否则 macOS 上读数会长期贴近 100%。
+    #expect(SystemResourceMemoryBreakdown.usedBytes(wired: 2_000, active: 3_000, compressed: 1_000) == 6_000)
+    // 负值按 0 计，避免异常数据把已用拉低。
+    #expect(SystemResourceMemoryBreakdown.usedBytes(wired: -1, active: 0, compressed: 0) == 0)
+}
+
+@Test("内存压力优先采用内核信号，而不是已用比例")
+func memoryPressurePrefersKernelSignalOverRatio() {
+    let ticks = SystemResourceCPUTicks(user: 0, system: 0, idle: 1, nice: 0)
+
+    // 已用比例 99%（旧口径必然判「临界」），但内核说正常 → 必须正常。
+    var kernelNormal = reading(time: 1, ticks: ticks, memoryUsed: 9_900, memoryTotal: 10_000)
+    kernelNormal.memoryPressureLevel = 1
+    #expect(SystemResourceCalculator.snapshot(current: kernelNormal, previous: nil).memoryPressure == .normal)
+
+    // 已用比例只有 10%，但内核说警告 → 必须警告。
+    var kernelWarning = reading(time: 1, ticks: ticks, memoryUsed: 1_000, memoryTotal: 10_000)
+    kernelWarning.memoryPressureLevel = 2
+    #expect(SystemResourceCalculator.snapshot(current: kernelWarning, previous: nil).memoryPressure == .warning)
+
+    var kernelCritical = reading(time: 1, ticks: ticks, memoryUsed: 1_000, memoryTotal: 10_000)
+    kernelCritical.memoryPressureLevel = 4
+    #expect(SystemResourceCalculator.snapshot(current: kernelCritical, previous: nil).memoryPressure == .critical)
+}
+
+@Test("内核压力信号缺失或非已知档位时才回退到已用比例")
+func memoryPressureFallsBackToRatioWithoutKnownKernelLevel() {
+    let ticks = SystemResourceCPUTicks(user: 0, system: 0, idle: 1, nice: 0)
+
+    var missing = reading(time: 1, ticks: ticks, memoryUsed: 9_500, memoryTotal: 10_000)
+    missing.memoryPressureLevel = nil
+    #expect(SystemResourceCalculator.snapshot(current: missing, previous: nil).memoryPressure == .critical)
+
+    // XNU 只定义 1 / 2 / 4，其他取值视为未知，不能当作危机。
+    var unknown = reading(time: 1, ticks: ticks, memoryUsed: 5_000, memoryTotal: 10_000)
+    unknown.memoryPressureLevel = 3
+    #expect(SystemResourceCalculator.snapshot(current: unknown, previous: nil).memoryPressure == .normal)
+}
+
 @Test("只有高内存压力时提供释放内存操作")
 func memoryReleaseActionIsLimitedToCriticalPressure() {
     #expect(!SystemMemoryPressure.normal.shouldOfferMemoryRelease)

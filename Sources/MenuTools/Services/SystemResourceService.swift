@@ -52,6 +52,8 @@ struct SystemResourceReading: Equatable, Sendable {
     var gpuUsage: Double?
     /// 温度（摄氏度）；系统不提供时为 nil。
     var temperatureCelsius: Double?
+    /// 内核内存压力信号（XNU：1 正常 / 2 警告 / 4 危急）；读不到时为 nil，由计算器回退到比例判定。
+    var memoryPressureLevel: Int?
 }
 
 enum SystemMemoryPressure: Equatable, Sendable {
@@ -59,8 +61,39 @@ enum SystemMemoryPressure: Equatable, Sendable {
     case warning
     case critical
 
+    /// 内核内存压力信号（`kern.memorystatus_vm_pressure_level`）到档位的映射。
+    /// XNU 只定义 1 / 2 / 4，其他取值一律返回 nil，交由调用方回退，避免把未知值误判成危机。
+    init?(kernelLevel: Int) {
+        switch kernelLevel {
+        case 1: self = .normal
+        case 2: self = .warning
+        case 4: self = .critical
+        default: return nil
+        }
+    }
+
     var shouldOfferMemoryRelease: Bool {
         self == .critical
+    }
+}
+
+/// 内存口径换算。macOS 会把大量内存用作文件缓存，因此「已用」必须排除可回收部分，
+/// 否则读数会长期贴近 100%（`total - free` 正是这种错误口径）。
+enum SystemResourceMemoryBreakdown {
+    /// 已用 = 活跃 + 常驻 + 压缩。
+    static func usedBytes(wired: Int64, active: Int64, compressed: Int64) -> Int64 {
+        max(wired, 0) + max(active, 0) + max(compressed, 0)
+    }
+
+    /// 读不到内核压力信号时的回退判据（沿用既有阈值）。
+    static func pressure(used: Int64, total: Int64) -> SystemMemoryPressure {
+        guard total > 0 else { return .normal }
+        let ratio = Double(min(max(used, 0), total)) / Double(total)
+        switch ratio {
+        case 0.9...: return .critical
+        case 0.75...: return .warning
+        default: return .normal
+        }
     }
 }
 
@@ -122,16 +155,10 @@ enum SystemResourceCalculator {
 
         let memoryTotal = max(current.memoryTotalBytes, 0)
         let memoryUsed = min(max(current.memoryUsedBytes, 0), memoryTotal)
-        let memoryRatio = memoryTotal == 0 ? 0 : Double(memoryUsed) / Double(memoryTotal)
-        let memoryPressure: SystemMemoryPressure
-        switch memoryRatio {
-        case 0.9...:
-            memoryPressure = .critical
-        case 0.75...:
-            memoryPressure = .warning
-        default:
-            memoryPressure = .normal
-        }
+        // 压力优先采用内核信号：已用比例会被文件缓存干扰，不足以判断真实压力。
+        let memoryPressure = current.memoryPressureLevel
+            .flatMap(SystemMemoryPressure.init(kernelLevel:))
+            ?? SystemResourceMemoryBreakdown.pressure(used: memoryUsed, total: memoryTotal)
 
         return SystemResourceSnapshot(
             cpuUsage: cpuUsage,
@@ -244,10 +271,9 @@ struct DefaultSystemResourceProvider: SystemResourceProviding {
     }
 
     func read() -> SystemResourceReading {
-        let memory = memoryReading()
+        let memory = memoryStatistics()
         let disk = diskReading()
         let network = networkReading()
-        let memoryDetail = memoryDetailReading()
         let diskCounters = diskCounterReading()
         return SystemResourceReading(
             timestamp: ProcessInfo.processInfo.systemUptime,
@@ -259,15 +285,16 @@ struct DefaultSystemResourceProvider: SystemResourceProviding {
             networkReceivedBytes: network.received,
             networkSentBytes: network.sent,
             coreTicks: coreReadings(),
-            memoryWiredBytes: memoryDetail.wired,
-            memoryActiveBytes: memoryDetail.active,
-            memoryCompressedBytes: memoryDetail.compressed,
-            memoryCachedBytes: memoryDetail.cached,
-            memoryFreeBytes: memoryDetail.free,
+            memoryWiredBytes: memory.wired,
+            memoryActiveBytes: memory.active,
+            memoryCompressedBytes: memory.compressed,
+            memoryCachedBytes: memory.cached,
+            memoryFreeBytes: memory.free,
             diskReadBytes: diskCounters.read,
             diskWrittenBytes: diskCounters.written,
             gpuUsage: optionalMetrics.readGPUUsage(),
-            temperatureCelsius: optionalMetrics.readTemperatureCelsius()
+            temperatureCelsius: optionalMetrics.readTemperatureCelsius(),
+            memoryPressureLevel: memory.pressureLevel
         )
     }
 
@@ -302,8 +329,24 @@ struct DefaultSystemResourceProvider: SystemResourceProviding {
         }
     }
 
-    /// 内存分区明细，来自 vm_statistics64 的页数。
-    private func memoryDetailReading() -> (wired: Int64, active: Int64, compressed: Int64, cached: Int64, free: Int64) {
+    /// 一次 `vm_statistics64` 读取，供「已用」、分区明细与总量共用（此前分两次系统调用）。
+    ///
+    /// 口径约定：
+    /// - 已用 = 活跃 + 常驻 + 压缩，**不含**文件缓存；
+    /// - 「缓存」取非活跃页（文件缓存等可回收部分），与已用互补；
+    /// - 空闲含 speculative，这样「常驻 + 活跃 + 压缩 + 缓存 + 空闲」才与总量对得上。
+    private func memoryStatistics() -> (
+        used: Int64,
+        total: Int64,
+        wired: Int64,
+        active: Int64,
+        compressed: Int64,
+        cached: Int64,
+        free: Int64,
+        pressureLevel: Int?
+    ) {
+        let total = Int64(ProcessInfo.processInfo.physicalMemory)
+        let pressureLevel = memoryPressureLevel()
         var info = vm_statistics64()
         var count = mach_msg_type_number_t(
             MemoryLayout<vm_statistics64_data_t>.stride / MemoryLayout<integer_t>.stride
@@ -313,17 +356,37 @@ struct DefaultSystemResourceProvider: SystemResourceProviding {
                 host_statistics64(mach_host_self(), HOST_VM_INFO64, $0, &count)
             }
         }
-        guard result == KERN_SUCCESS else { return (0, 0, 0, 0, 0) }
+        guard result == KERN_SUCCESS else {
+            return (0, total, 0, 0, 0, 0, 0, pressureLevel)
+        }
         var pageSize: vm_size_t = 0
         host_page_size(mach_host_self(), &pageSize)
         let page = Int64(pageSize)
+        let wired = Int64(info.wire_count) * page
+        let active = Int64(info.active_count) * page
+        let compressed = Int64(info.compressor_page_count) * page
+        let cached = Int64(info.inactive_count) * page
+        let free = (Int64(info.free_count) + Int64(info.speculative_count)) * page
         return (
-            Int64(info.wire_count) * page,
-            Int64(info.active_count) * page,
-            Int64(info.compressor_page_count) * page,
-            (Int64(info.purgeable_count) + Int64(info.speculative_count)) * page,
-            Int64(info.free_count) * page
+            SystemResourceMemoryBreakdown.usedBytes(wired: wired, active: active, compressed: compressed),
+            total,
+            wired,
+            active,
+            compressed,
+            cached,
+            free,
+            pressureLevel
         )
+    }
+
+    /// 内核内存压力信号（`kern.memorystatus_vm_pressure_level`）；读不到时返回 nil。
+    private func memoryPressureLevel() -> Int? {
+        var value: Int32 = 0
+        var size = MemoryLayout<Int32>.stride
+        guard sysctlbyname("kern.memorystatus_vm_pressure_level", &value, &size, nil, 0) == 0 else {
+            return nil
+        }
+        return Int(value)
     }
 
     /// 磁盘累计读写字节：遍历块设备驱动服务的统计属性。
@@ -368,25 +431,6 @@ struct DefaultSystemResourceProvider: SystemResourceProviding {
             idle: UInt64(info.cpu_ticks.2),
             nice: UInt64(info.cpu_ticks.3)
         )
-    }
-
-    private func memoryReading() -> (used: Int64, total: Int64) {
-        let total = Int64(ProcessInfo.processInfo.physicalMemory)
-        var info = vm_statistics64()
-        var count = mach_msg_type_number_t(
-            MemoryLayout<vm_statistics64_data_t>.stride / MemoryLayout<integer_t>.stride
-        )
-        let result = withUnsafeMutablePointer(to: &info) { pointer in
-            pointer.withMemoryRebound(to: integer_t.self, capacity: Int(count)) {
-                host_statistics64(mach_host_self(), HOST_VM_INFO64, $0, &count)
-            }
-        }
-        guard result == KERN_SUCCESS else { return (0, total) }
-
-        var pageSize: vm_size_t = 0
-        host_page_size(mach_host_self(), &pageSize)
-        let freeBytes = Int64(info.free_count) * Int64(pageSize)
-        return (max(total - freeBytes, 0), total)
     }
 
     private func diskReading() -> (available: Int64, total: Int64) {
