@@ -423,7 +423,8 @@ enum ClipboardSnippetSearch {
     }
 }
 
-private struct ClipboardSnippetDocument: Codable {
+/// 片段持久化文档。刻意不加 private：迁移用例需要按旧格式写出明文文件。
+struct ClipboardSnippetDocument: Codable {
     var groups: [ClipboardSnippetGroup]
     var snippets: [ClipboardSnippet]
 }
@@ -448,12 +449,43 @@ enum ClipboardSnippetPersistence {
 
     static func load(from url: URL) -> ClipboardSnippetStore {
         guard let data = try? Data(contentsOf: url) else { return ClipboardSnippetStore() }
+        // 加密与历史库一致；open 对没有密文头的旧文件原样返回，因此旧明文仍然读得回来。
+        let payload = (try? ClipboardHistoryEncryption.open(data)) ?? data
         let decoder = JSONDecoder()
         decoder.dateDecodingStrategy = .millisecondsSince1970
-        guard let document = try? decoder.decode(ClipboardSnippetDocument.self, from: data) else {
+        guard let document = try? decoder.decode(ClipboardSnippetDocument.self, from: payload) else {
             return ClipboardSnippetStore()
         }
         return ClipboardSnippetStore(groups: document.groups, snippets: document.snippets)
+    }
+
+    /// 把旧版明文文件就地回写为密文。
+    ///
+    /// 片段服务是懒加载的（只有打开设置页或触发同步才会构造），因此这个迁移必须由
+    /// 应用启动时显式调用，否则明文会一直留在磁盘上。
+    /// 把旧版明文文件就地回写为密文。
+    ///
+    /// 刻意**不**在应用启动时调用：解密要访问钥匙串，新签名的构建不在钥匙串项的 ACL 里时
+    /// 会弹出授权对话框并阻塞调用线程——放在 `MenuToolsApp.init()` 里会直接把启动卡住
+    /// （本轮实测主线程停在 SecurityAgent 上）。因此迁移挂在片段服务构造时：
+    /// 那是用户已经在使用片段功能的时机，也是一次授权后后续都顺畅的时机。
+    @discardableResult
+    static func migrateLegacyPlaintextIfNeeded(
+        at url: URL? = ClipboardSnippetPersistence.defaultURL()
+    ) -> Bool {
+        guard let url, isLegacyPlaintext(at: url) else { return false }
+        do {
+            try save(load(from: url), to: url)
+            return true
+        } catch {
+            return false
+        }
+    }
+
+    /// 是否是旧版明文文件（存在且没有密文头）：读得到，但应立即回写为密文。
+    static func isLegacyPlaintext(at url: URL) -> Bool {
+        guard let data = try? Data(contentsOf: url), !data.isEmpty else { return false }
+        return !ClipboardHistoryEncryption.isSealed(data)
     }
 
     static func save(_ store: ClipboardSnippetStore, to url: URL) throws {
@@ -464,7 +496,9 @@ enum ClipboardSnippetPersistence {
             groups: store.groups + store.groupTombstones,
             snippets: store.allSnippets + store.snippetTombstones
         )
-        try encoder.encode(document).write(to: url, options: .atomic)
+        // 片段里常放 token 与命令，必须与历史库一样加密落盘。
+        let payload = try ClipboardHistoryEncryption.seal(encoder.encode(document))
+        try payload.write(to: url, options: .atomic)
     }
 }
 
@@ -492,6 +526,10 @@ final class ClipboardSnippetService {
         self.groups = loadedStore.groups
         self.snippets = loadedStore.allSnippets
         self.persistenceErrorMessage = nil
+        // 旧版明文文件：内容照旧读入，但立刻回写为密文，别让明文继续留在磁盘上。
+        if let persistenceURL, ClipboardSnippetPersistence.isLegacyPlaintext(at: persistenceURL) {
+            try? persistenceSaver(loadedStore, persistenceURL)
+        }
     }
 
     func snippets(in groupID: UUID) -> [ClipboardSnippet] {

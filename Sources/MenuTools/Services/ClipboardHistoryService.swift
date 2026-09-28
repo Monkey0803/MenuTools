@@ -276,6 +276,11 @@ enum ClipboardHistoryEncryption {
         return magic + combined
     }
 
+    /// 是否是本模块写出的密文。用于判断旧版明文文件是否需要迁移回写。
+    static func isSealed(_ data: Data) -> Bool {
+        data.starts(with: magic)
+    }
+
     static func open(_ data: Data) throws -> Data {
         try open(data, primaryKey: { try key(createIfMissing: false) }, fallbackKey: {
             try fileBackedKey(createIfMissing: false)

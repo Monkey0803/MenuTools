@@ -166,3 +166,110 @@ func clipboardSnippetServiceExposesPersistenceErrors() {
 
     #expect(service.persistenceErrorMessage == "无法写入片段")
 }
+
+@Test("常用片段以密文落盘，磁盘上读不到明文内容")
+func clipboardSnippetsAreEncryptedAtRest() throws {
+    let fileManager = FileManager.default
+    let directory = fileManager.temporaryDirectory
+        .appendingPathComponent("ClipboardSnippets-\(UUID().uuidString)", isDirectory: true)
+    try fileManager.createDirectory(at: directory, withIntermediateDirectories: true)
+    defer { try? fileManager.removeItem(at: directory) }
+
+    let url = directory.appendingPathComponent("ClipboardSnippets.json")
+    let snippet = ClipboardSnippet(
+        id: UUID(),
+        groupID: ClipboardSnippetStore.defaultGroupID,
+        title: "部署令牌",
+        content: "TOKEN-SECRET-abc123",
+        updatedAt: Date(timeIntervalSince1970: 1_700_000_000)
+    )
+    let store = ClipboardSnippetStore(snippets: [snippet])
+
+    try ClipboardSnippetPersistence.save(store, to: url)
+
+    let raw = try Data(contentsOf: url)
+    // 明文落盘时这段字符串会直接出现在文件里（用户会把 token/命令存进片段）
+    #expect(!String(decoding: raw, as: UTF8.self).contains("TOKEN-SECRET-abc123"))
+    #expect(ClipboardHistoryEncryption.isSealed(raw))
+
+    let restored = ClipboardSnippetPersistence.load(from: url)
+    let restoredSnippet = try #require(restored.allSnippets.first { $0.id == snippet.id })
+    #expect(restoredSnippet.content == "TOKEN-SECRET-abc123")
+    #expect(restoredSnippet.title == "部署令牌")
+}
+
+@Test("旧版明文片段读得回来，并在服务启动时回写为密文")
+@MainActor
+func clipboardSnippetsMigrateLegacyPlaintextOnLoad() throws {
+    let fileManager = FileManager.default
+    let directory = fileManager.temporaryDirectory
+        .appendingPathComponent("ClipboardSnippetMigrate-\(UUID().uuidString)", isDirectory: true)
+    try fileManager.createDirectory(at: directory, withIntermediateDirectories: true)
+    defer { try? fileManager.removeItem(at: directory) }
+
+    let url = directory.appendingPathComponent("ClipboardSnippets.json")
+    let snippet = ClipboardSnippet(
+        id: UUID(),
+        groupID: ClipboardSnippetStore.defaultGroupID,
+        title: "旧片段",
+        content: "legacy-snippet-content",
+        updatedAt: Date(timeIntervalSince1970: 1_600_000_000)
+    )
+    // 按旧格式（明文 JSON）写入
+    let encoder = JSONEncoder()
+    encoder.dateEncodingStrategy = .millisecondsSince1970
+    let document = ClipboardSnippetDocument(groups: [], snippets: [snippet])
+    try encoder.encode(document).write(to: url)
+    #expect(!ClipboardHistoryEncryption.isSealed(try Data(contentsOf: url)))
+
+    // 迁移前：旧文件必须仍然读得回来
+    let legacyStore = ClipboardSnippetPersistence.load(from: url)
+    #expect(legacyStore.allSnippets.contains { $0.content == "legacy-snippet-content" })
+
+    // 服务启动即回写密文，内容不变
+    let service = ClipboardSnippetService(persistenceURL: url)
+    #expect(service.snippets.contains { $0.content == "legacy-snippet-content" })
+
+    let migrated = try Data(contentsOf: url)
+    #expect(ClipboardHistoryEncryption.isSealed(migrated))
+    #expect(ClipboardSnippetPersistence.load(from: url).allSnippets.contains {
+        $0.content == "legacy-snippet-content"
+    })
+}
+
+@Test("启动迁移：明文片段文件就地加密，内容保留且不重复迁移")
+func clipboardSnippetPersistenceMigratesPlaintextInPlace() throws {
+    let fileManager = FileManager.default
+    let directory = fileManager.temporaryDirectory
+        .appendingPathComponent("ClipboardSnippetStartup-\(UUID().uuidString)", isDirectory: true)
+    try fileManager.createDirectory(at: directory, withIntermediateDirectories: true)
+    defer { try? fileManager.removeItem(at: directory) }
+
+    let url = directory.appendingPathComponent("ClipboardSnippets.json")
+    let snippet = ClipboardSnippet(
+        id: UUID(),
+        groupID: ClipboardSnippetStore.defaultGroupID,
+        title: "启动迁移",
+        content: "startup-migration-content",
+        updatedAt: Date(timeIntervalSince1970: 1_600_000_000)
+    )
+    let encoder = JSONEncoder()
+    encoder.dateEncodingStrategy = .millisecondsSince1970
+    try encoder.encode(ClipboardSnippetDocument(groups: [], snippets: [snippet])).write(to: url)
+
+    #expect(ClipboardSnippetPersistence.migrateLegacyPlaintextIfNeeded(at: url))
+
+    let migrated = try Data(contentsOf: url)
+    #expect(ClipboardHistoryEncryption.isSealed(migrated))
+    #expect(ClipboardSnippetPersistence.load(from: url).allSnippets.contains {
+        $0.content == "startup-migration-content"
+    })
+
+    // 已经是密文：不再重复迁移
+    #expect(!ClipboardSnippetPersistence.migrateLegacyPlaintextIfNeeded(at: url))
+    // 文件不存在：不做任何事
+    #expect(!ClipboardSnippetPersistence.migrateLegacyPlaintextIfNeeded(
+        at: directory.appendingPathComponent("Missing.json")
+    ))
+    #expect(!ClipboardSnippetPersistence.migrateLegacyPlaintextIfNeeded(at: nil))
+}
