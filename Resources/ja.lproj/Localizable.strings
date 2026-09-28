@@ -1294,6 +1294,7 @@
 "runtime.shortcut.empty" = "グローバルショートカットは未設定です";
 "runtime.shortcut.hint" = "設定は各モジュールのページに分散しています。ここで全体を確認し、重複を表示します。";
 "runtime.shortcut.conflict" = "他に %d 件と重複";
+"runtime.shortcut.openSettings" = "このモジュールの設定を開く";
 "runtime.section.plugins" = "機能の実行状態";
 "runtime.permission.granted" = "許可済み";
 "runtime.permission.denied" = "未許可";

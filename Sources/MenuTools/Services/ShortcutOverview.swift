@@ -28,6 +28,18 @@ enum ShortcutOverview {
         var modifiers: UInt
     }
 
+    /// 条目所属模块的设置页；没有独立设置页的模块返回 nil（不要产出点了没反应的跳转）。
+    static func moduleSettingsTab(moduleKey: String) -> SettingsTab? {
+        switch moduleKey {
+        case "plugin.window-management.title": return .windowManagement
+        case "plugin.app-launcher.title": return .appLaunch
+        case "plugin.screenshot.title": return .screenshot
+        case "plugin.clipboard.title": return .clipboard
+        case "plugin.app-volume.title": return .volume
+        default: return nil
+        }
+    }
+
     /// 按 (keyCode, modifiers) 统计重复，并把冲突数写到每个条目上。
     static func entries(from bindings: [Binding]) -> [ShortcutOverviewEntry] {
         let counts = Dictionary(

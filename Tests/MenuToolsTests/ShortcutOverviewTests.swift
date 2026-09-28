@@ -30,3 +30,14 @@ func shortcutOverviewBuildsFromLiveServices() {
     let entries = ShortcutOverviewBuilder.liveEntries()
     #expect(entries.allSatisfy { $0.conflictCount >= 0 && !$0.moduleKey.isEmpty && !$0.action.isEmpty })
 }
+
+@Test("快捷键总览的跳转目标按模块映射，没有设置页的模块不产出跳转")
+func shortcutOverviewMapsModulesToSettingsTabs() {
+    #expect(ShortcutOverview.moduleSettingsTab(moduleKey: "plugin.window-management.title") == .windowManagement)
+    #expect(ShortcutOverview.moduleSettingsTab(moduleKey: "plugin.app-launcher.title") == .appLaunch)
+    #expect(ShortcutOverview.moduleSettingsTab(moduleKey: "plugin.screenshot.title") == .screenshot)
+    #expect(ShortcutOverview.moduleSettingsTab(moduleKey: "plugin.clipboard.title") == .clipboard)
+    #expect(ShortcutOverview.moduleSettingsTab(moduleKey: "plugin.app-volume.title") == .volume)
+    // 场景/快捷键目前只在面板卡片里配置，没有独立设置页，不应产出无效跳转
+    #expect(ShortcutOverview.moduleSettingsTab(moduleKey: "plugin.automation.title") == nil)
+}

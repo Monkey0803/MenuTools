@@ -1294,6 +1294,7 @@
 "runtime.shortcut.empty" = "설정된 전역 단축키가 없습니다";
 "runtime.shortcut.hint" = "설정은 각 모듈 페이지에 흩어져 있습니다. 여기서 전체를 확인하고 중복을 표시합니다.";
 "runtime.shortcut.conflict" = "다른 %d개와 중복";
+"runtime.shortcut.openSettings" = "이 모듈 설정 열기";
 "runtime.section.plugins" = "기능 실행 상태";
 "runtime.permission.granted" = "허용됨";
 "runtime.permission.denied" = "허용되지 않음";

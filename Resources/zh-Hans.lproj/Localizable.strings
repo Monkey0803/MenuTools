@@ -1294,6 +1294,7 @@
 "runtime.shortcut.empty" = "还没有配置任何全局快捷键";
 "runtime.shortcut.hint" = "快捷键入口分散在各模块设置页，这里汇总全貌并标出重复绑定。";
 "runtime.shortcut.conflict" = "与另外 %d 项重复";
+"runtime.shortcut.openSettings" = "打开该模块设置";
 "runtime.section.plugins" = "功能运行状态";
 "runtime.permission.granted" = "已授权";
 "runtime.permission.denied" = "未授权";

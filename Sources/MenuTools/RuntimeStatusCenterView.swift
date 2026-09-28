@@ -148,6 +148,19 @@ struct RuntimeStatusCenterView: View {
                         .foregroundStyle(.orange)
                 }
             }
+            // 只读汇总 + 跳转：就地编辑会再造一套绑定逻辑，这里只把用户送到对应设置页。
+            if let tab = ShortcutOverview.moduleSettingsTab(moduleKey: entry.moduleKey) {
+                Button {
+                    openFeatureSettings(tab)
+                } label: {
+                    Image(systemName: "arrow.up.forward.app")
+                        .font(.caption2)
+                }
+                .buttonStyle(.plain)
+                .foregroundStyle(.secondary)
+                .help(L("runtime.shortcut.openSettings"))
+                .accessibilityLabel(L("runtime.shortcut.openSettings"))
+            }
         }
         .padding(.horizontal, 12)
         .padding(.vertical, 8)
