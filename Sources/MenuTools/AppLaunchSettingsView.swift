@@ -64,11 +64,10 @@ struct AppLaunchSettingsView: View {
             VStack(alignment: .leading, spacing: 12) {
                 header
 
-                if !shortcutService.isAccessibilityTrusted {
-                    Label(L("shortcut.permission"), systemImage: "exclamationmark.triangle.fill")
-                        .font(.caption)
-                        .foregroundStyle(.orange)
-                }
+                AccessibilityPermissionNotice(
+                    isTrusted: shortcutService.isAccessibilityTrusted,
+                    refresh: shortcutService.refreshAccessibilityPermission
+                )
 
                 frontmostSection
                 appListSection

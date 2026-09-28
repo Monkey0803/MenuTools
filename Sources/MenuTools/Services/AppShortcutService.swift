@@ -85,6 +85,11 @@ final class AppShortcutService {
     private(set) var isRunning = false
     private(set) var isAccessibilityTrusted = AXIsProcessTrusted()
 
+    /// 权限变化后重新读取。此前只在 start/stop 时刷新，用户从系统设置授权回来时页面仍显示未授权。
+    func refreshAccessibilityPermission() {
+        isAccessibilityTrusted = AXIsProcessTrusted()
+    }
+
     private let defaults: UserDefaults
     private let launcher: AppLauncherService
     private let conflictChecker: any ShortcutConflictChecking

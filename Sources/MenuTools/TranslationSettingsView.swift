@@ -43,6 +43,11 @@ struct TranslationSettingsView: View {
             }
 
             Section(L("translation.shortcut")) {
+                // 翻译快捷键依赖辅助功能权限（插件清单里也声明了），此前这一页完全没有提示。
+                AccessibilityPermissionNotice(
+                    isTrusted: shortcutService.isAccessibilityTrusted,
+                    refresh: shortcutService.refreshAccessibilityPermission
+                )
                 HStack {
                     Text(isRecording ? L("settings.recording") : displayedShortcut?.displayName ?? L("settings.unset"))
                         .font(.callout.monospaced())

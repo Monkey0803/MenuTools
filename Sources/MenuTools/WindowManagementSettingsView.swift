@@ -56,11 +56,10 @@ struct WindowManagementSettingsView: View {
                     .font(.caption)
                     .foregroundStyle(.secondary)
 
-                if !shortcutService.isAccessibilityTrusted {
-                    Label(L("shortcut.permission"), systemImage: "exclamationmark.triangle.fill")
-                        .font(.caption)
-                        .foregroundStyle(.orange)
-                }
+                AccessibilityPermissionNotice(
+                    isTrusted: shortcutService.isAccessibilityTrusted,
+                    refresh: shortcutService.refreshAccessibilityPermission
+                )
 
                 feedbackLine
 
