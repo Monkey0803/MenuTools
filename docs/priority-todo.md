@@ -232,6 +232,14 @@
 | P2-21 | 设置页错误呈现各写各的 | `errorMessage`（翻译 `TranslationSettingsView.swift:10`）、`feedback`（存储 `SystemStorageSettingsView.swift:10`）、`ErrorBanner`（网络监控 `NetworkTrafficSettingsView.swift:176`）、`alert`（截图）；`SystemResourceSettingsView.swift` 全文件仅 1 处失败相关标识 | 面板侧已有统一的 `statusMessage` + `flashStatus`，设置侧缺同一套 | 小～中 |
 | P2-22 | 插件体系三处空转 | `BuiltInPluginCatalog.swift:32-177` 的 14 个 registration **无一传 `dependencies:`**，故依赖/环检测与文案永不可达；`.finderTools` 停用只做进程内反注册，系统里 appex 仍启用（`BuiltInPluginCatalog.swift:161-168`）；`PluginCenterView.swift:174-248` 不渲染依赖与连锁影响 | 「关了还在」的信任问题；系统扩展本就无法由 App 完全撤销，应诚实提示 | 小～中 |
 
+
+## P2 完成记录
+
+| # | 提交 | 说明 |
+|---|---|---|
+| P2-3 | `93e6aeb` | 管理区补「按内容类型分别保留」入口；新增 `retentionDays(for:)` getter 与 `ClipboardRetentionOptions` 纯数据；补 3 条用例 |
+| P2-4 | `8cbe2a7` | 暂停记录时在主面板与历史列表显示「记录已暂停」徽标（含恢复指引）；新增 `ClipboardRecordingBadge` 纯策略；补 1 条用例 |
+
 ---
 
 # P3：文档与清理
