@@ -327,7 +327,8 @@ rm /tmp/menutools-snap-debug        # 关闭（默认不写任何日志）
 
 ```bash
 swift Scripts/test_powersources.swift     # 电源与内存相关信息源可读性
-swift Scripts/test_app_volume_tap.swift   # 单 App 音量依赖的音频 Process Tap
+swift Scripts/test_app_volume_tap.swift   # 单 App 音量依赖的音频 Process Tap（会打印真实输入/输出缓冲布局）
+swift Scripts/test_audio_device_channels.swift  # 每个设备当前的输入/输出声道数（定位「输出 1 声道」这类接管失败）
 ```
 
 设置页的滚动长度也可回归：`swift Scripts/test_settings_layout.swift` 会逐个切换窗口管理/系统监控/音频三个页面共 13 个子页，测量内容高度并与基线对照。逐项验收步骤见 [`docs/system-and-audio-acceptance.md`](docs/system-and-audio-acceptance.md)。
@@ -394,7 +395,7 @@ export SPARKLE_DOWNLOAD_URL_PREFIX="https://your-server/releases/"
 - 不上报电量的蓝牙设备（部分白牌耳机）无法显示电量
 - AirPods 充电盒电量仅在开盖/刚连接时由系统上报
 - 单 App 音量需要系统音频录制权限；DRM 或无法被公开 Process Tap 捕获的音源会保持系统原始音量
-- 左右平衡只作用于前两个声道，多声道下混取各声道平均值；两者都需要为该 App 建立路由（会出现在「系统音频录制」的使用中）
+- 进程 tap 固定是立体声，会按输出设备**当前**的声道数映射（蓝牙耳机通话模式下只有 1 个声道时自动下混，5.1 等更宽输出只占前几个声道）；左右平衡只作用于前两个声道，单声道输出不参与平衡；两者都需要为该 App 建立路由（会出现在「系统音频录制」的使用中）
 - 清空废纸篓和截屏功能受 macOS 的自动化、屏幕录制权限控制；拒绝权限时会在面板显示失败原因
 - 快捷键冲突检测可识别系统快捷键和其他应用通过 Carbon 注册的独占热键；使用私有事件监听器的应用无法通过公开 API 完整枚举
 - 剪贴板历史依靠轮询系统剪贴板工作，只保存复制后的内容；macOS 不提供复制来源，因此「排除 App」按复制时的前台 App 判断

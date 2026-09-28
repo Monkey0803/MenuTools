@@ -1791,3 +1791,244 @@ func bufferLayoutComputesFrames() {
     // 交错输入与非交错输出的声道总数一致 → 可以逐声道映射
     #expect(AppVolumeBufferLayout.totalChannels(interleavedList) == AppVolumeBufferLayout.totalChannels(planarList))
 }
+
+@Test("输入声道多于输出时按下混分配来源（蓝牙通话模式只剩 1 个输出声道）")
+func channelMapDownmixesWhenOutputHasFewerChannels() {
+    // 进程 tap 固定立体声，而输出设备可能只有 1 个声道
+    let stereoToMono = AppVolumeChannelMap(inputChannels: 2, outputChannels: 1)
+    #expect(stereoToMono.sourceRange(forOutputChannel: 0) == 0..<2)
+
+    // 多声道下混时平均分组，不丢声道也不重复
+    let surroundToStereo = AppVolumeChannelMap(inputChannels: 6, outputChannels: 2)
+    #expect(surroundToStereo.sourceRange(forOutputChannel: 0) == 0..<3)
+    #expect(surroundToStereo.sourceRange(forOutputChannel: 1) == 3..<6)
+}
+
+@Test("输出声道多于输入时复制或留空，不再判为不支持")
+func channelMapUpsamplesWhenOutputHasMoreChannels() {
+    let stereo = AppVolumeChannelMap(inputChannels: 2, outputChannels: 2)
+    #expect(stereo.sourceRange(forOutputChannel: 0) == 0..<1)
+    #expect(stereo.sourceRange(forOutputChannel: 1) == 1..<2)
+
+    // 单声道来源复制到每个输出声道，不能只响一边
+    let monoToStereo = AppVolumeChannelMap(inputChannels: 1, outputChannels: 2)
+    #expect(monoToStereo.sourceRange(forOutputChannel: 0) == 0..<1)
+    #expect(monoToStereo.sourceRange(forOutputChannel: 1) == 0..<1)
+
+    // 更宽的输出只占前几个声道，多出来的保持静音
+    let stereoToSurround = AppVolumeChannelMap(inputChannels: 2, outputChannels: 6)
+    #expect(stereoToSurround.sourceRange(forOutputChannel: 0) == 0..<1)
+    #expect(stereoToSurround.sourceRange(forOutputChannel: 1) == 1..<2)
+    for channel in 2..<6 {
+        #expect(stereoToSurround.sourceRange(forOutputChannel: channel).isEmpty)
+    }
+}
+
+@Test("声道映射对无效声道数或越界下标返回空区间")
+func channelMapRejectsInvalidCoordinates() {
+    #expect(AppVolumeChannelMap(inputChannels: 0, outputChannels: 2).sourceRange(forOutputChannel: 0).isEmpty)
+    #expect(AppVolumeChannelMap(inputChannels: 2, outputChannels: 0).sourceRange(forOutputChannel: 0).isEmpty)
+    #expect(AppVolumeChannelMap(inputChannels: 2, outputChannels: 2).sourceRange(forOutputChannel: 2).isEmpty)
+    #expect(AppVolumeChannelMap(inputChannels: 2, outputChannels: 2).sourceRange(forOutputChannel: -1).isEmpty)
+}
+
+@Test("单声道输出忽略左右平衡，避免推到一侧后变成静音")
+func channelGainIgnoresBalanceForMonoOutput() {
+    #expect(AppVolumeChannelMix.channelGain(pan: 1, channel: 0, outputChannels: 1) == 1)
+    #expect(AppVolumeChannelMix.channelGain(pan: -1, channel: 0, outputChannels: 1) == 1)
+    #expect(AppVolumeChannelMix.channelGain(pan: 0, channel: 0, outputChannels: 1) == 1)
+
+    #expect(AppVolumeChannelMix.channelGain(pan: 1, channel: 0, outputChannels: 2) == 0)
+    #expect(AppVolumeChannelMix.channelGain(pan: 1, channel: 1, outputChannels: 2) == 1)
+    #expect(AppVolumeChannelMix.channelGain(pan: -1, channel: 0, outputChannels: 2) == 1)
+    #expect(AppVolumeChannelMix.channelGain(pan: -1, channel: 1, outputChannels: 2) == 0)
+    #expect(abs(AppVolumeChannelMix.channelGain(pan: 0.5, channel: 0, outputChannels: 2) - 0.5) < 0.0001)
+    // 第 3 个及以后的声道不参与平衡
+    #expect(AppVolumeChannelMix.channelGain(pan: 0.5, channel: 2, outputChannels: 6) == 1)
+}
+
+@Test("输入 2 声道 / 输出 1 声道时下混求平均，而不是判定为不支持")
+func renderCoreDownmixesStereoIntoMonoOutput() throws {
+    let (inputs, inputPointers) = makeBufferList(channelsPerBuffer: [2], frames: 4)
+    let (outputs, outputPointers) = makeBufferList(channelsPerBuffer: [1], frames: 4)
+    defer {
+        inputPointers.forEach { $0.deallocate() }
+        outputPointers.forEach { $0.deallocate() }
+        free(inputs.unsafeMutablePointer)
+        free(outputs.unsafeMutablePointer)
+    }
+    for frame in 0..<4 {
+        inputPointers[0][frame * 2] = 0.8
+        inputPointers[0][frame * 2 + 1] = 0.2
+    }
+
+    let stats = try #require(
+        AppVolumeRenderCore.render(
+            inputs: inputs,
+            outputs: outputs,
+            currentGain: 0.5,
+            targetGain: 0.5,
+            pan: 0,
+            isMono: false,
+            equalizer: nil,
+            equalizerConfiguration: nil
+        )
+    )
+
+    #expect(stats.sampleCount == 4)
+    for frame in 0..<4 {
+        // 左右平均 (0.8 + 0.2) / 2 = 0.5，再乘增益 0.5
+        #expect(abs(outputPointers[0][frame] - 0.25) < 0.0001)
+    }
+}
+
+@Test("输出声道多于输入时多余声道保持静音，前几个声道照常出声音")
+func renderCoreKeepsUnmappedOutputChannelsSilent() throws {
+    let (inputs, inputPointers) = makeBufferList(channelsPerBuffer: [2], frames: 2)
+    let (outputs, outputPointers) = makeBufferList(channelsPerBuffer: [1, 1, 1], frames: 2)
+    defer {
+        inputPointers.forEach { $0.deallocate() }
+        outputPointers.forEach { $0.deallocate() }
+        free(inputs.unsafeMutablePointer)
+        free(outputs.unsafeMutablePointer)
+    }
+    for frame in 0..<2 {
+        inputPointers[0][frame * 2] = 0.4
+        inputPointers[0][frame * 2 + 1] = -0.4
+    }
+
+    let stats = try #require(
+        AppVolumeRenderCore.render(
+            inputs: inputs,
+            outputs: outputs,
+            currentGain: 1,
+            targetGain: 1,
+            pan: 0,
+            isMono: false,
+            equalizer: nil,
+            equalizerConfiguration: nil
+        )
+    )
+
+    #expect(stats.sampleCount == 4)
+    for frame in 0..<2 {
+        #expect(abs(outputPointers[0][frame] - 0.4) < 0.0001)
+        #expect(abs(outputPointers[1][frame] + 0.4) < 0.0001)
+        #expect(outputPointers[2][frame] == 0)
+    }
+}
+
+@Test("开启单声道下混时左右声道输出同一份平均信号")
+func renderCoreDownmixesToDualMonoWhenRequested() throws {
+    let (inputs, inputPointers) = makeBufferList(channelsPerBuffer: [2], frames: 2)
+    let (outputs, outputPointers) = makeBufferList(channelsPerBuffer: [1, 1], frames: 2)
+    defer {
+        inputPointers.forEach { $0.deallocate() }
+        outputPointers.forEach { $0.deallocate() }
+        free(inputs.unsafeMutablePointer)
+        free(outputs.unsafeMutablePointer)
+    }
+    for frame in 0..<2 {
+        inputPointers[0][frame * 2] = 0.6
+        inputPointers[0][frame * 2 + 1] = 0.2
+    }
+
+    let stats = try #require(
+        AppVolumeRenderCore.render(
+            inputs: inputs,
+            outputs: outputs,
+            currentGain: 1,
+            targetGain: 1,
+            pan: 0,
+            isMono: true,
+            equalizer: nil,
+            equalizerConfiguration: nil
+        )
+    )
+
+    #expect(stats.sampleCount == 4)
+    for frame in 0..<2 {
+        for channel in 0..<2 {
+            // (0.6 + 0.2) / 2 = 0.4，两侧都是同一份下混信号
+            #expect(abs(outputPointers[channel][frame] - 0.4) < 0.0001)
+        }
+    }
+}
+
+@Test("布局类失败按退避重试；权限类失败不自动重试")
+func routeFailuresRetryWithBackoff() {
+    #expect(AppVolumeRouteRetryPolicy.isRetryable(.unsupportedFormat))
+    #expect(AppVolumeRouteRetryPolicy.isRetryable(.channelLayoutMismatch(input: 2, output: 1)))
+    #expect(AppVolumeRouteRetryPolicy.isRetryable(.operationFailed("AudioDeviceStart", -50)))
+    #expect(!AppVolumeRouteRetryPolicy.isRetryable(.permissionDenied))
+    #expect(!AppVolumeRouteRetryPolicy.isRetryable(.outputDeviceMissing(uid: "gone")))
+
+    // 首次失败等一个短间隔就重试，连续失败按指数退避到上限
+    #expect(AppVolumeRouteRetryPolicy.interval(consecutiveFailures: 1) == 2)
+    #expect(AppVolumeRouteRetryPolicy.interval(consecutiveFailures: 2) == 4)
+    #expect(AppVolumeRouteRetryPolicy.interval(consecutiveFailures: 3) == 8)
+    #expect(AppVolumeRouteRetryPolicy.interval(consecutiveFailures: 9) == 30)
+
+    // 没到间隔就不重建路由，到了才重试
+    #expect(
+        !AppVolumeRouteRetryPolicy.shouldRetry(
+            error: .channelLayoutMismatch(input: 2, output: 1),
+            consecutiveFailures: 1,
+            elapsed: 1
+        )
+    )
+    #expect(
+        AppVolumeRouteRetryPolicy.shouldRetry(
+            error: .channelLayoutMismatch(input: 2, output: 1),
+            consecutiveFailures: 1,
+            elapsed: 2
+        )
+    )
+    #expect(
+        !AppVolumeRouteRetryPolicy.shouldRetry(
+            error: .permissionDenied,
+            consecutiveFailures: 1,
+            elapsed: 600
+        )
+    )
+}
+
+@Test("目标变了要立刻重建路由，只有同一个目标才走退避")
+func routeFailureGateRebuildsWhenTargetChanges() {
+    // 同一个目标、还没到退避时间：复用错误
+    #expect(
+        AppVolumeRouteRetryPolicy.shouldReuseFailure(
+            error: .channelLayoutMismatch(input: 2, output: 1),
+            consecutiveFailures: 1,
+            elapsed: 0.5,
+            targetChanged: false
+        )
+    )
+    // 同一个目标、到点了：重新尝试
+    #expect(
+        !AppVolumeRouteRetryPolicy.shouldReuseFailure(
+            error: .channelLayoutMismatch(input: 2, output: 1),
+            consecutiveFailures: 1,
+            elapsed: 2,
+            targetChanged: false
+        )
+    )
+    // 目标变了（换输出设备 / EQ / 平衡 / 单声道）：不等退避
+    #expect(
+        !AppVolumeRouteRetryPolicy.shouldReuseFailure(
+            error: .channelLayoutMismatch(input: 2, output: 1),
+            consecutiveFailures: 3,
+            elapsed: 0,
+            targetChanged: true
+        )
+    )
+    // 权限被拒：即使过了很久也复用错误，等用户处理
+    #expect(
+        AppVolumeRouteRetryPolicy.shouldReuseFailure(
+            error: .permissionDenied,
+            consecutiveFailures: 1,
+            elapsed: 600,
+            targetChanged: false
+        )
+    )
+}

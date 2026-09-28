@@ -10,6 +10,8 @@ final class CoreAudioAppVolumeBackend: AppVolumeRoutingBackend {
     private struct FailedRoute {
         var target: AppVolumeTarget
         var error: AppVolumeRoutingError
+        var attempts: Int
+        var lastAttempt: TimeInterval
     }
 
     var onSnapshot: ((AppVolumeBackendSnapshot) -> Void)?
@@ -59,9 +61,16 @@ final class CoreAudioAppVolumeBackend: AppVolumeRoutingBackend {
             removeRoute(for: target.rootBundleID)
             return
         }
-        if let failure = failedRoutes[target.rootBundleID] {
-            if failure.target == target { throw failure.error }
-            failedRoutes.removeValue(forKey: target.rootBundleID)
+        // 同一个目标失败过：没到退避时间就复用错误，避免每秒重建一次 tap。
+        // 目标变了（换了输出设备、EQ、平衡或单声道）说明条件不同，立即重建；
+        // 允许重试时保留旧的 attempts，让下一次失败继续退避，成功时会统一清掉。
+        if let failure = failedRoutes[target.rootBundleID], AppVolumeRouteRetryPolicy.shouldReuseFailure(
+            error: failure.error,
+            consecutiveFailures: failure.attempts,
+            elapsed: Self.monotonicSeconds() - failure.lastAttempt,
+            targetChanged: failure.target != target
+        ) {
+            throw failure.error
         }
 
         let output = try outputDevice(uid: target.outputDeviceUID) ?? readDefaultOutputDevice()
@@ -72,6 +81,7 @@ final class CoreAudioAppVolumeBackend: AppVolumeRoutingBackend {
                 pan: target.pan,
                 isMono: target.isMono
             )
+            failedRoutes.removeValue(forKey: target.rootBundleID)
             return
         }
 
@@ -85,10 +95,28 @@ final class CoreAudioAppVolumeBackend: AppVolumeRoutingBackend {
                 outputUID: output.uid
             )
             routes[target.rootBundleID] = route
+            failedRoutes.removeValue(forKey: target.rootBundleID)
         } catch let error as AppVolumeRoutingError {
-            failedRoutes[target.rootBundleID] = FailedRoute(target: target, error: error)
+            recordFailure(error, for: target)
             throw error
         }
+    }
+
+    /// 记录一次建路由失败，并累计连续失败次数供退避重试使用。
+    private func recordFailure(_ error: AppVolumeRoutingError, for target: AppVolumeTarget) {
+        let previous = failedRoutes[target.rootBundleID]
+        let attempts = (previous?.target == target ? previous?.attempts ?? 0 : 0) + 1
+        failedRoutes[target.rootBundleID] = FailedRoute(
+            target: target,
+            error: error,
+            attempts: attempts,
+            lastAttempt: Self.monotonicSeconds()
+        )
+    }
+
+    /// 单调时钟：退避间隔不受系统时间调整影响。
+    private static func monotonicSeconds() -> TimeInterval {
+        TimeInterval(DispatchTime.now().uptimeNanoseconds) / 1_000_000_000
     }
 
     func removeRoute(for rootBundleID: String) {
@@ -233,7 +261,7 @@ final class CoreAudioAppVolumeBackend: AppVolumeRoutingBackend {
                 return (identifier, target, .unsupportedFormat)
             }
             for (identifier, target, error) in failed {
-                failedRoutes[identifier] = FailedRoute(target: target, error: error)
+                recordFailure(error, for: target)
                 stopRoute(for: identifier)
             }
             let outputDevice = try readDefaultOutputDevice()
@@ -259,16 +287,6 @@ final class CoreAudioAppVolumeBackend: AppVolumeRoutingBackend {
                 AppVolumeBackendSnapshot(candidates: [], output: .unavailable)
             )
         }
-    }
-
-    private func handleRouteFailure(
-        identifier: String,
-        target: AppVolumeTarget,
-        error: AppVolumeRoutingError
-    ) {
-        failedRoutes[identifier] = FailedRoute(target: target, error: error)
-        stopRoute(for: identifier)
-        refresh()
     }
 
     private func readProcessCandidates() throws -> [AppAudioProcessCandidate] {
@@ -543,6 +561,55 @@ enum AppVolumeRouteFailurePolicy {
     }
 }
 
+/// 建路由失败后的重试节奏。
+///
+/// 布局与格式类失败取决于输出设备**当前**的流格式：蓝牙耳机在音乐模式（A2DP，2 声道）
+/// 与通话模式（HFP，1 声道）之间切换时，同样的代码会时而成功时而失败。这类失败必须
+/// 允许退避重试，否则一次失败就让这台 App 永久停在失败状态。权限被拒、设备指定失效等
+/// 需要用户或上层处理的问题不自动重试（失效设备由服务层清掉后立即重试）。
+enum AppVolumeRouteRetryPolicy {
+    static let initialInterval: TimeInterval = 2
+    static let maximumInterval: TimeInterval = 30
+
+    static func isRetryable(_ error: AppVolumeRoutingError) -> Bool {
+        switch error {
+        case .permissionDenied, .outputDeviceMissing:
+            return false
+        case .unsupportedFormat, .channelLayoutMismatch, .operationFailed:
+            return true
+        }
+    }
+
+    /// 连续失败次数越多等得越久，封顶 `maximumInterval`。
+    static func interval(consecutiveFailures: Int) -> TimeInterval {
+        let exponent = min(max(consecutiveFailures - 1, 0), 5)
+        return min(initialInterval * pow(2, Double(exponent)), maximumInterval)
+    }
+
+    static func shouldRetry(
+        error: AppVolumeRoutingError,
+        consecutiveFailures: Int,
+        elapsed: TimeInterval
+    ) -> Bool {
+        guard isRetryable(error) else { return false }
+        return elapsed >= interval(consecutiveFailures: consecutiveFailures)
+    }
+
+    /// 复用上次的错误（不去重建路由）还是重新尝试。
+    ///
+    /// 目标变了说明条件不同（换了输出设备、EQ、平衡或单声道），必须立刻重建；
+    /// 目标没变才看退避间隔，避免每秒重建一次 tap。
+    static func shouldReuseFailure(
+        error: AppVolumeRoutingError,
+        consecutiveFailures: Int,
+        elapsed: TimeInterval,
+        targetChanged: Bool
+    ) -> Bool {
+        guard !targetChanged else { return false }
+        return !shouldRetry(error: error, consecutiveFailures: consecutiveFailures, elapsed: elapsed)
+    }
+}
+
 /// 音频缓冲列表的声道布局。
 ///
 /// 进程 tap 给出的是**交错**缓冲（一个缓冲装多声道），而聚合设备的输出常是**非交错**的
@@ -579,6 +646,140 @@ enum AppVolumeBufferLayout {
             frames = min(frames, bufferFrames)
         }
         return frames == Int.max ? 0 : frames
+    }
+}
+
+/// 输入声道到输出声道的映射规则。
+///
+/// 进程 tap 固定给立体声混音，而输出设备的声道数取决于**当前**硬件与协议：
+/// 蓝牙耳机从音乐模式（A2DP，2 声道）切到通话模式（HFP）后输出只剩 1 个声道。
+/// 因此渲染不能要求两边声道数相同，而要按需下混或复制；两种方向都不得判定为不支持。
+struct AppVolumeChannelMap: Equatable, Sendable {
+    let inputChannels: Int
+    let outputChannels: Int
+
+    /// 输出声道 `channel` 的来源声道区间；空区间表示该声道没有来源，保持静音。
+    ///
+    /// - 声道数相同：一一对应。
+    /// - 输出更少：按下混分组，多出来的输入声道求和取平均（输入 2 / 输出 1 即左右平均）。
+    /// - 输出更多：单声道来源复制到每个输出声道；更宽的输出只占前几个声道，其余静音。
+    func sourceRange(forOutputChannel channel: Int) -> Range<Int> {
+        guard inputChannels > 0, outputChannels > 0, channel >= 0, channel < outputChannels else {
+            return 0..<0
+        }
+        if inputChannels == outputChannels {
+            return channel..<(channel + 1)
+        }
+        if inputChannels > outputChannels {
+            let start = channel * inputChannels / outputChannels
+            let end = max((channel + 1) * inputChannels / outputChannels, start + 1)
+            return start..<min(end, inputChannels)
+        }
+        guard inputChannels == 1 || channel < inputChannels else { return 0..<0 }
+        return inputChannels == 1 ? 0..<1 : channel..<(channel + 1)
+    }
+}
+
+/// 一次 IOProc 渲染的统计结果，供电平表、削波提示与 CPU 占用使用。
+struct AppVolumeRenderStats: Equatable {
+    var peak: Float = 0
+    var sumSquares: Double = 0
+    var sampleCount: Int = 0
+    var isClipping = false
+
+    var rms: Float {
+        sampleCount == 0 ? 0 : Float(sqrt(sumSquares / Double(sampleCount)))
+    }
+}
+
+/// IOProc 的逐帧渲染核心：按声道映射把输入搬到输出，并施加增益渐变、左右平衡、
+/// 单声道下混与均衡。
+///
+/// 单独拆出来是为了能脱机测试：真实设备会出现「输入 2 声道 / 输出 1 声道」这类组合，
+/// 必须下混而不是连续失败。调用方需**先把输出缓冲清零**，没有来源的输出声道才会保持静音。
+enum AppVolumeRenderCore {
+    /// 一个来源声道的读取方式（缓冲内的起点指针、以 Float 计的偏移与步长）。
+    private struct SourceChannel {
+        let pointer: UnsafeMutablePointer<Float>
+        let offset: Int
+        let stride: Int
+    }
+
+    /// 返回 nil 表示缓冲布局不可用（缺数据指针或没有可渲染的帧），调用方按连续失败计数降级。
+    static func render(
+        inputs: UnsafeMutableAudioBufferListPointer,
+        outputs: UnsafeMutableAudioBufferListPointer,
+        currentGain: Float,
+        targetGain: Float,
+        pan: Double,
+        isMono: Bool,
+        equalizer: AppVolumeEqualizerProcessor?,
+        equalizerConfiguration: AppVolumeEqualizerConfiguration?
+    ) -> AppVolumeRenderStats? {
+        let inputChannels = AppVolumeBufferLayout.totalChannels(inputs)
+        let outputChannels = AppVolumeBufferLayout.totalChannels(outputs)
+        guard inputChannels > 0, outputChannels > 0 else { return nil }
+        let frames = min(AppVolumeBufferLayout.frames(inputs), AppVolumeBufferLayout.frames(outputs))
+        guard frames > 0 else { return nil }
+
+        let map = AppVolumeChannelMap(inputChannels: inputChannels, outputChannels: outputChannels)
+        let step = AppVolumeGainRamp.step(from: currentGain, to: targetGain, frames: frames)
+        return withUnsafeTemporaryAllocation(of: SourceChannel.self, capacity: inputChannels) { scratch in
+            var stats = AppVolumeRenderStats()
+            for channel in 0..<outputChannels {
+                guard let destination = AppVolumeBufferLayout.accessor(outputs, channel: channel),
+                      let destinationPointer = outputs[destination.index].mData?.assumingMemoryBound(to: Float.self) else {
+                    return nil
+                }
+                let mapped = map.sourceRange(forOutputChannel: channel)
+                // 没有来源的输出声道（例如 5.1 的中置与低频）保持调用方清零后的静音。
+                guard !mapped.isEmpty else { continue }
+                // 用户开启单声道下混时，所有输出声道都用输入侧全部声道求平均（双单声道）。
+                let sources = (isMono && inputChannels > 1) ? 0..<inputChannels : mapped
+                var sourceCount = 0
+                for source in sources {
+                    guard let accessor = AppVolumeBufferLayout.accessor(inputs, channel: source),
+                          let pointer = inputs[accessor.index].mData?.assumingMemoryBound(to: Float.self) else {
+                        return nil
+                    }
+                    scratch[sourceCount] = SourceChannel(
+                        pointer: pointer,
+                        offset: accessor.offset,
+                        stride: accessor.stride
+                    )
+                    sourceCount += 1
+                }
+                guard sourceCount > 0 else { continue }
+
+                let channelGain = AppVolumeChannelMix.channelGain(
+                    pan: pan,
+                    channel: channel,
+                    outputChannels: outputChannels
+                )
+                var gain = currentGain
+                for frame in 0..<frames {
+                    gain = AppVolumeGainRamp.advanced(gain, by: step)
+                    var sum: Float = 0
+                    for index in 0..<sourceCount {
+                        let source = scratch[index]
+                        sum += source.pointer[source.offset + frame * source.stride]
+                    }
+                    let value = AppVolumeChannelMix.monoSample(sum, channelCount: sourceCount)
+                    let processed = equalizer?.process(
+                        value * gain * channelGain,
+                        channel: channel,
+                        configuration: equalizerConfiguration
+                    ) ?? (value * gain * channelGain)
+                    stats.peak = max(stats.peak, abs(processed))
+                    stats.sumSquares += Double(processed * processed)
+                    stats.sampleCount += 1
+                    stats.isClipping = stats.isClipping || abs(processed) > 1
+                    destinationPointer[destination.offset + frame * destination.stride] =
+                        AppVolumeGainRamp.clamped(processed)
+                }
+            }
+            return stats
+        }
     }
 }
 
@@ -669,7 +870,8 @@ private final class AppVolumeRouteState: @unchecked Sendable {
     }
 }
 
-private struct AppVolumeBiquad: Sendable {
+/// 单个峰值滤波器的系数（均衡器快照的一部分）。
+struct AppVolumeBiquad: Sendable {
     var b0: Float
     var b1: Float
     var b2: Float
@@ -694,7 +896,8 @@ private struct AppVolumeBiquad: Sendable {
     }
 }
 
-private final class AppVolumeEqualizerConfiguration: @unchecked Sendable {
+/// 均衡器系数快照：渲染核心与测试都要用到，因此不再限制为文件私有。
+final class AppVolumeEqualizerConfiguration: @unchecked Sendable {
     let coefficients: [AppVolumeBiquad]
 
     init(equalizer: AppVolumeEqualizer, sampleRate: Double) {
@@ -709,7 +912,8 @@ private struct AppVolumeBiquadDelay {
     var z2: Float = 0
 }
 
-private final class AppVolumeEqualizerProcessor: @unchecked Sendable {
+/// 均衡器滤波器状态：每个声道每条频带各一份延迟，跨 IOProc 回调保活。
+final class AppVolumeEqualizerProcessor: @unchecked Sendable {
     private static let maximumChannels = 16
     private var delays = Array(
         repeating: Array(repeating: AppVolumeBiquadDelay(), count: AppVolumeEqualizer.bandFrequencies.count),
@@ -1009,6 +1213,7 @@ private final class CoreAudioAppVolumeRoute: @unchecked Sendable {
     ) -> Bool {
         let inputs = UnsafeMutableAudioBufferListPointer(UnsafeMutablePointer(mutating: input))
         let outputs = UnsafeMutableAudioBufferListPointer(output)
+        // 先清零：没有来源的输出声道要靠这个保持静音。
         for buffer in outputs {
             guard let data = buffer.mData else { continue }
             memset(data, 0, Int(buffer.mDataByteSize))
@@ -1017,71 +1222,39 @@ private final class CoreAudioAppVolumeRoute: @unchecked Sendable {
 
         let inputChannels = AppVolumeBufferLayout.totalChannels(inputs)
         let outputChannels = AppVolumeBufferLayout.totalChannels(outputs)
-        // 进程 tap 常给出交错缓冲，而聚合设备输出是非交错的：只要声道数一致就逐声道映射。
-        guard inputChannels > 0, inputChannels == outputChannels else {
+        // tap 一个声道都没给出：这是拿不到数据，不是声道数不一致，报出来供诊断。
+        // 声道数不同则由 AppVolumeChannelMap 下混/复制，不再算失败。
+        guard inputChannels > 0 else {
             state.noteLayoutMismatch(input: inputChannels, output: outputChannels)
             return false
         }
-        let frames = min(AppVolumeBufferLayout.frames(inputs), AppVolumeBufferLayout.frames(outputs))
-        guard frames > 0 else { return false }
-
         let startedAt = DispatchTime.now().uptimeNanoseconds
         let target = state.targetGain.load(ordering: .relaxed)
-        let equalizerConfiguration = state.currentEqualizerConfiguration()
-        var current = state.currentGain.load(ordering: .relaxed)
-        let panGains = AppVolumeChannelMix.panGains(pan: state.currentPan())
-        let mono = state.isMonoRequested()
-        var peak: Float = 0
-        var sumSquares: Double = 0
-        var sampleCount = 0
-        var isClipping = false
-        let step = AppVolumeGainRamp.step(from: current, to: target, frames: frames)
-
-        for channel in 0..<outputChannels {
-            guard let destination = AppVolumeBufferLayout.accessor(outputs, channel: channel),
-                  let source = AppVolumeBufferLayout.accessor(inputs, channel: channel),
-                  let destinationPointer = outputs[destination.index].mData?.assumingMemoryBound(to: Float.self),
-                  let sourcePointer = inputs[source.index].mData?.assumingMemoryBound(to: Float.self) else {
-                return false
-            }
-            var gain = current
-            for frame in 0..<frames {
-                gain = AppVolumeGainRamp.advanced(gain, by: step)
-                var value = sourcePointer[source.offset + frame * source.stride]
-                if mono, inputChannels > 1 {
-                    // 单声道下混：把各声道同一帧取平均（不分配内存）。
-                    var sum = value
-                    for other in 0..<inputChannels where other != channel {
-                        guard let accessor = AppVolumeBufferLayout.accessor(inputs, channel: other),
-                              let pointer = inputs[accessor.index].mData?.assumingMemoryBound(to: Float.self) else {
-                            continue
-                        }
-                        sum += pointer[accessor.offset + frame * accessor.stride]
-                    }
-                    value = AppVolumeChannelMix.monoSample(sum, channelCount: inputChannels)
-                }
-                let channelGain: Float = channel == 0
-                    ? panGains.left
-                    : (channel == 1 ? panGains.right : 1)
-                let processed = state.equalizerProcessor.process(
-                    value * gain * channelGain,
-                    channel: channel,
-                    configuration: equalizerConfiguration
-                )
-                peak = max(peak, abs(processed))
-                sumSquares += Double(processed * processed)
-                sampleCount += 1
-                isClipping = isClipping || abs(processed) > 1
-                destinationPointer[destination.offset + frame * destination.stride] = AppVolumeGainRamp.clamped(processed)
-            }
+        guard let stats = AppVolumeRenderCore.render(
+            inputs: inputs,
+            outputs: outputs,
+            currentGain: state.currentGain.load(ordering: .relaxed),
+            targetGain: target,
+            pan: state.currentPan(),
+            isMono: state.isMonoRequested(),
+            equalizer: state.equalizerProcessor,
+            equalizerConfiguration: state.currentEqualizerConfiguration()
+        ) else {
+            return false
         }
-        current = target
-        state.currentGain.store(current, ordering: .relaxed)
-        state.peakLevel.store(max(state.peakLevel.load(ordering: .relaxed), min(peak, 1)), ordering: .relaxed)
-        let rms = sampleCount == 0 ? 0 : Float(sqrt(sumSquares / Double(sampleCount)))
-        state.rmsLevel.store(max(state.rmsLevel.load(ordering: .relaxed), min(rms, 1)), ordering: .relaxed)
-        if isClipping { state.clipping.store(1, ordering: .relaxed) }
+
+        state.currentGain.store(target, ordering: .relaxed)
+        state.peakLevel.store(
+            max(state.peakLevel.load(ordering: .relaxed), min(stats.peak, 1)),
+            ordering: .relaxed
+        )
+        state.rmsLevel.store(
+            max(state.rmsLevel.load(ordering: .relaxed), min(stats.rms, 1)),
+            ordering: .relaxed
+        )
+        if stats.isClipping { state.clipping.store(1, ordering: .relaxed) }
         let elapsed = Double(DispatchTime.now().uptimeNanoseconds - startedAt) / 1_000_000_000
+        let frames = min(AppVolumeBufferLayout.frames(inputs), AppVolumeBufferLayout.frames(outputs))
         let bufferDuration = Double(frames) / 48_000
         let load = Float(min(max(elapsed / max(bufferDuration, 0.000_1), 0), 1))
         state.cpuLoad.store(max(state.cpuLoad.load(ordering: .relaxed), load), ordering: .relaxed)

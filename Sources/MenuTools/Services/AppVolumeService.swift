@@ -197,6 +197,24 @@ enum AppVolumeChannelMix {
     static func monoSample(_ sum: Float, channelCount: Int) -> Float {
         channelCount > 1 ? sum / Float(channelCount) : sum
     }
+
+    /// 某个输出声道的平衡增益。
+    ///
+    /// 只有输出侧真的有左右两个声道时平衡才有意义：输出设备的声道数会随硬件变化
+    /// （蓝牙耳机进通话模式后只剩 1 个声道），此时若照旧套用左侧增益，
+    /// 用户把平衡推到全右就会把声音推成静音。第 3 个及以后的声道同样不参与平衡。
+    static func channelGain(pan: Double, channel: Int, outputChannels: Int) -> Float {
+        guard outputChannels >= 2 else { return 1 }
+        let gains = panGains(pan: pan)
+        switch channel {
+        case 0:
+            return gains.left
+        case 1:
+            return gains.right
+        default:
+            return 1
+        }
+    }
 }
 
 enum AppVolumeSafetyPolicy {
