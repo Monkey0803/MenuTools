@@ -1280,6 +1280,10 @@
 "settings.tab.runtimeStatus" = "权限与运行状态";
 "settings.backToFeatures" = "功能中心";
 "settings.sidebar.settings" = "设置";
+"settings.search.placeholder" = "搜索设置";
+"settings.search.noResults" = "没有匹配的设置页";
+"settings.search.clear" = "清空搜索";
+"settings.sidebar" = "设置导航";
 "settings.sidebar.enabledFeatures" = "已启用功能";
 "plugin.center.title" = "功能中心";
 "plugin.center.description" = "只启用需要的功能；关闭后会停止对应的后台监听、快捷键和音频处理。";

@@ -1280,6 +1280,10 @@
 "settings.tab.runtimeStatus" = "權限與執行狀態";
 "settings.backToFeatures" = "功能中心";
 "settings.sidebar.settings" = "設定";
+"settings.search.placeholder" = "搜尋設定";
+"settings.search.noResults" = "沒有符合的設定頁";
+"settings.search.clear" = "清除搜尋";
+"settings.sidebar" = "設定導覽";
 "settings.sidebar.enabledFeatures" = "已啟用功能";
 "plugin.center.title" = "功能中心";
 "plugin.center.description" = "只啟用需要的功能；關閉後會停止對應的背景監聽、快速鍵和音訊處理。";

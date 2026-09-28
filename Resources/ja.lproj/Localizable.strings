@@ -1280,6 +1280,10 @@
 "settings.tab.runtimeStatus" = "権限と実行状態";
 "settings.backToFeatures" = "機能センター";
 "settings.sidebar.settings" = "設定";
+"settings.search.placeholder" = "設定を検索";
+"settings.search.noResults" = "一致する設定ページがありません";
+"settings.search.clear" = "検索をクリア";
+"settings.sidebar" = "設定ナビゲーション";
 "settings.sidebar.enabledFeatures" = "有効な機能";
 "plugin.center.title" = "機能センター";
 "plugin.center.description" = "必要な機能だけを有効にできます。無効にすると、関連するバックグラウンド監視、ショートカット、音声処理が停止します。";

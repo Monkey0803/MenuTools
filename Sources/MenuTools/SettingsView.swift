@@ -181,6 +181,8 @@ enum SettingsNavigationPolicy {
 /// 设置窗口（⌘, / 面板齿轮按钮打开）：左侧导航，右侧显示当前功能详情。
 struct SettingsView: View {
     @AppStorage(SettingsKey.appLanguage) private var appLanguage = AppLanguage.system.rawValue
+    @State private var settingsQuery = ""
+    @FocusState private var isSettingsSearchFocused: Bool
     @State private var selectedTab: SettingsTab?
     @State private var pluginManager = BuiltInPluginManager.shared
     @Namespace private var sidebarGlassNamespace
@@ -248,23 +250,41 @@ struct SettingsView: View {
         GlassEffectContainer(spacing: SettingsSidebarVisualPolicy.containerSpacing) {
             ScrollView {
                 LazyVStack(alignment: .leading, spacing: 20) {
-                    sidebarSection(
-                        title: L("settings.sidebar.settings"),
-                        tabs: SettingsTab.primaryTabs
-                    )
+                    settingsSearchField
 
-                    let featureTabs = SettingsTab.enabledFeatureTabs(
-                        enabledPluginIDs: pluginManager.enabledPluginIDs
-                    )
-                    if !featureTabs.isEmpty {
+                    if settingsQuery.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
                         sidebarSection(
-                            title: L("settings.sidebar.enabledFeatures"),
-                            tabs: featureTabs
+                            title: L("settings.sidebar.settings"),
+                            tabs: SettingsTab.primaryTabs
                         )
+
+                        let featureTabs = SettingsTab.enabledFeatureTabs(
+                            enabledPluginIDs: pluginManager.enabledPluginIDs
+                        )
+                        if !featureTabs.isEmpty {
+                            sidebarSection(
+                                title: L("settings.sidebar.enabledFeatures"),
+                                tabs: featureTabs
+                            )
+                        }
+                    } else {
+                        settingsSearchResults
                     }
                 }
                 .padding(.horizontal, 10)
                 .padding(.vertical, 12)
+                // 键盘上下键在页面之间移动选中项：对照主面板分类栏的做法
+                //（MenuPanelCategoryBar 有 focusable + onMoveCommand + label）。
+                .focusable()
+                .onMoveCommand { direction in
+                    switch direction {
+                    case .up: moveSidebarSelection(by: -1)
+                    case .down: moveSidebarSelection(by: 1)
+                    default: break
+                    }
+                }
+                .accessibilityElement(children: .contain)
+                .accessibilityLabel(L("settings.sidebar"))
             }
             .scrollIndicators(.never)
         }
@@ -274,6 +294,102 @@ struct SettingsView: View {
             Rectangle()
                 .fill(.separator.opacity(0.42))
                 .frame(width: 0.5)
+        }
+    }
+
+    /// 侧边栏搜索框：⌘F 聚焦，回车跳到第一条结果。
+    private var settingsSearchField: some View {
+        HStack(spacing: 6) {
+            Image(systemName: "magnifyingglass")
+                .font(.caption2)
+                .foregroundStyle(.secondary)
+            TextField(L("settings.search.placeholder"), text: $settingsQuery)
+                .textFieldStyle(.plain)
+                .font(.caption)
+                .focused($isSettingsSearchFocused)
+                .onSubmit { jumpToFirstSearchResult() }
+            if !settingsQuery.isEmpty {
+                Button {
+                    settingsQuery = ""
+                } label: {
+                    Image(systemName: "xmark.circle.fill")
+                        .font(.caption2)
+                }
+                .buttonStyle(.plain)
+                .foregroundStyle(.secondary)
+                .accessibilityLabel(L("settings.search.clear"))
+            }
+        }
+        .padding(.horizontal, 8)
+        .padding(.vertical, 6)
+        .background(.quaternary.opacity(0.4), in: .rect(cornerRadius: 8))
+        .background(
+            // SwiftUI 没有「聚焦某个控件」的快捷键，用一个隐藏按钮承接 ⌘F。
+            Button("") { isSettingsSearchFocused = true }
+                .keyboardShortcut("f", modifiers: .command)
+                .opacity(0)
+                .accessibilityHidden(true)
+        )
+    }
+
+    /// 搜索结果：直接跳到对应页面，不在这里改设置（避免再造一套编辑入口）。
+    private var settingsSearchResults: some View {
+        let results = SettingsSearch.matching(SettingsSearchIndex.entries(), query: settingsQuery)
+        return VStack(alignment: .leading, spacing: 6) {
+            if results.isEmpty {
+                Text(L("settings.search.noResults"))
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+                    .padding(.horizontal, 8)
+            } else {
+                ForEach(results, id: \.tab) { entry in
+                    Button {
+                        withAnimation(.spring(response: 0.28, dampingFraction: 0.82)) {
+                            selectedTab = entry.tab
+                        }
+                        settingsQuery = ""
+                        isSettingsSearchFocused = false
+                    } label: {
+                        HStack(spacing: 8) {
+                            Image(systemName: entry.tab.symbol)
+                                .font(.caption)
+                            Text(entry.title)
+                                .font(.callout)
+                            Spacer(minLength: 0)
+                        }
+                        .padding(.horizontal, 10)
+                        .frame(minHeight: 30, alignment: .leading)
+                        .contentShape(.rect(cornerRadius: 8))
+                    }
+                    .buttonStyle(.plain)
+                    .accessibilityLabel(entry.title)
+                }
+            }
+        }
+    }
+
+    private func jumpToFirstSearchResult() {
+        guard let first = SettingsSearch.matching(
+            SettingsSearchIndex.entries(),
+            query: settingsQuery
+        ).first else { return }
+        selectedTab = first.tab
+        settingsQuery = ""
+    }
+
+    /// 上下方向键在可见页面之间循环移动选中项。
+    private func moveSidebarSelection(by offset: Int) {
+        let tabs = SettingsTab.visibleTabs(enabledPluginIDs: pluginManager.enabledPluginIDs)
+        guard !tabs.isEmpty else { return }
+        // selectedTab 是可选值，先落到默认页再找位置
+        let current = selectedTab ?? tabs[0]
+        guard let index = tabs.firstIndex(of: current) else {
+            selectedTab = tabs[0]
+            return
+        }
+        let next = (index + offset + tabs.count) % tabs.count
+        withAnimation(.spring(response: 0.28, dampingFraction: 0.82)) {
+            selectedTab = tabs[next]
         }
     }
 
@@ -396,6 +512,8 @@ private struct SettingsSidebarNavigationItem: View {
         }
         .buttonStyle(.plain)
         .focusEffectDisabled(!SettingsSidebarVisualPolicy.showsSystemFocusRing)
+        .accessibilityLabel(title)
+        .accessibilityAddTraits(isSelected ? [.isSelected] : [])
         .modifier(
             SettingsSidebarItemSurface(
                 style: style,
@@ -651,7 +769,9 @@ struct GeneralSettingsView: View {
             .contentShape(.rect(cornerRadius: 8))
         }
         .buttonStyle(.plain)
-        .focusable(false)
+        // 此前这里写死 .focusable(false)：键盘与 VoiceOver 都到不了图标网格。
+        .accessibilityLabel(icon.displayName)
+        .accessibilityAddTraits(isSelected ? [.isSelected] : [])
         .foregroundStyle(isSelected ? AnyShapeStyle(.tint) : AnyShapeStyle(.secondary))
         .background(
             RoundedRectangle(cornerRadius: 8)

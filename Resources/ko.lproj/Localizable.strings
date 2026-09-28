@@ -1280,6 +1280,10 @@
 "settings.tab.runtimeStatus" = "권한 및 실행 상태";
 "settings.backToFeatures" = "기능 센터";
 "settings.sidebar.settings" = "설정";
+"settings.search.placeholder" = "설정 검색";
+"settings.search.noResults" = "일치하는 설정 페이지가 없습니다";
+"settings.search.clear" = "검색 지우기";
+"settings.sidebar" = "설정 탐색";
 "settings.sidebar.enabledFeatures" = "활성화된 기능";
 "plugin.center.title" = "기능 센터";
 "plugin.center.description" = "필요한 기능만 활성화하세요. 기능을 끄면 관련 백그라운드 감시, 단축키 및 오디오 처리가 중지됩니다.";

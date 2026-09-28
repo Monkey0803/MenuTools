@@ -1280,6 +1280,10 @@
 "settings.tab.runtimeStatus" = "Permissions & Runtime";
 "settings.backToFeatures" = "Feature Center";
 "settings.sidebar.settings" = "Settings";
+"settings.search.placeholder" = "Search settings";
+"settings.search.noResults" = "No matching settings page";
+"settings.search.clear" = "Clear search";
+"settings.sidebar" = "Settings navigation";
 "settings.sidebar.enabledFeatures" = "Enabled Features";
 "plugin.center.title" = "Feature Center";
 "plugin.center.description" = "Enable only what you need. Disabling a feature stops its background monitors, shortcuts, and audio processing.";
