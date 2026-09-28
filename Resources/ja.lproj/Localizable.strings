@@ -650,6 +650,9 @@
 "clipboard.retentionDays" = "保持期間";
 "clipboard.retentionDaysValue" = "%d 日";
 "clipboard.storageLimit" = "保存容量";
+"clipboard.storageUsage" = "ディスク使用量";
+"clipboard.storageUsage.hint" = "データベース、フォールバックバックアップ、画像/PDF 添付を含みます。「今すぐ整理」は上の保持設定で整理し、データベースを縮小します。";
+"clipboard.cleanUpNow" = "今すぐ整理";
 "clipboard.storageLimitValue" = "%d MB";
 "clipboard.unlimited" = "無制限";
 "clipboard.cleanupDescription" = "件数、保持期間、容量の上限に達すると、古い未固定項目を自動的に削除します。";

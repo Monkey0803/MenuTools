@@ -118,6 +118,36 @@ enum ClipboardRetentionOptions {
     static func normalized(_ value: Int) -> Int { max(0, value) }
 }
 
+/// 剪贴板历史在磁盘上的实际占用（纯逻辑，便于回归）。
+///
+/// 除了数据库本体，还要算上回退备份与 WAL/SHM：备份是数据库的完整副本，
+/// 附件目录里则是图片/PDF 等真实文件——它们才是真正会撑爆磁盘的部分。
+enum ClipboardHistoryStorageUsage {
+    static func bytes(databaseURL: URL?, fileManager: FileManager = .default) -> Int {
+        guard let databaseURL else { return 0 }
+        let directory = databaseURL.deletingLastPathComponent()
+        let name = databaseURL.lastPathComponent
+        var total = 0
+        for suffix in ["", ".backup", "-wal", "-shm"] {
+            total += fileSize(directory.appendingPathComponent(name + suffix), fileManager: fileManager)
+        }
+        total += directorySize(ClipboardHistoryPersistence.blobsURL(for: databaseURL), fileManager: fileManager)
+        return total
+    }
+
+    private static func fileSize(_ url: URL, fileManager: FileManager) -> Int {
+        guard let attributes = try? fileManager.attributesOfItem(atPath: url.path),
+              let size = attributes[.size] as? NSNumber else { return 0 }
+        return size.intValue
+    }
+
+    private static func directorySize(_ url: URL, fileManager: FileManager) -> Int {
+        guard let names = try? fileManager.contentsOfDirectory(atPath: url.path) else { return 0 }
+        return names.reduce(0) { total, name in
+            total + fileSize(url.appendingPathComponent(name), fileManager: fileManager)
+        }
+    }
+}
 /// 剪贴板历史中的内容；图片使用 TIFF 数据保存，避免把 NSImage 带入并发边界。
 enum ClipboardHistoryContent: Codable, Equatable, Sendable {
     case text(String)
@@ -1716,6 +1746,31 @@ enum ClipboardHistoryPersistence {
         return legacyItems
     }
 
+    /// 收缩数据库文件。
+    ///
+    /// 删除条目只会让 SQLite 复用页，文件本身不会变小；只有 VACUUM 才把空间真正还给系统。
+    /// 「立即清理」如果没有这一步，用户清完看到的占用不会有任何变化。
+    @discardableResult
+    static func vacuum(at url: URL) -> Bool {
+        guard FileManager.default.fileExists(atPath: url.path) else { return false }
+        var database: OpaquePointer?
+        let flags = SQLITE_OPEN_READWRITE | SQLITE_OPEN_FULLMUTEX
+        guard sqlite3_open_v2(url.path, &database, flags, nil) == SQLITE_OK, let database else {
+            if let database { sqlite3_close(database) }
+            return false
+        }
+        defer { sqlite3_close(database) }
+        guard sqlite3_exec(database, "VACUUM", nil, nil, nil) == SQLITE_OK else { return false }
+        // VACUUM 后 WAL 里可能还留着旧页，顺手做一次检查点。
+        sqlite3_exec(database, "PRAGMA wal_checkpoint(TRUNCATE)", nil, nil, nil)
+        // 回退备份也要跟着收缩：它此前是清理前的完整副本，
+        // 若不刷新，用户按下「立即清理」后占用几乎不会下降。副本本身仍然保留。
+        let backupURL = backupURL(for: url)
+        try? FileManager.default.removeItem(at: backupURL)
+        try? FileManager.default.copyItem(at: url, to: backupURL)
+        return true
+    }
+
     static func save(_ items: [ClipboardHistoryItem], to url: URL) throws {
         let fileManager = FileManager.default
         try fileManager.createDirectory(at: url.deletingLastPathComponent(), withIntermediateDirectories: true)
@@ -2096,6 +2151,8 @@ final class ClipboardHistoryService {
 
     private var buffer: ClipboardHistoryBuffer
     private let persistenceURL: URL?
+    /// 磁盘实际占用（数据库 + 回退备份 + WAL + blobs 附件），由 refreshStorageUsage() 刷新。
+    private(set) var storageUsageBytes = 0
     private let persistenceLoader: @Sendable (URL) async throws -> [ClipboardHistoryItem]
     private let pasteboard: NSPasteboard
     private let userDefaults: UserDefaults
@@ -2863,6 +2920,34 @@ final class ClipboardHistoryService {
         }
         synchronizeItems()
         persist()
+    }
+
+    /// 统计磁盘占用。走后台读取：附件目录里可能有很多图片，主线程不该为它阻塞。
+    func refreshStorageUsage() {
+        let url = persistenceURL
+        Task { @MainActor [weak self] in
+            let bytes = await Task.detached(priority: .utility) {
+                ClipboardHistoryStorageUsage.bytes(databaseURL: url)
+            }.value
+            self?.storageUsageBytes = bytes
+        }
+    }
+
+    /// 立即清理：按当前保留策略与容量上限裁剪一次，并 VACUUM 收缩数据库，最后刷新占用。
+    @discardableResult
+    func cleanUpNow() -> Bool {
+        applyAutomaticCleanup()
+        persist()
+        let url = persistenceURL
+        Task { @MainActor [weak self] in
+            let vacuumed = await Task.detached(priority: .utility) {
+                guard let url else { return false }
+                return ClipboardHistoryPersistence.vacuum(at: url)
+            }.value
+            _ = vacuumed
+            self?.refreshStorageUsage()
+        }
+        return true
     }
 
     func retryFailedImageRecognitions() {

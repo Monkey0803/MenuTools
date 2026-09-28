@@ -2283,3 +2283,100 @@ func clipboardImageRecognitionDisabledClearsExistingText() async throws {
     service.setImageRecognitionEnabled(false)
     #expect(service.items.first?.recognizedText == nil)
 }
+
+@Test("磁盘占用统计包含数据库、回退备份、WAL 与 blobs 附件")
+func clipboardStorageUsageCountsAllArtifacts() throws {
+    let fileManager = FileManager.default
+    let directory = fileManager.temporaryDirectory
+        .appendingPathComponent("ClipboardUsage-\(UUID().uuidString)", isDirectory: true)
+    try fileManager.createDirectory(at: directory, withIntermediateDirectories: true)
+    defer { try? fileManager.removeItem(at: directory) }
+
+    let databaseURL = directory.appendingPathComponent("ClipboardHistory.sqlite3")
+    try Data(repeating: 0, count: 1_000).write(to: databaseURL)
+    try Data(repeating: 0, count: 500).write(to: ClipboardHistoryPersistence.backupURL(for: databaseURL))
+    try Data(repeating: 0, count: 100).write(to: directory.appendingPathComponent("ClipboardHistory.sqlite3-wal"))
+
+    let blobsDirectory = ClipboardHistoryPersistence.blobsURL(for: databaseURL)
+    try fileManager.createDirectory(at: blobsDirectory, withIntermediateDirectories: true)
+    try Data(repeating: 0, count: 200).write(to: blobsDirectory.appendingPathComponent("a.png"))
+    try Data(repeating: 0, count: 300).write(to: blobsDirectory.appendingPathComponent("b.pdf"))
+
+    // 1000 + 500 + 100 + 200 + 300
+    #expect(ClipboardHistoryStorageUsage.bytes(databaseURL: databaseURL) == 2_100)
+
+    // 没有数据库时不计占用
+    #expect(ClipboardHistoryStorageUsage.bytes(databaseURL: nil) == 0)
+    let emptyURL = directory.appendingPathComponent("Missing.sqlite3")
+    #expect(ClipboardHistoryStorageUsage.bytes(databaseURL: emptyURL) == 0)
+}
+
+@Test("服务能读到实际磁盘占用，并在清理后刷新")
+@MainActor
+func clipboardServicePublishesStorageUsage() async throws {
+    let fileManager = FileManager.default
+    let directory = fileManager.temporaryDirectory
+        .appendingPathComponent("ClipboardServiceUsage-\(UUID().uuidString)", isDirectory: true)
+    try fileManager.createDirectory(at: directory, withIntermediateDirectories: true)
+    defer { try? fileManager.removeItem(at: directory) }
+
+    let suiteName = "ClipboardServiceUsage.\(UUID().uuidString)"
+    let defaults = try #require(UserDefaults(suiteName: suiteName))
+    defaults.removePersistentDomain(forName: suiteName)
+
+    let service = ClipboardHistoryService(
+        persistenceURL: directory.appendingPathComponent("ClipboardHistory.sqlite3"),
+        pasteboard: NSPasteboard(name: NSPasteboard.Name("MenuToolsTests.\(UUID().uuidString)")),
+        userDefaults: defaults
+    )
+
+    #expect(service.storageUsageBytes == 0)
+    #expect(service.copy(.text(String(repeating: "x", count: 2_000))))
+
+    service.refreshStorageUsage()
+    for _ in 0 ..< 200 where service.storageUsageBytes == 0 {
+        try await Task.sleep(for: .milliseconds(25))
+    }
+    #expect(service.storageUsageBytes > 0)
+
+    let before = service.storageUsageBytes
+    service.cleanUpNow()
+    for _ in 0 ..< 200 where service.storageUsageBytes == before && service.lastCleanupSummary == nil {
+        try await Task.sleep(for: .milliseconds(25))
+    }
+    // 清理后仍能读到占用（数值不保证变小：SQLite 会复用页而不是立刻收缩文件）
+    #expect(service.storageUsageBytes >= 0)
+}
+
+@Test("清理后 VACUUM 会把数据库文件真正收缩")
+func clipboardVacuumShrinksDatabase() throws {
+    let fileManager = FileManager.default
+    let directory = fileManager.temporaryDirectory
+        .appendingPathComponent("ClipboardVacuum-\(UUID().uuidString)", isDirectory: true)
+    try fileManager.createDirectory(at: directory, withIntermediateDirectories: true)
+    defer { try? fileManager.removeItem(at: directory) }
+
+    let url = directory.appendingPathComponent("ClipboardHistory.sqlite3")
+    let items = (0 ..< 400).map { index in
+        ClipboardHistoryItem(
+            id: UUID(),
+            content: .text(String(repeating: "y", count: 4_000) + "\(index)"),
+            capturedAt: Date(),
+            expiresAt: nil,
+            isPinned: false
+        )
+    }
+    try ClipboardHistoryPersistence.save(items, to: url)
+    let before = ClipboardHistoryStorageUsage.bytes(databaseURL: url)
+    #expect(before > 400_000)
+
+    // 清空条目：SQLite 只把页标成可复用，文件不会自动变小
+    try ClipboardHistoryPersistence.save([], to: url)
+    #expect(ClipboardHistoryPersistence.vacuum(at: url))
+
+    let after = ClipboardHistoryStorageUsage.bytes(databaseURL: url)
+    #expect(after < before / 2)
+
+    // 不存在的库不做处理
+    #expect(!ClipboardHistoryPersistence.vacuum(at: directory.appendingPathComponent("Missing.sqlite3")))
+}

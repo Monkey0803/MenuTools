@@ -59,6 +59,26 @@ struct ClipboardHistoryManagementSettingsSection: View {
                 .frame(width: 150)
             }
 
+            // 实际占用此前完全不可见：唯一会自动发生却看不到的机制。
+            HStack(spacing: 8) {
+                Text(L("clipboard.storageUsage"))
+                Spacer()
+                Text(ByteCountFormatter.string(
+                    fromByteCount: Int64(historyService.storageUsageBytes),
+                    countStyle: .file
+                ))
+                .font(.callout.monospacedDigit())
+                .foregroundStyle(.secondary)
+                Button(L("clipboard.cleanUpNow")) {
+                    historyService.cleanUpNow()
+                }
+                .controlSize(.small)
+            }
+
+            Text(L("clipboard.storageUsage.hint"))
+                .font(.caption)
+                .foregroundStyle(.secondary)
+
             Text(L("clipboard.cleanupDescription"))
                 .font(.caption)
                 .foregroundStyle(.secondary)
@@ -155,6 +175,7 @@ struct ClipboardHistoryManagementSettingsSection: View {
         .background(.quaternary.opacity(0.28), in: .rect(cornerRadius: 14))
         .onAppear {
             isAccessibilityTrusted = ClipboardAccessibilityPermission.isTrusted
+            historyService.refreshStorageUsage()
         }
     }
 }

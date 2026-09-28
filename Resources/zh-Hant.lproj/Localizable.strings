@@ -650,6 +650,9 @@
 "clipboard.retentionDays" = "保留天數";
 "clipboard.retentionDaysValue" = "%d 天";
 "clipboard.storageLimit" = "歷史佔用空間";
+"clipboard.storageUsage" = "磁碟實際佔用";
+"clipboard.storageUsage.hint" = "包含資料庫、回溯備份與圖片/PDF 附件；「立即清理」會依上面的保留策略裁剪並收縮資料庫。";
+"clipboard.cleanUpNow" = "立即清理";
 "clipboard.storageLimitValue" = "%d MB";
 "clipboard.unlimited" = "不限制";
 "clipboard.cleanupDescription" = "達到儲存數量、保留天數或佔用空間限制時，自動清理最早的非置頂記錄。";

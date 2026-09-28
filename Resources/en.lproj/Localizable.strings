@@ -650,6 +650,9 @@
 "clipboard.retentionDays" = "Keep for";
 "clipboard.retentionDaysValue" = "%d days";
 "clipboard.storageLimit" = "Storage limit";
+"clipboard.storageUsage" = "Disk usage";
+"clipboard.storageUsage.hint" = "Includes the database, its fallback backup and image/PDF attachments. Clean up now prunes by the retention settings above and shrinks the database.";
+"clipboard.cleanUpNow" = "Clean up now";
 "clipboard.storageLimitValue" = "%d MB";
 "clipboard.unlimited" = "Unlimited";
 "clipboard.cleanupDescription" = "The oldest unpinned entries are removed when an item, retention, or storage limit is reached.";
