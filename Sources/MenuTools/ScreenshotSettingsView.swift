@@ -18,8 +18,7 @@ struct ScreenshotSettingsView: View {
     @State private var ocrService = ScreenshotRegionOCRService.shared
     @State private var recordingMode: ScreenshotCaptureMode?
     @State private var isRecordingOCRShortcut = false
-    @State private var statusMessage: String?
-    @State private var isStatusError = false
+    @State private var status: SettingsStatusMessage?
     /// 当前错误是否由「屏幕录制未授权」引起；为真时给出系统设置跳转。
     @State private var needsScreenRecordingLink = false
 
@@ -286,10 +285,8 @@ struct ScreenshotSettingsView: View {
                     }
                 }
             }
-            if let statusMessage {
-                Text(statusMessage)
-                    .font(.caption)
-                    .foregroundStyle(isStatusError ? .red : .green)
+            if let status {
+                SettingsStatusBanner(message: status)
                 if needsScreenRecordingLink,
                    let url = RuntimePermissionSettingsLink.url(for: .screenRecording) {
                     Button(L("runtime.openSettings")) { NSWorkspace.shared.open(url) }
@@ -316,7 +313,7 @@ struct ScreenshotSettingsView: View {
     }
 
     private func capture(mode: ScreenshotCaptureMode, editAfterCapture: Bool) {
-        statusMessage = nil
+        status = nil
         needsScreenRecordingLink = false
         Task { @MainActor in
             do {
@@ -334,7 +331,7 @@ struct ScreenshotSettingsView: View {
     }
 
     private func captureLastSelectedRegion(editAfterCapture: Bool) {
-        statusMessage = nil
+        status = nil
         needsScreenRecordingLink = false
         Task { @MainActor in
             do {
@@ -350,7 +347,7 @@ struct ScreenshotSettingsView: View {
     }
 
     private func captureSelectedWindow() {
-        statusMessage = nil
+        status = nil
         needsScreenRecordingLink = false
         Task { @MainActor in
             do {
@@ -368,8 +365,7 @@ struct ScreenshotSettingsView: View {
     private func saveShortcut(_ shortcut: GlobalShortcut, for mode: ScreenshotCaptureMode) {
         do {
             try shortcutService.setBinding(shortcut, for: mode)
-            statusMessage = L("screenshot.shortcutSaved")
-            isStatusError = false
+            status = SettingsStatusMessage(success: L("screenshot.shortcutSaved"))
         } catch {
             reportFailure(error)
         }
@@ -390,7 +386,7 @@ struct ScreenshotSettingsView: View {
     }
 
     private func recognizeRegion() {
-        statusMessage = nil
+        status = nil
         needsScreenRecordingLink = false
         Task { @MainActor in
             do {
@@ -404,26 +400,22 @@ struct ScreenshotSettingsView: View {
 
     /// 统一成功反馈：顺带清掉权限跳转提示，避免成功后按钮仍挂着。
     private func reportSuccess(_ key: String) {
-        statusMessage = L(key)
-        isStatusError = false
+        status = SettingsStatusMessage(kind: .failure, text: L(key))
         needsScreenRecordingLink = false
     }
 
     /// 统一失败反馈：只有「屏幕录制未授权」才附带系统设置跳转。
     private func reportFailure(_ error: Error) {
-        statusMessage = error.localizedDescription
-        isStatusError = true
+        status = SettingsStatusMessage(failure: error)
         needsScreenRecordingLink = (error as? ScreenshotError) == .screenRecordingDenied
     }
 
     private func saveOCRShortcut(_ shortcut: GlobalShortcut) {
         guard shortcut.modifiers & GlobalShortcutModifier.relevantMask != 0 else {
-            statusMessage = L("shortcut.error.modifierRequired")
-            isStatusError = true
+            status = SettingsStatusMessage(kind: .failure, text: L("shortcut.error.modifierRequired"))
             return
         }
         ocrService.binding = shortcut
-        statusMessage = L("screenshot.shortcutSaved")
-        isStatusError = false
+        status = SettingsStatusMessage(success: L("screenshot.shortcutSaved"))
     }
 }

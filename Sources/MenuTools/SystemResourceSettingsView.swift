@@ -41,8 +41,8 @@ struct SystemResourceSettingsView: View {
     @State private var resource = SystemResourceService.shared
     @State private var processes = SystemProcessResourceService.shared
     @State private var page: SystemResourceSettingsPage = .overview
-    @State private var relieveMessage: String?
-    @State private var purgeMessage: String?
+    @State private var relieveMessage: SettingsStatusMessage?
+    @State private var purgeMessage: SettingsStatusMessage?
     @State private var historyRange: SystemResourceHistoryRange = .hour
     @State private var historyMetric: SystemResourceHistoryMetric = .cpu
     @State private var hoveredHistoryIndex: Int?
@@ -153,9 +153,13 @@ struct SystemResourceSettingsView: View {
                 DisclosureGroup(isExpanded: $showsMemoryTools) {
                 Button {
                     let released = resource.relieveProcessMemory()
-                    relieveMessage = released > 0
-                        ? L("resource.relieveMemory.done", bytes(released))
-                        : L("resource.relieveMemory.none")
+                    // 拆成两句话：嵌套泛型 + 三元表达式会让类型检查器明显变慢。
+                    if released > 0 {
+                        let text = L("resource.relieveMemory.done", bytes(released))
+                        relieveMessage = SettingsStatusMessage(success: text)
+                    } else {
+                        relieveMessage = SettingsStatusMessage(info: L("resource.relieveMemory.none"))
+                    }
                 } label: {
                     Label(
                         resource.isReleasingMemory ? L("resource.releasingMemory") : L("resource.relieveMemory"),
@@ -164,16 +168,16 @@ struct SystemResourceSettingsView: View {
                 }
                 .disabled(resource.isReleasingMemory)
                 if let relieveMessage {
-                    Text(relieveMessage)
-                        .font(.caption)
-                        .foregroundStyle(.secondary)
+                    SettingsStatusBanner(message: relieveMessage)
                 }
 
                 // 需要管理员授权：与上面的免权限回收互不影响，取消也不会影响它。
                 Button {
-                    purgeMessage = resource.purgeSystemCache()
-                        ? L("resource.purgeSystemCache.done")
-                        : L("resource.purgeSystemCache.cancelled")
+                    if resource.purgeSystemCache() {
+                        purgeMessage = SettingsStatusMessage(success: L("resource.purgeSystemCache.done"))
+                    } else {
+                        purgeMessage = SettingsStatusMessage(info: L("resource.purgeSystemCache.cancelled"))
+                    }
                 } label: {
                     Label(L("resource.purgeSystemCache"), systemImage: "externaldrive.badge.checkmark")
                 }
@@ -182,9 +186,7 @@ struct SystemResourceSettingsView: View {
                     .foregroundStyle(.secondary)
                     .fixedSize(horizontal: false, vertical: true)
                 if let purgeMessage {
-                    Text(purgeMessage)
-                        .font(.caption)
-                        .foregroundStyle(.secondary)
+                    SettingsStatusBanner(message: purgeMessage)
                 }
                 } label: {
                     Text(L("resource.memory.tools"))

@@ -7,7 +7,7 @@ struct TranslationSettingsView: View {
     @State private var apiKey = ""
     @State private var isRecording = false
     @State private var capturedShortcut: GlobalShortcut?
-    @State private var errorMessage: String?
+    @State private var status: SettingsStatusMessage?
     @State private var didSaveAPIKey = false
 
     private var displayedShortcut: GlobalShortcut? {
@@ -58,7 +58,7 @@ struct TranslationSettingsView: View {
                     }
                     Button {
                         capturedShortcut = nil
-                        errorMessage = nil
+                        status = nil
                         isRecording.toggle()
                     } label: {
                         Image(systemName: isRecording ? "xmark" : "record.circle")
@@ -69,10 +69,8 @@ struct TranslationSettingsView: View {
                         }
                     }
                 }
-                if let errorMessage {
-                    Text(errorMessage)
-                        .font(.caption)
-                        .foregroundStyle(.red)
+                if let status {
+                    SettingsStatusBanner(message: status)
                 }
             }
         }
@@ -83,7 +81,7 @@ struct TranslationSettingsView: View {
                 isRecording = false
                 guard let shortcut else { return }
                 capturedShortcut = shortcut
-                errorMessage = nil
+                status = nil
             }
             .frame(width: 1, height: 1)
         }
@@ -109,7 +107,7 @@ struct TranslationSettingsView: View {
 
     private func saveAPIKey() {
         didSaveAPIKey = TranslationAPIKeyStore.save(apiKey.trimmingCharacters(in: .whitespacesAndNewlines))
-        if !didSaveAPIKey { errorMessage = L("translation.error.saveAPIKey") }
+        if !didSaveAPIKey { status = SettingsStatusMessage(kind: .failure, text: L("translation.error.saveAPIKey")) }
     }
 
     private func saveShortcut() {
@@ -117,9 +115,9 @@ struct TranslationSettingsView: View {
         do {
             try shortcutService.setBinding(capturedShortcut)
             self.capturedShortcut = nil
-            errorMessage = nil
+            status = nil
         } catch {
-            errorMessage = error.localizedDescription
+            status = SettingsStatusMessage(failure: error)
         }
     }
 }

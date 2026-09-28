@@ -7,7 +7,7 @@ struct SystemStorageSettingsView: View {
     @State private var storage = StorageAnalysisService.shared
     @State private var cleanupPreview: StorageCleanupPreview?
     @State private var selectedDeveloperItemIDs: Set<String> = []
-    @State private var feedback: String?
+    @State private var status: SettingsStatusMessage?
     @State private var largeFileMode: StorageLargeFileMode = .largest
 
     var body: some View {
@@ -217,10 +217,8 @@ struct SystemStorageSettingsView: View {
                 .padding(.vertical, 3)
             }
 
-            if let feedback {
-                Text(feedback)
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
+            if let status {
+                SettingsStatusBanner(message: status)
             }
         } header: {
             HStack {
@@ -333,9 +331,9 @@ struct SystemStorageSettingsView: View {
             guard !preview.items.isEmpty else { return }
             try await storage.clean(preview.items)
             selectedDeveloperItemIDs.subtract(preview.items.map(\.id))
-            feedback = L("status.freed", formatted(preview.reclaimableBytes))
+            status = SettingsStatusMessage(success: L("status.freed", formatted(preview.reclaimableBytes)))
         } catch {
-            feedback = error.localizedDescription
+            status = SettingsStatusMessage(failure: error)
         }
     }
 
