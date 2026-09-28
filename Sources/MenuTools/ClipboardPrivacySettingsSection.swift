@@ -194,6 +194,11 @@ struct ClipboardPrivacySettingsSection: View {
                 .font(.subheadline.weight(.medium))
             SecureField(L("clipboard.archive.passphrase"), text: $archivePassphrase)
                 .textFieldStyle(.roundedBorder)
+            if autoSync.hasStoredPassphrase {
+                Label(L("clipboard.sync.passphraseSaved"), systemImage: "key.fill")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+            }
             HStack(spacing: 8) {
                 Button(action: exportArchive) {
                     Label(L("clipboard.archive.export"), systemImage: "lock.doc")
@@ -227,12 +232,13 @@ struct ClipboardPrivacySettingsSection: View {
             HStack(spacing: 8) {
                 Button(L("clipboard.sync.chooseFolder"), action: chooseSyncFolder)
                 Button(L("clipboard.sync.now"), action: requestSynchronizeSharedFile)
-                    .disabled(
-                        syncFilePath == nil
-                            || archivePassphrase.isEmpty
-                            || isArchiveOperationInProgress
-                            || autoSync.isSyncing
-                    )
+                    .disabled(!ClipboardAutoSyncService.ClipboardSyncAvailability.canSyncNow(
+                        hasSyncFile: syncFilePath != nil,
+                        hasStoredPassphrase: autoSync.hasStoredPassphrase,
+                        typedPassphrase: archivePassphrase,
+                        isArchiveOperationInProgress: isArchiveOperationInProgress,
+                        isSyncing: autoSync.isSyncing
+                    ))
                 if let syncFilePath {
                     Text(URL(fileURLWithPath: syncFilePath).deletingLastPathComponent().lastPathComponent)
                         .font(.caption)
@@ -541,14 +547,17 @@ struct ClipboardPrivacySettingsSection: View {
     }
 
     private func requestSynchronizeSharedFile() {
-        guard !archivePassphrase.isEmpty,
+        // 存过口令就直接用钥匙串里的那份，不再强制重新输入。
+        guard autoSync.hasStoredPassphrase || !archivePassphrase.isEmpty,
               let syncFilePath else { return }
         let fileURL = URL(fileURLWithPath: syncFilePath)
         pendingArchiveAction = .synchronize(fileURL)
     }
 
     private func performSynchronizeSharedFile(at fileURL: URL) {
-        let passphrase = archivePassphrase
+        // 输入框为空时传 nil，让服务回退到钥匙串（服务本身早已支持）。
+        let trimmed = archivePassphrase.trimmingCharacters(in: .whitespacesAndNewlines)
+        let passphrase: String? = trimmed.isEmpty ? nil : trimmed
         isArchiveOperationInProgress = true
         archiveStatus = nil
         autoSync.clearLastError()

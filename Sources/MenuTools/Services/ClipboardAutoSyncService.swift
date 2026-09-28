@@ -262,6 +262,24 @@ final class ClipboardAutoSyncService {
         defaults.set(minutes, forKey: ClipboardSyncSettings.intervalMinutesKey)
     }
 
+    /// 手动「立即同步」的可用条件（纯逻辑，便于回归）。
+    ///
+    /// 口令既可以现输、也可以来自钥匙串；此前按钮只看输入框是否为空，
+    /// 于是存过口令的用户每次都要重新输入，而同库的音频预设同步页早已按 hasStoredPassphrase 判断。
+    enum ClipboardSyncAvailability {
+        static func canSyncNow(
+            hasSyncFile: Bool,
+            hasStoredPassphrase: Bool,
+            typedPassphrase: String,
+            isArchiveOperationInProgress: Bool,
+            isSyncing: Bool
+        ) -> Bool {
+            guard hasSyncFile, !isArchiveOperationInProgress, !isSyncing else { return false }
+            if hasStoredPassphrase { return true }
+            return !typedPassphrase.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+        }
+    }
+
     func storePassphrase(_ passphrase: String) {
         let trimmed = passphrase.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !trimmed.isEmpty else { return }

@@ -360,3 +360,43 @@ func systemTriggerForwardsWakeNotification() async {
 
     #expect(fired == 1)
 }
+
+@Test("立即同步：已存钥匙串口令时不必重新输入，其余门槛保持不变")
+func clipboardSyncAvailabilityAcceptsStoredPassphrase() {
+    // 存过口令 + 输入框为空 → 可用（这正是此前被错误禁用的场景）
+    #expect(ClipboardAutoSyncService.ClipboardSyncAvailability.canSyncNow(
+        hasSyncFile: true,
+        hasStoredPassphrase: true,
+        typedPassphrase: "",
+        isArchiveOperationInProgress: false,
+        isSyncing: false
+    ))
+    // 没存过口令且输入框为空 → 不可用
+    #expect(!ClipboardAutoSyncService.ClipboardSyncAvailability.canSyncNow(
+        hasSyncFile: true,
+        hasStoredPassphrase: false,
+        typedPassphrase: "   ",
+        isArchiveOperationInProgress: false,
+        isSyncing: false
+    ))
+    // 现输口令 → 可用
+    #expect(ClipboardAutoSyncService.ClipboardSyncAvailability.canSyncNow(
+        hasSyncFile: true,
+        hasStoredPassphrase: false,
+        typedPassphrase: "secret",
+        isArchiveOperationInProgress: false,
+        isSyncing: false
+    ))
+    // 没有同步文件、正在忙、正在同步 → 一律不可用
+    for (hasFile, isBusy, isSyncing) in [
+        (false, false, false), (true, true, false), (true, false, true)
+    ] {
+        #expect(!ClipboardAutoSyncService.ClipboardSyncAvailability.canSyncNow(
+            hasSyncFile: hasFile,
+            hasStoredPassphrase: true,
+            typedPassphrase: "",
+            isArchiveOperationInProgress: isBusy,
+            isSyncing: isSyncing
+        ))
+    }
+}
