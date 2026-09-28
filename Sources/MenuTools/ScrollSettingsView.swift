@@ -18,6 +18,14 @@ struct ScrollSettingsView: View {
     @AppStorage(SettingsKey.scrollDisableKey) private var disableKey = 0
 
     @State private var accessibilityOK = SmoothScrollEngine.shared.accessibilityGranted
+
+    private var engineStatus: SmoothScrollStatus {
+        SmoothScrollStatusPolicy.status(
+            isEnabled: enabled,
+            isRunning: engine.isRunning,
+            hasAccessibility: accessibilityOK
+        )
+    }
     private let refreshTimer = Timer.publish(every: 2, on: .main, in: .common).autoconnect()
 
     var body: some View {
@@ -74,6 +82,13 @@ struct ScrollSettingsView: View {
                     .foregroundStyle(.secondary)
             }
             Spacer(minLength: 0)
+            // 开关打开、权限也有、但监听没装上时此前没有任何提示，用户只看到「没效果」。
+            Label(L(engineStatus.titleKey), systemImage: engineStatus.symbolName)
+                .font(.caption2)
+                .foregroundStyle(engineStatus.isWarning
+                    ? AnyShapeStyle(.orange)
+                    : (engineStatus == .active ? AnyShapeStyle(.green) : AnyShapeStyle(.secondary)))
+                .help(L(engineStatus.titleKey))
             Toggle("", isOn: $enabled)
                 .labelsHidden()
                 .toggleStyle(.switch)

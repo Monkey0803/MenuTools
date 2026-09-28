@@ -87,3 +87,28 @@ func smoothScrollInputPolicyKeepsContinuousMouseInputNative() {
     #expect(!SmoothScrollInputPolicy.shouldAnimate(isTrackpad: true, isContinuous: false))
     #expect(SmoothScrollInputPolicy.shouldAnimate(isTrackpad: false, isContinuous: false))
 }
+
+@Test("平滑滚动状态：未启用优先，其次运行中，再区分权限与启动失败")
+func smoothScrollStatusPolicyDecidesState() {
+    #expect(SmoothScrollStatusPolicy.status(isEnabled: false, isRunning: false, hasAccessibility: true) == .disabled)
+    // 关闭时不谈权限，避免关了还提示权限
+    #expect(SmoothScrollStatusPolicy.status(isEnabled: false, isRunning: false, hasAccessibility: false) == .disabled)
+    #expect(SmoothScrollStatusPolicy.status(isEnabled: true, isRunning: true, hasAccessibility: true) == .active)
+    // 已经在跑说明监听装上了，权限状态不影响结论
+    #expect(SmoothScrollStatusPolicy.status(isEnabled: true, isRunning: true, hasAccessibility: false) == .active)
+    #expect(SmoothScrollStatusPolicy.status(isEnabled: true, isRunning: false, hasAccessibility: false) == .needsAccessibility)
+    // 有权限却没跑起来：这正是此前完全无声的情况
+    #expect(SmoothScrollStatusPolicy.status(isEnabled: true, isRunning: false, hasAccessibility: true) == .failedToStart)
+}
+
+@Test("平滑滚动各状态都有文案键、符号与警示语义")
+func smoothScrollStatusPresentationIsComplete() {
+    #expect(SmoothScrollStatus.allCases.count == 4)
+    #expect(Set(SmoothScrollStatus.allCases.map(\.titleKey)).count == 4)
+    #expect(SmoothScrollStatus.active.symbolName == "checkmark.circle.fill")
+    #expect(!SmoothScrollStatus.active.isWarning)
+    #expect(!SmoothScrollStatus.disabled.isWarning)
+    #expect(SmoothScrollStatus.needsAccessibility.isWarning)
+    #expect(SmoothScrollStatus.failedToStart.isWarning)
+    #expect(SmoothScrollStatus.needsAccessibility.titleKey == "scroll.status.needsAccessibility")
+}

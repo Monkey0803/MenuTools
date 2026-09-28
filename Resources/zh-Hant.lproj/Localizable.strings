@@ -747,6 +747,10 @@
 "scroll.title" = "捲動增強";
 "scroll.subtitle" = "接管滑鼠滾輪，將生硬的捲動插值成順滑捲動。僅作用於滑鼠，不影響觸控板。";
 "scroll.enable" = "啟用平滑捲動";
+"scroll.status.disabled" = "已關閉";
+"scroll.status.active" = "監聽中";
+"scroll.status.needsAccessibility" = "需要輔助功能權限";
+"scroll.status.failedToStart" = "監聽未啟動：捲動事件未安裝";
 "scroll.enable.desc" = "需在「輔助使用」中授權 MenuTools 才能接管滾輪。";
 "scroll.needAccessibility" = "尚未取得「輔助使用」權限，平滑捲動無法生效。";
 "scroll.openAccessibility" = "打開輔助使用";

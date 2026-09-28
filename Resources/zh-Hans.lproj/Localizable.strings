@@ -747,6 +747,10 @@
 "scroll.title" = "滚动增强";
 "scroll.subtitle" = "接管鼠标滚轮，将生硬的滚动插值成顺滑滚动。仅作用于鼠标，不影响触控板。";
 "scroll.enable" = "启用平滑滚动";
+"scroll.status.disabled" = "已关闭";
+"scroll.status.active" = "监听中";
+"scroll.status.needsAccessibility" = "需要辅助功能权限";
+"scroll.status.failedToStart" = "监听未启动：滚动事件没装上";
 "scroll.enable.desc" = "需在“辅助功能”中授权 MenuTools 才能接管滚轮。";
 "scroll.needAccessibility" = "尚未获得“辅助功能”权限，平滑滚动无法生效。";
 "scroll.openAccessibility" = "打开辅助功能";

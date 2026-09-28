@@ -453,6 +453,41 @@ private final class SmoothScrollTapRunner: @unchecked Sendable {
     }
 }
 
+/// 平滑滚动的运行状态：开关、监听与权限三者组合出的用户可见结论。
+enum SmoothScrollStatus: String, CaseIterable, Equatable {
+    case disabled
+    case active
+    case needsAccessibility
+    case failedToStart
+
+    var titleKey: String { "scroll.status.\(rawValue)" }
+
+    var symbolName: String {
+        switch self {
+        case .disabled: return "pause.circle"
+        case .active: return "checkmark.circle.fill"
+        case .needsAccessibility, .failedToStart: return "exclamationmark.triangle.fill"
+        }
+    }
+
+    var isWarning: Bool {
+        switch self {
+        case .disabled, .active: return false
+        case .needsAccessibility, .failedToStart: return true
+        }
+    }
+}
+
+/// 状态判定（纯逻辑，便于回归）。
+enum SmoothScrollStatusPolicy {
+    static func status(isEnabled: Bool, isRunning: Bool, hasAccessibility: Bool) -> SmoothScrollStatus {
+        guard isEnabled else { return .disabled }
+        if isRunning { return .active }
+        // 有权限却没跑起来，说明事件监听没装上——这是唯一无法靠权限解释的情况。
+        return hasAccessibility ? .failedToStart : .needsAccessibility
+    }
+}
+
 /// 平滑滚动引擎：消费传统鼠标滚轮事件，在后台将其注入为带完整 phase 的连续像素滚动事件。
 /// 触控板与 MenuTools 自身窗口的滚动始终放行。
 final class SmoothScrollEngine: ObservableObject, @unchecked Sendable {

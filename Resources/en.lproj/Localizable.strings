@@ -747,6 +747,10 @@
 "scroll.title" = "Scrolling";
 "scroll.subtitle" = "Intercepts the mouse wheel and interpolates jerky scrolls into smooth motion. Affects the mouse only, not the trackpad.";
 "scroll.enable" = "Enable Smooth Scrolling";
+"scroll.status.disabled" = "Off";
+"scroll.status.active" = "Listening";
+"scroll.status.needsAccessibility" = "Accessibility permission needed";
+"scroll.status.failedToStart" = "Not listening: the scroll event tap is not installed";
 "scroll.enable.desc" = "Requires Accessibility permission for MenuTools to intercept the wheel.";
 "scroll.needAccessibility" = "Accessibility permission not granted; smooth scrolling is inactive.";
 "scroll.openAccessibility" = "Open Accessibility";

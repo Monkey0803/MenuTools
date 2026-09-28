@@ -747,6 +747,10 @@
 "scroll.title" = "スクロール";
 "scroll.subtitle" = "マウスホイールを引き取り、カクつくスクロールを滑らかに補間します。トラックパッドには影響しません。";
 "scroll.enable" = "スムーズスクロールを有効にする";
+"scroll.status.disabled" = "オフ";
+"scroll.status.active" = "監視中";
+"scroll.status.needsAccessibility" = "アクセシビリティ権限が必要";
+"scroll.status.failedToStart" = "監視が開始できません：スクロールイベントを取得できていません";
 "scroll.enable.desc" = "ホイールを引き取るには「アクセシビリティ」の許可が必要です。";
 "scroll.needAccessibility" = "「アクセシビリティ」未許可のため、スムーズスクロールは無効です。";
 "scroll.openAccessibility" = "アクセシビリティを開く";
