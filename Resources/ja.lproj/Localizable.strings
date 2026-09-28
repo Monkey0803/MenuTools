@@ -988,6 +988,12 @@
 "screenshot.history.empty" = "スクリーンショットはありません";
 "screenshot.history.remove" = "履歴から削除";
 "screenshot.history.clear" = "履歴を消去";
+"screenshot.history.search" = "ファイル名で検索";
+"screenshot.history.noMatch" = "一致する記録がありません";
+"screenshot.history.showAll" = "すべて表示（残り %d 件）";
+"screenshot.history.collapse" = "折りたたむ";
+"screenshot.history.clearConfirm.title" = "スクリーンショット履歴を消去しますか？";
+"screenshot.history.clearConfirm.message" = "この一覧のみ消去します。保存済みの画像は削除されません。";
 "screenshot.quickAccess.title" = "スクリーンショット完了";
 "screenshot.quickAccess.copy" = "コピー";
 "screenshot.quickAccess.save" = "保存 / 表示";

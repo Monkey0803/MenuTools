@@ -988,6 +988,12 @@
 "screenshot.history.empty" = "还没有截图";
 "screenshot.history.remove" = "从历史记录移除";
 "screenshot.history.clear" = "清空历史记录";
+"screenshot.history.search" = "搜索文件名";
+"screenshot.history.noMatch" = "没有匹配的记录";
+"screenshot.history.showAll" = "显示全部（还有 %d 条）";
+"screenshot.history.collapse" = "收起";
+"screenshot.history.clearConfirm.title" = "清空截图记录？";
+"screenshot.history.clearConfirm.message" = "只清空这份记录，已保存到磁盘的图片不会被删除。";
 "screenshot.quickAccess.title" = "截图完成";
 "screenshot.quickAccess.copy" = "复制";
 "screenshot.quickAccess.save" = "保存 / 定位";

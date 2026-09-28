@@ -132,6 +132,41 @@ enum ScreenshotFileNaming {
 }
 
 /// 截图历史条目。历史只保存文件元数据，不把大图编码进 UserDefaults。
+/// 截图历史的筛选与折叠（纯逻辑，便于回归）。
+///
+/// 历史最多保留 50 条，而设置页此前固定 `prefix(8)`：剩下 42 条在界面上完全不可见，
+/// 想找上周的截图只能去 Finder 里翻。
+enum ScreenshotHistoryFilter {
+    /// 折叠时显示的条数。
+    static let collapsedLimit = 8
+
+    /// 按文件名筛选，大小写不敏感；空查询（含纯空白）返回全部。
+    static func matching(_ entries: [ScreenshotHistoryEntry], query: String) -> [ScreenshotHistoryEntry] {
+        let trimmed = query.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !trimmed.isEmpty else { return entries }
+        let needle = trimmed.lowercased()
+        return entries.filter { $0.fileURL.lastPathComponent.lowercased().contains(needle) }
+    }
+
+    static func visible(
+        _ entries: [ScreenshotHistoryEntry],
+        isExpanded: Bool,
+        collapsedLimit: Int = ScreenshotHistoryFilter.collapsedLimit
+    ) -> [ScreenshotHistoryEntry] {
+        guard !isExpanded else { return entries }
+        return Array(entries.prefix(max(1, collapsedLimit)))
+    }
+
+    /// 折叠时被隐藏的条数，用于「显示全部 N 条」按钮。
+    static func hiddenCount(
+        _ entries: [ScreenshotHistoryEntry],
+        isExpanded: Bool,
+        collapsedLimit: Int = ScreenshotHistoryFilter.collapsedLimit
+    ) -> Int {
+        max(0, entries.count - visible(entries, isExpanded: isExpanded, collapsedLimit: collapsedLimit).count)
+    }
+}
+
 struct ScreenshotHistoryEntry: Codable, Equatable, Identifiable, Sendable {
     let id: UUID
     let filePath: String

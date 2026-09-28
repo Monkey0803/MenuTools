@@ -988,6 +988,12 @@
 "screenshot.history.empty" = "尚未有截圖";
 "screenshot.history.remove" = "從歷史記錄移除";
 "screenshot.history.clear" = "清除歷史記錄";
+"screenshot.history.search" = "搜尋檔名";
+"screenshot.history.noMatch" = "沒有符合的記錄";
+"screenshot.history.showAll" = "顯示全部（還有 %d 筆）";
+"screenshot.history.collapse" = "收合";
+"screenshot.history.clearConfirm.title" = "清空截圖記錄？";
+"screenshot.history.clearConfirm.message" = "只會清空這份記錄，已儲存到磁碟的圖片不會被刪除。";
 "screenshot.quickAccess.title" = "截圖完成";
 "screenshot.quickAccess.copy" = "複製";
 "screenshot.quickAccess.save" = "儲存 / 定位";

@@ -19,6 +19,9 @@ struct ScreenshotSettingsView: View {
     @State private var recordingMode: ScreenshotCaptureMode?
     @State private var isRecordingOCRShortcut = false
     @State private var status: SettingsStatusMessage?
+    @State private var historyQuery = ""
+    @State private var isHistoryExpanded = false
+    @State private var isConfirmingHistoryClear = false
     /// 当前错误是否由「屏幕录制未授权」引起；为真时给出系统设置跳转。
     @State private var needsScreenRecordingLink = false
 
@@ -216,14 +219,22 @@ struct ScreenshotSettingsView: View {
                     Text(L("screenshot.history.empty"))
                         .foregroundStyle(.secondary)
                 } else {
-                    ForEach(historyStore.entries.prefix(8)) { entry in
+                    TextField(L("screenshot.history.search"), text: $historyQuery)
+                    let filtered = ScreenshotHistoryFilter.matching(historyStore.entries, query: historyQuery)
+                    let shown = ScreenshotHistoryFilter.visible(filtered, isExpanded: isHistoryExpanded)
+                    if filtered.isEmpty {
+                        Text(L("screenshot.history.noMatch"))
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                    }
+                    ForEach(shown) { entry in
                         HStack(spacing: 8) {
                             Image(systemName: entry.mode.symbol)
                                 .foregroundStyle(.tint)
                             VStack(alignment: .leading, spacing: 2) {
                                 Text(entry.fileURL.lastPathComponent)
                                     .lineLimit(1)
-                                Text("\(entry.width) × \(entry.height) · \(entry.format.fileExtension)")
+                                Text("\(entry.width) × \(entry.height) · \(entry.format.fileExtension) · \(entry.createdAt.formatted(date: .abbreviated, time: .shortened))")
                                     .font(.caption2)
                                     .foregroundStyle(.secondary)
                             }
@@ -258,8 +269,33 @@ struct ScreenshotSettingsView: View {
                             .help(L("screenshot.history.remove"))
                         }
                     }
-                    Button(L("screenshot.history.clear")) {
-                        historyStore.clear()
+                    // 折叠时给出「还剩多少条」，避免用户以为历史只有 8 条
+                    let hidden = ScreenshotHistoryFilter.hiddenCount(filtered, isExpanded: isHistoryExpanded)
+                    if hidden > 0 {
+                        Button(L("screenshot.history.showAll", hidden)) {
+                            isHistoryExpanded = true
+                        }
+                    } else if isHistoryExpanded, filtered.count > ScreenshotHistoryFilter.collapsedLimit {
+                        Button(L("screenshot.history.collapse")) {
+                            isHistoryExpanded = false
+                        }
+                    }
+                    Button(L("screenshot.history.clear"), role: .destructive) {
+                        isConfirmingHistoryClear = true
+                    }
+                    .confirmationDialog(
+                        L("screenshot.history.clearConfirm.title"),
+                        isPresented: $isConfirmingHistoryClear,
+                        titleVisibility: .visible
+                    ) {
+                        Button(L("screenshot.history.clear"), role: .destructive) {
+                            historyStore.clear()
+                            historyQuery = ""
+                            isHistoryExpanded = false
+                        }
+                        Button(L("update.cancel"), role: .cancel) {}
+                    } message: {
+                        Text(L("screenshot.history.clearConfirm.message"))
                     }
                 }
             }

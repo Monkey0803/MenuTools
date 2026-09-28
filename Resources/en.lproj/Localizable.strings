@@ -988,6 +988,12 @@
 "screenshot.history.empty" = "No screenshots yet";
 "screenshot.history.remove" = "Remove from history";
 "screenshot.history.clear" = "Clear history";
+"screenshot.history.search" = "Search file name";
+"screenshot.history.noMatch" = "No matching entries";
+"screenshot.history.showAll" = "Show all (%d more)";
+"screenshot.history.collapse" = "Collapse";
+"screenshot.history.clearConfirm.title" = "Clear the screenshot history?";
+"screenshot.history.clearConfirm.message" = "This only clears the list; images already saved on disk are kept.";
 "screenshot.quickAccess.title" = "Screenshot captured";
 "screenshot.quickAccess.copy" = "Copy";
 "screenshot.quickAccess.save" = "Save / reveal";
