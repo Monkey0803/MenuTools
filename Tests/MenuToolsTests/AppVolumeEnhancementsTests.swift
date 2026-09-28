@@ -2137,3 +2137,56 @@ func equalizerBackendDoesNotGrowForever() {
     }
     #expect(state.retainedEqualizerCount <= AppVolumeEqualizerRetention.defaultLimit)
 }
+
+@Test("受保护音源判定：静音阈值、静音/音量归零时不提示")
+func appVolumeProtectedSourcePolicy() {
+    let silent = AppVolumeMeter.empty
+    let loud = AppVolumeMeter(peak: 0.4, rms: 0.2)
+    #expect(AppVolumeProtectedSourcePolicy.isSilent(silent))
+    #expect(!AppVolumeProtectedSourcePolicy.isSilent(loud))
+
+    // 正在处理、未静音、主音量不为 0，静音满 5 秒才提示
+    #expect(!AppVolumeProtectedSourcePolicy.shouldHint(
+        silentDuration: 1, isTapRunning: true, isMuted: false, masterVolume: 0.8
+    ))
+    #expect(AppVolumeProtectedSourcePolicy.shouldHint(
+        silentDuration: 5, isTapRunning: true, isMuted: false, masterVolume: 0.8
+    ))
+    // tap 没跑起来、用户自己静音了、或者主音量就是 0：静音是预期的，不该提示
+    #expect(!AppVolumeProtectedSourcePolicy.shouldHint(
+        silentDuration: 60, isTapRunning: false, isMuted: false, masterVolume: 0.8
+    ))
+    #expect(!AppVolumeProtectedSourcePolicy.shouldHint(
+        silentDuration: 60, isTapRunning: true, isMuted: true, masterVolume: 0.8
+    ))
+    #expect(!AppVolumeProtectedSourcePolicy.shouldHint(
+        silentDuration: 60, isTapRunning: true, isMuted: false, masterVolume: 0
+    ))
+}
+
+@Test("服务在「正在处理却长时间静音」时给出提示，有声音后立刻清除")
+@MainActor
+func appVolumeProtectedSourceHintFollowsMeter() throws {
+    let defaults = try makeEnhancementDefaults("protectedSourceHint")
+    let backend = EnhancedFakeAppVolumeBackend()
+    let service = AppVolumeService(backend: backend, userDefaults: defaults)
+    service.start()
+    backend.send(candidates: [.music], output: .fixture(volume: 0.8), levels: ["com.apple.Music": .empty])
+    // 基准取在 send 之后：receive 内部会用真实时间先记一次「开始静音」
+    let base = Date()
+    service.refreshProtectedSourceHint(now: base)
+    #expect(!service.protectedSourceHint)
+
+    // 连续静音超过阈值 → 提示（不改动任何音频行为）
+    service.refreshProtectedSourceHint(now: base.addingTimeInterval(6))
+    #expect(service.protectedSourceHint)
+
+    // 一旦有声音，立刻清除
+    backend.send(
+        candidates: [.music],
+        output: .fixture(volume: 0.8),
+        levels: ["com.apple.Music": AppVolumeMeter(peak: 0.5, rms: 0.3)]
+    )
+    service.refreshProtectedSourceHint(now: base.addingTimeInterval(7))
+    #expect(!service.protectedSourceHint)
+}

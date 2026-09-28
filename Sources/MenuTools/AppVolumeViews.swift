@@ -243,6 +243,15 @@ struct AppVolumeQuickAccessView: View {
 
             Divider()
 
+            // 受保护音源（DRM）：tap 拿不到样本，表现为「App 在放、音量也对，但没声音」。
+            // 只提示，不改动音频行为。
+            if service.protectedSourceHint {
+                Label(L("volume.protectedSource.hint"), systemImage: "exclamationmark.triangle.fill")
+                    .font(.caption2)
+                    .foregroundStyle(.orange)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
+
             if service.filteredSessions.isEmpty {
                 HStack(spacing: 7) {
                     Image(systemName: "waveform.slash")

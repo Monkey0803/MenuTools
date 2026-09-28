@@ -369,6 +369,32 @@ enum AppVolumeSessionSort: String, CaseIterable, Codable, Sendable {
     var titleKey: String { "volume.sort.\(rawValue)" }
 }
 
+/// 受保护音源（DRM 流）提示判定（纯逻辑，便于回归）。
+///
+/// 私有 tap 建立时会立刻静音原声（`.mutedWhenTapped`），受保护音源下 tap 拿不到样本，
+/// 于是表现为「App 在放、音量也对，但就是没声音」。README 里的承诺原本只在**建 tap 失败**
+/// 时才成立，这种情况没有任何提示。这里只做检测与提示，不改动音频行为。
+enum AppVolumeProtectedSourcePolicy {
+    /// 判定静音的电平上限：真实音频的峰值远高于它。
+    static let silentThreshold: Double = 0.0005
+    /// 连续静音多久才提示，避免正常间隙（曲目切换）误报。
+    static let silentDuration: TimeInterval = 5
+
+    static func isSilent(_ meter: AppVolumeMeter) -> Bool {
+        meter.peak <= silentThreshold && meter.rms <= silentThreshold
+    }
+
+    static func shouldHint(
+        silentDuration: TimeInterval,
+        isTapRunning: Bool,
+        isMuted: Bool,
+        masterVolume: Double
+    ) -> Bool {
+        guard isTapRunning, !isMuted, masterVolume > 0.001 else { return false }
+        return silentDuration >= AppVolumeProtectedSourcePolicy.silentDuration
+    }
+}
+
 struct AppVolumeMeter: Equatable, Sendable {
     var peak: Double = 0
     var rms: Double = 0
@@ -1023,6 +1049,9 @@ final class AppVolumeService {
     private var appliedAutomationKeys: Set<String> = []
     private var isApplyingPreset = false
     private var automationTimer: Timer?
+    /// 受保护音源提示：正在处理却长时间静音时为 true（只提示，不改音频行为）。
+    private(set) var protectedSourceHint = false
+    private var silentProcessingSince: Date?
     private var workspaceActivationObserver: NSObjectProtocol?
     private var lastExposureDate: Date?
     private var highVolumeExposure: TimeInterval = 0
@@ -2347,10 +2376,31 @@ final class AppVolumeService {
         enforceMasterVolumeLimitIfNeeded()
         rebuildSessions()
         applyLevels(snapshot.levels)
+        refreshProtectedSourceHint()
         updateMeetingDucking()
         if isEnabled { reconcileRoutes() }
         evaluateAutomation()
         recordHearingExposure()
+    }
+
+    /// 由电平刷新驱动：正在处理的会话长时间静音时给出提示，有声音立刻清除。
+    func refreshProtectedSourceHint(now: Date = Date()) {
+        let processed = sessions.filter(\.isRunningOutput)
+        let anySilent = processed.contains { AppVolumeProtectedSourcePolicy.isSilent($0.meter) }
+        guard !processed.isEmpty, anySilent else {
+            silentProcessingSince = nil
+            if protectedSourceHint { protectedSourceHint = false }
+            return
+        }
+        let since = silentProcessingSince ?? now
+        silentProcessingSince = since
+        let shouldHint = AppVolumeProtectedSourcePolicy.shouldHint(
+            silentDuration: now.timeIntervalSince(since),
+            isTapRunning: true,
+            isMuted: output.isMuted,
+            masterVolume: output.volume
+        )
+        if protectedSourceHint != shouldHint { protectedSourceHint = shouldHint }
     }
 
     private func rebuildSessions() {

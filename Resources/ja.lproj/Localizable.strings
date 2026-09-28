@@ -1023,6 +1023,7 @@
 "volume.enabled.desc" = "システムオーディオをキャプチャして、再生中の App を個別に調整します";
 "volume.showAll" = "すべての App 音量を表示";
 "volume.empty" = "音声を再生中の App はありません";
+"volume.protectedSource.hint" = "保護された音源（DRM 保護の音楽・動画など）を再生中の App があります。このような音声は処理すると無音のみになることがあります。その App の処理をオフにして再試行してください。";
 "volume.more" = "ほか %ld 個の App";
 "volume.master" = "システム音量";
 "volume.mute" = "システム出力をミュート";

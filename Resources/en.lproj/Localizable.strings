@@ -1023,6 +1023,7 @@
 "volume.enabled.desc" = "Capture system audio to adjust each active app independently";
 "volume.showAll" = "Show all app volumes";
 "volume.empty" = "No apps are playing audio";
+"volume.protectedSource.hint" = "An app is playing protected audio (for example DRM-protected music or video). Processing such audio can output silence only; turn processing off for that app and try again.";
 "volume.more" = "%ld more apps";
 "volume.master" = "System volume";
 "volume.mute" = "Mute system output";

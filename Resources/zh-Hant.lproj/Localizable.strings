@@ -1023,6 +1023,7 @@
 "volume.enabled.desc" = "透過系統音訊擷取分別調整正在發聲的 App";
 "volume.showAll" = "查看全部 App 音量";
 "volume.empty" = "暫無正在發聲的 App";
+"volume.protectedSource.hint" = "有 App 正在播放受保護音源（如受 DRM 保護的音樂/影片），這類音訊在處理時可能只輸出靜音；可關閉該 App 的處理後重試。";
 "volume.more" = "另外 %ld 個 App";
 "volume.master" = "系統主音量";
 "volume.mute" = "靜音系統輸出";

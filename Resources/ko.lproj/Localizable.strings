@@ -1023,6 +1023,7 @@
 "volume.enabled.desc" = "시스템 오디오를 캡처하여 재생 중인 App을 개별 조절합니다";
 "volume.showAll" = "모든 App 볼륨 보기";
 "volume.empty" = "오디오를 재생 중인 App이 없습니다";
+"volume.protectedSource.hint" = "보호된 음원(DRM 보호 음악/동영상 등)을 재생하는 앱이 있습니다. 이런 오디오는 처리 시 무음만 출력될 수 있습니다. 해당 앱의 처리를 끄고 다시 시도하세요.";
 "volume.more" = "App %ld개 더 보기";
 "volume.master" = "시스템 볼륨";
 "volume.mute" = "시스템 출력 음소거";
