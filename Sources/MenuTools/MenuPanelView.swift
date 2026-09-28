@@ -627,7 +627,11 @@ struct MenuPanelView: View {
         case .hero: heroTiles
         case .translation: translationCard
         case .quickActions: quickActionsCard
-        case .scenes: ScenePresetsCard(activeScene: sceneService.activeScene, apply: applyScene)
+        case .scenes: ScenePresetsCard(
+            activeScene: sceneService.activeScene,
+            apply: applyScene,
+            exit: exitScene
+        )
         case .shortcuts: GlobalShortcutCard(service: globalShortcutService, report: flashStatus)
         case .focus:
             FocusModeCard(
@@ -1929,11 +1933,23 @@ struct MenuPanelView: View {
     }
 
     private func applyScene(_ scene: ScenePreset) {
-        do {
-            try sceneService.apply(scene, launcher: appLauncherService, focusService: focusModeService)
+        let report = sceneService.apply(scene, launcher: appLauncherService, focusService: focusModeService)
+        if report.isFullSuccess {
             flashStatus(L("scene.applied", L(scene.titleKey)), isError: false)
-        } catch {
-            flashStatus(error.localizedDescription, isError: true)
+        } else {
+            flashStatus(
+                L("scene.appliedPartial", L(scene.titleKey), report.failures.count),
+                isError: true
+            )
+        }
+    }
+
+    private func exitScene() {
+        let report = sceneService.exitScene()
+        if report.isFullSuccess {
+            flashStatus(L("scene.exited"), isError: false)
+        } else {
+            flashStatus(L("scene.exitPartial", report.failures.count), isError: true)
         }
     }
 

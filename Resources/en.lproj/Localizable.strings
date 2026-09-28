@@ -780,6 +780,10 @@
 "scene.night" = "Night";
 "scene.night.desc" = "Dark mode, Night Shift, mute and Focus";
 "scene.applied" = "Scene applied: %@";
+"scene.exit" = "Exit scene";
+"scene.exited" = "Scene exited";
+"scene.appliedPartial" = "%@ applied with %d failure(s)";
+"scene.exitPartial" = "Exiting the scene had %d failure(s)";
 "window.title" = "Window Management";
 "window.subtitle" = "Layouts and saved size";
 "window.leftHalf" = "Left half";

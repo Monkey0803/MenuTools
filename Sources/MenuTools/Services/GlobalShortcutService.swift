@@ -158,6 +158,7 @@ final class GlobalShortcutService {
     private let screenshotBindingsProvider: @MainActor () -> [ScreenshotCaptureMode: GlobalShortcut]
     private let clipboardBindingProvider: @MainActor () -> GlobalShortcut?
     private let appVolumeBindingProvider: @MainActor () -> GlobalShortcut?
+    private let messagePresenter: any TransientMessagePresenting
     private var globalMonitor: Any?
     private var localMonitor: Any?
 
@@ -168,7 +169,8 @@ final class GlobalShortcutService {
         appBindingsProvider: @escaping @MainActor () -> [String: GlobalShortcut] = { AppShortcutService.shared.bindings },
         screenshotBindingsProvider: @escaping @MainActor () -> [ScreenshotCaptureMode: GlobalShortcut] = { ScreenshotShortcutService.shared.bindings },
         clipboardBindingProvider: @escaping @MainActor () -> GlobalShortcut? = { ClipboardShortcutService.shared.binding },
-        appVolumeBindingProvider: @escaping @MainActor () -> GlobalShortcut? = { AppVolumeShortcutService.shared.binding }
+        appVolumeBindingProvider: @escaping @MainActor () -> GlobalShortcut? = { AppVolumeShortcutService.shared.binding },
+        messagePresenter: any TransientMessagePresenting = ClipboardHUDMessagePresenter()
     ) {
         self.defaults = defaults
         self.conflictChecker = conflictChecker
@@ -177,6 +179,7 @@ final class GlobalShortcutService {
         self.screenshotBindingsProvider = screenshotBindingsProvider
         self.clipboardBindingProvider = clipboardBindingProvider
         self.appVolumeBindingProvider = appVolumeBindingProvider
+        self.messagePresenter = messagePresenter
         self.bindings = GlobalShortcutService.loadBindings(from: defaults)
     }
 
@@ -274,16 +277,19 @@ final class GlobalShortcutService {
         guard let scene = GlobalShortcutCatalog.match(keyCode: keyCode, modifiers: modifiers, bindings: bindings) else {
             return
         }
-        do {
-            try SceneService.shared.apply(
-                scene,
-                launcher: AppLauncherService.shared,
-                focusService: FocusModeService.shared
-            )
-            lastTriggeredScene = scene
+        let report = SceneService.shared.apply(
+            scene,
+            launcher: AppLauncherService.shared,
+            focusService: FocusModeService.shared
+        )
+        lastTriggeredScene = scene
+        if report.isFullSuccess {
             lastError = nil
-        } catch {
-            lastError = error.localizedDescription
+            messagePresenter.show(message: L("scene.applied", L(scene.titleKey)), isSuccess: true)
+        } else {
+            let message = L("scene.appliedPartial", L(scene.titleKey), report.failures.count)
+            lastError = message
+            messagePresenter.show(message: message, isSuccess: false)
         }
     }
 

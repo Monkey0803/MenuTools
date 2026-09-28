@@ -780,6 +780,10 @@
 "scene.night" = "夜間";
 "scene.night.desc" = "ダークモード、Night Shift、消音、集中モード";
 "scene.applied" = "シーンを適用しました：%@";
+"scene.exit" = "シーンを終了";
+"scene.exited" = "シーンを終了しました";
+"scene.appliedPartial" = "%@を適用しましたが %d 件失敗しました";
+"scene.exitPartial" = "シーン終了時に %d 件失敗しました";
 "window.title" = "ウインドウ管理";
 "window.subtitle" = "レイアウトとサイズ保存";
 "window.leftHalf" = "左半分";

@@ -780,6 +780,10 @@
 "scene.night" = "야간";
 "scene.night.desc" = "다크 모드, Night Shift, 음소거 및 집중 모드";
 "scene.applied" = "장면 적용됨: %@";
+"scene.exit" = "장면 종료";
+"scene.exited" = "장면을 종료했습니다";
+"scene.appliedPartial" = "%@ 적용됨, %d개 실패";
+"scene.exitPartial" = "장면 종료 시 %d개 실패";
 "window.title" = "윈도우 관리";
 "window.subtitle" = "배치 및 크기 저장";
 "window.leftHalf" = "왼쪽 절반";

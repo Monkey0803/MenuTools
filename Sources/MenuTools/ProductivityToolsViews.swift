@@ -5,6 +5,7 @@ import SwiftUI
 struct ScenePresetsCard: View {
     let activeScene: ScenePreset?
     let apply: (ScenePreset) -> Void
+    let exit: () -> Void
 
     var body: some View {
         VStack(alignment: .leading, spacing: 9) {
@@ -19,6 +20,10 @@ struct ScenePresetsCard: View {
                     Text(L(activeScene.titleKey))
                         .font(.caption2)
                         .foregroundStyle(.tint)
+                    // 演示模式会开启防休眠与隐藏桌面图标，必须给一个退出入口。
+                    Button(L("scene.exit"), action: exit)
+                        .buttonStyle(.borderless)
+                        .controlSize(.small)
                 }
             }
 

@@ -780,6 +780,10 @@
 "scene.night" = "夜间";
 "scene.night.desc" = "深色模式、夜览、静音和专注模式";
 "scene.applied" = "已应用场景：%@";
+"scene.exit" = "退出场景";
+"scene.exited" = "已退出场景";
+"scene.appliedPartial" = "%@已应用，但有 %d 项失败";
+"scene.exitPartial" = "退出场景时有 %d 项失败";
 "window.title" = "窗口管理";
 "window.subtitle" = "布局与尺寸记忆";
 "window.leftHalf" = "左半屏";
