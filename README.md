@@ -165,12 +165,12 @@
 
 ### 下载
 
-当前目标版本：[MenuTools v1.1.4](https://github.com/Monkey0803/MenuTools/releases/tag/v1.1.4)
+当前目标版本：[MenuTools v1.1.5](https://github.com/Monkey0803/MenuTools/releases/tag/v1.1.5)
 
 两种安装包任选其一：
 
-- `MenuTools-1.1.4.dmg`：打开后把 `MenuTools.app` 拖入「应用程序」
-- `MenuTools-1.1.4.zip`：解压后将 `MenuTools.app` 拖入「应用程序」
+- `MenuTools-1.1.5.dmg`：打开后把 `MenuTools.app` 拖入「应用程序」
+- `MenuTools-1.1.5.zip`：解压后将 `MenuTools.app` 拖入「应用程序」
 
 源码由 GitHub 按 tag 自动提供（Source code zip / tar.gz）。每个 Release 说明里会附上下载文件的 SHA-256，便于校验。
 
@@ -379,10 +379,10 @@ open "menutools://preset?name=开发"             # 套用固定尺寸预设
    ```
 5. 用生成好的说明创建 Release：
    ```bash
-   gh release create v1.1.2 \
-     dist/MenuTools-1.1.2.zip dist/MenuTools-1.1.2.dmg dist/appcast.xml \
-     --title "MenuTools 1.1.2" \
-     --notes-file docs/release-notes-1.1.2.md \
+   gh release create v1.1.5 \
+     dist/MenuTools-1.1.5.zip dist/MenuTools-1.1.5.dmg dist/appcast.xml \
+     --title "MenuTools 1.1.5" \
+     --notes-file docs/release-notes-1.1.5.md \
      --target main
    ```
    创建前先让 `main` 包含本次发版提交：`--target main` 会把 tag 指向 `main` 的头，所以要先 `git push origin <版本分支>`，再 `git checkout main && git merge --ff-only <版本分支> && git push origin main`，最后切回版本分支。否则 tag 会落到上一个版本上。
