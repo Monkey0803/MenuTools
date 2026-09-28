@@ -1207,6 +1207,7 @@
 "volume.sleepTimer.desc" = "The master volume fades linearly to 0 during the last 30 seconds, then mutes";
 "volume.sleepTimer.finished" = "Muted by the sleep timer";
 "volume.sleepTimer.dismiss" = "Got it";
+"volume.sleepTimer.restore" = "Restore previous volume";
 "volume.preset.none" = "Do not apply automatically";
 "volume.preset.overwrite" = "Overwrite with current settings";
 "volume.preset.importSuccess" = "Presets imported";

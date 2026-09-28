@@ -1207,6 +1207,7 @@
 "volume.sleepTimer.desc" = "到点前最后 30 秒会把主音量线性渐弱到 0，然后静音";
 "volume.sleepTimer.finished" = "已按睡眠定时静音";
 "volume.sleepTimer.dismiss" = "知道了";
+"volume.sleepTimer.restore" = "恢复到定时前";
 "volume.preset.none" = "不自动应用";
 "volume.preset.overwrite" = "覆盖当前配置";
 "volume.preset.importSuccess" = "预设导入完成";

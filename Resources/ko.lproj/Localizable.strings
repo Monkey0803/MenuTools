@@ -1207,6 +1207,7 @@
 "volume.sleepTimer.desc" = "마지막 30초 동안 마스터 볼륨이 0까지 선형으로 줄어든 뒤 음소거됩니다";
 "volume.sleepTimer.finished" = "슬립 타이머로 음소거됨";
 "volume.sleepTimer.dismiss" = "확인";
+"volume.sleepTimer.restore" = "타이머 이전 볼륨으로 복원";
 "volume.preset.none" = "자동 적용 안 함";
 "volume.preset.overwrite" = "현재 설정으로 덮어쓰기";
 "volume.preset.importSuccess" = "프리셋을 가져왔습니다";

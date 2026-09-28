@@ -970,6 +970,13 @@ struct AppVolumeSettingsView: View {
                     HStack(spacing: 8) {
                         Label(L("volume.sleepTimer.finished"), systemImage: "moon.zzz.fill")
                             .foregroundStyle(.secondary)
+                        if service.sleepTimerRestoreVolume != nil {
+                            Button(L("volume.sleepTimer.restore")) {
+                                service.restoreVolumeFromSleepTimer()
+                            }
+                            .buttonStyle(.borderless)
+                            .controlSize(.small)
+                        }
                         Button(L("volume.sleepTimer.dismiss")) {
                             service.acknowledgeSleepTimerFinish()
                         }

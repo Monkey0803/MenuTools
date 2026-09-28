@@ -1580,6 +1580,82 @@ func sleepTimerAppliesFadeAndCancelRestores() throws {
     #expect(service.output.isMuted)
 }
 
+@Test("定时结束后仍可一键恢复到定时前的音量")
+@MainActor
+func sleepTimerFinishOffersRestore() throws {
+    let defaults = try makeEnhancementDefaults("sleepTimerRestore")
+    let backend = EnhancedFakeAppVolumeBackend()
+    let service = AppVolumeService(backend: backend, userDefaults: defaults)
+    service.start()
+    backend.send(output: .fixture(volume: 0.8))
+    service.setMasterVolume(0.8)
+
+    #expect(service.sleepTimerRestoreVolume == nil)
+
+    service.startSleepTimer(minutes: 5)
+    let start = try #require(service.sleepTimer?.startedAt)
+    service.tickSleepTimer(now: start.addingTimeInterval(300))
+
+    // 到点静音，但保留定时前的音量以便恢复。
+    #expect(service.output.isMuted)
+    #expect(service.sleepTimerRestoreVolume == 0.8)
+
+    service.restoreVolumeFromSleepTimer()
+
+    #expect(!service.output.isMuted)
+    #expect(abs(service.output.volume - 0.8) < 0.01)
+    #expect(service.sleepTimerRestoreVolume == nil)
+    #expect(!service.sleepTimerDidFinish)
+}
+
+@Test("结束提示里选择「知道了」表示接受静音，不再保留恢复入口")
+@MainActor
+func acknowledgingSleepTimerFinishDropsRestoreOffer() throws {
+    let defaults = try makeEnhancementDefaults("sleepTimerAcknowledge")
+    let backend = EnhancedFakeAppVolumeBackend()
+    let service = AppVolumeService(backend: backend, userDefaults: defaults)
+    service.start()
+    backend.send(output: .fixture(volume: 0.6))
+    service.setMasterVolume(0.6)
+
+    service.startSleepTimer(minutes: 5)
+    let start = try #require(service.sleepTimer?.startedAt)
+    service.tickSleepTimer(now: start.addingTimeInterval(300))
+    #expect(service.sleepTimerRestoreVolume == 0.6)
+
+    service.acknowledgeSleepTimerFinish()
+
+    #expect(!service.sleepTimerDidFinish)
+    #expect(service.sleepTimerRestoreVolume == nil)
+    #expect(service.output.isMuted)
+}
+
+@Test("停用音频模块会取消睡眠定时并恢复定时前的音量")
+@MainActor
+func stoppingServiceCancelsSleepTimerAndRestoresVolume() throws {
+    let defaults = try makeEnhancementDefaults("sleepTimerStop")
+    let backend = EnhancedFakeAppVolumeBackend()
+    let service = AppVolumeService(backend: backend, userDefaults: defaults)
+    service.start()
+    backend.send(output: .fixture(volume: 0.8))
+    service.setMasterVolume(0.8)
+
+    service.startSleepTimer(minutes: 10)
+    let start = try #require(service.sleepTimer?.startedAt)
+    service.tickSleepTimer(now: start.addingTimeInterval(600 - 15))
+    #expect(abs(service.output.volume - 0.4) < 0.01)
+
+    service.stop()
+
+    #expect(service.sleepTimer == nil)
+    #expect(abs(service.output.volume - 0.8) < 0.01)
+
+    // 任务若仍在跑，后续 tick 不能再把音量压到 0（此前停用插件后仍会静音系统）。
+    service.tickSleepTimer(now: start.addingTimeInterval(600))
+    #expect(!service.output.isMuted)
+    #expect(abs(service.output.volume - 0.8) < 0.01)
+}
+
 @Test("需要接管音频的判定包含声像与单声道，并尊重不接管选项")
 func routingPolicyIncludesChannelMixAndSkip() {
     // 只看声像或单声道也需要建立路由（此前后端漏判，导致该功能实际失效）

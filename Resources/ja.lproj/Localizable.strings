@@ -1207,6 +1207,7 @@
 "volume.sleepTimer.desc" = "最後の 30 秒でマスター音量を 0 まで直線的にフェードし、その後ミュートします";
 "volume.sleepTimer.finished" = "スリープタイマーでミュートしました";
 "volume.sleepTimer.dismiss" = "了解";
+"volume.sleepTimer.restore" = "タイマー前の音量に戻す";
 "volume.preset.none" = "自動適用しない";
 "volume.preset.overwrite" = "現在の設定で上書き";
 "volume.preset.importSuccess" = "プリセットを読み込みました";

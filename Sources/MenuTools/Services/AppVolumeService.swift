@@ -1041,6 +1041,8 @@ final class AppVolumeService {
     private var sleepTimerTask: Task<Void, Never>?
     /// 定时结束时广播一次，供界面提示。
     private(set) var sleepTimerDidFinish = false
+    /// 定时结束前的主音量：结束后仍保留，供「恢复到定时前」使用；「知道了」或新定时会清掉。
+    private(set) var sleepTimerRestoreVolume: Double?
 
     init(
         backend: AppVolumeRoutingBackend,
@@ -1178,6 +1180,8 @@ final class AppVolumeService {
 
     func stop() {
         guard isStarted else { return }
+        // 停用模块时必须先取消睡眠定时：否则任务会继续跑，到点仍会把系统音量静音。
+        cancelSleepTimer()
         restoreInputStateAfterMonitoring()
         sessions.forEach { backend.removeRoute(for: $0.rootBundleID) }
         backend.stop()
@@ -2089,6 +2093,7 @@ final class AppVolumeService {
     func startSleepTimer(minutes: Int, now: Date = Date()) {
         guard minutes > 0 else { return }
         sleepTimerDidFinish = false
+        sleepTimerRestoreVolume = nil
         sleepTimer = AppVolumeSleepTimer(
             startedAt: now,
             duration: TimeInterval(minutes) * 60,
@@ -2108,12 +2113,23 @@ final class AppVolumeService {
     func cancelSleepTimer() {
         sleepTimerTask?.cancel()
         sleepTimerTask = nil
+        sleepTimerRestoreVolume = nil
         guard let timer = sleepTimer else { return }
         sleepTimer = nil
         if !timer.isExpired(at: Date()), output.isMuted || output.volume < timer.baseVolume {
             setMasterVolume(timer.baseVolume)
             if output.isMuted { setMasterMuted(false) }
         }
+    }
+
+    /// 定时结束、把系统音量压到 0 之后，恢复到定时前的音量。
+    func restoreVolumeFromSleepTimer() {
+        guard let baseVolume = sleepTimerRestoreVolume else { return }
+        sleepTimerRestoreVolume = nil
+        sleepTimerDidFinish = false
+        setMasterVolume(baseVolume)
+        if output.isMuted { setMasterMuted(false) }
+        notifySnapshotChanged()
     }
 
     /// 驱动一次淡出计算；可注入时间以便回归。
@@ -2126,6 +2142,8 @@ final class AppVolumeService {
             setMasterVolume(0)
             setMasterMuted(true)
             sleepTimerDidFinish = true
+            // 结束前的主音量要留着：此后用户仍可选择「恢复到定时前」。
+            sleepTimerRestoreVolume = timer.baseVolume
             notifySnapshotChanged()
             return
         }
@@ -2136,8 +2154,10 @@ final class AppVolumeService {
         notifySnapshotChanged()
     }
 
+    /// 「知道了」表示接受静音，因此同时放弃恢复入口。
     func acknowledgeSleepTimerFinish() {
         sleepTimerDidFinish = false
+        sleepTimerRestoreVolume = nil
     }
 
     /// 剩余分钟数（界面显示用）。
