@@ -91,6 +91,8 @@
 "resource.alert.memoryPressure" = "内存压力紧张";
 "resource.alert.memoryPressure.desc" = "系统内存压力已到临界，可考虑释放内存或关闭占用较高的 App。";
 "resource.alert.diskSpace" = "磁盘剩余不足";
+"resource.alert.batteryHealth" = "电池健康度偏低";
+"resource.alert.batteryHealth.desc" = "电池健康度低于 80%（或系统已提示维修）。可在「系统监控 → 电池健康」查看详情。";
 "resource.alert.diskSpace.desc" = "磁盘可用空间已低于设定阈值，可在面板里用 DerivedData 清理释放空间。";
 "resource.alert.permission.notRequested" = "启用告警时系统会询问";
 "resource.alert.permission.authorized" = "已授权";

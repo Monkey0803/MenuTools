@@ -1037,7 +1037,7 @@ private final class RecordingResourceAlerter: SystemResourceAlerting {
 
     func requestPermission() { requestedPermission = true }
     func currentPermission() async -> SystemResourceNotificationPermission { permission }
-    func send(_ kind: SystemResourceAlertKind, snapshot: SystemResourceSnapshot) { sent.append(kind) }
+    func send(_ kind: SystemResourceAlertKind, snapshot: SystemResourceSnapshot?) { sent.append(kind) }
 }
 
 /// 持续高 CPU 的数据源，用来驱动告警（计数器必须递增，否则差值为 0）。

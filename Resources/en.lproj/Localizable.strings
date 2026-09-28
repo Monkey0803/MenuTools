@@ -91,6 +91,8 @@
 "resource.alert.memoryPressure" = "Memory pressure critical";
 "resource.alert.memoryPressure.desc" = "System memory pressure is critical; consider releasing memory or quitting heavy apps.";
 "resource.alert.diskSpace" = "Low disk space";
+"resource.alert.batteryHealth" = "Battery health is low";
+"resource.alert.batteryHealth.desc" = "Battery health dropped below 80%, or the system is already recommending service. See System Monitoring > Battery Health for details.";
 "resource.alert.diskSpace.desc" = "Free disk space is below the threshold; use the DerivedData cleanup in the panel to reclaim space.";
 "resource.alert.permission.notRequested" = "macOS will ask when you enable alerts";
 "resource.alert.permission.authorized" = "Authorized";

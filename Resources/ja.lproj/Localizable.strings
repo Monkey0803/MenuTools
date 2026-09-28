@@ -91,6 +91,8 @@
 "resource.alert.memoryPressure" = "メモリプレッシャーがひっ迫";
 "resource.alert.memoryPressure.desc" = "システムのメモリプレッシャーが限界です。メモリ解放や負荷の高い App の終了を検討してください。";
 "resource.alert.diskSpace" = "ディスクの空き不足";
+"resource.alert.batteryHealth" = "バッテリーの状態が低下";
+"resource.alert.batteryHealth.desc" = "バッテリーの最大容量が 80% を下回ったか、システムが修理を推奨しています。「システムモニタ → バッテリー」で詳細を確認できます。";
 "resource.alert.diskSpace.desc" = "ディスクの空きがしきい値を下回っています。パネルの DerivedData クリーンアップで空きを確保できます。";
 "resource.alert.permission.notRequested" = "通知を有効にするとシステムが確認します";
 "resource.alert.permission.authorized" = "許可済み";

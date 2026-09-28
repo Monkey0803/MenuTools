@@ -91,6 +91,8 @@
 "resource.alert.memoryPressure" = "記憶體壓力緊張";
 "resource.alert.memoryPressure.desc" = "系統記憶體壓力已到臨界，可考慮釋放記憶體或關閉佔用較高的 App。";
 "resource.alert.diskSpace" = "磁碟剩餘不足";
+"resource.alert.batteryHealth" = "電池健康度偏低";
+"resource.alert.batteryHealth.desc" = "電池健康度低於 80%（或系統已提示維修）。可在「系統監控 → 電池健康」查看詳情。";
 "resource.alert.diskSpace.desc" = "磁碟可用空間已低於設定閾值，可在面板裡用 DerivedData 清理釋放空間。";
 "resource.alert.permission.notRequested" = "啟用告警時系統會詢問";
 "resource.alert.permission.authorized" = "已授權";

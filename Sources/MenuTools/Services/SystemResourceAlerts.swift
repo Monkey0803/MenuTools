@@ -9,6 +9,8 @@ enum SystemResourceAlertKind: String, CaseIterable, Equatable, Sendable {
     case memoryPressure
     /// 磁盘剩余不足。
     case diskSpace
+    /// 电池健康度偏低或系统已提示维修。
+    case batteryHealth
 
     var titleKey: String { "resource.alert.\(rawValue)" }
     var detailKey: String { "resource.alert.\(rawValue).desc" }
@@ -19,6 +21,8 @@ enum SystemResourceAlertKind: String, CaseIterable, Equatable, Sendable {
         case .cpuSustained: return 30 * 60
         case .memoryPressure: return 30 * 60
         case .diskSpace: return 24 * 60 * 60
+        // 电池健康变化很慢：与 BatteryHealthAlertPolicy 的冷却保持一致。
+        case .batteryHealth: return BatteryHealthAlertPolicy.cooldown
         }
     }
 }
@@ -149,7 +153,8 @@ enum SystemResourceNotificationPermission: String, CaseIterable, Equatable, Send
 protocol SystemResourceAlerting {
     func requestPermission()
     func currentPermission() async -> SystemResourceNotificationPermission
-    func send(_ kind: SystemResourceAlertKind, snapshot: SystemResourceSnapshot)
+    /// 电池健康告警没有对应的资源快照，因此快照是可选参数（实现里并不使用它）。
+    func send(_ kind: SystemResourceAlertKind, snapshot: SystemResourceSnapshot?)
 }
 
 @MainActor
@@ -180,7 +185,7 @@ final class UserNotificationSystemResourceAlerter: SystemResourceAlerting {
         }
     }
 
-    func send(_ kind: SystemResourceAlertKind, snapshot: SystemResourceSnapshot) {
+    func send(_ kind: SystemResourceAlertKind, snapshot: SystemResourceSnapshot?) {
         guard canPostNotifications else { return }
         let content = UNMutableNotificationContent()
         content.title = L(kind.titleKey)
