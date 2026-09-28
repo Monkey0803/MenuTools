@@ -170,6 +170,62 @@ struct RightClickDirectoryListingOptions: Codable, Equatable, Sendable {
 }
 
 /// App 与 Finder 扩展共享的配置；缺少新字段时迁移旧版本配置。
+/// 应用内语言 → lproj 目录名。
+///
+/// 主程序按 `appLanguage` 手动选 lproj，而 Finder 扩展此前用 `NSLocalizedString`，
+/// 只按**系统**语言：非中文系统 + 手动切中文时会出现「主界面英文、右键菜单中文」。
+/// 语言跟着共享配置走，扩展与本进程用的是同一套规则。
+enum RightClickConfigLanguage {
+    /// 与主程序 `SettingsKey.appLanguage` 同一个键。
+    static let defaultsKey = "appLanguage"
+    static let supported = ["en", "ja", "ko", "zh-Hans", "zh-Hant"]
+
+    /// `system`、空值与未知取值都归一化为 nil（表示跟随系统）。
+    static func normalized(_ raw: String?) -> String? {
+        guard let raw else { return nil }
+        let trimmed = raw.trimmingCharacters(in: .whitespacesAndNewlines)
+        return supported.first { $0.caseInsensitiveCompare(trimmed) == .orderedSame }
+    }
+
+    /// 解析应当使用的 lproj：手动设置优先，其次按系统首选语言顺序匹配。
+    static func resourceLanguage(configured: String?, preferredLanguages: [String]) -> String? {
+        if let configured = normalized(configured) { return configured }
+        for preferred in preferredLanguages {
+            let normalized = preferred.lowercased()
+            if normalized.hasPrefix("zh-hant") || normalized.hasPrefix("zh-tw")
+                || normalized.hasPrefix("zh-hk") || normalized.hasPrefix("zh-mo") {
+                return "zh-Hant"
+            }
+            if normalized.hasPrefix("zh") { return "zh-Hans" }
+            if normalized.hasPrefix("en") { return "en" }
+            if normalized.hasPrefix("ja") { return "ja" }
+            if normalized.hasPrefix("ko") { return "ko" }
+        }
+        return nil
+    }
+
+    private static let lock = NSLock()
+    /// 只在 lock 保护下读写；菜单构建可能来自 Finder 的 XPC 线程。
+    nonisolated(unsafe) private static var bundleCache: [String: Bundle] = [:]
+
+    /// 取对应语言的资源 bundle；解析不到时回退主 bundle。
+    ///
+    /// 菜单构建可能来自 Finder 的 XPC 线程，缓存必须加锁。
+    static func localizedBundle(for language: String?, in bundle: Bundle = .main) -> Bundle {
+        guard let resource = resourceLanguage(
+            configured: language,
+            preferredLanguages: Locale.preferredLanguages
+        ), let path = bundle.path(forResource: resource, ofType: "lproj"),
+           let localized = Bundle(path: path) else { return bundle }
+
+        lock.lock()
+        defer { lock.unlock() }
+        if let cached = bundleCache[resource] { return cached }
+        bundleCache[resource] = localized
+        return localized
+    }
+}
+
 struct RightClickConfig: Codable, Equatable, Sendable {
     var enabled: [String: Bool]
     var order: [String]
@@ -180,6 +236,9 @@ struct RightClickConfig: Codable, Equatable, Sendable {
     var menuStyle: RightClickMenuStyle
     /// 操作日志开关。放在共享配置里，沙盒扩展才读得到（它读不到主 App 的 UserDefaults）。
     var loggerEnabled: Bool
+    /// 应用内语言（lproj 名）；nil 表示跟随系统。扩展据此选资源，
+    /// 避免出现「主界面英文、右键菜单中文」。
+    var language: String? = nil
 
     init(
         enabled: [String: Bool], order: [String] = [],
@@ -200,7 +259,7 @@ struct RightClickConfig: Codable, Equatable, Sendable {
     }
 
     private enum CodingKeys: String, CodingKey {
-        case enabled, order, templates, applications, destinations, directoryListing, menuStyle, loggerEnabled
+        case enabled, order, templates, applications, destinations, directoryListing, menuStyle, loggerEnabled, language
     }
 
     init(from decoder: any Decoder) throws {
@@ -217,6 +276,7 @@ struct RightClickConfig: Codable, Equatable, Sendable {
             ? container.decode(RightClickMenuStyle.self, forKey: .menuStyle) : .nested
         loggerEnabled = try container.contains(.loggerEnabled)
             ? container.decode(Bool.self, forKey: .loggerEnabled) : false
+        language = try container.decodeIfPresent(String.self, forKey: .language)
     }
 
     static let `default` = RightClickConfig(
@@ -243,6 +303,7 @@ struct RightClickConfig: Codable, Equatable, Sendable {
     /// 应用、目录和排序；这里改为按条目过滤，并把越界数值夹取回可用范围。
     func sanitized() -> RightClickConfig {
         var result = self
+        result.language = RightClickConfigLanguage.normalized(language)
         result.enabled = enabled.filter { RightClickItem(rawValue: $0.key) != nil }
         for item in RightClickItem.allCases where result.enabled[item.rawValue] == nil {
             result.enabled[item.rawValue] = true

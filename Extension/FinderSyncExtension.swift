@@ -221,7 +221,13 @@ final class FinderSyncExtension: FIFinderSync {
         return NSImage(systemSymbolName: name, accessibilityDescription: nil)
     }
 
-    private func localized(_ key: String) -> String { NSLocalizedString(key, comment: "") }
+    /// 按**共享配置里的应用内语言**取文案：此前用 NSLocalizedString 只认系统语言，
+    /// 非中文系统 + 手动切中文就会出现「主界面英文、右键菜单中文」。
+    private func localized(_ key: String) -> String {
+        RightClickConfigLanguage
+            .localizedBundle(for: configState.read().language)
+            .localizedString(forKey: key, value: nil, table: nil)
+    }
 }
 
 // MARK: - 主线程转交

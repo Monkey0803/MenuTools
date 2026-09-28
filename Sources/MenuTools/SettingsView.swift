@@ -538,6 +538,11 @@ struct GeneralSettingsView: View {
                         Text(language.displayName).tag(language.rawValue)
                     }
                 }
+                // 扩展是沙盒进程，只认共享配置里的语言：切换后立刻重新发布，
+                // 否则右键菜单要等下次启动主程序才会跟上。
+                .onChange(of: appLanguage) { _, _ in
+                    RightClickCommandHandler.publishLanguageToExtension()
+                }
             }
 
             Section(L("settings.section.terminal")) {

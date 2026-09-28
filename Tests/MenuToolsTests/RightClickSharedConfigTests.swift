@@ -156,3 +156,54 @@ func commandAuthenticityRequiresToken() throws {
     let decoded = try JSONDecoder().decode(RightClickCommand.self, from: json)
     #expect(RightClickCommandStore.isAuthentic(decoded, secret: "secret-token"))
 }
+
+@Test("语言归一化：system 与未知值表示跟随系统")
+func rightClickConfigLanguageNormalization() {
+    #expect(RightClickConfigLanguage.normalized(nil) == nil)
+    #expect(RightClickConfigLanguage.normalized("") == nil)
+    #expect(RightClickConfigLanguage.normalized("system") == nil)
+    #expect(RightClickConfigLanguage.normalized("klingon") == nil)
+    #expect(RightClickConfigLanguage.normalized("en") == "en")
+    #expect(RightClickConfigLanguage.normalized("zh-Hans") == "zh-Hans")
+    #expect(RightClickConfigLanguage.normalized("zh-Hant") == "zh-Hant")
+}
+
+@Test("lproj 解析：手动语言优先，其次按系统首选语言，最后回退")
+func rightClickConfigLanguageResolvesResource() {
+    // 手动设置优先于系统语言
+    #expect(RightClickConfigLanguage.resourceLanguage(configured: "en", preferredLanguages: ["zh-Hans-CN"]) == "en")
+    #expect(RightClickConfigLanguage.resourceLanguage(configured: "zh-Hant", preferredLanguages: ["en-US"]) == "zh-Hant")
+
+    // 跟随系统：按首选语言顺序逐条匹配
+    #expect(RightClickConfigLanguage.resourceLanguage(configured: "system", preferredLanguages: ["zh-Hans-CN", "en-US"]) == "zh-Hans")
+    #expect(RightClickConfigLanguage.resourceLanguage(configured: nil, preferredLanguages: ["zh-TW", "en-US"]) == "zh-Hant")
+    #expect(RightClickConfigLanguage.resourceLanguage(configured: nil, preferredLanguages: ["zh-HK"]) == "zh-Hant")
+    #expect(RightClickConfigLanguage.resourceLanguage(configured: nil, preferredLanguages: ["en-GB"]) == "en")
+    #expect(RightClickConfigLanguage.resourceLanguage(configured: nil, preferredLanguages: ["ja-JP"]) == "ja")
+    #expect(RightClickConfigLanguage.resourceLanguage(configured: nil, preferredLanguages: ["ko-KR"]) == "ko")
+    // 不认识的语言一律回退到主 bundle
+    #expect(RightClickConfigLanguage.resourceLanguage(configured: nil, preferredLanguages: ["fr-FR"]) == nil)
+    #expect(RightClickConfigLanguage.resourceLanguage(configured: nil, preferredLanguages: []) == nil)
+}
+
+@Test("共享配置携带应用内语言，并忽略未知取值")
+func rightClickConfigCarriesLanguage() throws {
+    var config = RightClickConfig.default
+    #expect(config.language == nil)
+
+    config.language = "ja"
+    let data = try JSONEncoder().encode(config)
+    let decoded = try JSONDecoder().decode(RightClickConfig.self, from: data)
+    #expect(decoded.language == "ja")
+
+    // 旧版本配置没有这个字段：解码后为 nil，不影响其它设置
+    var legacy = RightClickConfig.default
+    legacy.language = nil
+    let legacyData = try JSONEncoder().encode(legacy)
+    #expect(try JSONDecoder().decode(RightClickConfig.self, from: legacyData).language == nil)
+
+    // 未知取值被 sanitize 掉，避免扩展去找不存在的 lproj
+    var unknown = RightClickConfig.default
+    unknown.language = "klingon"
+    #expect(unknown.sanitized().language == nil)
+}

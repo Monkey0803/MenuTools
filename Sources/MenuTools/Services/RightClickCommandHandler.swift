@@ -40,7 +40,24 @@ enum RightClickCommandHandler {
             // 通知内容先由 logger 解码并做长度/级别校验，避免把外部输入直接写进日志。
             RightClickLogger.receiveForwardedPayload(note.object as? String)
         })
+        // 把应用内语言同步进共享配置：扩展是沙盒进程，读不到主 App 的 UserDefaults，
+        // 只能通过这份配置知道自己该用哪个 lproj。
+        publishLanguageToExtension()
         RightClickConfigStore.broadcast(RightClickConfigStore.load())
+    }
+
+    /// 语言变化后也要重新发布：否则扩展会一直用上一次的语言。
+    static func publishLanguageToExtension() {
+        let raw = UserDefaults.standard.string(forKey: SettingsKey.appLanguage)
+        let config = RightClickConfigStore.load()
+        var updated = config
+        updated.language = RightClickConfigLanguage.normalized(raw)
+        guard updated.language != config.language else {
+            RightClickConfigStore.broadcast(config)
+            return
+        }
+        RightClickConfigStore.persist(updated)
+        RightClickConfigStore.broadcast(updated)
     }
 
     static func deactivate() {
