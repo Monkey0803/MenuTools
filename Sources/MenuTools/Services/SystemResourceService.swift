@@ -503,6 +503,10 @@ final class SystemResourceService {
     static let shared = SystemResourceService()
 
     private let provider: any SystemResourceProviding
+    /// 是否已有一次采样在途：合并并发请求，避免积压。
+    private var isSampling = false
+    /// 采样代次：停止或换档后自增，用来丢弃在途的过期读数。
+    private var samplingGeneration = 0
     private let memoryReleaser: any SystemMemoryReleasing
     private let historyStore: any SystemResourceHistoryStoring
     private let alerter: SystemResourceAlerting
@@ -607,6 +611,9 @@ final class SystemResourceService {
         samplingTask?.cancel()
         samplingTask = nil
         currentSamplingInterval = interval
+        // 换档或停止后，在途采样的结果必须作废，否则停用后还会回填一份旧快照。
+        samplingGeneration &+= 1
+        isSampling = false
         guard let interval else {
             snapshot = nil
             previousReading = nil
@@ -614,18 +621,42 @@ final class SystemResourceService {
             return
         }
 
-        refresh()
+        refreshInBackground()
         samplingTask = Task { @MainActor [weak self] in
             while !Task.isCancelled {
                 try? await Task.sleep(for: .seconds(interval))
                 guard !Task.isCancelled else { return }
-                self?.refresh()
+                self?.refreshInBackground()
             }
         }
     }
 
+    /// 后台采样：读取（IOKit / getifaddrs / 进程枚举）放到主线程之外。
+    ///
+    /// 面板打开时每 2 秒一次、菜单栏显示资源指标时每 10 秒一次；同步在主线程做这些读取
+    /// 会直接卡住面板滚动与菜单栏标题刷新，磁盘慢的时候尤其明显。
+    func refreshInBackground(now: Date = Date()) {
+        // 上一次还没读完就跳过本次请求，避免高频档下请求积压。
+        guard !isSampling else { return }
+        isSampling = true
+        let provider = self.provider
+        let generation = samplingGeneration
+        Task { [weak self] in
+            let current = await Task.detached(priority: .utility) { provider.read() }.value
+            guard let self else { return }
+            // 采样已停止或已换档：丢掉这次在途读数。
+            guard generation == self.samplingGeneration else { return }
+            self.isSampling = false
+            self.applyReading(current, now: now)
+        }
+    }
+
+    /// 同步采样：读取在主线程完成，只用于测试与需要立刻拿到结果的场景。
     func refresh(now: Date = Date()) {
-        let current = provider.read()
+        applyReading(provider.read(), now: now)
+    }
+
+    private func applyReading(_ current: SystemResourceReading, now: Date) {
         snapshot = SystemResourceCalculator.snapshot(
             current: current,
             previous: previousReading

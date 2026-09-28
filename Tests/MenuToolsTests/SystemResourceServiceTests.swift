@@ -344,6 +344,7 @@ func resourceMonitoringLifecycle() async throws {
 
     service.beginMonitoring(interval: 60)
     #expect(service.isMonitoring)
+    try await waitForResourceSnapshot(service)
     #expect(provider.readCount == 1)
     #expect(service.snapshot != nil)
 
@@ -351,6 +352,43 @@ func resourceMonitoringLifecycle() async throws {
     #expect(!service.isMonitoring)
     // 结束时清掉快照，插件关闭后不应残留读数
     #expect(service.snapshot == nil)
+}
+
+/// 等待首帧采样落地（采样已移到后台线程，不再同步可见）。
+@MainActor
+private func waitForResourceSnapshot(_ service: SystemResourceService, timeout: Int = 200) async throws {
+    var waited = 0
+    while service.snapshot == nil, waited < timeout {
+        try await Task.sleep(for: .milliseconds(10))
+        waited += 1
+    }
+}
+
+/// 记录读取发生在哪个线程：这项修复的核心就是「读取不能在主线程」。
+private final class ThreadRecordingResourceProvider: SystemResourceProviding, @unchecked Sendable {
+    private let lock = NSLock()
+    private var storedReadCount = 0
+    private var storedReadOnMainThread: Bool?
+
+    var readCount: Int { lock.withLock { storedReadCount } }
+    var readOnMainThread: Bool? { lock.withLock { storedReadOnMainThread } }
+
+    func read() -> SystemResourceReading {
+        lock.withLock {
+            storedReadCount += 1
+            storedReadOnMainThread = Thread.isMainThread
+        }
+        return SystemResourceReading(
+            timestamp: 0,
+            cpuTicks: SystemResourceCPUTicks(user: 1, system: 1, idle: 1, nice: 0),
+            memoryUsedBytes: 1,
+            memoryTotalBytes: 2,
+            diskAvailableBytes: 3,
+            diskTotalBytes: 4,
+            networkReceivedBytes: 0,
+            networkSentBytes: 0
+        )
+    }
 }
 
 private struct NoopMemoryReleaser: SystemMemoryReleasing {
@@ -1496,4 +1534,44 @@ private func pragmaInt(_ database: OpaquePointer, _ name: String) -> Int {
     defer { sqlite3_finalize(statement) }
     guard sqlite3_step(statement) == SQLITE_ROW else { return -1 }
     return Int(sqlite3_column_int64(statement, 0))
+}
+
+@Test("资源采样在后台线程读取，并合并并发请求")
+@MainActor
+func resourceSamplingReadsOffMainThread() async throws {
+    let provider = ThreadRecordingResourceProvider()
+    let service = SystemResourceService(
+        provider: provider,
+        memoryReleaser: NoopMemoryReleaser(),
+        historyStore: RecordingHistoryStore()
+    )
+
+    service.refreshInBackground()
+    service.refreshInBackground()
+    try await waitForResourceSnapshot(service)
+
+    #expect(service.snapshot != nil)
+    // 并发的第二次请求被合并，不会读两遍
+    #expect(provider.readCount == 1)
+    // 读取必须发生在后台线程（此前是主线程同步读 IOKit/getifaddrs）
+    #expect(provider.readOnMainThread == false)
+}
+
+@Test("停止采样后在途读数不会再回填快照")
+@MainActor
+func resourceSamplingDropsInFlightReadingAfterStop() async throws {
+    let provider = ThreadRecordingResourceProvider()
+    let service = SystemResourceService(
+        provider: provider,
+        memoryReleaser: NoopMemoryReleaser(),
+        historyStore: RecordingHistoryStore()
+    )
+
+    service.beginMonitoring(interval: 60)
+    // 还没等采样回来就停止：在途结果必须被丢弃
+    service.endMonitoring()
+    try await Task.sleep(for: .milliseconds(120))
+
+    #expect(service.snapshot == nil)
+    #expect(!service.isMonitoring)
 }
