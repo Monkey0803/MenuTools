@@ -471,6 +471,8 @@
 "clipboard.privacy" = "Privacy";
 "clipboard.pauseRecording" = "Pause Recording";
 "clipboard.pauseRecording.description" = "Clipboard changes are not saved while recording is paused.";
+"clipboard.imageRecognition" = "Recognize text and QR codes in images";
+"clipboard.imageRecognition.description" = "Recognition runs on-device with Vision and uploads nothing. Turning it off stops recognition and clears saved results; the images stay in history.";
 "clipboard.recordingPaused" = "Recording paused";
 "clipboard.recordingPaused.hint" = "Clipboard changes are not saved. Resume in Settings > Clipboard > Privacy.";
 "clipboard.excludedApps" = "Pause recording while these apps are active";

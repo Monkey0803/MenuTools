@@ -42,6 +42,24 @@ struct ClipboardPrivacySettingsSection: View {
 
             Divider()
 
+            HStack(spacing: 8) {
+                Text(L("clipboard.imageRecognition"))
+                Spacer()
+                Toggle(L("clipboard.imageRecognition"), isOn: Binding(
+                    get: { historyService.isImageRecognitionEnabled },
+                    set: { historyService.setImageRecognitionEnabled($0) }
+                ))
+                .toggleStyle(.switch)
+                .controlSize(.small)
+                .labelsHidden()
+            }
+
+            Text(L("clipboard.imageRecognition.description"))
+                .font(.caption)
+                .foregroundStyle(.secondary)
+
+            Divider()
+
             HStack {
                 Text(L("clipboard.excludedApps"))
                     .font(.subheadline.weight(.medium))

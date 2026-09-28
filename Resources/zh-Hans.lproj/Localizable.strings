@@ -471,6 +471,8 @@
 "clipboard.privacy" = "隐私";
 "clipboard.pauseRecording" = "暂停记录";
 "clipboard.pauseRecording.description" = "暂停后，剪贴板的变化不会保存到历史记录。";
+"clipboard.imageRecognition" = "识别图片中的文字与二维码";
+"clipboard.imageRecognition.description" = "在本机用 Vision 完成识别，不上传图片；关闭后不再识别，并会清掉已保存的识别结果（图片本身仍保留在历史里）。";
 "clipboard.recordingPaused" = "记录已暂停";
 "clipboard.recordingPaused.hint" = "剪贴板变化不会保存。可在「设置 → 剪贴板 → 隐私」恢复记录。";
 "clipboard.excludedApps" = "以下 App 前台时暂停记录";

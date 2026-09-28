@@ -471,6 +471,8 @@
 "clipboard.privacy" = "隱私";
 "clipboard.pauseRecording" = "暫停記錄";
 "clipboard.pauseRecording.description" = "暫停後，剪貼簿的變更不會儲存到歷史記錄。";
+"clipboard.imageRecognition" = "辨識圖片中的文字與 QR Code";
+"clipboard.imageRecognition.description" = "在本機以 Vision 完成辨識，不上傳圖片；關閉後不再辨識，並會清除已儲存的辨識結果（圖片本身仍保留在歷史中）。";
 "clipboard.recordingPaused" = "記錄已暫停";
 "clipboard.recordingPaused.hint" = "剪貼板變化不會儲存。可在「設定 → 剪貼板 → 隱私」恢復記錄。";
 "clipboard.excludedApps" = "以下 App 位於前台時暫停記錄";

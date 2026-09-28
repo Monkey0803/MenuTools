@@ -2125,6 +2125,8 @@ final class ClipboardHistoryService {
     private(set) var currentItemCount = 0
     private(set) var hasLoadedPersistedHistory: Bool
     private(set) var isRecordingPaused: Bool
+    /// 图片文字/二维码识别总开关：关闭后不再识别，已有识别结果也会清掉。
+    private(set) var isImageRecognitionEnabled: Bool
     private(set) var excludedBundleIDs: [String]
     private(set) var sensitiveRules: ClipboardSensitiveRules
     private(set) var applicationPolicies: [ClipboardApplicationPolicy]
@@ -2177,6 +2179,8 @@ final class ClipboardHistoryService {
         self.sensitiveLifetime = max(0, sensitiveLifetime)
         self.hasLoadedPersistedHistory = persistenceURL == nil
         self.isRecordingPaused = userDefaults.bool(forKey: StorageKey.isRecordingPaused)
+        // 默认开启：识别在本机完成、不上传，但会影响耗电与隐私观感，因此给一个总开关。
+        self.isImageRecognitionEnabled = userDefaults.object(forKey: StorageKey.imageRecognitionEnabled) as? Bool ?? true
         self.excludedBundleIDs = Array(
             Set(userDefaults.stringArray(forKey: StorageKey.excludedBundleIDs) ?? [])
         ).sorted()
@@ -2798,7 +2802,8 @@ final class ClipboardHistoryService {
     }
 
     private func scheduleImageTextRecognitionIfNeeded(_ item: ClipboardHistoryItem) {
-        guard item.recognizedText == nil,
+        guard isImageRecognitionEnabled,
+              item.recognizedText == nil,
               case let .image(data) = item.content,
               imageRecognitionTasks[item.id] == nil else {
             return
@@ -2841,8 +2846,27 @@ final class ClipboardHistoryService {
 
     /// 补试识别失败的图片：面板刷新时自动调用，也供用户点「重试」手动触发。
     /// 单次最多补试固定条数，连续点击可以继续推进。
+    /// 开关图片识别。关闭时取消在途任务并清掉已有识别结果，
+    /// 否则会出现「明明关了还在识别/还能搜到识别文字」的不一致。
+    func setImageRecognitionEnabled(_ enabled: Bool) {
+        guard isImageRecognitionEnabled != enabled else { return }
+        isImageRecognitionEnabled = enabled
+        userDefaults.set(enabled, forKey: StorageKey.imageRecognitionEnabled)
+        historyMutationGeneration &+= 1
+        if !enabled {
+            imageRecognitionTasks.values.forEach { $0.cancel() }
+            imageRecognitionTasks.removeAll()
+            failedImageRecognitionIDs.removeAll()
+            for item in buffer.items where item.recognizedText != nil {
+                buffer.setRecognizedText(nil, for: item.id)
+            }
+        }
+        synchronizeItems()
+        persist()
+    }
+
     func retryFailedImageRecognitions() {
-        guard !failedImageRecognitionIDs.isEmpty else { return }
+        guard isImageRecognitionEnabled, !failedImageRecognitionIDs.isEmpty else { return }
         let candidates = failedImageRecognitionIDs
             .compactMap { id in buffer.items.first { $0.id == id && $0.recognizedText == nil } }
             .prefix(ClipboardImageRecognitionPolicy.refreshRetryLimit)
@@ -2913,6 +2937,7 @@ final class ClipboardHistoryService {
 
     private enum StorageKey {
         static let isRecordingPaused = "clipboard.isRecordingPaused"
+        static let imageRecognitionEnabled = "clipboard.imageRecognitionEnabled"
         static let excludedBundleIDs = "clipboard.excludedBundleIDs"
         static let sensitiveRules = "clipboard.sensitiveRules"
         static let retentionDays = "clipboard.retentionDays"

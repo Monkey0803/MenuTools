@@ -471,6 +471,8 @@
 "clipboard.privacy" = "プライバシー";
 "clipboard.pauseRecording" = "記録を一時停止";
 "clipboard.pauseRecording.description" = "一時停止中のクリップボード変更は履歴に保存されません。";
+"clipboard.imageRecognition" = "画像内の文字と QR コードを認識";
+"clipboard.imageRecognition.description" = "認識は Vision により本体内で行い、画像は送信しません。オフにすると認識を停止し、保存済みの認識結果も削除します（画像自体は履歴に残ります）。";
 "clipboard.recordingPaused" = "記録を一時停止中";
 "clipboard.recordingPaused.hint" = "クリップボードの変更は保存されません。「設定 → クリップボード → プライバシー」で再開できます。";
 "clipboard.excludedApps" = "次のアプリが前面にある間は記録を停止";

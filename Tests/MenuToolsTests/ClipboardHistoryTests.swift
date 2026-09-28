@@ -2193,3 +2193,93 @@ func clipboardItemLimitOptionsAreStable() {
     #expect(values.contains(ClipboardHistoryLimit.defaultValue))
     #expect(!values.contains(0))
 }
+
+/// 计数型识别器：识别在 @Sendable 闭包里跑，因此这里不能带 MainActor 隔离。
+private final class RecognitionCallCounter: @unchecked Sendable {
+    private let lock = NSLock()
+    private var count = 0
+
+    var callCount: Int { lock.withLock { count } }
+    func increment() { lock.withLock { count += 1 } }
+}
+
+@Test("图片识别默认开启，可关闭并持久化")
+@MainActor
+func clipboardImageRecognitionTogglePersists() throws {
+    let suiteName = "ClipboardImageRecognition.\(UUID().uuidString)"
+    let defaults = try #require(UserDefaults(suiteName: suiteName))
+    defaults.removePersistentDomain(forName: suiteName)
+
+    let service = ClipboardHistoryService(persistenceURL: nil, userDefaults: defaults)
+    #expect(service.isImageRecognitionEnabled)
+
+    service.setImageRecognitionEnabled(false)
+    #expect(!service.isImageRecognitionEnabled)
+    #expect(!ClipboardHistoryService(persistenceURL: nil, userDefaults: defaults).isImageRecognitionEnabled)
+
+    service.setImageRecognitionEnabled(true)
+    #expect(ClipboardHistoryService(persistenceURL: nil, userDefaults: defaults).isImageRecognitionEnabled)
+}
+
+@Test("关闭图片识别后不再排队识别")
+@MainActor
+func clipboardImageRecognitionDisabledSkipsRecognition() async throws {
+    let image = NSImage(size: NSSize(width: 2, height: 2))
+    image.lockFocus()
+    NSColor.white.setFill()
+    NSRect(x: 0, y: 0, width: 2, height: 2).fill()
+    image.unlockFocus()
+    let imageData = try #require(image.tiffRepresentation)
+
+    let counter = RecognitionCallCounter()
+    // 必须用独立 suite：写进 UserDefaults.standard 会污染同进程的其他用例。
+    let suiteName = "ClipboardImageRecognition.off.\(UUID().uuidString)"
+    let defaults = try #require(UserDefaults(suiteName: suiteName))
+    defaults.removePersistentDomain(forName: suiteName)
+    let service = ClipboardHistoryService(
+        persistenceURL: nil,
+        pasteboard: NSPasteboard(name: NSPasteboard.Name("MenuToolsTests.\(UUID().uuidString)")),
+        userDefaults: defaults,
+        imageTextRecognizer: { _ in
+            counter.increment()
+            return .recognized("不该被识别的文字")
+        }
+    )
+    service.setImageRecognitionEnabled(false)
+
+    #expect(service.copy(.image(imageData)))
+    try await Task.sleep(for: .milliseconds(200))
+
+    #expect(counter.callCount == 0)
+    #expect(service.items.first?.recognizedText == nil)
+}
+
+@Test("关闭图片识别会清掉已存的识别结果，状态与开关一致")
+@MainActor
+func clipboardImageRecognitionDisabledClearsExistingText() async throws {
+    let image = NSImage(size: NSSize(width: 2, height: 2))
+    image.lockFocus()
+    NSColor.white.setFill()
+    NSRect(x: 0, y: 0, width: 2, height: 2).fill()
+    image.unlockFocus()
+    let imageData = try #require(image.tiffRepresentation)
+
+    let suiteName = "ClipboardImageRecognition.clear.\(UUID().uuidString)"
+    let defaults = try #require(UserDefaults(suiteName: suiteName))
+    defaults.removePersistentDomain(forName: suiteName)
+    let service = ClipboardHistoryService(
+        persistenceURL: nil,
+        pasteboard: NSPasteboard(name: NSPasteboard.Name("MenuToolsTests.\(UUID().uuidString)")),
+        userDefaults: defaults,
+        imageTextRecognizer: { _ in .recognized("识别文字") }
+    )
+
+    #expect(service.copy(.image(imageData)))
+    for _ in 0 ..< 200 where service.items.first?.recognizedText == nil {
+        try await Task.sleep(for: .milliseconds(25))
+    }
+    #expect(service.items.first?.recognizedText == "识别文字")
+
+    service.setImageRecognitionEnabled(false)
+    #expect(service.items.first?.recognizedText == nil)
+}
