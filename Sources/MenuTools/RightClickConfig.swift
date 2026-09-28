@@ -612,14 +612,110 @@ struct RightClickCommand: Codable, Equatable, Sendable {
     var optionID: String? = nil
     var directoryPath: String? = nil
     var requestID: String? = nil
+    /// 通道令牌：命令走 DistributedNotificationCenter，任何本地进程都能投递同名通知，
+    /// 令牌用来证明这条命令确实来自我们的 Finder 扩展。
+    var channelToken: String? = nil
+}
+
+/// 右键命令通道的共享令牌。
+///
+/// 命令通过 `DistributedNotificationCenter` 投递，通知名是公开的字符串，**任何本地进程**
+/// 都能伪造一份 JSON 让主进程去执行文件操作（新建/改名/移动/复制），而主进程拿着用户的
+/// 文件权限。这里放一个只有当前用户可读的令牌在载荷里，宿主校验通过才执行。
+enum RightClickChannelSecret {
+    static let fileName = "rightclick-channel.secret"
+    /// 令牌长度（字节）；写成十六进制后字符数是它的两倍。
+    static let tokenByteCount = 32
+
+    /// 纯路径计算，便于在无签名的测试进程里验证。
+    static func secretFileURL(inBaseDirectory base: URL) -> URL {
+        base.appendingPathComponent("MenuTools", isDirectory: true)
+            .appendingPathComponent(fileName, isDirectory: false)
+    }
+
+    static func load(inBaseDirectory base: URL, fileManager: FileManager = .default) -> String? {
+        guard let data = try? Data(contentsOf: secretFileURL(inBaseDirectory: base)),
+              let token = String(data: data, encoding: .utf8)?
+                  .trimmingCharacters(in: .whitespacesAndNewlines),
+              !token.isEmpty else { return nil }
+        return token
+    }
+
+    /// 读取已有令牌，没有就生成一个并落盘（0600）。
+    static func loadOrCreate(inBaseDirectory base: URL, fileManager: FileManager = .default) -> String? {
+        if let existing = load(inBaseDirectory: base, fileManager: fileManager) { return existing }
+
+        var bytes = [UInt8](repeating: 0, count: tokenByteCount)
+        for index in bytes.indices {
+            bytes[index] = UInt8.random(in: .min ... .max)
+        }
+        let token = bytes.map { String(format: "%02x", $0) }.joined()
+
+        let url = secretFileURL(inBaseDirectory: base)
+        do {
+            try fileManager.createDirectory(
+                at: url.deletingLastPathComponent(),
+                withIntermediateDirectories: true
+            )
+            try Data(token.utf8).write(to: url, options: .atomic)
+            // 只有当前用户可读：令牌泄露等于把右键通道交出去。
+            try? fileManager.setAttributes([.posixPermissions: 0o600], ofItemAtPath: url.path)
+            return token
+        } catch {
+            return nil
+        }
+    }
+
+    /// 应用真实数据目录下的令牌（宿主与扩展共用同一份）。
+    static func load(fileManager: FileManager = .default) -> String? {
+        load(
+            inBaseDirectory: RightClickConfigStore.resolveBaseDirectory(fileManager: fileManager),
+            fileManager: fileManager
+        )
+    }
+
+    static func loadOrCreate(fileManager: FileManager = .default) -> String? {
+        loadOrCreate(
+            inBaseDirectory: RightClickConfigStore.resolveBaseDirectory(fileManager: fileManager),
+            fileManager: fileManager
+        )
+    }
+
+    /// 常量时间比较，避免通过耗时差异逐字节猜令牌。
+    static func matches(_ token: String?, expected: String) -> Bool {
+        guard let token, !token.isEmpty, !expected.isEmpty else { return false }
+        let candidate = Array(token.utf8)
+        let reference = Array(expected.utf8)
+        guard candidate.count == reference.count else { return false }
+        var difference: UInt8 = 0
+        for index in candidate.indices {
+            difference |= candidate[index] ^ reference[index]
+        }
+        return difference == 0
+    }
 }
 
 enum RightClickCommandStore {
     static let commandNotification = "com.qoder.menutools.rightclick.command"
     static let acceptedNotification = "com.qoder.menutools.rightclick.accepted"
 
+    /// 给命令附加通道令牌。
+    static func authenticated(_ command: RightClickCommand, secret: String) -> RightClickCommand {
+        var copy = command
+        copy.channelToken = secret
+        return copy
+    }
+
+    /// 校验投递来源：令牌必须与宿主保存的一致，否则这条命令不是我们的扩展发出来的。
+    static func isAuthentic(_ command: RightClickCommand, secret: String?) -> Bool {
+        guard let secret else { return false }
+        return RightClickChannelSecret.matches(command.channelToken, expected: secret)
+    }
+
     static func send(_ command: RightClickCommand) {
-        guard let data = try? JSONEncoder().encode(command),
+        // 拿不到令牌就不发：宿主一定会拒收，发了也只是静默失败。
+        guard let secret = RightClickChannelSecret.loadOrCreate() else { return }
+        guard let data = try? JSONEncoder().encode(authenticated(command, secret: secret)),
               let json = String(data: data, encoding: .utf8) else { return }
         DistributedNotificationCenter.default().postNotificationName(
             Notification.Name(commandNotification), object: json, deliverImmediately: true

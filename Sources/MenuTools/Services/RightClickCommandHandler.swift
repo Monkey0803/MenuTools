@@ -12,13 +12,20 @@ enum RightClickCommandHandler {
 
     static func activate() {
         guard observerTokens.isEmpty else { return }
+        // 先确保通道令牌存在：否则宿主在扩展首次投递之前一直读不到令牌，
+        // 会把升级后的第一条命令当成伪造命令拒掉。
+        _ = RightClickChannelSecret.loadOrCreate()
         let center = DistributedNotificationCenter.default()
         observerTokens.append(center.addObserver(
             forName: Notification.Name(RightClickCommandStore.commandNotification), object: nil, queue: .main
         ) { note in
             let json = note.object as? String
             MainActor.assumeIsolated {
-                guard let command = RightClickCommandStore.decode(json) else { return }
+                guard let command = RightClickCommandStore.decode(json),
+                      RightClickCommandStore.isAuthentic(command, secret: RightClickChannelSecret.load()) else {
+                    RightClickLogger.error("Rejected command without a valid channel token")
+                    return
+                }
                 receive(command)
             }
         })

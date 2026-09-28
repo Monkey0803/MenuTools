@@ -100,3 +100,59 @@ private func withSharedConfigDirectory(_ body: (URL) throws -> Void) throws {
     defer { try? FileManager.default.removeItem(at: directory) }
     try body(directory)
 }
+
+@Test("通道令牌只生成一次并只有当前用户可读")
+func channelSecretIsGeneratedOnceAndPrivate() throws {
+    let fileManager = FileManager.default
+    let base = fileManager.temporaryDirectory
+        .appendingPathComponent("ChannelSecret-\(UUID().uuidString)", isDirectory: true)
+    try fileManager.createDirectory(at: base, withIntermediateDirectories: true)
+    defer { try? fileManager.removeItem(at: base) }
+
+    #expect(RightClickChannelSecret.load(inBaseDirectory: base) == nil)
+
+    let created = try #require(
+        RightClickChannelSecret.loadOrCreate(inBaseDirectory: base, fileManager: fileManager)
+    )
+    #expect(created.count == RightClickChannelSecret.tokenByteCount * 2)
+
+    // 二次调用必须返回同一个令牌，否则扩展与宿主会各说各话
+    #expect(RightClickChannelSecret.loadOrCreate(inBaseDirectory: base, fileManager: fileManager) == created)
+    #expect(RightClickChannelSecret.load(inBaseDirectory: base, fileManager: fileManager) == created)
+
+    let url = RightClickChannelSecret.secretFileURL(inBaseDirectory: base)
+    let attributes = try fileManager.attributesOfItem(atPath: url.path)
+    let permissions = try #require(attributes[.posixPermissions] as? NSNumber)
+    #expect(permissions.intValue == 0o600)
+}
+
+@Test("令牌比较拒绝缺失、空值与长度不同的输入")
+func channelSecretMatchingRejectsSpoofs() {
+    #expect(RightClickChannelSecret.matches("abc", expected: "abc"))
+    #expect(!RightClickChannelSecret.matches(nil, expected: "abc"))
+    #expect(!RightClickChannelSecret.matches("", expected: "abc"))
+    #expect(!RightClickChannelSecret.matches("abcd", expected: "abc"))
+    #expect(!RightClickChannelSecret.matches("abd", expected: "abc"))
+    // 宿主读不到令牌时一律拒绝（fail closed）
+    #expect(!RightClickCommandStore.isAuthentic(
+        RightClickCommand(action: "copyFilename", paths: ["/tmp/a"]),
+        secret: nil
+    ))
+}
+
+@Test("命令载荷必须带正确令牌才算可信")
+func commandAuthenticityRequiresToken() throws {
+    let command = RightClickCommand(action: "copyFilename", paths: ["/tmp/a"])
+    let authenticated = RightClickCommandStore.authenticated(command, secret: "secret-token")
+
+    #expect(authenticated.channelToken == "secret-token")
+    #expect(RightClickCommandStore.isAuthentic(authenticated, secret: "secret-token"))
+    #expect(!RightClickCommandStore.isAuthentic(authenticated, secret: "other-token"))
+    // 没有令牌的裸命令（任意进程都能伪造出来的那种）必须被拒
+    #expect(!RightClickCommandStore.isAuthentic(command, secret: "secret-token"))
+
+    // 令牌要随 JSON 一起传输
+    let json = try JSONEncoder().encode(authenticated)
+    let decoded = try JSONDecoder().decode(RightClickCommand.self, from: json)
+    #expect(RightClickCommandStore.isAuthentic(decoded, secret: "secret-token"))
+}
