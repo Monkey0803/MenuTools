@@ -19,6 +19,23 @@ enum MenuBarMetric: String, CaseIterable, Equatable, Hashable, Sendable {
     var footerKey: String? {
         self == .automatic ? "menubar.metric.automatic.footer" : nil
     }
+
+    /// 该指标依赖的功能模块：模块在功能中心被停用时，菜单栏不会显示它。
+    /// 与 `MenuBarStatusItemController` 里的取值门槛保持一致。
+    var requiredPlugin: BuiltInPluginID? {
+        switch self {
+        case .networkSpeed: return .networkTraffic
+        case .volume: return .appVolume
+        case .cpu, .memory, .disk: return .systemResources
+        case .automatic, .off: return nil
+        }
+    }
+
+    /// 统一选择器里是否可选。模块停用的指标必须禁用，否则用户「选了没反应」且得不到解释。
+    func isAvailable(enabledPluginIDs: Set<BuiltInPluginID>) -> Bool {
+        guard let requiredPlugin else { return true }
+        return enabledPluginIDs.contains(requiredPlugin)
+    }
 }
 
 /// 统一选择器与各模块设置的合并规则（纯函数，便于回归）。

@@ -525,6 +525,7 @@
 "menubar.metric.title" = "選單列內容";
 "menubar.metric.automatic" = "依模組設定";
 "menubar.metric.automatic.footer" = "沿用各模組自己的設定：網速優先，其次音量；選具體項目後由這裡統一決定。";
+"menubar.metric.unavailable" = "該指標所屬模組已在「功能中心」停用，選單列不會顯示它；啟用後再選即可。";
 "menubar.metric.networkSpeed" = "網速";
 "menubar.metric.volume" = "音量";
 "menubar.metric.cpu" = "CPU 佔用";

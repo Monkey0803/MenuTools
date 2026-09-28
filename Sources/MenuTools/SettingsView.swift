@@ -446,6 +446,8 @@ struct GeneralSettingsView: View {
     @AppStorage(SettingsKey.autoCheckUpdate) private var autoCheckUpdate = true
     /// 后台发现的待处理更新（温和提醒）。
     @State private var updateReminder = AppUpdateReminder.shared
+    /// 菜单栏统一选择器要知道哪些模块被停用，用来禁用对应指标并给出说明。
+    @State private var pluginManager = BuiltInPluginManager.shared
     @AppStorage(SettingsKey.appLanguage) private var appLanguage = AppLanguage.system.rawValue
 
     @State private var launchAtLogin = LoginItemService.isEnabled
@@ -503,8 +505,17 @@ struct GeneralSettingsView: View {
             Section(L("menubar.metric.title")) {
                 Picker(L("menubar.metric.title"), selection: $menuBarMetric) {
                     ForEach(MenuBarMetric.allCases, id: \.self) { metric in
-                        Text(L(metric.titleKey)).tag(metric.rawValue)
+                        Text(L(metric.titleKey))
+                            .tag(metric.rawValue)
+                            .disabled(!metric.isAvailable(enabledPluginIDs: pluginManager.enabledPluginIDs))
                     }
+                }
+                // 选中的指标所属模块被停用时，菜单栏不会显示它；这里说明原因，避免被当成 bug。
+                if let selected = MenuBarMetric(rawValue: menuBarMetric),
+                   !selected.isAvailable(enabledPluginIDs: pluginManager.enabledPluginIDs) {
+                    Text(L("menubar.metric.unavailable"))
+                        .font(.caption)
+                        .foregroundStyle(.orange)
                 }
                 if let footerKey = MenuBarMetric(rawValue: menuBarMetric)?.footerKey {
                     Text(L(footerKey))

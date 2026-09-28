@@ -525,6 +525,7 @@
 "menubar.metric.title" = "菜单栏内容";
 "menubar.metric.automatic" = "按模块设置";
 "menubar.metric.automatic.footer" = "沿用各模块自己的设置：网速优先，其次音量；选具体项目后由这里统一决定。";
+"menubar.metric.unavailable" = "该指标所属模块已在「功能中心」停用，菜单栏不会显示它；启用后再选即可。";
 "menubar.metric.networkSpeed" = "网速";
 "menubar.metric.volume" = "音量";
 "menubar.metric.cpu" = "CPU 占用";

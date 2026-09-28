@@ -1204,6 +1204,35 @@ func menuBarMetricResolverPicksSingleSource() {
     }
 }
 
+@Test("菜单栏指标标注所属模块，模块停用时不可选")
+func menuBarMetricAvailabilityFollowsPluginState() {
+    // 指标 → 依赖模块
+    #expect(MenuBarMetric.networkSpeed.requiredPlugin == .networkTraffic)
+    #expect(MenuBarMetric.volume.requiredPlugin == .appVolume)
+    #expect(MenuBarMetric.cpu.requiredPlugin == .systemResources)
+    #expect(MenuBarMetric.memory.requiredPlugin == .systemResources)
+    #expect(MenuBarMetric.disk.requiredPlugin == .systemResources)
+    // 自动与关闭不依赖任何模块，永远可选
+    #expect(MenuBarMetric.automatic.requiredPlugin == nil)
+    #expect(MenuBarMetric.off.requiredPlugin == nil)
+
+    let allPlugins = Set(BuiltInPluginID.allCases)
+    #expect(MenuBarMetric.cpu.isAvailable(enabledPluginIDs: allPlugins))
+    #expect(MenuBarMetric.automatic.isAvailable(enabledPluginIDs: []))
+    #expect(MenuBarMetric.off.isAvailable(enabledPluginIDs: []))
+
+    // 关掉「系统监控」后 CPU/内存/磁盘不可选，但音量仍可选
+    let withoutResources = allPlugins.subtracting([.systemResources])
+    #expect(!MenuBarMetric.cpu.isAvailable(enabledPluginIDs: withoutResources))
+    #expect(!MenuBarMetric.memory.isAvailable(enabledPluginIDs: withoutResources))
+    #expect(!MenuBarMetric.disk.isAvailable(enabledPluginIDs: withoutResources))
+    #expect(MenuBarMetric.volume.isAvailable(enabledPluginIDs: withoutResources))
+
+    // 关掉音频与网络监控后，对应指标不可选
+    #expect(!MenuBarMetric.volume.isAvailable(enabledPluginIDs: allPlugins.subtracting([.appVolume])))
+    #expect(!MenuBarMetric.networkSpeed.isAvailable(enabledPluginIDs: allPlugins.subtracting([.networkTraffic])))
+}
+
 @Test("资源菜单栏标题：只对 CPU/内存/磁盘产出，百分比固定三位宽")
 func resourceMenuBarPresenterFormatsTitle() {
     let snapshot = SystemResourceSnapshot(

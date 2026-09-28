@@ -525,6 +525,7 @@
 "menubar.metric.title" = "メニューバーの内容";
 "menubar.metric.automatic" = "モジュールごと";
 "menubar.metric.automatic.footer" = "各モジュールの設定に従います（ネット速度が優先、次に音量）。項目を選ぶとここで統一されます。";
+"menubar.metric.unavailable" = "この指標のモジュールは「機能センター」で無効になっているため、メニューバーには表示されません。有効にしてから選び直してください。";
 "menubar.metric.networkSpeed" = "ネット速度";
 "menubar.metric.volume" = "音量";
 "menubar.metric.cpu" = "CPU 使用率";

@@ -525,6 +525,7 @@
 "menubar.metric.title" = "메뉴 막대 내용";
 "menubar.metric.automatic" = "모듈별 설정";
 "menubar.metric.automatic.footer" = "각 모듈의 설정을 따릅니다(네트워크 속도 우선, 다음 볼륨). 항목을 선택하면 여기서 통합됩니다.";
+"menubar.metric.unavailable" = "이 지표의 모듈이 「기능 센터」에서 비활성화되어 메뉴 막대에 표시되지 않습니다. 활성화한 뒤 다시 선택하세요.";
 "menubar.metric.networkSpeed" = "네트워크 속도";
 "menubar.metric.volume" = "볼륨";
 "menubar.metric.cpu" = "CPU 사용률";
