@@ -88,25 +88,31 @@ func storageServiceShowsCachedSnapshotBeforeRefresh() async throws {
         snapshot: cachedSnapshot,
         scanDate: Date(timeIntervalSince1970: 1_700_000_000)
     )
-    let service = StorageAnalysisService(cachedResult: cached, snapshotLoader: {
-        Thread.sleep(forTimeInterval: 0.12)
-        return freshSnapshot
-    })
+    let loader = GatedStorageSnapshotLoader(snapshot: freshSnapshot)
+    let service = StorageAnalysisService(cachedResult: cached, snapshotLoader: loader.load)
 
     #expect(service.snapshot == cachedSnapshot)
     #expect(service.lastScanDate == cached.scanDate)
     #expect(!service.isLoading)
 
     service.refresh()
-    try await Task.sleep(for: .milliseconds(30))
+    for _ in 0..<750 where !loader.hasEntered {
+        try await Task.sleep(for: .milliseconds(20))
+    }
+    #expect(loader.hasEntered)
 
+    // 加载器已进入并阻塞，此刻必然仍在扫描中：旧快照必须原样保留。
     #expect(service.snapshot == cachedSnapshot)
     #expect(service.isLoading)
 
-    try await Task.sleep(for: .milliseconds(150))
+    loader.release()
+    for _ in 0..<750 where service.snapshot != freshSnapshot {
+        try await Task.sleep(for: .milliseconds(20))
+    }
 
     #expect(service.snapshot == freshSnapshot)
     #expect(service.lastScanDate != cached.scanDate)
+    #expect(!service.isLoading)
 }
 
 @Test("同一存储服务在扫描中忽略重复刷新请求")
@@ -235,27 +241,51 @@ func storageCleanupPreviewIncludesPathAndReclaimableBytes() {
     #expect(preview.reclaimableBytes == 4_096)
 }
 
-private final class DelayedStorageSnapshotLoader: @unchecked Sendable {
-    private let lock = NSLock()
-    private var callCount = 0
-    private let first: StorageAnalysisSnapshot
-    private let subsequent: StorageAnalysisSnapshot
+/// 阻塞式扫描加载器：进入扫描后先发出「已开始」信号，再等待测试显式放行。
+/// 用它替代固定 sleep，取消才必然发生在扫描仍在飞的时候；固定 sleep 在整包并发
+/// 跑测试时会被拖长，可能晚于加载器返回，从而让「取消」变成「扫描完成后才取消」。
+private final class GatedStorageSnapshotLoader: @unchecked Sendable {
+    private let condition = NSCondition()
+    private let snapshot: StorageAnalysisSnapshot
+    private var entered = false
+    private var released = false
+    private var returned = false
 
-    init(first: StorageAnalysisSnapshot, subsequent: StorageAnalysisSnapshot) {
-        self.first = first
-        self.subsequent = subsequent
+    init(snapshot: StorageAnalysisSnapshot) {
+        self.snapshot = snapshot
+    }
+
+    var hasEntered: Bool {
+        condition.lock()
+        defer { condition.unlock() }
+        return entered
+    }
+
+    var hasReturned: Bool {
+        condition.lock()
+        defer { condition.unlock() }
+        return returned
     }
 
     func load() -> StorageAnalysisSnapshot {
-        lock.lock()
-        callCount += 1
-        let isFirst = callCount == 1
-        lock.unlock()
-        if isFirst {
-            Thread.sleep(forTimeInterval: 0.12)
-            return first
+        condition.lock()
+        entered = true
+        condition.broadcast()
+        while !released {
+            condition.wait(until: .now.addingTimeInterval(15))
+            if !released { break }
         }
-        return subsequent
+        returned = true
+        condition.broadcast()
+        condition.unlock()
+        return snapshot
+    }
+
+    func release() {
+        condition.lock()
+        released = true
+        condition.broadcast()
+        condition.unlock()
     }
 }
 
@@ -344,17 +374,61 @@ func storageServiceCancelsRefreshWithoutPublishingResult() async throws {
         entries: [],
         volume: StorageVolumeOverview(totalBytes: 100, availableBytes: 50)
     )
-    let loader = DelayedStorageSnapshotLoader(first: snapshot, subsequent: snapshot)
+    let loader = GatedStorageSnapshotLoader(snapshot: snapshot)
     let service = StorageAnalysisService(snapshotLoader: loader.load)
 
     service.refresh()
-    try await Task.sleep(for: .milliseconds(20))
+    for _ in 0..<750 where !loader.hasEntered {
+        try await Task.sleep(for: .milliseconds(20))
+    }
+    #expect(loader.hasEntered)
+
+    // 取消发生在扫描确实在飞的时候；放行后加载器仍会返回非 nil 结果，
+    // 因此这里验证的是服务自身的取消判定，而不是加载器提前退出。
     service.cancelRefresh()
-    try await Task.sleep(for: .milliseconds(180))
+    loader.release()
+
+    for _ in 0..<750 where !loader.hasReturned {
+        try await Task.sleep(for: .milliseconds(20))
+    }
+    #expect(loader.hasReturned)
+
+    // 给被取消的扫描一次发布的机会：取消判定若失效，快照会在窗口内出现。
+    for _ in 0..<25 where service.snapshot == nil {
+        try await Task.sleep(for: .milliseconds(20))
+    }
 
     #expect(service.snapshot == nil)
     #expect(!service.isLoading)
     #expect(service.lastScanWasCancelled)
+}
+
+@Test("扫描完成后才取消不会丢弃已完成的结果")
+@MainActor
+func storageServiceKeepsCompletedSnapshotWhenCancelledAfterCompletion() async throws {
+    let snapshot = StorageAnalysisSnapshot(
+        entries: [],
+        volume: StorageVolumeOverview(totalBytes: 100, availableBytes: 50)
+    )
+    let loader = GatedStorageSnapshotLoader(snapshot: snapshot)
+    let service = StorageAnalysisService(snapshotLoader: loader.load)
+
+    service.refresh()
+    for _ in 0..<750 where !loader.hasEntered {
+        try await Task.sleep(for: .milliseconds(20))
+    }
+    loader.release()
+    for _ in 0..<750 where service.snapshot == nil {
+        try await Task.sleep(for: .milliseconds(20))
+    }
+    #expect(service.snapshot == snapshot)
+
+    // 迟到的取消对应界面上已经消失的「取消」按钮：刚拿到的结果必须保留，
+    // 「扫描已取消」只在没有快照且未在加载时才显示，因此不会自相矛盾。
+    service.cancelRefresh()
+
+    #expect(service.snapshot == snapshot)
+    #expect(!service.isLoading)
 }
 
 @Test("经过审核的开发目录通过白名单校验，CoreSimulator 保持只读")
