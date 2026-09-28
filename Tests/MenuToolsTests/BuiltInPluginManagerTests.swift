@@ -243,6 +243,114 @@ func duplicateStoredOrderIsDeduplicated() throws {
     #expect(manager.manifests.map(\.id) == [.clipboard, .screenshot])
 }
 
+@Test("重新载入会把内存态与运行时对齐到存储里的新配置")
+@MainActor
+func reloadingAlignsMemoryStateWithStoredConfiguration() throws {
+    let defaults = try makePluginDefaults("reloadAligns")
+    let clipboard = PluginRuntimeSpy(id: "clipboard")
+    let screenshot = PluginRuntimeSpy(id: "screenshot")
+    let manager = BuiltInPluginManager(
+        registrations: [
+            BuiltInPluginRegistration(manifest: .fixture(id: .clipboard), runtime: clipboard),
+            BuiltInPluginRegistration(manifest: .fixture(id: .screenshot), runtime: screenshot)
+        ],
+        userDefaults: defaults
+    )
+    manager.startEnabledPlugins()
+    #expect(clipboard.startCount == 1)
+    #expect(screenshot.startCount == 1)
+
+    // 模拟备份导入：外部直接改写存储，改成只启用剪贴板。
+    try BuiltInPluginManager.persist(
+        BuiltInPluginConfiguration(
+            enabledPluginIDs: [.clipboard],
+            orderedPluginIDs: [.clipboard, .screenshot]
+        ),
+        to: defaults
+    )
+
+    // 未重新载入前内存态仍是旧值——这正是「导入后开关没变」的原因。
+    #expect(manager.isEnabled(.screenshot))
+
+    manager.reloadFromStorage()
+
+    #expect(manager.isEnabled(.clipboard))
+    #expect(!manager.isEnabled(.screenshot))
+    #expect(manager.runtimeState(for: .clipboard) == .running)
+    #expect(manager.runtimeState(for: .screenshot) == .stopped)
+    #expect(screenshot.stopCount == 1)
+    // 仍然启用的插件不该被无谓重启。
+    #expect(clipboard.startCount == 1)
+}
+
+@Test("重新载入会启动新启用的插件")
+@MainActor
+func reloadingStartsNewlyEnabledPlugins() throws {
+    let defaults = try makePluginDefaults("reloadStarts")
+    try BuiltInPluginManager.persist(
+        BuiltInPluginConfiguration(
+            enabledPluginIDs: [.clipboard],
+            orderedPluginIDs: [.clipboard, .screenshot]
+        ),
+        to: defaults
+    )
+    let clipboard = PluginRuntimeSpy(id: "clipboard")
+    let screenshot = PluginRuntimeSpy(id: "screenshot")
+    let manager = BuiltInPluginManager(
+        registrations: [
+            BuiltInPluginRegistration(manifest: .fixture(id: .clipboard), runtime: clipboard),
+            BuiltInPluginRegistration(manifest: .fixture(id: .screenshot), runtime: screenshot)
+        ],
+        userDefaults: defaults
+    )
+    manager.startEnabledPlugins()
+    #expect(screenshot.startCount == 0)
+
+    // 导入一份「截图也启用」的配置。
+    try BuiltInPluginManager.persist(
+        BuiltInPluginConfiguration(
+            enabledPluginIDs: [.clipboard, .screenshot],
+            orderedPluginIDs: [.clipboard, .screenshot]
+        ),
+        to: defaults
+    )
+    manager.reloadFromStorage()
+
+    #expect(manager.isEnabled(.screenshot))
+    #expect(screenshot.startCount == 1)
+    #expect(manager.runtimeState(for: .screenshot) == .running)
+}
+
+@Test("重新载入后旧内存态不会在后续操作中回写覆盖导入的配置")
+@MainActor
+func reloadedConfigurationSurvivesLaterWriteBack() throws {
+    let defaults = try makePluginDefaults("reloadWriteBack")
+    let manager = BuiltInPluginManager(
+        registrations: [
+            BuiltInPluginRegistration(manifest: .fixture(id: .clipboard), runtime: PluginRuntimeSpy()),
+            BuiltInPluginRegistration(manifest: .fixture(id: .screenshot), runtime: PluginRuntimeSpy())
+        ],
+        userDefaults: defaults
+    )
+    manager.startEnabledPlugins()
+
+    let imported = try BuiltInPluginConfiguration(
+        enabledPluginIDs: [.clipboard],
+        orderedPluginIDs: [.clipboard, .screenshot]
+    ).validated()
+    try BuiltInPluginManager.persist(imported, to: defaults)
+    manager.reloadFromStorage()
+
+    // 任意后续 UI 操作都会 persist；此时必须写回导入后的配置，而不是旧内存态。
+    // 注意 toOffset 是「原数组中的插入位置」，0 → 1 是空操作，这里用 2 才真正把剪贴板移到末尾。
+    manager.movePlugins(fromOffsets: IndexSet(integer: 0), toOffset: 2)
+
+    #expect(!manager.isEnabled(.screenshot))
+    let stored = try #require(BuiltInPluginManager.configuration(from: defaults))
+    #expect(stored.enabledPluginIDs == [.clipboard])
+    #expect(stored.orderedPluginIDs == [.screenshot, .clipboard])
+}
+
 private func makePluginDefaults(_ name: String) throws -> UserDefaults {
     let suiteName = "BuiltInPluginManagerTests.\(name).\(UUID().uuidString)"
     let defaults = try #require(UserDefaults(suiteName: suiteName))

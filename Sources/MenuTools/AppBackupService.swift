@@ -249,6 +249,26 @@ enum AppBackupService {
         }
     }
 
+    /// 导入备份后的完整收尾：先落盘，再把各处的内存态对齐到新配置。
+    ///
+    /// 备份恢复只写 `UserDefaults`，而插件管理器、右键配置（需跨进程广播）与平滑滚动引擎各自持有
+    /// 内存态；不重新载入的话功能中心仍显示旧开关，而且下一次任意开关或排序都会用旧状态整体回写，
+    /// 把刚导入的配置覆盖掉。
+    @MainActor
+    static func applyRestoredState(
+        _ document: AppBackupDocument,
+        userDefaults: UserDefaults,
+        rightClickStore: any RightClickConfigPersisting,
+        pluginManager: BuiltInPluginManager,
+        reloadSmoothScroll: () -> Void = { SmoothScrollEngine.shared.reload() },
+        broadcastRightClick: (RightClickConfig) -> Void = { RightClickConfigStore.broadcast($0) }
+    ) throws {
+        try restore(document, userDefaults: userDefaults, rightClickStore: rightClickStore)
+        broadcastRightClick(document.rightClick)
+        pluginManager.reloadFromStorage()
+        reloadSmoothScroll()
+    }
+
     private static func restore(_ values: [(String, Any?)], to userDefaults: UserDefaults) {
         for (key, value) in values {
             if let value {

@@ -460,6 +460,87 @@ func backupRejectsDuplicatePluginIdentifiers() {
     }
 }
 
+@Test("导入备份后会重新载入插件配置，功能中心不再停留在旧状态")
+@MainActor
+func restoreReloadsPluginManagerLiveState() throws {
+    let defaults = try makeDefaults(named: "restoreReloadsPlugins")
+    let clipboard = RestorePluginRuntimeSpy()
+    let screenshot = RestorePluginRuntimeSpy()
+    let manager = BuiltInPluginManager(
+        registrations: [
+            BuiltInPluginRegistration(manifest: restoreManifest(.clipboard), runtime: clipboard),
+            BuiltInPluginRegistration(manifest: restoreManifest(.screenshot), runtime: screenshot)
+        ],
+        userDefaults: defaults
+    )
+    manager.startEnabledPlugins()
+    #expect(clipboard.startCount == 1)
+    #expect(screenshot.startCount == 1)
+
+    // 备份里「截图已关闭」。
+    var settings = AppBackupSettings.serviceFixture
+    settings.enabledPluginIDs = ["clipboard"]
+    settings.pluginOrder = ["clipboard", "screenshot"]
+    let document = AppBackupDocument.current(
+        settings: settings,
+        rightClick: .default,
+        appVersion: "1.1.5",
+        createdAt: Date(timeIntervalSince1970: 600)
+    )
+
+    var broadcasted: RightClickConfig?
+    var smoothScrollReloads = 0
+    try AppBackupService.applyRestoredState(
+        document,
+        userDefaults: defaults,
+        rightClickStore: InMemoryRightClickStore(config: .default),
+        pluginManager: manager,
+        reloadSmoothScroll: { smoothScrollReloads += 1 },
+        broadcastRightClick: { broadcasted = $0 }
+    )
+
+    // 存储已写入导入的配置。
+    #expect(BuiltInPluginManager.configuration(from: defaults)?.enabledPluginIDs == [.clipboard])
+    // 内存态与运行时也已对齐：截图被停用，剪贴板保持运行。
+    #expect(!manager.isEnabled(.screenshot))
+    #expect(manager.runtimeState(for: .screenshot) == .stopped)
+    #expect(screenshot.stopCount == 1)
+    #expect(manager.isEnabled(.clipboard))
+    #expect(manager.runtimeState(for: .clipboard) == .running)
+    #expect(clipboard.startCount == 1)
+    // 右键配置广播与平滑滚动重载照旧执行。
+    #expect(broadcasted != nil)
+    #expect(smoothScrollReloads == 1)
+}
+
+/// 备份恢复测试用的最小运行时：只统计启停，不启动任何真实服务。
+@MainActor
+private final class RestorePluginRuntimeSpy: BuiltInPluginRuntime {
+    private(set) var startCount = 0
+    private(set) var stopCount = 0
+
+    func start() throws {
+        startCount += 1
+    }
+
+    func stop() {
+        stopCount += 1
+    }
+}
+
+private func restoreManifest(_ id: BuiltInPluginID) -> BuiltInPluginManifest {
+    BuiltInPluginManifest(
+        id: id,
+        category: .productivity,
+        titleKey: "plugin.\(id.rawValue).title",
+        descriptionKey: "plugin.\(id.rawValue).description",
+        symbol: "puzzlepiece.extension",
+        requiredPermissions: [],
+        dependencies: [],
+        defaultEnabled: true
+    )
+}
+
 private func makeDefaults(named name: String) throws -> UserDefaults {
     let suiteName = defaultsSuiteName(named: name)
     let defaults = try #require(UserDefaults(suiteName: suiteName))

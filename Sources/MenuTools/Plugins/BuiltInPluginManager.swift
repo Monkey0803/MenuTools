@@ -133,6 +133,8 @@ final class BuiltInPluginManager {
 
     private let registrations: [BuiltInPluginID: BuiltInPluginRegistration]
     private let userDefaults: UserDefaults
+    /// 注册顺序；存储缺失或损坏时用它兜底，也用于补齐存储里没有的插件。
+    private let fallbackOrder: [BuiltInPluginID]
     private var states: [BuiltInPluginID: BuiltInPluginRuntimeState]
 
     private(set) var enabledPluginIDs: Set<BuiltInPluginID>
@@ -154,34 +156,69 @@ final class BuiltInPluginManager {
         registrations: [BuiltInPluginRegistration],
         userDefaults: UserDefaults = .standard
     ) {
+        let fallbackOrder = registrations.map(\.manifest.id)
+        self.fallbackOrder = fallbackOrder
         self.registrations = Dictionary(uniqueKeysWithValues: registrations.map {
             ($0.manifest.id, $0)
         })
         self.userDefaults = userDefaults
-        self.states = Dictionary(uniqueKeysWithValues: registrations.map {
-            ($0.manifest.id, .stopped)
+        self.states = Dictionary(uniqueKeysWithValues: fallbackOrder.map {
+            ($0, .stopped)
         })
+        self.orderedPluginIDs = fallbackOrder
+        self.enabledPluginIDs = []
+        applyStoredConfiguration()
+    }
 
-        let fallbackOrder = registrations.map(\.manifest.id)
-        if let data = userDefaults.data(forKey: Self.storageKey),
-           let stored = try? JSONDecoder().decode(StoredState.self, from: data),
-           stored.version == 1 {
-            let known = Set(fallbackOrder)
-            var restoredIDs: Set<BuiltInPluginID> = []
-            let restoredOrder = stored.order.compactMap(BuiltInPluginID.init(rawValue:)).filter {
-                known.contains($0) && restoredIDs.insert($0).inserted
+    /// 按存储内容重建顺序与启用集合；存储缺失、版本不符或损坏时回退到注册顺序与各插件默认值。
+    private func applyStoredConfiguration() {
+        guard let data = userDefaults.data(forKey: Self.storageKey),
+              let stored = try? JSONDecoder().decode(StoredState.self, from: data),
+              stored.version == 1 else {
+            orderedPluginIDs = fallbackOrder
+            enabledPluginIDs = Set(fallbackOrder.compactMap { id in
+                registrations[id]?.manifest.defaultEnabled == true ? id : nil
+            })
+            return
+        }
+
+        let known = Set(fallbackOrder)
+        var restoredIDs: Set<BuiltInPluginID> = []
+        let restoredOrder = stored.order.compactMap(BuiltInPluginID.init(rawValue:)).filter {
+            known.contains($0) && restoredIDs.insert($0).inserted
+        }
+        orderedPluginIDs = restoredOrder + fallbackOrder.filter { !restoredOrder.contains($0) }
+        enabledPluginIDs = Set(fallbackOrder.compactMap { id in
+            let enabled = stored.enabled[id.rawValue] ?? registrations[id]?.manifest.defaultEnabled ?? false
+            return enabled ? id : nil
+        })
+    }
+
+    /// 从存储重新载入配置，并把运行时对齐到新配置。
+    ///
+    /// 备份导入等「外部直接改写 UserDefaults」的场景必须调用：否则内存态仍是旧值（功能中心开关、
+    /// 面板入口都不变），而且下一次任意开关或排序都会用旧内存态整体回写，覆盖刚导入的配置。
+    func reloadFromStorage() {
+        applyStoredConfiguration()
+        lastErrorMessage = nil
+
+        // 先停掉不再启用的（逆序，与停止顺序一致）。
+        for id in orderedPluginIDs.reversed() where !enabledPluginIDs.contains(id) {
+            if states[id] == .running {
+                registrations[id]?.runtime.stop()
             }
-            self.orderedPluginIDs = restoredOrder + fallbackOrder.filter { !restoredOrder.contains($0) }
-            self.enabledPluginIDs = Set(registrations.compactMap { registration in
-                let enabled = stored.enabled[registration.manifest.id.rawValue]
-                    ?? registration.manifest.defaultEnabled
-                return enabled ? registration.manifest.id : nil
-            })
-        } else {
-            self.orderedPluginIDs = fallbackOrder
-            self.enabledPluginIDs = Set(registrations.compactMap {
-                $0.manifest.defaultEnabled ? $0.manifest.id : nil
-            })
+            states[id] = .stopped
+        }
+        // 再启动新启用或此前失败的；仍在运行的插件不重建，避免无谓打断。
+        for id in orderedPluginIDs where enabledPluginIDs.contains(id) {
+            guard states[id] != .running else { continue }
+            do {
+                try start(id, visiting: [])
+            } catch {
+                states[id] = .failed(String(describing: error))
+                lastErrorMessage = error.localizedDescription
+                persist()
+            }
         }
     }
 

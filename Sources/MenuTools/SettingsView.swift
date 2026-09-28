@@ -703,13 +703,14 @@ struct GeneralSettingsView: View {
         }
 
         do {
-            try AppBackupService.restore(
+            // 统一收尾：落盘之后必须重新载入插件管理器，否则开关仍显示旧状态，
+            // 且下一次任意开关操作会把旧状态回写、覆盖刚导入的配置。
+            try AppBackupService.applyRestoredState(
                 document,
                 userDefaults: .standard,
-                rightClickStore: LocalRightClickConfigStore()
+                rightClickStore: LocalRightClickConfigStore(),
+                pluginManager: .shared
             )
-            RightClickConfigStore.broadcast(document.rightClick)
-            SmoothScrollEngine.shared.reload()
             backupStatus = .success(L("settings.backup.importSuccess"))
         } catch {
             backupStatus = .failure(L("settings.backup.writeFailed"))
