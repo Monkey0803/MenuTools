@@ -15,6 +15,34 @@ enum SmoothScrollTargetPolicy {
     }
 }
 
+/// 判断 MenuTools 自己是否存在「用户可能正在里面滚动」的窗口。
+///
+/// 只按前台应用判断会漏掉一种情况：窗口管理的快速面板是**不抢前台**的，
+/// 此时前台仍是外部应用，面板里的滚动会被当成外部滚动改写掉。
+///
+/// 不能简单地枚举 `NSApp.windows` 里是否有可见窗口——状态栏按钮本身就是一个常驻窗口，
+/// 那样判断会恒为 true、平滑滚动直接永久失效。因此这里按「可见 + 有内容尺寸 + 不是状态栏项」筛。
+enum SmoothScrollOwnWindowPolicy {
+    struct WindowFacts: Equatable {
+        var isVisible: Bool
+        var frameWidth: CGFloat
+        var frameHeight: CGFloat
+        var isStatusBarItem: Bool
+    }
+
+    /// 状态栏项窗口约 24pt 高；真正承载滚动内容的面板与设置窗口都远高于此。
+    static let minimumInteractiveHeight: CGFloat = 60
+
+    static func hasInteractiveWindow(_ windows: [WindowFacts]) -> Bool {
+        windows.contains { window in
+            window.isVisible
+                && !window.isStatusBarItem
+                && window.frameWidth > 1
+                && window.frameHeight >= minimumInteractiveHeight
+        }
+    }
+}
+
 /// HID 事件有硬件来源时，设备身份比滚动 phase 更可靠：MX Master 2S 的自由滚轮也会带 phase。
 enum ScrollDeviceClassifier {
     static func isTrackpad(productName: String?, hasHIDSender: Bool, hasScrollPhase: Bool) -> Bool {
@@ -501,6 +529,8 @@ final class SmoothScrollEngine: ObservableObject, @unchecked Sendable {
     private let tapRunner = SmoothScrollTapRunner()
     private var activityToken: NSObjectProtocol?
     private let animator = SmoothScrollAnimator()
+    /// 「本进程是否有可交互窗口」的短时缓存，避免在每个滚动事件里枚举窗口。
+    private var ownWindowStateCache: (checkedAt: Date, value: Bool)?
 
     private init() {}
 
@@ -544,6 +574,41 @@ final class SmoothScrollEngine: ObservableObject, @unchecked Sendable {
 
     // MARK: - 事件处理
 
+    /// 把当前窗口状态映射成策略需要的事实。
+    ///
+    /// 滚动事件可达 120Hz，每次枚举窗口会给热路径加负担，因此做 0.25 秒短时缓存：
+    /// 面板开合远慢于这个间隔，不会漏判。
+    private func hasInteractiveOwnWindow(now: Date = Date()) -> Bool {
+        if let cached = ownWindowStateCache, now.timeIntervalSince(cached.checkedAt) < 0.25 {
+            return cached.value
+        }
+        let value = SmoothScrollOwnWindowPolicy.hasInteractiveWindow(
+            NSApp.windows.map { window in
+                SmoothScrollOwnWindowPolicy.WindowFacts(
+                    isVisible: window.isVisible,
+                    frameWidth: window.frame.width,
+                    frameHeight: window.frame.height,
+                    // 状态栏项的窗口类名固定，直接按类名识别，不靠尺寸猜。
+                    isStatusBarItem: NSStringFromClass(type(of: window)).contains("StatusBar")
+                )
+            }
+        )
+        ownWindowStateCache = (now, value)
+        return value
+    }
+
+    /// 是否接管这次滚动。前台就是 MenuTools 时直接放行，不必再枚举窗口。
+    private func shouldTransform(event: CGEvent) -> Bool {
+        let own = ProcessInfo.processInfo.processIdentifier
+        let frontmost = NSWorkspace.shared.frontmostApplication?.processIdentifier
+        if frontmost == own { return false }
+        return SmoothScrollTargetPolicy.shouldTransform(
+            frontmostProcessIdentifier: frontmost,
+            ownProcessIdentifier: own,
+            hasVisibleOwnWindow: hasInteractiveOwnWindow()
+        )
+    }
+
     fileprivate func handle(type: CGEventType, event: CGEvent) -> Unmanaged<CGEvent>? {
         if type == .tapDisabledByTimeout || type == .tapDisabledByUserInput {
             tapRunner.reenable()
@@ -555,10 +620,7 @@ final class SmoothScrollEngine: ObservableObject, @unchecked Sendable {
         guard config.enabled,
               event.getIntegerValueField(.eventSourceUserData) != Self.syntheticEventUserData,
               SmoothScrollInputPolicy.shouldAnimate(isTrackpad: isTrackpad, isContinuous: isContinuous),
-              SmoothScrollTargetPolicy.shouldTransform(
-                frontmostProcessIdentifier: NSWorkspace.shared.frontmostApplication?.processIdentifier,
-                ownProcessIdentifier: ProcessInfo.processInfo.processIdentifier
-              )
+              shouldTransform(event: event)
         else {
             return Unmanaged.passUnretained(event)
         }

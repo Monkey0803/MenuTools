@@ -1,3 +1,4 @@
+import CoreGraphics
 import Testing
 @testable import MenuTools
 
@@ -111,4 +112,32 @@ func smoothScrollStatusPresentationIsComplete() {
     #expect(SmoothScrollStatus.needsAccessibility.isWarning)
     #expect(SmoothScrollStatus.failedToStart.isWarning)
     #expect(SmoothScrollStatus.needsAccessibility.titleKey == "scroll.status.needsAccessibility")
+}
+
+private func ownWindow(
+    isVisible: Bool = true,
+    height: CGFloat = 400,
+    width: CGFloat = 600,
+    isStatusBarItem: Bool = false
+) -> SmoothScrollOwnWindowPolicy.WindowFacts {
+    SmoothScrollOwnWindowPolicy.WindowFacts(
+        isVisible: isVisible,
+        frameWidth: width,
+        frameHeight: height,
+        isStatusBarItem: isStatusBarItem
+    )
+}
+
+@Test("只有可见且像内容窗口的本进程窗口才让滚动事件直接放行")
+func smoothScrollOwnWindowPolicyDetectsInteractiveWindows() {
+    // 没有窗口（外部应用前台）：照常接管
+    #expect(!SmoothScrollOwnWindowPolicy.hasInteractiveWindow([]))
+    // 状态栏按钮本身是常驻窗口，必须被排除，否则接管会永久失效
+    #expect(!SmoothScrollOwnWindowPolicy.hasInteractiveWindow([ownWindow(isStatusBarItem: true)]))
+    #expect(!SmoothScrollOwnWindowPolicy.hasInteractiveWindow([ownWindow(height: 24)]))
+    // 不可见的窗口（例如已关闭的设置窗口）不算
+    #expect(!SmoothScrollOwnWindowPolicy.hasInteractiveWindow([ownWindow(isVisible: false)]))
+    // 真正的内容窗口：面板、快速面板、设置窗口
+    #expect(SmoothScrollOwnWindowPolicy.hasInteractiveWindow([ownWindow()]))
+    #expect(SmoothScrollOwnWindowPolicy.hasInteractiveWindow([ownWindow(isStatusBarItem: true), ownWindow(height: 320)]))
 }
