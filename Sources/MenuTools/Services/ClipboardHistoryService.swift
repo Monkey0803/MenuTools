@@ -55,6 +55,31 @@ enum ClipboardHistoryContentType: String, CaseIterable, Codable, Sendable {
     case pdf
 }
 
+extension ClipboardHistoryContentType {
+    /// 界面标题：文本/图片/链接/文件复用筛选菜单的既有文案，富文本与 PDF 单独命名。
+    var titleKey: String {
+        switch self {
+        case .text: return "clipboard.category.text"
+        case .image: return "clipboard.category.image"
+        case .url: return "clipboard.category.url"
+        case .files: return "clipboard.category.file"
+        case .richText: return "clipboard.type.richText"
+        case .pdf: return "clipboard.type.pdf"
+        }
+    }
+}
+
+/// 剪贴板历史的保留天数与容量档位（纯数据，便于回归）。
+enum ClipboardRetentionOptions {
+    /// 天数：0 表示不额外限制。
+    static let dayChoices = [0, 1, 7, 30, 90]
+    /// 容量（MB）：0 表示不限制。
+    static let storageChoices = [0, 10, 50, 100, 500]
+
+    static func isInfinite(_ value: Int) -> Bool { value <= 0 }
+    static func normalized(_ value: Int) -> Int { max(0, value) }
+}
+
 /// 剪贴板历史中的内容；图片使用 TIFF 数据保存，避免把 NSImage 带入并发边界。
 enum ClipboardHistoryContent: Codable, Equatable, Sendable {
     case text(String)
@@ -2399,6 +2424,12 @@ final class ClipboardHistoryService {
         storageLimitBytes = bytes
         userDefaults.set(bytes, forKey: StorageKey.storageLimitBytes)
         applyAutomaticCleanup()
+    }
+
+    /// 当前生效的按类型保留天数；0 表示不额外限制。
+    func retentionDays(for type: ClipboardHistoryContentType) -> Int {
+        guard let duration = retentionByContentType[type] else { return 0 }
+        return Int(duration / 86_400)
     }
 
     func setRetentionDays(_ days: Int, for type: ClipboardHistoryContentType) {

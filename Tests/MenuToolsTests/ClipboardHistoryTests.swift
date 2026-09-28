@@ -2098,3 +2098,51 @@ func historyServiceMergesImportsDuringRecovery(importDuringRetry: Bool) async th
     #expect(Set(service.items.map(\.id)) == [original.id, imported.id])
     #expect(Set(ClipboardHistoryPersistence.load(from: url).map(\.id)) == [original.id, imported.id])
 }
+
+@Test("按内容类型保留：读写往返、持久化，0 表示不额外限制")
+@MainActor
+func clipboardPerTypeRetentionRoundTrip() throws {
+    let suiteName = "ClipboardPerTypeRetention.\(UUID().uuidString)"
+    let defaults = try #require(UserDefaults(suiteName: suiteName))
+    defaults.removePersistentDomain(forName: suiteName)
+
+    let service = ClipboardHistoryService(persistenceURL: nil, userDefaults: defaults)
+    for type in ClipboardHistoryContentType.allCases {
+        #expect(service.retentionDays(for: type) == 0)
+    }
+
+    service.setRetentionDays(7, for: .image)
+    #expect(service.retentionDays(for: .image) == 7)
+    // 只影响设置的那一类
+    #expect(service.retentionDays(for: .text) == 0)
+
+    // 落盘后新实例能读回（此前只有 setter，界面上无法确认设置成了什么）
+    let restored = ClipboardHistoryService(persistenceURL: nil, userDefaults: defaults)
+    #expect(restored.retentionDays(for: .image) == 7)
+
+    // 置 0 表示清除该项限制
+    service.setRetentionDays(0, for: .image)
+    #expect(service.retentionDays(for: .image) == 0)
+}
+
+@Test("保留与容量档位是稳定的升序选项，含「不限制」")
+func clipboardRetentionChoicesAreStable() {
+    #expect(ClipboardRetentionOptions.dayChoices.first == 0)
+    #expect(ClipboardRetentionOptions.dayChoices == ClipboardRetentionOptions.dayChoices.sorted())
+    #expect(ClipboardRetentionOptions.storageChoices.first == 0)
+    #expect(ClipboardRetentionOptions.storageChoices == ClipboardRetentionOptions.storageChoices.sorted())
+
+    #expect(ClipboardRetentionOptions.isInfinite(0))
+    #expect(!ClipboardRetentionOptions.isInfinite(1))
+    #expect(ClipboardRetentionOptions.normalized(-5) == 0)
+    #expect(ClipboardRetentionOptions.normalized(30) == 30)
+}
+
+@Test("内容类型都有可用于界面的标题键，且 6 类各不相同")
+func clipboardContentTypesHaveTitles() {
+    let keys = ClipboardHistoryContentType.allCases.map(\.titleKey)
+    #expect(ClipboardHistoryContentType.allCases.count == 6)
+    #expect(Set(keys).count == 6)
+    #expect(keys.allSatisfy { !$0.isEmpty })
+    #expect(ClipboardHistoryContentType.image.titleKey == "clipboard.category.image")
+}

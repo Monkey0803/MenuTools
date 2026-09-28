@@ -649,6 +649,10 @@
 "clipboard.storageLimitValue" = "%d MB";
 "clipboard.unlimited" = "無制限";
 "clipboard.cleanupDescription" = "件数、保持期間、容量の上限に達すると、古い未固定項目を自動的に削除します。";
+"clipboard.type.richText" = "リッチテキスト";
+"clipboard.type.pdf" = "PDF";
+"clipboard.retentionByType" = "種類ごとの保持期間";
+"clipboard.retentionByType.hint" = "画像は容量を圧迫しやすいので、短めにすると最近のスクリーンショットだけを残せます。0 は追加制限なし。";
 "clipboard.primaryAction" = "デフォルト操作";
 "clipboard.primaryAction.copy" = "クリップボードにコピー";
 "clipboard.primaryAction.paste" = "前の App にペースト";

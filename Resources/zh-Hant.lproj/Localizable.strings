@@ -649,6 +649,10 @@
 "clipboard.storageLimitValue" = "%d MB";
 "clipboard.unlimited" = "不限制";
 "clipboard.cleanupDescription" = "達到儲存數量、保留天數或佔用空間限制時，自動清理最早的非置頂記錄。";
+"clipboard.type.richText" = "富文本";
+"clipboard.type.pdf" = "PDF";
+"clipboard.retentionByType" = "依內容類型分別保留";
+"clipboard.retentionByType.hint" = "圖片最容易撐爆容量：單獨設短一些可以只保留最近的截圖。0 表示不額外限制。";
 "clipboard.primaryAction" = "預設動作";
 "clipboard.primaryAction.copy" = "複製到剪貼簿";
 "clipboard.primaryAction.paste" = "貼到上一個 App";

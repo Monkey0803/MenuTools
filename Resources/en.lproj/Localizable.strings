@@ -649,6 +649,10 @@
 "clipboard.storageLimitValue" = "%d MB";
 "clipboard.unlimited" = "Unlimited";
 "clipboard.cleanupDescription" = "The oldest unpinned entries are removed when an item, retention, or storage limit is reached.";
+"clipboard.type.richText" = "Rich text";
+"clipboard.type.pdf" = "PDF";
+"clipboard.retentionByType" = "Retention by content type";
+"clipboard.retentionByType.hint" = "Images fill up the limit fastest: a shorter window for them keeps only recent screenshots. 0 means no extra limit.";
 "clipboard.primaryAction" = "Default action";
 "clipboard.primaryAction.copy" = "Copy to Clipboard";
 "clipboard.primaryAction.paste" = "Paste into Previous App";

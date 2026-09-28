@@ -5,8 +5,7 @@ struct ClipboardHistoryManagementSettingsSection: View {
     @Bindable var historyService: ClipboardHistoryService
     @State private var isAccessibilityTrusted = ClipboardAccessibilityPermission.isTrusted
 
-    private let retentionOptions = [0, 1, 7, 30, 90]
-    private let storageOptions = [0, 10, 50, 100, 500]
+    @State private var isPerTypeRetentionExpanded = false
 
     var body: some View {
         VStack(alignment: .leading, spacing: 12) {
@@ -20,7 +19,7 @@ struct ClipboardHistoryManagementSettingsSection: View {
                     get: { historyService.retentionDays },
                     set: { historyService.setRetentionDays($0) }
                 )) {
-                    ForEach(retentionOptions, id: \.self) { days in
+                    ForEach(ClipboardRetentionOptions.dayChoices, id: \.self) { days in
                         Text(days == 0 ? L("clipboard.unlimited") : L("clipboard.retentionDaysValue", days))
                             .tag(days)
                     }
@@ -36,7 +35,7 @@ struct ClipboardHistoryManagementSettingsSection: View {
                     get: { historyService.storageLimitBytes == .max ? 0 : historyService.storageLimitBytes / 1_024 / 1_024 },
                     set: { historyService.setStorageLimitMegabytes($0) }
                 )) {
-                    ForEach(storageOptions, id: \.self) { megabytes in
+                    ForEach(ClipboardRetentionOptions.storageChoices, id: \.self) { megabytes in
                         Text(megabytes == 0 ? L("clipboard.unlimited") : L("clipboard.storageLimitValue", megabytes))
                             .tag(megabytes)
                     }
@@ -48,6 +47,41 @@ struct ClipboardHistoryManagementSettingsSection: View {
             Text(L("clipboard.cleanupDescription"))
                 .font(.caption)
                 .foregroundStyle(.secondary)
+
+            // 按内容类型分别保留：能力早已实现并持久化，此前没有任何界面入口。
+            DisclosureGroup(isExpanded: $isPerTypeRetentionExpanded) {
+                VStack(alignment: .leading, spacing: 8) {
+                    ForEach(ClipboardHistoryContentType.allCases, id: \.self) { type in
+                        HStack {
+                            Text(L(type.titleKey))
+                            Spacer()
+                            Picker(L(type.titleKey), selection: Binding(
+                                get: { historyService.retentionDays(for: type) },
+                                set: { historyService.setRetentionDays($0, for: type) }
+                            )) {
+                                ForEach(ClipboardRetentionOptions.dayChoices, id: \.self) { days in
+                                    Text(days == 0
+                                        ? L("clipboard.unlimited")
+                                        : L("clipboard.retentionDaysValue", days))
+                                        .tag(days)
+                                }
+                            }
+                            .labelsHidden()
+                            .frame(width: 150)
+                        }
+                    }
+                }
+                .padding(.top, 6)
+            } label: {
+                Text(L("clipboard.retentionByType"))
+                    .font(.callout)
+            }
+
+            if isPerTypeRetentionExpanded {
+                Text(L("clipboard.retentionByType.hint"))
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+            }
 
             if let summary = historyService.lastCleanupSummary {
                 Label(
