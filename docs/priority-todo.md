@@ -253,6 +253,7 @@
 | P2-10 | `d628eb7` | 标注器新增 `ScreenshotEditorShortcutAction`（⌘Z/⇧⌘C/⌘⌫/⌘S/Esc）并给旋转、取色、线宽、工具菜单补无障碍标签；补 1 条用例 |
 | P2-9 | `751f20d` | 新增 `ScreenshotHistoryFilter`（按文件名搜索 + 折叠上限可配置 + 隐藏条数）；历史区补搜索框、拍摄时间、「显示全部/收起」，清空改为二次确认；补 2 条用例 |
 | P2-8 | `624584b` | 新增 `ScreenshotEditorHistory<State>` 快照式撤销栈（上限 30 步），裁剪/旋转/清空/新增标注均可撤销，新增重做与 ⌘⇧Z；裁剪旋转不再不可逆地清空标注；补 2 条用例 |
+| P2-12 | `c690bca` | 接线 `hasVisibleOwnWindow`（此前是死代码）：新增 `SmoothScrollOwnWindowPolicy`（可见+有内容尺寸+非状态栏项），快速面板里的滚动不再被改写；窗口枚举加 0.25s 缓存；补 1 条用例。**未做**：per-App 例外（文档只把它列为对照） |
 
 ---
 
