@@ -16,15 +16,39 @@ enum WindowLayoutURLName {
         return WindowLayout.allCases.first { kebab($0.rawValue) == normalized }
     }
 
+    /// camelCase → kebab-case。
+    ///
+    /// 连续大写属于同一个缩写词，必须整体小写：`flushDNS` → `flush-dns`。
+    /// 最初的实现给每个大写字母都补连字符，于是 `flushDNS` 变成 `flush-d-n-s`，
+    /// 脚本按 `flush-dns` 调用时解析直接失败。
     static func kebab(_ rawValue: String) -> String {
         var result = ""
-        for scalar in rawValue.unicodeScalars {
-            if CharacterSet.uppercaseLetters.contains(scalar) {
-                if !result.isEmpty { result.append("-") }
-                result.append(String(scalar).lowercased())
-            } else {
+        let scalars = Array(rawValue.unicodeScalars)
+        for (index, scalar) in scalars.enumerated() {
+            guard CharacterSet.uppercaseLetters.contains(scalar) else {
                 result.unicodeScalars.append(scalar)
+                continue
             }
+            let previous = index > 0 ? scalars[index - 1] : nil
+            let next = index + 1 < scalars.count ? scalars[index + 1] : nil
+
+            var startsNewWord = false
+            if let previous {
+                if CharacterSet.lowercaseLetters.contains(previous)
+                    || CharacterSet.decimalDigits.contains(previous) {
+                    // flushDNS：前面是小写，这里是新词的开头
+                    startsNewWord = true
+                } else if CharacterSet.uppercaseLetters.contains(previous),
+                          let next,
+                          CharacterSet.lowercaseLetters.contains(next) {
+                    // DNSValue → dns-value：缩写结束、下一个词开始
+                    startsNewWord = true
+                }
+            }
+            if startsNewWord, !result.isEmpty {
+                result.append("-")
+            }
+            result.append(String(scalar).lowercased())
         }
         return result
     }
@@ -35,6 +59,8 @@ enum MenuToolsURLAction: Equatable {
     case layout(WindowLayout)
     case preset(String)
     case settings(SettingsTab)
+    case scene(ScenePreset)
+    case quickAction(QuickAction)
 }
 
 /// `menutools://` 链接解析。
@@ -45,6 +71,8 @@ enum MenuToolsURLAction: Equatable {
 ///     menutools://action?name=left-half      # 与 Rectangle 的 execute-action 习惯一致
 ///     menutools://preset?name=开发
 ///     menutools://settings?tab=runtime-status
+///     menutools://scene?name=demo
+///     menutools://quick-action?name=lock-screen
 enum MenuToolsURL {
     static let scheme = "menutools"
 
@@ -72,6 +100,19 @@ enum MenuToolsURL {
                 WindowLayoutURLName.kebab($0.rawValue) == raw.lowercased()
             }) else { return nil }
             return .settings(tab)
+        case "scene":
+            // 场景名就是枚举 rawValue（work / demo / night），大小写不敏感。
+            guard let raw = value("name")?.trimmingCharacters(in: .whitespacesAndNewlines).lowercased(),
+                  let scene = ScenePreset(rawValue: raw) else { return nil }
+            return .scene(scene)
+        case "quick-action", "quickaction":
+            guard let raw = value("name")?.trimmingCharacters(in: .whitespacesAndNewlines).lowercased(),
+                  !raw.isEmpty else { return nil }
+            // 同时接受 kebab-case（lock-screen）与原始驼峰（lockScreen）写法。
+            guard let action = QuickAction.allCases.first(where: {
+                WindowLayoutURLName.kebab($0.rawValue) == raw || $0.rawValue.lowercased() == raw
+            }) else { return nil }
+            return .quickAction(action)
         default:
             return nil
         }
@@ -96,6 +137,46 @@ enum MenuToolsURLActionHandler {
             try? WindowManagementService.shared.apply(preset)
         case let .settings(tab):
             MenuBarStatusItemController.shared.showSettings(tab)
+        case let .scene(scene):
+            // 与场景快捷键走同一条链路：逐动作报告失败，并用统一 HUD 把失败原因显示出来。
+            let report = SceneService.shared.apply(
+                scene,
+                launcher: AppLauncherService.shared,
+                focusService: FocusModeService.shared
+            )
+            if !report.isFullSuccess {
+                ClipboardHUDMessagePresenter().show(
+                    message: L("scene.appliedPartial", L(scene.titleKey), report.failures.count),
+                    isSuccess: false
+                )
+            }
+        case let .quickAction(action):
+            performQuickAction(action)
+        }
+    }
+
+    /// 快捷操作：与面板里的按钮走同一套实现（截图单独走捕获流程）。
+    private static func performQuickAction(_ action: QuickAction) {
+        if action == .screenshot {
+            Task { @MainActor in
+                do {
+                    _ = try await ScreenshotService.shared.captureConfigured()
+                } catch {
+                    ClipboardHUDMessagePresenter().show(
+                        message: error.localizedDescription,
+                        isSuccess: false
+                    )
+                }
+            }
+            return
+        }
+        do {
+            try QuickActionService().perform(action)
+        } catch {
+            ClipboardHUDMessagePresenter().show(
+                message: error.localizedDescription,
+                isSuccess: false
+            )
         }
     }
 }

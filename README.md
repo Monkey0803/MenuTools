@@ -337,17 +337,20 @@ swift Scripts/test_screen_lock.swift      # 锁屏通道路径探测（默认不
 
 设置页的滚动长度也可回归：`swift Scripts/test_settings_layout.swift` 会逐个切换窗口管理/系统监控/音频三个页面共 13 个子页，测量内容高度并与基线对照。逐项验收步骤见 [`docs/system-and-audio-acceptance.md`](docs/system-and-audio-acceptance.md)。
 
-### 用链接触发窗口操作
+### 用链接触发功能
 
-菜单栏应用本身没有窗口，但可以用 `menutools://` 链接触发窗口操作，便于 Raycast、快捷指令和脚本调用：
+菜单栏应用本身没有窗口，但可以用 `menutools://` 链接触发功能，便于 Raycast、快捷指令和脚本调用：
 
 ```bash
-open "menutools://window?layout=left-half"     # 套用指定布局
-open "menutools://action?name=maximize"        # 与 Rectangle 的 execute-action 命名习惯一致
-open "menutools://preset?name=开发"             # 套用固定尺寸预设
+open "menutools://window?layout=left-half"        # 套用指定布局
+open "menutools://action?name=maximize"           # 与 Rectangle 的 execute-action 命名习惯一致
+open "menutools://preset?name=开发"                # 套用固定尺寸预设
+open "menutools://scene?name=demo"                # 应用场景（work / demo / night）
+open "menutools://quick-action?name=lock-screen"  # 执行快捷操作
+open "menutools://settings?tab=runtime-status"    # 打开设置页
 ```
 
-布局名用 kebab-case，由布局本身推导（`left-half`、`top-left-sixth`、`stash-left`…），全部 60 种布局都可用。
+布局名与快捷操作名用 kebab-case，由各自的枚举名推导（`left-half`、`top-left-sixth`、`stash-left`、`lock-screen`、`flush-dns`…），全部 60 种布局、场景与快捷操作都可用；`quick-action` 的参数也接受驼峰写法（`lockScreen`）。
 
 ## 🔄 发布更新
 
