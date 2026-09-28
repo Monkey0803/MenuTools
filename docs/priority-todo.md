@@ -82,23 +82,29 @@
 
 ---
 
-# P1：1.1.5 内建议完成
+# P1：1.1.5 内建议完成（已完成 6/11，见各条状态）
 
 ## 失败路径与信任
 
 ### P1-1 截屏快捷键失败完全无声
+
+> **状态：已修复（`77873f8`）**。HUD 增加任意文案能力并抽出 `TransientMessagePresenting`；截图与区域 OCR 的快捷键失败都会弹提示，不再只写无人读取的 `lastError`。补 5 条用例。
 - **证据**：`Sources/MenuTools/Services/ScreenshotShortcutService.swift:277-279`、`ScreenshotService.swift:1026-1029`、`ScreenshotRegionOCRService.swift:110-114` 都只写 `lastError`，全仓**无任何视图读取**这些字段（唯一读取者是窗口管理页 `WindowManagementSettingsView.swift:659`）。只有鼠标点击路径才会 `flashStatus`（`MenuPanelView.swift:1914`、`ScreenshotSettingsView.swift:324`）。
 - **影响**：全局快捷键是这条功能的主交互路径，失败（权限拒绝、窗口已消失、Vision 返回空）时用户只看到「按了没反应」。
 - **改法**：复用现有 HUD（`ClipboardFeedbackHUDController`、`AppVolumeHUDController`）；注意现有 HUD 只接受本地化 key，显示任意错误串需小幅扩展。
 - **成本**：小。
 
 ### P1-2 场景只施加不回滚，演示模式会让 Mac 一直不休眠
+
+> **状态：已修复（`5cc29e3`）**。抽出 `SceneSystemEffects` 能力边界，新增 `exitScene()` 按施加前的值还原可逆动作并释放防休眠（打开的应用与专注模式按 `isReversible` 排除）；`apply` 改为逐动作报告，不再遇错即中断；场景卡片新增「退出场景」。补 4 条用例。
 - **证据**：`Sources/MenuTools/Services/SceneService.swift:50-84` 只有 `apply`，`:83` 设 `activeScene` 后永不清除；`:70` 调 `CaffeinateService.shared.start()`，而 `CaffeinateService.swift:17-19` 只有 toggle/start/stop，**没有时长、也没有退出场景时的自动 stop**；`:13` 定义了 `.restoreDesktopFiles` 但 `:34-40` 的三个预设**无一处使用**；`Sources/MenuTools/ProductivityToolsViews.swift:6,18-19` 只用 `activeScene` 做高亮，**没有「退出场景」入口**。
 - **影响**：「用完忘记 → 合盖不睡、电池跑空」。防锁屏恰是本工具的高频卖点。
 - **改法**：按动作白名单可逆化（`.enableFocus` 是 toggle、`.openFavoriteApps` 不该回滚，需排除）；面板/场景卡加「退出场景」；`Caffeinate` 增加时长或场景归属；`apply` 的「遇错即中断」改为逐动作报告。
 - **成本**：中。**注意**不要借此扩成完整场景编排器。
 
 ### P1-3 权限降级路径三家不一致，翻译页连提示都没有
+
+> **状态：已修复（`6abfe0f`）**。新增共享组件 `AccessibilityPermissionNotice`，窗口管理/应用启动器/翻译三页统一使用；三个服务补 `refreshAccessibilityPermission()`，从系统设置授权后切回应用会自动刷新。新增静态一致性用例守护该不变量。
 - **证据**：
   - 做对了的：`Sources/MenuTools/ProductivityToolsViews.swift:76-88`（跳转按钮）、`ClipboardHistoryManagementSettingsSection.swift:89-98`（状态 + 重新检查）
   - `WindowManagementSettingsView.swift:59-63`、`AppLaunchSettingsView.swift:67-71` 只有静态橙色文字，**无跳转**
@@ -135,6 +141,8 @@
 - **成本**：入口小～中；键盘支持为纯前端增量。
 
 ### P1-7 菜单栏指标选择器与插件启停脱钩：选了没反应且无解释
+
+> **状态：已修复（`1562928`）**。新增 `MenuBarMetric.requiredPlugin` 与 `isAvailable(enabledPluginIDs:)`（映射与菜单栏取值门槛一致），停用模块的指标在 Picker 里禁用并给出橙色说明。补 1 条用例。
 - **证据**：`SettingsView.swift:504-509` 的 Picker 无条件列出全部 `MenuBarMetric`，不按插件启用状态过滤或禁用；而标题按插件开关逐项置 nil（`MenuBarStatusItemController.swift:118-123` 网速、`:131-139` 音量、`:151-156` 资源），`:160-178` 在 title 为 nil 时退化成应用名或空。
 - **影响**：在功能中心关掉「系统监控」后再选「CPU」，菜单栏什么也不显示，设置页也不说原因——极易被判为 bug。
 - **改法**：Picker 内对停用插件对应的 metric 加 `.disabled` + 一行说明；与 `MenuBarMetric.swift:30-43` 的 automatic 回退语义对齐。
@@ -155,6 +163,8 @@
 ## 性能与磁盘
 
 ### P1-9 数据目录残留 116 MB，无任何可见性或清理入口
+
+> **状态：已修复（`74596a1`）**。新增 `MigrationResidueCleaner`：7 天保留期后清理，且仅在替代库存在时才删；应用启动时执行。真机验证：112 MB + 4.2 MB 残留已被删除，替换库与附件完好，释放约 116 MB。补 2 条用例。
 - **本机实测**（`~/Library/Application Support/MenuTools/`）：
   - `ClipboardHistory.json.migrated` = **112 MB**（迁移到 SQLite 时留下的安全备份，2026-09-04）
   - `network-traffic-history.json` = **4.2 MB**（迁移到 SQLite 前的旧文件）
@@ -176,6 +186,8 @@
 - **成本**：中（涉及 3 个服务 + 自检页）。
 
 ### P1-11 音频：睡眠定时结束后不恢复原音量；停用模块也不会取消定时
+
+> **状态：已修复（`f60a1b9`）**。结束后保留「定时前的音量」并新增「恢复到定时前」（「知道了」= 接受静音）；`stop()` 会先取消定时并恢复音量。补 3 条用例。
 - **证据**：`AppVolumeService.swift:2120-2136` 到点 `setMasterVolume(0)` + `setMasterMuted(true)`，`baseVolume` 随之丢弃；`AppVolumeViews.swift:970-980` 结束后只有「知道了」按钮；`AppVolumeService.swift:1179-1186` 的 `stop()` 取消只在 `cancelSleepTimer`（`:2109`）里做，`stop()` **不取消** `sleepTimerTask`。
 - **影响**：「定时结束 → 主音量永久 0% 且无恢复入口」；停用插件后定时任务仍在跑并继续写音量。
 - **改法**：保留 `baseVolume` 到用户确认并提供「恢复到定时前」；`stop()` 里取消定时任务。纯状态改动，可先用 `AppVolumeEnhancementsTests` 补测试。
