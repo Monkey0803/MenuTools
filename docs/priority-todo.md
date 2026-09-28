@@ -239,6 +239,9 @@
 |---|---|---|
 | P2-3 | `93e6aeb` | 管理区补「按内容类型分别保留」入口；新增 `retentionDays(for:)` getter 与 `ClipboardRetentionOptions` 纯数据；补 3 条用例 |
 | P2-4 | `8cbe2a7` | 暂停记录时在主面板与历史列表显示「记录已暂停」徽标（含恢复指引）；新增 `ClipboardRecordingBadge` 纯策略；补 1 条用例 |
+| P2-5 | `5edf897` | 已存钥匙串口令时「立即同步」不再强制重输；新增 `ClipboardSyncAvailability.canSyncNow` 纯策略；补 1 条用例 |
+| P2-6 | `568f26d` | 条目数上限从「筛选」菜单移到管理区，不再算进「筛选已生效」计数；新增 `ClipboardFilterBadge`；补 2 条用例 |
+| P2-7 | `85ddd41` | 图片文字/二维码识别增加总开关（默认开启），关闭时清掉已有识别结果；补 3 条用例 |
 
 ---
 
