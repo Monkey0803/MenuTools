@@ -1686,3 +1686,56 @@
 "storage.confirm.detail" = "이 디렉터리의 내용만 삭제하고 디렉터리 자체는 유지합니다.\n경로: %@\n예상 확보 공간: %@";
 "storage.openFinder" = "Finder에서 보기";
 "storage.unsafePath" = "정리 경로가 안전성 검사를 통과하지 못했습니다.";
+
+"storage.xcodeArchives" = "Xcode 아카이브";
+"storage.iOSDeviceSupport" = "iOS Device Support";
+"storage.coreSimulator" = "CoreSimulator";
+"storage.xcodeArchives.detail" = "로컬 빌드 아카이브입니다. 내보내기나 배포에 더 이상 필요하지 않은지 확인한 후 정리하세요.";
+"storage.iOSDeviceSupport.detail" = "이전 iOS 기기 지원 파일입니다. Xcode를 종료한 후 정리할 수 있습니다.";
+"storage.coreSimulator.detail" = "시뮬레이터 앱과 데이터를 포함할 수 있습니다. Finder에서 보기만 제공합니다.";
+"storage.unreadable" = "이 디렉터리를 읽을 수 없습니다. Finder에서 권한을 확인하세요.";
+"storage.lastScan" = "마지막 검사: %@";
+"storage.scanning" = "%@ 검사 중";
+"storage.cancelScan" = "검사 취소";
+"storage.recommendations" = "권장 항목";
+"storage.recommendation.staleDeveloper" = "오래 사용하지 않은 개발자 파일";
+"storage.recommendation.downloads" = "검토할 다운로드";
+"storage.recommendation.detail" = "%@ · 마지막 수정: %@";
+
+"storage.scanCancelled" = "검사를 취소했습니다. 다시 검사하려면 새로 고치세요.";
+
+"storage.developerItems" = "%d개의 선택 가능한 항목";
+
+"storage.selectedItems" = "%d개 선택됨, 예상 확보 공간 %@";
+
+"storage.cleanSelected" = "선택 항목 정리";
+
+"storage.item.modified" = "마지막 수정: %@";
+
+"storage.confirm.selectionDetail" = "선택한 %d개 항목을 삭제합니다. 예상 확보 공간: %@\n항목:\n%@";
+
+"storage.manageItems" = "항목 관리";
+
+"storage.simulator.title" = "CoreSimulator 분석";
+
+"storage.simulator.warning" = "분석 및 Finder 위치 확인만 제공합니다. 시뮬레이터 데이터에는 앱, 기기 및 런타임이 포함될 수 있으므로 Finder에서 신중히 검토하세요.";
+
+"storage.simulator.runtime" = "런타임";
+
+"storage.simulator.deviceData" = "기기 데이터";
+
+"storage.simulator.appData" = "앱 데이터";
+
+"storage.simulator.cache" = "캐시";
+
+"storage.largeFiles.title" = "대용량 및 장기간 미사용 파일";
+
+"storage.largeFiles.filter" = "보기";
+
+"storage.largeFiles.largest" = "가장 큰 파일";
+
+"storage.largeFiles.stale" = "장기간 미사용";
+
+"storage.largeFiles.readOnly" = "보기 및 Finder 위치 확인만 가능하며 자동 정리는 제공하지 않습니다.";
+
+"storage.largeFiles.dateRule" = "날짜는 마지막 접근 시간을 사용하며, 사용할 수 없으면 마지막 수정 시간을 사용합니다.";

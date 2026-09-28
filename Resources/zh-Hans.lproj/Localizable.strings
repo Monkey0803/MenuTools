@@ -1681,8 +1681,61 @@
 "storage.logs.detail" = "多个 App 共享的日志目录，不提供批量删除。";
 "storage.downloads.detail" = "个人下载文件，不提供自动清理。";
 
-"storage.xcodeRunning" = "Xcode 正在运行，请退出后再清理 DerivedData。";
+"storage.xcodeRunning" = "Xcode 正在运行，请退出后再清理开发者文件。";
 
 "storage.confirm.detail" = "只会删除目录内容，目录本身会保留。\n路径：%@\n预计释放：%@";
 "storage.openFinder" = "在 Finder 中查看";
 "storage.unsafePath" = "清理路径未通过安全校验。";
+
+"storage.xcodeArchives" = "Xcode Archives";
+"storage.iOSDeviceSupport" = "iOS DeviceSupport";
+"storage.coreSimulator" = "CoreSimulator";
+"storage.xcodeArchives.detail" = "本地构建归档；清理前请确认不再需要导出或提交。";
+"storage.iOSDeviceSupport.detail" = "旧版 iOS 设备支持文件；关闭 Xcode 后可清理。";
+"storage.coreSimulator.detail" = "可能包含模拟器 App 与数据，仅提供在 Finder 中查看。";
+"storage.unreadable" = "无法读取此目录；请在 Finder 中检查权限。";
+"storage.lastScan" = "上次扫描：%@";
+"storage.scanning" = "正在扫描 %@";
+"storage.cancelScan" = "取消扫描";
+"storage.recommendations" = "建议处理";
+"storage.recommendation.staleDeveloper" = "长期未使用的开发者文件";
+"storage.recommendation.downloads" = "长期未整理的下载文件";
+"storage.recommendation.detail" = "%@ · 最后修改：%@";
+
+"storage.scanCancelled" = "扫描已取消，点击刷新可重新扫描。";
+
+"storage.developerItems" = "%d 个可选项目";
+
+"storage.selectedItems" = "已选择 %d 项，预计释放 %@";
+
+"storage.cleanSelected" = "清理已选项目";
+
+"storage.item.modified" = "最后修改：%@";
+
+"storage.confirm.selectionDetail" = "将删除 %d 个已选项目，预计释放：%@\n项目：\n%@";
+
+"storage.manageItems" = "管理项目";
+
+"storage.simulator.title" = "CoreSimulator 分析";
+
+"storage.simulator.warning" = "仅供分析和定位。模拟器数据可能包含 App、设备和运行时，请在 Finder 中谨慎处理。";
+
+"storage.simulator.runtime" = "运行时";
+
+"storage.simulator.deviceData" = "设备数据";
+
+"storage.simulator.appData" = "App 数据";
+
+"storage.simulator.cache" = "缓存";
+
+"storage.largeFiles.title" = "大文件与长期未使用文件";
+
+"storage.largeFiles.filter" = "查看方式";
+
+"storage.largeFiles.largest" = "最大文件";
+
+"storage.largeFiles.stale" = "长期未使用";
+
+"storage.largeFiles.readOnly" = "仅供查看和在 Finder 中定位，不提供自动清理。";
+
+"storage.largeFiles.dateRule" = "日期按最后访问时间筛选；系统未提供时使用最后修改时间。";

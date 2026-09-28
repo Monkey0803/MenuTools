@@ -1688,3 +1688,56 @@
 "storage.confirm.detail" = "只會刪除目錄內容，目錄本身會保留。\n路徑：%@\n預計釋放：%@";
 "storage.openFinder" = "在 Finder 中查看";
 "storage.unsafePath" = "清理路徑未通過安全驗證。";
+
+"storage.xcodeArchives" = "Xcode Archives";
+"storage.iOSDeviceSupport" = "iOS DeviceSupport";
+"storage.coreSimulator" = "CoreSimulator";
+"storage.xcodeArchives.detail" = "本機建置封存；清理前請確認不再需要匯出或提交。";
+"storage.iOSDeviceSupport.detail" = "舊版 iOS 裝置支援檔案；關閉 Xcode 後可清理。";
+"storage.coreSimulator.detail" = "可能包含模擬器 App 與資料，僅提供在 Finder 中查看。";
+"storage.unreadable" = "無法讀取此目錄；請在 Finder 中檢查權限。";
+"storage.lastScan" = "上次掃描：%@";
+"storage.scanning" = "正在掃描 %@";
+"storage.cancelScan" = "取消掃描";
+"storage.recommendations" = "建議處理";
+"storage.recommendation.staleDeveloper" = "長期未使用的開發者檔案";
+"storage.recommendation.downloads" = "長期未整理的下載檔案";
+"storage.recommendation.detail" = "%@ · 最後修改：%@";
+
+"storage.scanCancelled" = "掃描已取消，點擊重新整理可再次掃描。";
+
+"storage.developerItems" = "%d 個可選項目";
+
+"storage.selectedItems" = "已選擇 %d 項，預計釋放 %@";
+
+"storage.cleanSelected" = "清理已選項目";
+
+"storage.item.modified" = "最後修改：%@";
+
+"storage.confirm.selectionDetail" = "將刪除 %d 個已選項目，預計釋放：%@\n項目：\n%@";
+
+"storage.manageItems" = "管理項目";
+
+"storage.simulator.title" = "CoreSimulator 分析";
+
+"storage.simulator.warning" = "僅供分析與在 Finder 中定位。模擬器資料可能包含 App、裝置與執行階段，請在 Finder 中謹慎處理。";
+
+"storage.simulator.runtime" = "執行階段";
+
+"storage.simulator.deviceData" = "裝置資料";
+
+"storage.simulator.appData" = "App 資料";
+
+"storage.simulator.cache" = "快取";
+
+"storage.largeFiles.title" = "大型與長期未使用檔案";
+
+"storage.largeFiles.filter" = "檢視方式";
+
+"storage.largeFiles.largest" = "最大檔案";
+
+"storage.largeFiles.stale" = "長期未使用";
+
+"storage.largeFiles.readOnly" = "僅供檢視及在 Finder 中定位，不提供自動清理。";
+
+"storage.largeFiles.dateRule" = "日期按最後存取時間篩選；系統未提供時使用最後修改時間。";

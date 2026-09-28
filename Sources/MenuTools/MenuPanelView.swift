@@ -278,8 +278,7 @@ struct MenuPanelView: View {
     @State private var networkService = NetworkStatusService.shared
     @State private var batteryHealthService = BatteryHealthService.shared
     @State private var displayService = DisplayService()
-    @State private var storageAnalysisService = StorageAnalysisService()
-    @State private var storageCleanupPreview: StorageCleanupPreview?
+    @State private var storageAnalysisService = StorageAnalysisService.shared
     @State private var quickActionService = QuickActionService()
     @State private var screenshotService = ScreenshotService.shared
     @State private var activeQuickAction: QuickAction?
@@ -433,12 +432,9 @@ struct MenuPanelView: View {
         }
         .task {
             guard pluginManager.isEnabled(.systemStorage) else { return }
+            // 存储扫描可能遍历大量缓存；面板打开时扫描一次，后续由用户显式刷新，
+            // 避免 30 秒轮询取消尚未完成的扫描。
             storageAnalysisService.refresh()
-            while !Task.isCancelled {
-                try? await Task.sleep(for: .seconds(30))
-                guard !Task.isCancelled else { return }
-                storageAnalysisService.refresh()
-            }
         }
         .task {
             guard pluginManager.isEnabled(.networkTraffic) else { return }
@@ -447,23 +443,6 @@ struct MenuPanelView: View {
             while !Task.isCancelled {
                 try? await Task.sleep(for: .seconds(30))
             }
-        }
-        .alert(L("storage.confirm.title"), isPresented: Binding(
-            get: { storageCleanupPreview != nil },
-            set: { if !$0 { storageCleanupPreview = nil } }
-        ), presenting: storageCleanupPreview) { preview in
-            Button(L("storage.openFinder")) {
-                NSWorkspace.shared.activateFileViewerSelecting([preview.directoryURL])
-            }
-            Button(L("storage.clean"), role: .destructive) {
-                storageCleanupPreview = nil
-                cleanStorage(preview)
-            }
-            Button(L("update.cancel"), role: .cancel) {
-                storageCleanupPreview = nil
-            }
-        } message: { preview in
-            Text(L("storage.confirm.detail", preview.path, formattedStorage(preview.reclaimableBytes)))
         }
     }
 
@@ -1358,16 +1337,29 @@ struct MenuPanelView: View {
                     .foregroundStyle(.secondary)
                     .accessibilityLabel(L("storage.openSettings"))
 
-                    Button {
-                        storageAnalysisService.refresh()
-                    } label: {
-                        Image(systemName: "arrow.clockwise")
-                            .font(.caption)
+                    if storageAnalysisService.isLoading {
+                        Button {
+                            storageAnalysisService.cancelRefresh()
+                        } label: {
+                            Image(systemName: "xmark")
+                                .font(.caption)
+                        }
+                        .buttonStyle(.plain)
+                        .controlCenterHover(shape: AnyShape(.circle))
+                        .foregroundStyle(.secondary)
+                        .accessibilityLabel(L("storage.cancelScan"))
+                    } else {
+                        Button {
+                            storageAnalysisService.refresh()
+                        } label: {
+                            Image(systemName: "arrow.clockwise")
+                                .font(.caption)
+                        }
+                        .buttonStyle(.plain)
+                        .controlCenterHover(shape: AnyShape(.circle))
+                        .foregroundStyle(.secondary)
+                        .accessibilityLabel(L("storage.refresh"))
                     }
-                    .buttonStyle(.plain)
-                    .controlCenterHover(shape: AnyShape(.circle))
-                    .foregroundStyle(.secondary)
-                    .accessibilityLabel(L("storage.refresh"))
                 }
             }
 
@@ -1381,7 +1373,7 @@ struct MenuPanelView: View {
                         .foregroundStyle(.secondary)
                     Spacer()
                 }
-                ForEach(snapshot.entries) { entry in
+                ForEach(snapshot.sortedEntries.filter(\.category.isDeveloperFile)) { entry in
                     HStack(spacing: 8) {
                         Image(systemName: entry.category.symbol)
                             .font(.caption)
@@ -1394,24 +1386,25 @@ struct MenuPanelView: View {
                             .font(.caption2.weight(.semibold))
                             .monospacedDigit()
                             .foregroundStyle(.secondary)
-                        if entry.category.isSafeToClean && entry.bytes > 0 {
+                        if entry.category.supportsDetailedCleanup && entry.bytes > 0 {
                             Button {
-                                storageCleanupPreview = storageAnalysisService.cleanupPreview(for: entry)
+                                showPanelSettings(.systemStorage)
                             } label: {
-                                if storageAnalysisService.cleaningCategory == entry.category {
-                                    ProgressView().controlSize(.mini)
-                                } else {
-                                    Image(systemName: "trash")
-                                        .font(.caption2)
-                                }
+                                Image(systemName: "slider.horizontal.3")
+                                    .font(.caption2)
                             }
                             .buttonStyle(.plain)
                             .controlCenterHover(shape: AnyShape(.circle))
                             .foregroundStyle(.secondary)
-                            .disabled(storageAnalysisService.cleaningCategory != nil)
-                            .accessibilityLabel(L("storage.clean"))
+                            .accessibilityLabel(L("storage.manageItems"))
                         }
                     }
+                }
+                if storageAnalysisService.isLoading,
+                   let progress = storageAnalysisService.scanProgress {
+                    ProgressView(value: progress.fractionCompleted)
+                        .controlSize(.mini)
+                        .tint(.indigo)
                 }
             } else if storageAnalysisService.isLoading {
                 HStack {
@@ -1782,7 +1775,7 @@ struct MenuPanelView: View {
     private var cleanupTiles: some View {
         HStack(spacing: 12) {
             if pluginManager.isEnabled(.systemStorage) {
-                Button(action: requestDerivedDataCleanup) {
+                Button(action: openSystemStorageSettings) {
                     cleanupTileLabel(
                         symbol: "hammer.fill",
                         title: L("cleanup.derivedData"),
@@ -1791,12 +1784,6 @@ struct MenuPanelView: View {
                     )
                 }
                 .buttonStyle(.plain)
-                .disabled(
-                    storageAnalysisService.cleaningCategory == .derivedData
-                        || storageAnalysisService.cleaningCategory != nil
-                        || derivedDataBytes == nil
-                        || derivedDataBytes == 0
-                )
                 .controlCenterSurface(interactive: true, shape: AnyShape(.rect(cornerRadius: 16)))
             }
         }
@@ -1985,17 +1972,6 @@ struct MenuPanelView: View {
         }
     }
 
-    private func cleanStorage(_ preview: StorageCleanupPreview) {
-        Task {
-            do {
-                try await storageAnalysisService.clean(preview.category)
-                flashStatus(L("status.freed", formattedStorage(preview.reclaimableBytes)), isError: false)
-            } catch {
-                flashStatus(error.localizedDescription, isError: true)
-            }
-        }
-    }
-
     private func refreshToggles() {
         toggles = SystemToggleStates(
             hiddenFilesShown: SystemToggleService.hiddenFilesShown,
@@ -2006,9 +1982,8 @@ struct MenuPanelView: View {
         )
     }
 
-    private func requestDerivedDataCleanup() {
-        guard let bytes = derivedDataBytes else { return }
-        storageCleanupPreview = StorageCleanupPreview(category: .derivedData, reclaimableBytes: bytes)
+    private func openSystemStorageSettings() {
+        showPanelSettings(.systemStorage)
     }
 
     private func checkForUpdate() {

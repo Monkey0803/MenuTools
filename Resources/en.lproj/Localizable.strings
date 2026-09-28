@@ -1686,3 +1686,56 @@
 "storage.confirm.detail" = "Only this directory’s contents will be removed.\nPath: %@\nEstimated space to free: %@";
 "storage.openFinder" = "Show in Finder";
 "storage.unsafePath" = "The cleanup path did not pass safety validation.";
+
+"storage.xcodeArchives" = "Xcode Archives";
+"storage.iOSDeviceSupport" = "iOS Device Support";
+"storage.coreSimulator" = "CoreSimulator";
+"storage.xcodeArchives.detail" = "Local build archives; confirm they are no longer needed for export or distribution.";
+"storage.iOSDeviceSupport.detail" = "Older iOS device support files; close Xcode before cleaning.";
+"storage.coreSimulator.detail" = "May contain simulator apps and data. View in Finder only.";
+"storage.unreadable" = "This directory could not be read. Check its permissions in Finder.";
+"storage.lastScan" = "Last scan: %@";
+"storage.scanning" = "Scanning %@";
+"storage.cancelScan" = "Cancel scan";
+"storage.recommendations" = "Suggestions";
+"storage.recommendation.staleDeveloper" = "Long-unused developer files";
+"storage.recommendation.downloads" = "Downloads to review";
+"storage.recommendation.detail" = "%@ · Last modified: %@";
+
+"storage.scanCancelled" = "Scan cancelled. Refresh to scan again.";
+
+"storage.developerItems" = "%d selectable items";
+
+"storage.selectedItems" = "%d selected, estimated recovery %@";
+
+"storage.cleanSelected" = "Clean Selected";
+
+"storage.item.modified" = "Modified: %@";
+
+"storage.confirm.selectionDetail" = "Delete %d selected items, with an estimated recovery of %@?\nItems:\n%@";
+
+"storage.manageItems" = "Manage Items";
+
+"storage.simulator.title" = "CoreSimulator Analysis";
+
+"storage.simulator.warning" = "Analysis and Finder location only. Simulator data can include apps, devices, and runtimes; review carefully in Finder.";
+
+"storage.simulator.runtime" = "Runtimes";
+
+"storage.simulator.deviceData" = "Device Data";
+
+"storage.simulator.appData" = "App Data";
+
+"storage.simulator.cache" = "Caches";
+
+"storage.largeFiles.title" = "Large and Stale Files";
+
+"storage.largeFiles.filter" = "View";
+
+"storage.largeFiles.largest" = "Largest Files";
+
+"storage.largeFiles.stale" = "Stale Files";
+
+"storage.largeFiles.readOnly" = "View and locate in Finder only; automatic cleanup is unavailable.";
+
+"storage.largeFiles.dateRule" = "Dates use last access time, falling back to last modification time when unavailable.";
