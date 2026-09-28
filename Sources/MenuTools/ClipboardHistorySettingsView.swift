@@ -1050,6 +1050,7 @@ struct ClipboardHistoryQuickAccessView: View {
     var body: some View {
         ClipboardHistoryPopover(
             items: historyService.items,
+            isRecordingPaused: historyService.isRecordingPaused,
             onCopy: { item in
                 if historyService.perform(item, action: selectionAction) {
                     onCopy()

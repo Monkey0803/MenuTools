@@ -2146,3 +2146,14 @@ func clipboardContentTypesHaveTitles() {
     #expect(keys.allSatisfy { !$0.isEmpty })
     #expect(ClipboardHistoryContentType.image.titleKey == "clipboard.category.image")
 }
+
+@Test("只有暂停记录时才产出提示文案与符号")
+func clipboardRecordingBadgeOnlyWhenPaused() {
+    #expect(ClipboardRecordingBadge.labelKey(isPaused: true) == "clipboard.recordingPaused")
+    #expect(ClipboardRecordingBadge.labelKey(isPaused: false) == nil)
+    #expect(ClipboardRecordingBadge.symbolName(isPaused: true) == "pause.circle.fill")
+    #expect(ClipboardRecordingBadge.symbolName(isPaused: false) == nil)
+    // 提示语必须能读到「在哪恢复」，否则用户只会以为功能坏了
+    #expect(ClipboardRecordingBadge.hintKey(isPaused: true) == "clipboard.recordingPaused.hint")
+    #expect(ClipboardRecordingBadge.hintKey(isPaused: false) == nil)
+}

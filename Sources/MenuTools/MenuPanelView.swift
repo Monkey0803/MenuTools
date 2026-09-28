@@ -283,6 +283,8 @@ struct MenuPanelView: View {
     @State private var screenshotService = ScreenshotService.shared
     @State private var activeQuickAction: QuickAction?
     @State private var appLauncherService = AppLauncherService.shared
+    /// 剪贴板卡片要显示「记录已暂停」，需要观察服务状态。
+    @State private var clipboardService = ClipboardHistoryService.shared
     @State private var sceneService = SceneService.shared
     @State private var focusModeService = FocusModeService.shared
     @State private var globalShortcutService = GlobalShortcutService.shared
@@ -663,6 +665,13 @@ struct MenuPanelView: View {
                         .foregroundStyle(.tint)
                     Text(L("clipboard.history"))
                         .font(.callout.weight(.medium))
+                    if let labelKey = ClipboardRecordingBadge.labelKey(isPaused: clipboardService.isRecordingPaused),
+                       let symbolName = ClipboardRecordingBadge.symbolName(isPaused: clipboardService.isRecordingPaused) {
+                        Label(L(labelKey), systemImage: symbolName)
+                            .font(.caption2)
+                            .foregroundStyle(.orange)
+                            .help(L(ClipboardRecordingBadge.hintKey(isPaused: true) ?? labelKey))
+                    }
                     Spacer()
                     Image(systemName: "chevron.right")
                         .font(.caption.weight(.semibold))
@@ -2145,6 +2154,7 @@ struct ClipboardHistoryPopover: View {
     }
 
     let items: [ClipboardHistoryItem]
+    let isRecordingPaused: Bool
     let onCopy: (ClipboardHistoryItem) -> Void
     let onPerformAction: (ClipboardHistoryItem, ClipboardHistoryAction) -> Void
     let onTogglePinned: (UUID) -> Void
@@ -2184,6 +2194,13 @@ struct ClipboardHistoryPopover: View {
                     Text(L("clipboard.historyItems", items.count))
                         .font(.caption2)
                         .foregroundStyle(.secondary)
+                }
+                if let labelKey = ClipboardRecordingBadge.labelKey(isPaused: isRecordingPaused),
+                   let symbolName = ClipboardRecordingBadge.symbolName(isPaused: isRecordingPaused) {
+                    Label(L(labelKey), systemImage: symbolName)
+                        .font(.caption2)
+                        .foregroundStyle(.orange)
+                        .help(L(ClipboardRecordingBadge.hintKey(isPaused: true) ?? labelKey))
                 }
                 Spacer()
                 Menu {

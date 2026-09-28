@@ -69,6 +69,25 @@ extension ClipboardHistoryContentType {
     }
 }
 
+/// 暂停记录时的全局可见提示（纯逻辑，便于回归）。
+///
+/// `isRecordingPaused` 此前唯一的消费者是隐私页那个开关本身：暂停之后界面上没有任何提示，
+/// 用户几天后发现历史不再增长，只会以为功能坏了。
+enum ClipboardRecordingBadge {
+    static func labelKey(isPaused: Bool) -> String? {
+        isPaused ? "clipboard.recordingPaused" : nil
+    }
+
+    static func symbolName(isPaused: Bool) -> String? {
+        isPaused ? "pause.circle.fill" : nil
+    }
+
+    /// 提示语要说明去哪恢复，而不是只说「已暂停」。
+    static func hintKey(isPaused: Bool) -> String? {
+        isPaused ? "clipboard.recordingPaused.hint" : nil
+    }
+}
+
 /// 剪贴板历史的保留天数与容量档位（纯数据，便于回归）。
 enum ClipboardRetentionOptions {
     /// 天数：0 表示不额外限制。
