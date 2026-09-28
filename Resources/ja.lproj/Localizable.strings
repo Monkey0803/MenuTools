@@ -407,6 +407,7 @@
 "screenshot.error.clipboard" = "クリップボードに書き込めません";
 "screenshot.error.editor" = "画像編集アプリを開けません";
 "screenshot.error.stitch" = "スクロール撮影の結合に失敗しました";
+"screenshot.error.screenRecording" = "「画面収録」権限が必要です：システム設定 → プライバシーとセキュリティ → 画面収録 で MenuTools を許可してください（一覧に無い場合は「+」でアプリケーションから追加）。その後再試行してください";
 "screenshot.error.memoryLimit" = "スクロール撮影がメモリ上限に達しました。現在の撮影を完了してください";
 "screenshot.error.displayUnknown" = "ディスプレイを特定できません";
 "screenshot.error.displayMissing" = "対象のディスプレイが見つかりません";

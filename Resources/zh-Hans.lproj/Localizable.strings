@@ -407,6 +407,7 @@
 "screenshot.error.clipboard" = "无法写入剪贴板";
 "screenshot.error.editor" = "无法打开图片编辑器";
 "screenshot.error.stitch" = "长截图拼接失败";
+"screenshot.error.screenRecording" = "需要「屏幕录制」权限：请到 系统设置 → 隐私与安全性 → 屏幕录制 中允许 MenuTools（列表里没有就用「+」从「应用程序」添加），然后重试";
 "screenshot.error.memoryLimit" = "长截图已达到内存保护上限，请先完成当前截图";
 "screenshot.error.displayUnknown" = "无法确定显示器";
 "screenshot.error.displayMissing" = "无法找到目标显示器";

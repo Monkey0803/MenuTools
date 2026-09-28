@@ -407,6 +407,7 @@
 "screenshot.error.clipboard" = "無法寫入剪貼簿";
 "screenshot.error.editor" = "無法開啟圖片編輯器";
 "screenshot.error.stitch" = "長截圖拼接失敗";
+"screenshot.error.screenRecording" = "需要「螢幕錄製」權限：請到 系統設定 → 隱私權與安全性 → 螢幕錄製 中允許 MenuTools（清單中沒有就用「+」從「應用程式」加入），然後重試";
 "screenshot.error.memoryLimit" = "長截圖已達到記憶體保護上限，請先完成目前截圖";
 "screenshot.error.displayUnknown" = "無法確定顯示器";
 "screenshot.error.displayMissing" = "無法找到目標顯示器";

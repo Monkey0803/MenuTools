@@ -692,6 +692,8 @@ enum ScreenshotError: LocalizedError, Equatable {
     case clipboardFailed
     case editorFailed
     case stitchFailed
+    /// 屏幕录制未授权：此时采集只会得到桌面/墙纸帧，必须明确报错而不是当作成功。
+    case screenRecordingDenied
 
     var errorDescription: String? {
         switch self {
@@ -704,6 +706,7 @@ enum ScreenshotError: LocalizedError, Equatable {
         case .clipboardFailed: return L("screenshot.error.clipboard")
         case .editorFailed: return L("screenshot.error.editor")
         case .stitchFailed: return L("screenshot.error.stitch")
+        case .screenRecordingDenied: return L("screenshot.error.screenRecording")
         }
     }
 }
@@ -796,6 +799,8 @@ final class ScreenshotService {
     private let imageCapturer: any ScreenshotImageCapturing
     private let regionStore: ScreenshotRegionStore
     private let fileManager: FileManager
+    /// 屏幕录制是否已授权。未授权时系统只会给出桌面/墙纸帧，因此必须在采集前拦下。
+    private let isScreenRecordingAuthorized: () -> Bool
 
     private(set) var isCapturing = false
     private(set) var capturingMode: ScreenshotCaptureMode?
@@ -812,7 +817,8 @@ final class ScreenshotService {
         windowSelector: any ScreenshotWindowSelecting = ScreenshotWindowSelector.shared,
         imageCapturer: any ScreenshotImageCapturing = DefaultScreenshotImageCapturer(),
         regionStore: ScreenshotRegionStore = ScreenshotRegionStore(),
-        fileManager: FileManager = .default
+        fileManager: FileManager = .default,
+        isScreenRecordingAuthorized: @escaping () -> Bool = { CGPreflightScreenCaptureAccess() }
     ) {
         self.processRunner = processRunner
         self.regionSelector = regionSelector
@@ -820,6 +826,7 @@ final class ScreenshotService {
         self.imageCapturer = imageCapturer
         self.regionStore = regionStore
         self.fileManager = fileManager
+        self.isScreenRecordingAuthorized = isScreenRecordingAuthorized
     }
 
     var configuredMode: ScreenshotCaptureMode {
@@ -919,6 +926,8 @@ final class ScreenshotService {
         copyToClipboard: Bool,
         editAfterCapture: Bool
     ) async throws -> URL {
+        // 先查权限，避免弹出一个点完必然失败的窗口选择层。
+        try requireScreenRecordingPermission()
         let windowID = try await windowSelector.select()
         return try await capture(
             mode: .window,
@@ -947,6 +956,17 @@ final class ScreenshotService {
         )
     }
 
+    /// 屏幕录制未授权时直接报错。
+    ///
+    /// 未授权时 ScreenCaptureKit 必然失败，而回退的 `screencapture` 只会产出桌面/墙纸帧，
+    /// 它又能通过「可解码且宽高 > 0」的校验被判为成功，最终进入截图历史与快捷卡片。
+    /// 因此必须在任何采集动作之前拦下，并给出可读原因与系统设置跳转。
+    private func requireScreenRecordingPermission() throws {
+        guard isScreenRecordingAuthorized() else {
+            throw ScreenshotError.screenRecordingDenied
+        }
+    }
+
     private func capture(
         mode: ScreenshotCaptureMode,
         copyToClipboard: Bool,
@@ -961,6 +981,7 @@ final class ScreenshotService {
         ) else {
             throw ScreenshotError.alreadyCapturing
         }
+        try requireScreenRecordingPermission()
         isCapturing = true
         capturingMode = mode
         lastError = nil

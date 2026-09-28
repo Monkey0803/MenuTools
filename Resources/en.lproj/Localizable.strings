@@ -407,6 +407,7 @@
 "screenshot.error.clipboard" = "Could not write to the clipboard";
 "screenshot.error.editor" = "Could not open the image editor";
 "screenshot.error.stitch" = "Could not stitch the scrolling screenshot";
+"screenshot.error.screenRecording" = "Screen Recording permission is required: allow MenuTools in System Settings → Privacy & Security → Screen Recording (if it is not listed, add it from Applications with the plus button), then try again";
 "screenshot.error.memoryLimit" = "The scrolling screenshot reached its memory limit; finish it before starting another one";
 "screenshot.error.displayUnknown" = "Could not determine the display";
 "screenshot.error.displayMissing" = "Could not find the target display";

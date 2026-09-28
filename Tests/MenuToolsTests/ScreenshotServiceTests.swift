@@ -642,3 +642,91 @@ func screenshotEditorCropUsesImagePixelCoordinates() {
         ) == CGRect(x: 100, y: 320, width: 500, height: 320)
     )
 }
+
+@MainActor
+private final class RecordingScreenshotProcessRunner: ScreenshotProcessRunning {
+    private(set) var calls: [(String, [String])] = []
+
+    func run(executable: String, arguments: [String]) async throws {
+        calls.append((executable, arguments))
+    }
+}
+
+@MainActor
+private final class FailingScreenshotImageCapturer: ScreenshotImageCapturing {
+    enum Failure: Error {
+        case unavailable
+    }
+
+    func captureDisplay(_ displayID: CGDirectDisplayID) async throws -> CGImage {
+        throw Failure.unavailable
+    }
+
+    func captureWindow(_ windowID: CGWindowID) async throws -> CGImage {
+        throw Failure.unavailable
+    }
+}
+
+@MainActor
+private final class RecordingScreenshotWindowSelector: ScreenshotWindowSelecting {
+    private(set) var selectCount = 0
+
+    func select() async throws -> CGWindowID {
+        selectCount += 1
+        return 1
+    }
+}
+
+@Test("未授权屏幕录制时明确报错，不再静默回退命令行采集产出墙纸图")
+@MainActor
+func screenshotWithoutScreenRecordingPermissionFailsLoudly() async {
+    let processes = RecordingScreenshotProcessRunner()
+    let service = ScreenshotService(
+        processRunner: processes,
+        imageCapturer: FailingScreenshotImageCapturer(),
+        isScreenRecordingAuthorized: { false }
+    )
+
+    await #expect(throws: ScreenshotError.screenRecordingDenied) {
+        _ = try await service.capture(mode: .fullScreen, copyToClipboard: false, editAfterCapture: false)
+    }
+    // 未授权时既不该读屏幕，也不该回退命令行采集。
+    #expect(processes.calls.isEmpty)
+}
+
+@Test("已授权时保留命令行回退：直接采集失败仍会尝试 screencapture")
+@MainActor
+func screenshotKeepsProcessFallbackWhenAuthorized() async {
+    let processes = RecordingScreenshotProcessRunner()
+    let service = ScreenshotService(
+        processRunner: processes,
+        imageCapturer: FailingScreenshotImageCapturer(),
+        isScreenRecordingAuthorized: { true }
+    )
+
+    _ = try? await service.capture(mode: .fullScreen, copyToClipboard: false, editAfterCapture: false)
+
+    #expect(processes.calls.count == 1)
+}
+
+@Test("未授权时不会先弹出窗口选择层")
+@MainActor
+func screenshotWindowSelectionRequiresPermissionFirst() async {
+    let selector = RecordingScreenshotWindowSelector()
+    let service = ScreenshotService(
+        windowSelector: selector,
+        isScreenRecordingAuthorized: { false }
+    )
+
+    await #expect(throws: ScreenshotError.screenRecordingDenied) {
+        _ = try await service.captureSelectedWindow(copyToClipboard: false, editAfterCapture: false)
+    }
+    #expect(selector.selectCount == 0)
+}
+
+@Test("屏幕录制权限缺失的错误文案会指向系统设置里的对应开关")
+func screenRecordingDeniedMessageIsActionable() throws {
+    let message = try #require(ScreenshotError.screenRecordingDenied.errorDescription)
+    #expect(!message.isEmpty)
+    #expect(RuntimePermissionSettingsLink.url(for: .screenRecording) != nil)
+}
