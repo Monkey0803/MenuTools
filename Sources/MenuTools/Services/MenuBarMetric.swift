@@ -60,12 +60,32 @@ enum MenuBarMetricResolver {
     }
 }
 
+/// 资源百分比的统一口径。
+///
+/// 此前设置页把上界夹到 99%（满载也显示 99%），而菜单栏标题按 0...1 计算：
+/// 同一读数在面板与设置页不一致，磁盘占满时尤其容易被当成故障。
+enum SystemResourcePercent {
+    /// 夹到 0...1；非有限值按 0 处理。
+    static func ratio(_ value: Double) -> Double {
+        guard value.isFinite else { return 0 }
+        return min(max(value, 0), 1)
+    }
+
+    static func percent(_ value: Double) -> String {
+        "\(Int((ratio(value) * 100).rounded()))%"
+    }
+
+    /// 菜单栏标题用的固定三位宽写法（"  5%"、" 42%"、"100%"）。
+    static func paddedPercent(_ value: Double) -> String {
+        String(format: "%3d%%", Int((ratio(value) * 100).rounded()))
+    }
+}
+
 /// 资源指标在菜单栏上的标题。
 enum SystemResourceMenuBarPresenter {
     /// 百分比固定三位宽（如 "  5%"、" 42%"、"100%"），避免菜单栏标题宽度变化带动弹窗抖动。
     static func percent(_ value: Double) -> String {
-        let clamped = min(max(value.isFinite ? value : 0, 0), 1)
-        return String(format: "%3d%%", Int((clamped * 100).rounded()))
+        SystemResourcePercent.paddedPercent(value)
     }
 
     /// 只有选择 CPU / 内存 / 磁盘时才产出标题；其余情况返回 nil。

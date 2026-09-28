@@ -1677,3 +1677,39 @@ func resourceServicePersistsAlertCooldowns() throws {
     restarted.refresh(now: base.addingTimeInterval(24 * 3_600 + 60))
     #expect(second.sent == [.diskSpace])
 }
+
+@Test("资源百分比口径统一：满载显示 100%，越界与 NaN 收敛到 0")
+func systemResourcePercentUnifiesFormatting() {
+    #expect(SystemResourcePercent.percent(1) == "100%")
+    #expect(SystemResourcePercent.percent(0.999) == "100%")
+    #expect(SystemResourcePercent.percent(0.424) == "42%")
+    #expect(SystemResourcePercent.percent(0) == "0%")
+    #expect(SystemResourcePercent.percent(-1) == "0%")
+    #expect(SystemResourcePercent.percent(2) == "100%")
+    #expect(SystemResourcePercent.percent(.nan) == "0%")
+
+    // 菜单栏标题与设置页必须同源：此前设置页把上界夹到 99%，同一读数两处不一致
+    #expect(SystemResourceMenuBarPresenter.percent(1) == "100%")
+    #expect(SystemResourceMenuBarPresenter.percent(0.05) == "  5%")
+    #expect(
+        SystemResourceMenuBarPresenter.percent(1).trimmingCharacters(in: .whitespaces)
+            == SystemResourcePercent.percent(1)
+    )
+}
+
+@Test("历史柱支持方向键移动选择，两端回绕")
+func historyChartKeyboardNavigation() {
+    // 还没选中时按右键从第一根开始
+    #expect(SystemResourceHistoryChartLayout.movedIndex(current: nil, step: 1, sampleCount: 5) == 0)
+    #expect(SystemResourceHistoryChartLayout.movedIndex(current: 2, step: 1, sampleCount: 5) == 3)
+    #expect(SystemResourceHistoryChartLayout.movedIndex(current: 2, step: -1, sampleCount: 5) == 1)
+    // 两端回绕，键盘用户不必「撞墙」
+    #expect(SystemResourceHistoryChartLayout.movedIndex(current: 0, step: -1, sampleCount: 5) == 4)
+    #expect(SystemResourceHistoryChartLayout.movedIndex(current: 4, step: 1, sampleCount: 5) == 0)
+    // 取消选择与空图表
+    #expect(SystemResourceHistoryChartLayout.movedIndex(current: 3, step: 0, sampleCount: 5) == nil)
+    #expect(SystemResourceHistoryChartLayout.movedIndex(current: 0, step: 1, sampleCount: 0) == nil)
+    // 越界的当前下标视为「没有有效选择」：按前进方向回到端点，而不是崩溃或原地不动
+    #expect(SystemResourceHistoryChartLayout.movedIndex(current: 99, step: 1, sampleCount: 5) == 0)
+    #expect(SystemResourceHistoryChartLayout.movedIndex(current: -3, step: -1, sampleCount: 5) == 4)
+}

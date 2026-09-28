@@ -38,6 +38,7 @@
 "resource.process.showAll" = "顯示全部 %ld 項";
 "resource.process.showTop" = "只看佔用最高的 %ld 項";
 "resource.cores" = "各核心佔用";
+"resource.core.label" = "核心 %d";
 "resource.memory.pressure" = "記憶體壓力";
 "resource.memory.wired" = "鎖定";
 "resource.memory.active" = "活躍";

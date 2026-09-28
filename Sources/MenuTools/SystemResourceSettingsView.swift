@@ -261,11 +261,14 @@ struct SystemResourceSettingsView: View {
                             }
                         }
                         .frame(height: 8)
-                        Text("\(Int((core.usage * 100).rounded()))")
+                        Text("\(Int((SystemResourcePercent.ratio(core.usage) * 100).rounded()))")
                             .font(.caption2.monospacedDigit())
                             .foregroundStyle(.secondary)
                             .frame(width: 26, alignment: .trailing)
                     }
+                    .accessibilityElement(children: .ignore)
+                    .accessibilityLabel(L("resource.core.label", core.index))
+                    .accessibilityValue(SystemResourcePercent.percent(core.usage))
                 }
             }
         }
@@ -486,6 +489,10 @@ struct SystemResourceSettingsView: View {
                             .opacity(hoveredHistoryIndex == nil || hoveredHistoryIndex == index ? 1 : 0.42)
                             .frame(maxHeight: .infinity, alignment: .bottom)
                             .help(historyDetailText(bucket))
+                            // VoiceOver 此前读不到任何一根柱子
+                            .accessibilityElement()
+                            .accessibilityLabel(L("resource.history.title"))
+                            .accessibilityValue(historyDetailText(bucket))
                     }
                 }
                 .frame(maxWidth: .infinity, alignment: .leading)
@@ -507,6 +514,28 @@ struct SystemResourceSettingsView: View {
                 }
             }
             .frame(height: 96)
+            // 键盘：左右方向键移动选中，Esc 用 movedIndex 的取消语义清空。
+            // 此前只看鼠标悬停，键盘与 VoiceOver 用户拿不到单根柱子的数值。
+            .focusable()
+            .onMoveCommand { direction in
+                switch direction {
+                case .left:
+                    hoveredHistoryIndex = SystemResourceHistoryChartLayout.movedIndex(
+                        current: hoveredHistoryIndex,
+                        step: -1,
+                        sampleCount: buckets.count
+                    )
+                case .right:
+                    hoveredHistoryIndex = SystemResourceHistoryChartLayout.movedIndex(
+                        current: hoveredHistoryIndex,
+                        step: 1,
+                        sampleCount: buckets.count
+                    )
+                default:
+                    break
+                }
+            }
+            .accessibilityLabel(L("resource.history.title"))
         }
     }
 
@@ -640,7 +669,7 @@ struct SystemResourceSettingsView: View {
     // MARK: - 格式化
 
     private func percent(_ value: Double) -> String {
-        "\(Int((min(max(value, 0), 99) * 100).rounded()))%"
+        SystemResourcePercent.percent(value)
     }
 
     private func bytes(_ value: Int64) -> String {

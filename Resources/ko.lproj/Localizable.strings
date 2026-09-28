@@ -38,6 +38,7 @@
 "resource.process.showAll" = "모두 표시(%ld개)";
 "resource.process.showTop" = "상위 %ld개만 표시";
 "resource.cores" = "코어별 사용률";
+"resource.core.label" = "코어 %d";
 "resource.memory.pressure" = "메모리 압력";
 "resource.memory.wired" = "와이어드";
 "resource.memory.active" = "활성";

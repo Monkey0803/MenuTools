@@ -202,6 +202,15 @@ enum SystemResourceHistoryChartLayout {
         return (min(max(width, minimumBarWidth), maximumBarWidth), spacing)
     }
 
+    /// 键盘移动历史柱选择：step 为 ±1，两端回绕；step 为 0 或没有样本时返回 nil（取消选择）。
+    static func movedIndex(current: Int?, step: Int, sampleCount: Int) -> Int? {
+        guard sampleCount > 0, step != 0 else { return nil }
+        guard let current, current >= 0, current < sampleCount else {
+            return step > 0 ? 0 : sampleCount - 1
+        }
+        return ((current + step) % sampleCount + sampleCount) % sampleCount
+    }
+
     /// 悬停位置对应第几个柱子；落在柱子之间的空隙或越界时返回 nil。
     static func hoveredIndex(
         x: CGFloat,

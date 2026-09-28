@@ -38,6 +38,7 @@
 "resource.process.showAll" = "Show all %ld";
 "resource.process.showTop" = "Show only the top %ld";
 "resource.cores" = "Per-core usage";
+"resource.core.label" = "Core %d";
 "resource.memory.pressure" = "Memory pressure";
 "resource.memory.wired" = "Wired";
 "resource.memory.active" = "Active";

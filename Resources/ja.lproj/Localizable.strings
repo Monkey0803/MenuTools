@@ -38,6 +38,7 @@
 "resource.process.showAll" = "すべて表示（%ld 件）";
 "resource.process.showTop" = "上位 %ld 件のみ表示";
 "resource.cores" = "コアごとの使用率";
+"resource.core.label" = "コア %d";
 "resource.memory.pressure" = "メモリプレッシャー";
 "resource.memory.wired" = "ワイヤード";
 "resource.memory.active" = "アクティブ";
