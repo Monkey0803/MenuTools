@@ -476,6 +476,7 @@ enum SystemResourceAlertSettings {
     static let cpuUsageKey = "systemResource.alerts.cpuUsage"
     static let cpuSustainSecondsKey = "systemResource.alerts.cpuSustainSeconds"
     static let diskFreeRatioKey = "systemResource.alerts.diskFreeRatio"
+    static let cooldownsKey = "systemResource.alerts.cooldowns"
     static let defaultEnabled = true
 }
 
@@ -561,6 +562,14 @@ final class SystemResourceService {
             cpuSustainDuration: storedSustain ?? 5 * 60,
             diskFreeRatio: storedDisk ?? 0.1
         ).normalized()
+        // 恢复上次的告警冷却：重启后不应立刻重复提醒已经提醒过的事。
+        if let stored = userDefaults.dictionary(forKey: SystemResourceAlertSettings.cooldownsKey) {
+            var cooldowns: [String: Double] = [:]
+            for (key, value) in stored {
+                if let number = value as? NSNumber { cooldowns[key] = number.doubleValue }
+            }
+            alertPolicy.restoreCooldowns(cooldowns)
+        }
     }
 
     /// 面板可见时的高频采样；面板关闭请调用 `endPanelMonitoring()`。
@@ -707,6 +716,9 @@ final class SystemResourceService {
         let fired = alertPolicy.evaluate(snapshot: snapshot, now: now, thresholds: alertThresholds)
         for kind in fired {
             alerter.send(kind, snapshot: snapshot)
+        }
+        if !fired.isEmpty {
+            userDefaults.set(alertPolicy.cooldownSnapshot(), forKey: SystemResourceAlertSettings.cooldownsKey)
         }
     }
 

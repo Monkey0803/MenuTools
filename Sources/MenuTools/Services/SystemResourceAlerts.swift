@@ -95,6 +95,25 @@ struct SystemResourceAlertPolicy: Equatable, Sendable {
         lastFiredAt[kind]
     }
 
+    /// 导出冷却时间戳，供跨启动持久化。
+    ///
+    /// 冷却此前只存在内存里：应用一重启，同一件已经提醒过的事会立刻再提醒一次
+    /// （磁盘剩余不足的冷却长达 24 小时，重复提醒尤其明显）。
+    func cooldownSnapshot() -> [String: Double] {
+        Dictionary(uniqueKeysWithValues: lastFiredAt.map {
+            ($0.key.rawValue, $0.value.timeIntervalSince1970)
+        })
+    }
+
+    /// 从持久化状态恢复冷却。未知类别与非法时间戳直接忽略，避免脏数据把冷却推到荒谬的时间。
+    mutating func restoreCooldowns(_ stored: [String: Double]) {
+        for (key, value) in stored {
+            guard let kind = SystemResourceAlertKind(rawValue: key),
+                  value.isFinite, value > 0 else { continue }
+            lastFiredAt[kind] = Date(timeIntervalSince1970: value)
+        }
+    }
+
     private func shouldFire(_ kind: SystemResourceAlertKind, now: Date) -> Bool {
         guard let last = lastFiredAt[kind] else { return true }
         return now.timeIntervalSince(last) >= kind.cooldown

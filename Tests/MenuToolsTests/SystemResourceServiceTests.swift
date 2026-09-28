@@ -1575,3 +1575,105 @@ func resourceSamplingDropsInFlightReadingAfterStop() async throws {
     #expect(service.snapshot == nil)
     #expect(!service.isMonitoring)
 }
+
+@Test("告警冷却可导出与恢复：重启后同一告警仍在冷却期内")
+func alertCooldownsPersistAcrossRestart() {
+    let thresholds = SystemResourceAlertThresholds(cpuUsage: 0.99, cpuSustainDuration: 300, diskFreeRatio: 0.1)
+    let base = Date(timeIntervalSince1970: 1_800_000_000)
+
+    var policy = SystemResourceAlertPolicy()
+    #expect(policy.evaluate(
+        snapshot: alertSnapshot(diskFree: 50, diskTotal: 1_000),
+        now: base,
+        thresholds: thresholds
+    ) == [.diskSpace])
+
+    let stored = policy.cooldownSnapshot()
+    #expect(stored[SystemResourceAlertKind.diskSpace.rawValue] == base.timeIntervalSince1970)
+
+    // 模拟重启：新状态从持久化恢复，冷却期内不应重复提醒
+    var restarted = SystemResourceAlertPolicy()
+    restarted.restoreCooldowns(stored)
+    #expect(restarted.lastFired(.diskSpace) == base)
+    #expect(restarted.evaluate(
+        snapshot: alertSnapshot(diskFree: 5, diskTotal: 1_000),
+        now: base.addingTimeInterval(3_600),
+        thresholds: thresholds
+    ).isEmpty)
+
+    // 冷却结束后恢复告警
+    #expect(restarted.evaluate(
+        snapshot: alertSnapshot(diskFree: 5, diskTotal: 1_000),
+        now: base.addingTimeInterval(24 * 3_600 + 60),
+        thresholds: thresholds
+    ) == [.diskSpace])
+}
+
+@Test("恢复冷却时忽略未知类别与非法时间戳")
+func alertCooldownRestoreValidatesInput() {
+    var policy = SystemResourceAlertPolicy()
+    policy.restoreCooldowns([
+        "unknownKind": 1_800_000_000,
+        SystemResourceAlertKind.cpuSustained.rawValue: .nan,
+        SystemResourceAlertKind.memoryPressure.rawValue: -5,
+        SystemResourceAlertKind.diskSpace.rawValue: 1_800_000_000
+    ])
+
+    #expect(policy.lastFired(.cpuSustained) == nil)
+    #expect(policy.lastFired(.memoryPressure) == nil)
+    #expect(policy.lastFired(.diskSpace) == Date(timeIntervalSince1970: 1_800_000_000))
+}
+
+/// 磁盘几乎占满的数据源：用来驱动磁盘告警（不需要持续时间）。
+private final class FullDiskResourceProvider: SystemResourceProviding, @unchecked Sendable {
+    func read() -> SystemResourceReading {
+        SystemResourceReading(
+            timestamp: 0,
+            cpuTicks: SystemResourceCPUTicks(user: 1, system: 1, idle: 1, nice: 0),
+            memoryUsedBytes: 1,
+            memoryTotalBytes: 2,
+            diskAvailableBytes: 1,
+            diskTotalBytes: 1_000,
+            networkReceivedBytes: 0,
+            networkSentBytes: 0
+        )
+    }
+}
+
+@Test("服务把告警冷却写进偏好，重启后不会立刻重复提醒")
+@MainActor
+func resourceServicePersistsAlertCooldowns() throws {
+    let suiteName = "SystemResourceAlertCooldown.\(UUID().uuidString)"
+    let defaults = try #require(UserDefaults(suiteName: suiteName))
+    defaults.removePersistentDomain(forName: suiteName)
+    let base = Date(timeIntervalSince1970: 1_800_000_000)
+
+    let first = RecordingResourceAlerter()
+    let service = SystemResourceService(
+        provider: FullDiskResourceProvider(),
+        memoryReleaser: NoopMemoryReleaser(),
+        historyStore: RecordingHistoryStore(),
+        alerter: first,
+        userDefaults: defaults
+    )
+    service.setAlertsEnabled(true)
+    service.refresh(now: base)
+    #expect(first.sent == [.diskSpace])
+
+    // 「重启」：新实例共用同一份偏好
+    let second = RecordingResourceAlerter()
+    let restarted = SystemResourceService(
+        provider: FullDiskResourceProvider(),
+        memoryReleaser: NoopMemoryReleaser(),
+        historyStore: RecordingHistoryStore(),
+        alerter: second,
+        userDefaults: defaults
+    )
+    restarted.setAlertsEnabled(true)
+    restarted.refresh(now: base.addingTimeInterval(3_600))
+    #expect(second.sent.isEmpty)
+
+    // 冷却过后恢复提醒
+    restarted.refresh(now: base.addingTimeInterval(24 * 3_600 + 60))
+    #expect(second.sent == [.diskSpace])
+}
