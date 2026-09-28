@@ -2157,3 +2157,39 @@ func clipboardRecordingBadgeOnlyWhenPaused() {
     #expect(ClipboardRecordingBadge.hintKey(isPaused: true) == "clipboard.recordingPaused.hint")
     #expect(ClipboardRecordingBadge.hintKey(isPaused: false) == nil)
 }
+
+@Test("筛选计数只看真正的筛选条件，容量档位不算")
+func clipboardFilterBadgeExcludesRetentionLimit() {
+    // 什么都不筛
+    #expect(ClipboardFilterBadge.activeFilterCount(
+        isCategoryFiltered: false,
+        isSortChanged: false,
+        hasSourceFilter: false,
+        isDateFiltered: false
+    ) == 0)
+    // 只改了容量档位（不再作为输入参与）→ 仍然是 0，这正是此前被算成 1 的场景
+    #expect(ClipboardFilterBadge.titleKey(count: 0) == "clipboard.filters")
+    #expect(ClipboardFilterBadge.titleKey(count: 3) == "clipboard.filtersCount")
+
+    #expect(ClipboardFilterBadge.activeFilterCount(
+        isCategoryFiltered: true,
+        isSortChanged: false,
+        hasSourceFilter: true,
+        isDateFiltered: false
+    ) == 2)
+    #expect(ClipboardFilterBadge.activeFilterCount(
+        isCategoryFiltered: true,
+        isSortChanged: true,
+        hasSourceFilter: true,
+        isDateFiltered: true
+    ) == 4)
+}
+
+@Test("条目数上限是保留策略，档位取自 ClipboardHistoryLimit 且默认 50")
+func clipboardItemLimitOptionsAreStable() {
+    #expect(ClipboardHistoryLimit.defaultValue == 50)
+    let values = ClipboardHistoryLimit.allCases.map(\.rawValue)
+    #expect(values == values.sorted())
+    #expect(values.contains(ClipboardHistoryLimit.defaultValue))
+    #expect(!values.contains(0))
+}

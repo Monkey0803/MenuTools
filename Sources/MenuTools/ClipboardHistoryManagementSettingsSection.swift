@@ -44,6 +44,21 @@ struct ClipboardHistoryManagementSettingsSection: View {
                 .frame(width: 150)
             }
 
+            HStack {
+                Text(L("clipboard.limit"))
+                Spacer()
+                Picker(L("clipboard.limit"), selection: Binding(
+                    get: { ClipboardHistoryLimit(rawValue: historyService.limit) ?? .fifty },
+                    set: { limit in historyService.setLimit(limit) }
+                )) {
+                    ForEach(ClipboardHistoryLimit.allCases) { limit in
+                        Text(L("clipboard.limitValue", limit.rawValue)).tag(limit)
+                    }
+                }
+                .labelsHidden()
+                .frame(width: 150)
+            }
+
             Text(L("clipboard.cleanupDescription"))
                 .font(.caption)
                 .foregroundStyle(.secondary)

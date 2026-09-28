@@ -69,6 +69,25 @@ extension ClipboardHistoryContentType {
     }
 }
 
+/// 「筛选已生效」计数（纯逻辑，便于回归）。
+///
+/// 条目数上限与容量都属于保留策略，此前却被算进筛选计数、且入口放在筛选菜单里，
+/// 于是用户改一次容量就会看到「筛选已生效 1」，而真正的筛选设置里根本没有容量。
+enum ClipboardFilterBadge {
+    static func activeFilterCount(
+        isCategoryFiltered: Bool,
+        isSortChanged: Bool,
+        hasSourceFilter: Bool,
+        isDateFiltered: Bool
+    ) -> Int {
+        [isCategoryFiltered, isSortChanged, hasSourceFilter, isDateFiltered].filter { $0 }.count
+    }
+
+    static func titleKey(count: Int) -> String {
+        count == 0 ? "clipboard.filters" : "clipboard.filtersCount"
+    }
+}
+
 /// 暂停记录时的全局可见提示（纯逻辑，便于回归）。
 ///
 /// `isRecordingPaused` 此前唯一的消费者是隐私页那个开关本身：暂停之后界面上没有任何提示，

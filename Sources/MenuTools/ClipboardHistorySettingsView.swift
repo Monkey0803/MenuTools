@@ -316,14 +316,6 @@ struct ClipboardHistorySettingsView: View {
                     Button(L(filter.titleKey)) { dateFilter = filter }
                 }
 
-                Picker(L("clipboard.limit"), selection: Binding<ClipboardHistoryLimit>(
-                    get: { ClipboardHistoryLimit(rawValue: historyService.limit) ?? .fifty },
-                    set: { limit in historyService.setLimit(limit) }
-                )) {
-                    ForEach(ClipboardHistoryLimit.allCases) { limit in
-                        Text(L("clipboard.limitValue", limit.rawValue)).tag(limit)
-                    }
-                }
             } label: {
                 Label(filterMenuTitle, systemImage: "line.3.horizontal.decrease.circle")
             }
@@ -582,14 +574,15 @@ struct ClipboardHistorySettingsView: View {
     }
 
     private var filterMenuTitle: String {
-        let count = [
-            category != .all,
-            sortOrder != .newestFirst,
-            sourceBundleID != nil,
-            dateFilter != .all,
-            historyService.limit != ClipboardHistoryLimit.fifty.rawValue
-        ].filter { $0 }.count
-        return count == 0 ? L("clipboard.filters") : L("clipboard.filtersCount", count)
+        // 容量/条目数上限是保留策略，不算筛选条件（管理区才是它的位置）。
+        let count = ClipboardFilterBadge.activeFilterCount(
+            isCategoryFiltered: category != .all,
+            isSortChanged: sortOrder != .newestFirst,
+            hasSourceFilter: sourceBundleID != nil,
+            isDateFiltered: dateFilter != .all
+        )
+        // 0 项时走不带参数的文案键，避免依赖 String(format:) 忽略多余参数的行为。
+        return count == 0 ? L(ClipboardFilterBadge.titleKey(count: 0)) : L(ClipboardFilterBadge.titleKey(count: count), count)
     }
 
     private func sourceApplicationName(for bundleID: String) -> String {
