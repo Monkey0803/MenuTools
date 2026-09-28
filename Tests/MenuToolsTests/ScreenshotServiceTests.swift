@@ -730,3 +730,52 @@ func screenRecordingDeniedMessageIsActionable() throws {
     #expect(!message.isEmpty)
     #expect(RuntimePermissionSettingsLink.url(for: .screenRecording) != nil)
 }
+
+@MainActor
+private final class RecordingTransientMessagePresenter: TransientMessagePresenting {
+    private(set) var messages: [(text: String, isSuccess: Bool)] = []
+
+    func show(message: String, isSuccess: Bool) {
+        messages.append((message, isSuccess))
+    }
+}
+
+@Test("截图快捷键失败会弹提示，而不是只写一个没人读的状态字段")
+@MainActor
+func screenshotShortcutFailurePresentsHUD() {
+    let presenter = RecordingTransientMessagePresenter()
+    let service = ScreenshotShortcutService(messagePresenter: presenter)
+
+    service.reportShortcutFailure(ScreenshotError.screenRecordingDenied)
+
+    #expect(service.lastError == ScreenshotError.screenRecordingDenied.errorDescription)
+    #expect(presenter.messages.count == 1)
+    #expect(presenter.messages.first?.text == ScreenshotError.screenRecordingDenied.errorDescription)
+    #expect(presenter.messages.first?.isSuccess == false)
+}
+
+@Test("截图快捷键成功不会弹失败提示")
+@MainActor
+func screenshotShortcutSuccessClearsError() {
+    let presenter = RecordingTransientMessagePresenter()
+    let service = ScreenshotShortcutService(messagePresenter: presenter)
+
+    service.reportShortcutFailure(ScreenshotError.screenRecordingDenied)
+    service.reportShortcutSuccess()
+
+    #expect(service.lastError == nil)
+    #expect(presenter.messages.count == 1)
+}
+
+@Test("区域 OCR 快捷键失败也会弹提示")
+@MainActor
+func regionOCRShortcutFailurePresentsHUD() {
+    let presenter = RecordingTransientMessagePresenter()
+    let service = ScreenshotRegionOCRService(messagePresenter: presenter)
+
+    service.reportShortcutFailure(ScreenshotError.imageUnavailable)
+
+    #expect(service.lastError == ScreenshotError.imageUnavailable.errorDescription)
+    #expect(presenter.messages.count == 1)
+    #expect(presenter.messages.first?.isSuccess == false)
+}

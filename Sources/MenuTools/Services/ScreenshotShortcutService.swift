@@ -112,6 +112,7 @@ final class ScreenshotShortcutService {
     private let appBindingsProvider: @MainActor () -> [String: GlobalShortcut]
     private let clipboardBindingProvider: @MainActor () -> GlobalShortcut?
     private let appVolumeBindingProvider: @MainActor () -> GlobalShortcut?
+    private let messagePresenter: any TransientMessagePresenting
     private var globalMonitor: Any?
     private var localMonitor: Any?
     private var isRecordingShortcut = false
@@ -125,7 +126,8 @@ final class ScreenshotShortcutService {
         windowBindingsProvider: @escaping @MainActor () -> [WindowLayout: GlobalShortcut] = { WindowShortcutService.shared.bindings },
         appBindingsProvider: @escaping @MainActor () -> [String: GlobalShortcut] = { AppShortcutService.shared.bindings },
         clipboardBindingProvider: @escaping @MainActor () -> GlobalShortcut? = { ClipboardShortcutService.shared.binding },
-        appVolumeBindingProvider: @escaping @MainActor () -> GlobalShortcut? = { AppVolumeShortcutService.shared.binding }
+        appVolumeBindingProvider: @escaping @MainActor () -> GlobalShortcut? = { AppVolumeShortcutService.shared.binding },
+        messagePresenter: any TransientMessagePresenting = ClipboardHUDMessagePresenter()
     ) {
         self.defaults = defaults
         self.conflictChecker = conflictChecker
@@ -135,6 +137,7 @@ final class ScreenshotShortcutService {
         self.appBindingsProvider = appBindingsProvider
         self.clipboardBindingProvider = clipboardBindingProvider
         self.appVolumeBindingProvider = appVolumeBindingProvider
+        self.messagePresenter = messagePresenter
         self.bindings = Self.loadBindings(from: defaults)
     }
 
@@ -243,6 +246,17 @@ final class ScreenshotShortcutService {
         saveBinding()
     }
 
+    /// 快捷键失败上报：写状态并弹提示。
+    /// 快捷键路径没有设置页在屏，只写 lastError 用户看不到任何东西，只会以为按键没生效。
+    func reportShortcutFailure(_ error: Error) {
+        lastError = error.localizedDescription
+        messagePresenter.show(message: error.localizedDescription, isSuccess: false)
+    }
+
+    func reportShortcutSuccess() {
+        lastError = nil
+    }
+
     private func handle(keyCode: UInt16, modifiers: UInt, timestamp: TimeInterval) {
         // 录入快捷键时，当前按键只能交给录入控件，不能启动截图。
         guard !isRecordingShortcut else { return }
@@ -273,9 +287,9 @@ final class ScreenshotShortcutService {
                     editAfterCapture: screenshotService.openEditorAfterCapture,
                     longSelectRegion: screenshotService.longSelectRegion
                 )
-                lastError = nil
+                reportShortcutSuccess()
             } catch {
-                lastError = error.localizedDescription
+                reportShortcutFailure(error)
             }
         }
     }

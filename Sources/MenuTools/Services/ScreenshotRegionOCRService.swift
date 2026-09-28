@@ -13,6 +13,7 @@ final class ScreenshotRegionOCRService {
     private let defaults: UserDefaults
     private let regionSelector: any ScreenshotRegionSelecting
     private let imageCapturer: any ScreenshotImageCapturing
+    private let messagePresenter: any TransientMessagePresenting
     private var globalMonitor: Any?
     private var localMonitor: Any?
     private(set) var isRunning = false
@@ -22,11 +23,13 @@ final class ScreenshotRegionOCRService {
     init(
         defaults: UserDefaults = .standard,
         regionSelector: any ScreenshotRegionSelecting = ScreenshotRegionSelector.shared,
-        imageCapturer: any ScreenshotImageCapturing = DefaultScreenshotImageCapturer()
+        imageCapturer: any ScreenshotImageCapturing = DefaultScreenshotImageCapturer(),
+        messagePresenter: any TransientMessagePresenting = ClipboardHUDMessagePresenter()
     ) {
         self.defaults = defaults
         self.regionSelector = regionSelector
         self.imageCapturer = imageCapturer
+        self.messagePresenter = messagePresenter
     }
 
     var binding: GlobalShortcut? {
@@ -102,6 +105,12 @@ final class ScreenshotRegionOCRService {
         }
     }
 
+    /// 区域 OCR 快捷键失败上报：该路径没有设置页在屏，只写 lastError 用户看不到。
+    func reportShortcutFailure(_ error: Error) {
+        lastError = error.localizedDescription
+        messagePresenter.show(message: error.localizedDescription, isSuccess: false)
+    }
+
     private func handle(keyCode: UInt16, modifiers: UInt) {
         guard let binding,
               binding.keyCode == keyCode,
@@ -110,7 +119,7 @@ final class ScreenshotRegionOCRService {
         Task { @MainActor [weak self] in
             guard let self else { return }
             do { _ = try await recognizeSelectedRegion() }
-            catch { lastError = error.localizedDescription }
+            catch { reportShortcutFailure(error) }
         }
     }
 }
