@@ -370,6 +370,8 @@ struct WindowApplicationInfo: Equatable, Sendable {
 @MainActor
 @Observable
 final class WindowManagementService {
+    /// 自动应用规则最近一次失败原因；供设置页显示，避免规则静默失效。
+    private(set) var ruleErrorMessage: String?
     static let shared = WindowManagementService()
 
     private(set) var configuration: WindowManagerConfiguration
@@ -845,7 +847,13 @@ final class WindowManagementService {
                 SnapDebugLog.log("auto rule: skipped, focused window is not the main window")
                 return
             }
-            try? self.apply(layout)
+            do {
+                try self.apply(layout)
+            } catch {
+                // 自动应用规则此前用 try? 完全吞错，用户既看不到失败也不知道规则没生效。
+                SnapDebugLog.log("auto rule: apply failed: \(error.localizedDescription)")
+                self.ruleErrorMessage = error.localizedDescription
+            }
         }
     }
 

@@ -407,3 +407,21 @@ func windowShortcutMatchesPresetBinding() {
         bindings: bindings
     ) == nil)
 }
+
+@Test("窗口快捷键失败会弹提示，而不是只写没人看的 lastError")
+@MainActor
+func windowShortcutFailurePresentsHUD() throws {
+    let presenter = RecordingTransientMessagePresenter()
+    let defaults = try #require(UserDefaults(suiteName: "WindowShortcutFailure.\(UUID().uuidString)"))
+    let service = WindowShortcutService(
+        defaults: defaults,
+        conflictChecker: NoShortcutConflictChecker(),
+        messagePresenter: presenter
+    )
+
+    service.reportShortcutFailure(WindowManagementError.excludedApplication)
+
+    #expect(service.lastError == WindowManagementError.excludedApplication.errorDescription)
+    #expect(presenter.messages.count == 1)
+    #expect(presenter.messages.first?.isSuccess == false)
+}

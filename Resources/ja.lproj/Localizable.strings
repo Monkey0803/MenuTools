@@ -1290,6 +1290,10 @@
 "runtime.summary.attention" = "要対応";
 "runtime.summary.disabled" = "無効";
 "runtime.section.permissions" = "システム権限";
+"runtime.section.shortcuts" = "グローバルショートカット";
+"runtime.shortcut.empty" = "グローバルショートカットは未設定です";
+"runtime.shortcut.hint" = "設定は各モジュールのページに分散しています。ここで全体を確認し、重複を表示します。";
+"runtime.shortcut.conflict" = "他に %d 件と重複";
 "runtime.section.plugins" = "機能の実行状態";
 "runtime.permission.granted" = "許可済み";
 "runtime.permission.denied" = "未許可";

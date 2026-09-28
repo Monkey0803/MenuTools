@@ -155,6 +155,7 @@ final class WindowShortcutService {
     private let eventMonitor: any WindowShortcutEventMonitoring
     private let prepareQuickAccessTarget: @MainActor () -> Void
     private let onQuickAccessTrigger: @MainActor () -> Void
+    private let messagePresenter: any TransientMessagePresenting
     private var globalMonitor: Any?
     private var localMonitor: Any?
     private var eventGate = WindowShortcutEventGate()
@@ -169,7 +170,8 @@ final class WindowShortcutService {
         appVolumeBindingProvider: @escaping @MainActor () -> GlobalShortcut? = { AppVolumeShortcutService.shared.binding },
         eventMonitor: any WindowShortcutEventMonitoring = DefaultWindowShortcutEventMonitor(),
         prepareQuickAccessTarget: @escaping @MainActor () -> Void = { WindowManagementService.shared.rememberFrontmostExternalApplication() },
-        onQuickAccessTrigger: @escaping @MainActor () -> Void = { MenuBarStatusItemController.shared.showWindowManagement() }
+        onQuickAccessTrigger: @escaping @MainActor () -> Void = { MenuBarStatusItemController.shared.showWindowManagement() },
+        messagePresenter: any TransientMessagePresenting = ClipboardHUDMessagePresenter()
     ) {
         self.defaults = defaults
         self.bindings = Self.loadBindings(from: defaults)
@@ -183,6 +185,7 @@ final class WindowShortcutService {
         self.eventMonitor = eventMonitor
         self.prepareQuickAccessTarget = prepareQuickAccessTarget
         self.onQuickAccessTrigger = onQuickAccessTrigger
+        self.messagePresenter = messagePresenter
         self.quickAccessBinding = Self.loadQuickAccessBinding(from: defaults)
     }
 
@@ -444,9 +447,9 @@ final class WindowShortcutService {
             }
             do {
                 try WindowManagementService.shared.apply(preset)
-                lastError = nil
+                reportShortcutSuccess()
             } catch {
-                lastError = error.localizedDescription
+                reportShortcutFailure(error)
             }
             return
         }
@@ -460,10 +463,21 @@ final class WindowShortcutService {
 
         do {
             try WindowManagementService.shared.apply(layout)
-            lastError = nil
+            reportShortcutSuccess()
         } catch {
-            lastError = error.localizedDescription
+            reportShortcutFailure(error)
         }
+    }
+
+    /// 快捷键失败上报：写状态并弹提示。
+    /// 布局快捷键没有设置页在屏，只写 lastError 时用户只会觉得「按了没反应」。
+    func reportShortcutFailure(_ error: Error) {
+        lastError = error.localizedDescription
+        messagePresenter.show(message: error.localizedDescription, isSuccess: false)
+    }
+
+    func reportShortcutSuccess() {
+        lastError = nil
     }
 
     private func savePresetShortcuts() {

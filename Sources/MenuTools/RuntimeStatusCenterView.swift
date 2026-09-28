@@ -6,6 +6,8 @@ struct RuntimeStatusCenterView: View {
     let openFeatureSettings: (SettingsTab) -> Void
 
     @State private var permissionMonitor = RuntimePermissionMonitor.shared
+    /// 各模块当前生效的快捷键汇总（只读）。
+    @State private var shortcutEntries: [ShortcutOverviewEntry] = []
 
     private var pluginReadiness: [(manifest: BuiltInPluginManifest, readiness: PluginReadiness)] {
         manager.manifests.map { manifest in
@@ -36,11 +38,15 @@ struct RuntimeStatusCenterView: View {
                 header
                 summaryCard
                 permissionsSection
+                shortcutsSection
                 pluginsSection
             }
             .padding(SettingsScrollLayout.contentInsets())
         }
-        .task { permissionMonitor.refresh() }
+        .task {
+            permissionMonitor.refresh()
+            shortcutEntries = ShortcutOverviewBuilder.liveEntries()
+        }
     }
 
     private var header: some View {
@@ -88,6 +94,63 @@ struct RuntimeStatusCenterView: View {
                 .foregroundStyle(color)
         }
         .frame(maxWidth: .infinity)
+    }
+
+    /// 全局快捷键汇总：入口分散在各模块设置页，这里给出全貌并标出重复绑定。
+    private var shortcutsSection: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            Text(L("runtime.section.shortcuts"))
+                .font(.headline)
+
+            if shortcutEntries.isEmpty {
+                Text(L("runtime.shortcut.empty"))
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+            } else {
+                VStack(spacing: 0) {
+                    ForEach(Array(shortcutEntries.enumerated()), id: \.element.id) { index, entry in
+                        shortcutRow(entry)
+                        if index < shortcutEntries.count - 1 {
+                            Divider().padding(.leading, 42)
+                        }
+                    }
+                }
+                .background(.background, in: RoundedRectangle(cornerRadius: 12))
+                .overlay {
+                    RoundedRectangle(cornerRadius: 12).stroke(.quaternary, lineWidth: 1)
+                }
+            }
+
+            Text(L("runtime.shortcut.hint"))
+                .font(.caption2)
+                .foregroundStyle(.secondary)
+        }
+    }
+
+    private func shortcutRow(_ entry: ShortcutOverviewEntry) -> some View {
+        HStack(spacing: 10) {
+            Image(systemName: entry.conflictCount > 0 ? "exclamationmark.triangle.fill" : "keyboard")
+                .foregroundStyle(entry.conflictCount > 0 ? AnyShapeStyle(.orange) : AnyShapeStyle(.secondary))
+                .frame(width: 20)
+            VStack(alignment: .leading, spacing: 2) {
+                Text(entry.action)
+                Text(L(entry.moduleKey))
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+            }
+            Spacer()
+            VStack(alignment: .trailing, spacing: 2) {
+                Text(entry.shortcut.displayName)
+                    .font(.callout.monospaced())
+                if entry.conflictCount > 0 {
+                    Text(L("runtime.shortcut.conflict", entry.conflictCount))
+                        .font(.caption2)
+                        .foregroundStyle(.orange)
+                }
+            }
+        }
+        .padding(.horizontal, 12)
+        .padding(.vertical, 8)
     }
 
     private var permissionsSection: some View {

@@ -1290,6 +1290,10 @@
 "runtime.summary.attention" = "需處理";
 "runtime.summary.disabled" = "已停用";
 "runtime.section.permissions" = "系統權限";
+"runtime.section.shortcuts" = "全域快捷鍵";
+"runtime.shortcut.empty" = "尚未設定任何全域快捷鍵";
+"runtime.shortcut.hint" = "快捷鍵入口分散在各模組設定頁，這裡彙總全貌並標出重複綁定。";
+"runtime.shortcut.conflict" = "與另外 %d 項重複";
 "runtime.section.plugins" = "功能執行狀態";
 "runtime.permission.granted" = "已授權";
 "runtime.permission.denied" = "未授權";

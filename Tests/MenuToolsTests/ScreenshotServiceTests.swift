@@ -732,7 +732,7 @@ func screenRecordingDeniedMessageIsActionable() throws {
 }
 
 @MainActor
-private final class RecordingTransientMessagePresenter: TransientMessagePresenting {
+final class RecordingTransientMessagePresenter: TransientMessagePresenting {
     private(set) var messages: [(text: String, isSuccess: Bool)] = []
 
     func show(message: String, isSuccess: Bool) {

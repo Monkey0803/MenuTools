@@ -1290,6 +1290,10 @@
 "runtime.summary.attention" = "Needs Attention";
 "runtime.summary.disabled" = "Disabled";
 "runtime.section.permissions" = "System Permissions";
+"runtime.section.shortcuts" = "Global shortcuts";
+"runtime.shortcut.empty" = "No global shortcuts configured yet";
+"runtime.shortcut.hint" = "Shortcut entries live on each module page; this is the full picture, with duplicates flagged.";
+"runtime.shortcut.conflict" = "Duplicated %d time(s)";
 "runtime.section.plugins" = "Plugin Runtime";
 "runtime.permission.granted" = "Granted";
 "runtime.permission.denied" = "Not Granted";
