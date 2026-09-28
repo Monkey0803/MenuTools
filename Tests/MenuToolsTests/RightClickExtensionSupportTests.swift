@@ -312,3 +312,37 @@ private extension RightClickMenuNode {
         return nil
     }
 }
+
+@Test("剪贴板展示缓存按 changeCount 失效，避免每次构建都重编码图片")
+func rightClickClipboardCacheReusesUnchangedPasteboard() {
+    var cache = RightClickClipboardCache()
+    #expect(cache.payload(changeCount: 1) == nil)
+
+    let payload = RightClickClipboardPayload(text: "hello")
+    cache.store(payload, changeCount: 1)
+    // 同一个 changeCount：复用，不再读剪贴板
+    #expect(cache.payload(changeCount: 1) == payload)
+    // 剪贴板变了：取不到内容，需要重新读一次（查询不匹配不会丢弃条目本身）
+    #expect(cache.payload(changeCount: 2) == nil)
+    // 重新读取并写入新结果后，旧版本内容不会再被返回
+    cache.store(RightClickClipboardPayload(text: "world"), changeCount: 2)
+    #expect(cache.payload(changeCount: 1) == nil)
+    #expect(cache.payload(changeCount: 2)?.text == "world")
+
+    // 记住「空剪贴板」也是有效结果：否则每次构建都会重读一次
+    var emptyCache = RightClickClipboardCache()
+    emptyCache.store(nil, changeCount: 7)
+    #expect(emptyCache.payload(changeCount: 7) == nil)
+    #expect(emptyCache.hasEntry(for: 7))
+}
+
+@Test("过大的剪贴板图片不做解码与重编码")
+func rightClickClipboardRejectsOversizedImages() {
+    // 上限存在且为正
+    #expect(RightClickClipboardReader.maximumImageBytes > 0)
+    #expect(RightClickClipboardReader.acceptsImage(byteCount: 1_000))
+    #expect(RightClickClipboardReader.acceptsImage(byteCount: RightClickClipboardReader.maximumImageBytes))
+    #expect(!RightClickClipboardReader.acceptsImage(byteCount: RightClickClipboardReader.maximumImageBytes + 1))
+    // 边界：0 字节不可解码
+    #expect(!RightClickClipboardReader.acceptsImage(byteCount: 0))
+}

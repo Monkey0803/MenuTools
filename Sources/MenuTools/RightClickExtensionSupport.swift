@@ -331,7 +331,45 @@ enum RightClickClipboardSnapshot: Equatable, Sendable {
     case image(Data)
 }
 
+/// 剪贴板展示结果的缓存。
+///
+/// 菜单构建只需要「是不是图片、有哪些格式」，但取一次 payload 要做 TIFF 解码 + PNG 重编码；
+/// 而 `menu(for:)` 在用户每次右键（含多选）都会调用。剪贴板没变时直接用上次结果，
+/// 判据是 `NSPasteboard.changeCount`——它是一次廉价的原子读。
+struct RightClickClipboardCache {
+    private var cachedChangeCount: Int?
+    private var cachedPayload: RightClickClipboardPayload?
+
+    /// 命中缓存时返回上次结果（含「空剪贴板」），否则返回 nil 表示需要重新读取。
+    /// 查询不匹配时不会丢弃条目：它对自身那个 changeCount 依然有效，调用方随后的 store 会覆盖它。
+    func payload(changeCount: Int) -> RightClickClipboardPayload? {
+        guard cachedChangeCount == changeCount else { return nil }
+        return cachedPayload
+    }
+
+    func hasEntry(for changeCount: Int) -> Bool {
+        cachedChangeCount == changeCount
+    }
+
+    mutating func store(_ payload: RightClickClipboardPayload?, changeCount: Int) {
+        cachedChangeCount = changeCount
+        cachedPayload = payload
+    }
+
+    mutating func invalidate() {
+        cachedChangeCount = nil
+        cachedPayload = nil
+    }
+}
+
 enum RightClickClipboardReader {
+    /// 单张剪贴板图片的解码上限：TIFF 解码 + PNG 重编码是菜单构建里最贵的一步，
+    /// 超大截图（多屏拼接）会让 menu(for:) 明显超时，而 FinderSync 超时的表现是「菜单空白」。
+    static let maximumImageBytes = 20 * 1024 * 1024
+
+    static func acceptsImage(byteCount: Int) -> Bool {
+        byteCount > 0 && byteCount <= maximumImageBytes
+    }
     /// 文件引用不作为内容；图片按 PNG、纯文本优先，富文本不会顶掉模板里的纯文本。
     static func read(from pasteboard: NSPasteboard = .general) -> RightClickClipboardSnapshot? {
         guard let payload = payload(from: pasteboard) else { return nil }
@@ -359,6 +397,7 @@ enum RightClickClipboardReader {
     private static func pngData(from pasteboard: NSPasteboard) -> Data? {
         for type in [NSPasteboard.PasteboardType.png, .tiff] {
             guard let data = pasteboard.data(forType: type),
+                  acceptsImage(byteCount: data.count),
                   let bitmap = NSBitmapImageRep(data: data),
                   let png = bitmap.representation(using: .png, properties: [:]) else { continue }
             return png

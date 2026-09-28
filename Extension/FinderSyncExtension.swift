@@ -9,6 +9,9 @@ import FinderSync
 @objc(FinderSyncExtension)
 final class FinderSyncExtension: FIFinderSync {
     private let configState: RightClickLockedState<RightClickConfig>
+    /// 剪贴板展示缓存：menu(for:) 每次右键（含多选）都会调用，
+    /// 剪贴板没变时不该重复做 TIFF 解码 + PNG 重编码。
+    private let clipboardCache = RightClickLockedState(RightClickClipboardCache())
     private let registryState = RightClickLockedState(RightClickCommandRegistry())
     private var observers: [NSObjectProtocol] = []
     private lazy var dispatcher = RightClickCommandDispatcher(
@@ -66,7 +69,7 @@ final class FinderSyncExtension: FIFinderSync {
         let config = configState.read()
 
         let menu = NSMenu(title: "")
-        let payload = RightClickClipboardReader.payload()
+        let payload = clipboardPayload()
 
         monitor.endPhase("payload_read")
 
@@ -112,14 +115,30 @@ final class FinderSyncExtension: FIFinderSync {
             directoryPath: directory, selection: selection, clipboard: clipboardKind(for: payload))
     }
 
+    /// 只在剪贴板真的变了（changeCount 变化）时才重新读取。
+    ///
+    /// 必须用 hasEntry 区分「缓存里就是空的」与「没有缓存」——两者都返回 nil，
+    /// 否则空剪贴板会被反复重读。
+    private func clipboardPayload() -> RightClickClipboardPayload? {
+        let pasteboard = NSPasteboard.general
+        let changeCount = pasteboard.changeCount
+        let cached = clipboardCache.read()
+        if cached.hasEntry(for: changeCount) {
+            return cached.payload(changeCount: changeCount)
+        }
+        let payload = RightClickClipboardReader.payload(from: pasteboard)
+        clipboardCache.mutate { $0.store(payload, changeCount: changeCount) }
+        return payload
+    }
+
     private func menuResources(for payload: RightClickClipboardPayload?) -> RightClickMenuResources {
         var terminals: [RightClickMenuChoice] = [
             .init(title: .key("rc.terminal.default"), optionID: TerminalApp.defaultOptionID)
         ]
+        // 安装状态只查一次：此前每次菜单构建都对 6 个终端各查一次 LaunchServices。
+        // 只缓存「是否安装」，显示名仍按当前语言实时取，避免语言切换后名字被冻结。
         terminals += TerminalApp.allCases.compactMap { terminal in
-            guard NSWorkspace.shared.urlForApplication(withBundleIdentifier: terminal.rawValue) != nil else {
-                return nil
-            }
+            guard Self.installedTerminalIDs.contains(terminal.rawValue) else { return nil }
             let name = terminal == .terminal ? localized("terminal.builtin") : terminal.shortName
             return .init(title: .literal(name), optionID: terminal.rawValue)
         }
@@ -223,6 +242,14 @@ final class FinderSyncExtension: FIFinderSync {
 
     /// 按**共享配置里的应用内语言**取文案：此前用 NSLocalizedString 只认系统语言，
     /// 非中文系统 + 手动切中文就会出现「主界面英文、右键菜单中文」。
+    /// 进程内只查一次「哪些终端已安装」。static let 是惰性且线程安全的，
+    /// 因此这里不需要额外加锁（菜单构建可能来自 Finder 的 XPC 线程）。
+    private static let installedTerminalIDs: Set<String> = Set(
+        TerminalApp.allCases
+            .filter { NSWorkspace.shared.urlForApplication(withBundleIdentifier: $0.rawValue) != nil }
+            .map(\.rawValue)
+    )
+
     private func localized(_ key: String) -> String {
         RightClickConfigLanguage
             .localizedBundle(for: configState.read().language)
