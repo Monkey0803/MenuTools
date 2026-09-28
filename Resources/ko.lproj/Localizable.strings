@@ -355,6 +355,7 @@
 "screenshot.long.highlight" = "내용을 스크롤한 후 스크롤 캡처 단축키를 눌러 종료하세요";
 "screenshot.editor.title" = "스크린샷 편집";
 "screenshot.editor.undo" = "실행 취소";
+"screenshot.editor.redo" = "다시 실행";
 "screenshot.editor.clear" = "주석 지우기";
 "screenshot.editor.save" = "저장";
 "screenshot.editSaved" = "편집한 스크린샷을 클립보드에 저장했습니다";

@@ -89,6 +89,7 @@ private enum ScreenshotEditorDraft {
 /// 避免两者各写一份后逐渐不一致。
 enum ScreenshotEditorShortcutAction: String, CaseIterable {
     case undo
+    case redo
     case copyRecognizedText
     case clearAnnotations
     case save
@@ -97,6 +98,7 @@ enum ScreenshotEditorShortcutAction: String, CaseIterable {
     var titleKey: String {
         switch self {
         case .undo: return "screenshot.editor.undo"
+        case .redo: return "screenshot.editor.redo"
         case .copyRecognizedText: return "screenshot.ocr.copy"
         case .clearAnnotations: return "screenshot.editor.clear"
         case .save: return "screenshot.editor.save"
@@ -106,7 +108,7 @@ enum ScreenshotEditorShortcutAction: String, CaseIterable {
 
     var key: KeyEquivalent {
         switch self {
-        case .undo: return "z"
+        case .undo, .redo: return "z"
         case .copyRecognizedText: return "c"
         case .clearAnnotations: return .delete
         case .save: return "s"
@@ -118,11 +120,20 @@ enum ScreenshotEditorShortcutAction: String, CaseIterable {
     var modifiers: EventModifiers {
         switch self {
         case .undo, .save: return .command
+        case .redo: return [.command, .shift]
         case .copyRecognizedText: return [.command, .shift]
         case .clearAnnotations: return .command
         case .cancel: return []
         }
     }
+}
+
+/// 可撤销的编辑器状态：图片与标注一起快照。
+///
+/// 裁剪与旋转会同时改图片和画布尺寸，只存标注无法回到原图，因此整份状态一起记。
+private struct ScreenshotEditorState {
+    var imageData: Data
+    var annotations: [ScreenshotEditorAnnotation]
 }
 
 struct ScreenshotEditorView: View {
@@ -144,6 +155,7 @@ struct ScreenshotEditorView: View {
     @State private var editingTextIndex: Int?
     @FocusState private var textFieldFocused: Bool
     @State private var errorMessage: String?
+    @State private var history = ScreenshotEditorHistory<ScreenshotEditorState>()
 
     init(
         session: ScreenshotEditorSession,
@@ -315,14 +327,27 @@ struct ScreenshotEditorView: View {
             } label: {
                 Label(L("screenshot.editor.undo"), systemImage: "arrow.uturn.backward")
             }
-            .disabled(annotations.isEmpty)
+            // 撤销不再只看「有没有标注」：裁剪与旋转同样可撤销。
+            .disabled(!history.canUndo && draft == nil && textPosition == nil)
             .keyboardShortcut(
                 ScreenshotEditorShortcutAction.undo.key,
                 modifiers: ScreenshotEditorShortcutAction.undo.modifiers
             )
 
             Button {
+                redo()
+            } label: {
+                Label(L("screenshot.editor.redo"), systemImage: "arrow.uturn.forward")
+            }
+            .disabled(!history.canRedo)
+            .keyboardShortcut(
+                ScreenshotEditorShortcutAction.redo.key,
+                modifiers: ScreenshotEditorShortcutAction.redo.modifiers
+            )
+
+            Button {
                 commitTextEditing()
+                recordHistory()
                 annotations.removeAll()
                 draft = nil
             } label: {
@@ -450,6 +475,7 @@ struct ScreenshotEditorView: View {
 
     private func commitDraft() {
         guard let draft else { return }
+        recordHistory()
         switch draft {
         case let .crop(rect) where rect.width >= 0.02 && rect.height >= 0.02:
             applyCrop(rect)
@@ -533,6 +559,7 @@ struct ScreenshotEditorView: View {
         guard let textPosition else { return }
         let value = textValue.trimmingCharacters(in: .whitespacesAndNewlines)
 
+        recordHistory()
         if let editingTextIndex,
            annotations.indices.contains(editingTextIndex) {
             if value.isEmpty {
@@ -585,12 +612,40 @@ struct ScreenshotEditorView: View {
         return nil
     }
 
+    /// 撤销：正在绘制/编辑的草稿先取消；否则回到上一个快照（含裁剪与旋转）。
     private func undo() {
         if draft != nil {
             draft = nil
-        } else {
-            _ = annotations.popLast()
+            return
         }
+        if textPosition != nil {
+            cancelTextEditing()
+            return
+        }
+        guard let previous = history.undo(current: editorState) else { return }
+        restore(previous)
+    }
+
+    /// 重做：此前完全不存在。
+    private func redo() {
+        guard let next = history.redo(current: editorState) else { return }
+        restore(next)
+    }
+
+    private var editorState: ScreenshotEditorState {
+        ScreenshotEditorState(imageData: imageData, annotations: annotations)
+    }
+
+    private func recordHistory() {
+        history.record(editorState)
+    }
+
+    private func restore(_ state: ScreenshotEditorState) {
+        imageData = state.imageData
+        annotations = state.annotations
+        draft = nil
+        gestureStart = nil
+        resetTextEditing()
     }
 
     private func applyCrop(_ rect: CGRect) {
@@ -600,6 +655,8 @@ struct ScreenshotEditorView: View {
             gestureStart = nil
             return
         }
+        // 成功裁剪后才记快照：失败时状态没变，记下来只会多一步「撤销了但什么都没发生」。
+        recordHistory()
         imageData = cropped
         annotations.removeAll()
         draft = nil
@@ -611,6 +668,7 @@ struct ScreenshotEditorView: View {
             errorMessage = L("screenshot.error.editor")
             return
         }
+        recordHistory()
         imageData = rotated
         annotations.removeAll()
         draft = nil

@@ -355,6 +355,7 @@
 "screenshot.long.highlight" = "自行捲動內容，按長截圖快捷鍵結束";
 "screenshot.editor.title" = "編輯截圖";
 "screenshot.editor.undo" = "復原";
+"screenshot.editor.redo" = "重做";
 "screenshot.editor.clear" = "清除標註";
 "screenshot.editor.save" = "儲存";
 "screenshot.editSaved" = "編輯後的截圖已儲存到剪貼簿";

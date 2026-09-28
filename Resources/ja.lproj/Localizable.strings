@@ -355,6 +355,7 @@
 "screenshot.long.highlight" = "内容をスクロールし、スクロール撮影のショートカットで終了";
 "screenshot.editor.title" = "スクリーンショットを編集";
 "screenshot.editor.undo" = "取り消す";
+"screenshot.editor.redo" = "やり直す";
 "screenshot.editor.clear" = "注釈を消去";
 "screenshot.editor.save" = "保存";
 "screenshot.editSaved" = "編集したスクリーンショットをクリップボードに保存しました";

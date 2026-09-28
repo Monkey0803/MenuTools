@@ -355,6 +355,7 @@
 "screenshot.long.highlight" = "Scroll the content, then press the scrolling screenshot shortcut to finish";
 "screenshot.editor.title" = "Edit Screenshot";
 "screenshot.editor.undo" = "Undo";
+"screenshot.editor.redo" = "Redo";
 "screenshot.editor.clear" = "Clear";
 "screenshot.editor.save" = "Save";
 "screenshot.editSaved" = "Edited screenshot saved to clipboard";

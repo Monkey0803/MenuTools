@@ -355,6 +355,7 @@
 "screenshot.long.highlight" = "滚动内容，按长截图快捷键结束";
 "screenshot.editor.title" = "编辑截图";
 "screenshot.editor.undo" = "撤销";
+"screenshot.editor.redo" = "重做";
 "screenshot.editor.clear" = "清空标注";
 "screenshot.editor.save" = "保存";
 "screenshot.editSaved" = "编辑后的截图已保存到剪贴板";
