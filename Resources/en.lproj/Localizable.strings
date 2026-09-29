@@ -555,11 +555,14 @@
 "settings.currentVersion" = "Current Version";
 "settings.releaseDate" = "Release date";
 "settings.releaseNotes" = "Release notes";
+"settings.availableReleaseNotes" = "New version release notes";
 "settings.updateNow" = "Update now";
 "update.available" = "Version %@ is available";
 "footer.updateAvailable" = "Version %@";
 "settings.manualCheck" = "Manual Check";
 "settings.checkNow" = "Check Now";
+"settings.updateTemporarilyUnavailable" = "Update checks are temporarily unavailable. Try again later.";
+"settings.updateStartupFailed" = "The updater failed to start: %@";
 "settings.download" = "Download v%@";
 "settings.latest" = "Up to date";
 "settings.found" = "New version v%@ found";

@@ -555,11 +555,14 @@
 "settings.currentVersion" = "目前版本";
 "settings.releaseDate" = "發布日期";
 "settings.releaseNotes" = "更新說明";
+"settings.availableReleaseNotes" = "新版本更新說明";
 "settings.updateNow" = "立即更新";
 "update.available" = "新版本 %@ 可用";
 "footer.updateAvailable" = "新版本 %@";
 "settings.manualCheck" = "手動檢查";
 "settings.checkNow" = "立即檢查";
+"settings.updateTemporarilyUnavailable" = "更新檢查暫時無法使用，請稍後再試。";
+"settings.updateStartupFailed" = "更新器啟動失敗：%@";
 "settings.download" = "下載 v%@";
 "settings.latest" = "已是最新版本";
 "settings.found" = "發現新版本 v%@";

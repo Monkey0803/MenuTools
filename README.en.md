@@ -154,10 +154,9 @@ sudo xattr -dr com.apple.quarantine MenuTools.app
 git clone https://github.com/Monkey0803/MenuTools.git
 cd MenuTools
 ./build.sh
-open dist/MenuTools.app
 ```
 
-The build script compiles the Swift Package, assembles the app bundle, builds the Finder extension, and signs the result. The app is written to `dist/MenuTools.app`.
+The build script compiles the Swift Package, assembles the app bundle, builds the Finder extension, and signs the result. It writes `dist/MenuTools.app`, installs it to `/Applications/MenuTools.app`, restarts Finder, and launches the app. Use `./build.sh --no-install` to keep the installed app unchanged; that option still launches the built app and may restart Finder.
 
 ### Network Monitor Validation
 
@@ -298,7 +297,7 @@ MenuTools/
 
 Updates use [Sparkle](https://github.com/sparkle-project/Sparkle) for appcast checks, downloads, Ed25519 signature verification, installation, and relaunch. To publish a release:
 
-1. Write this release's user-facing changes into `Resources/ReleaseNotes.md` (add a section titled like `## 1.1.2 — 2026-09-20`) — the same text feeds the in-app "Settings → Release notes"; `release.sh` refuses to run when the current version has no section.
+1. Write this release's changes into `Resources/ReleaseNotes.md` (add a section titled like `## 1.1.2 — 2026-09-20`), then add the same version to `Resources/{zh-Hant,en,ja,ko}.lproj/ReleaseNotes.md`. The app shows notes in its selected language, and `release.sh` requires all five languages before embedding them in the appcast.
 2. Update `CFBundleShortVersionString` and `CFBundleVersion` in `Resources/Info.plist`, commit, and make sure the working tree is clean (the script enforces this).
 3. Choose a release mode:
 

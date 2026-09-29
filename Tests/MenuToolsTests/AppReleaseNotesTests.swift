@@ -57,3 +57,23 @@ func releaseNotesHandlesEmptyInput() {
     #expect(AppReleaseNotes.note(for: "1.1.1", in: "") == nil)
     #expect(AppReleaseNotes.note(for: "1.1.1", in: "# 更新说明\n\n还没有内容\n") == nil)
 }
+
+@Test("应用内更新说明优先读取所选语言，并在缺失时回退中文")
+func releaseNotesLoadsLocalizedResource() throws {
+    let bundleURL = FileManager.default.temporaryDirectory
+        .appendingPathComponent("MenuToolsNotes-\(UUID().uuidString).bundle", isDirectory: true)
+    defer { try? FileManager.default.removeItem(at: bundleURL) }
+    let resources = bundleURL.appendingPathComponent("Contents/Resources", isDirectory: true)
+    let english = resources.appendingPathComponent("en.lproj", isDirectory: true)
+    try FileManager.default.createDirectory(at: english, withIntermediateDirectories: true)
+    try "## 1.1.6 — 2026-09-29\n- 中文说明\n".write(
+        to: resources.appendingPathComponent("ReleaseNotes.md"), atomically: true, encoding: .utf8
+    )
+    try "## 1.1.6 — 2026-09-29\n- English notes\n".write(
+        to: english.appendingPathComponent("ReleaseNotes.md"), atomically: true, encoding: .utf8
+    )
+    let bundle = try #require(Bundle(url: bundleURL))
+
+    #expect(AppReleaseNotes.note(for: "1.1.6", language: "en", bundle: bundle)?.bullets == ["English notes"])
+    #expect(AppReleaseNotes.note(for: "1.1.6", language: "ko", bundle: bundle)?.bullets == ["中文说明"])
+}

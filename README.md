@@ -204,11 +204,10 @@ sudo xattr -dr com.apple.quarantine MenuTools.app
 ```bash
 git clone https://github.com/Monkey0803/MenuTools.git
 cd MenuTools
-./build.sh          # 编译 + 打包 + ad-hoc 签名
-open dist/MenuTools.app
+./build.sh          # 编译、打包、签名，安装到 /Applications 并启动
 ```
 
-产物位于 `dist/MenuTools.app`，可直接拖入「应用程序」文件夹。
+产物位于 `dist/MenuTools.app`。默认流程还会替换 `/Applications/MenuTools.app`、重启 Finder 并启动应用；如只需构建，可用 `./build.sh --no-install`（仍会启动 `dist/MenuTools.app`，必要时重启 Finder）。
 
 > 当前使用 ad-hoc 签名，仅限本机运行；分发需替换为开发者证书。
 
@@ -356,7 +355,7 @@ open "menutools://settings?tab=runtime-status"    # 打开设置页
 
 更新功能使用 **[Sparkle](https://github.com/sparkle-project/Sparkle)**，由 Sparkle 负责 appcast 检查、下载、Ed25519 签名校验、安装和重启：
 
-1. 把这一版的更新内容写进 `Resources/ReleaseNotes.md`（新增一段，标题形如 `## 1.1.2 — 2026-09-20`）——它同时用于应用内「设置 → 更新说明」；`release.sh` 会校验当前版本是否存在这一段。
+1. 把这一版的更新内容写进 `Resources/ReleaseNotes.md`（新增一段，标题形如 `## 1.1.2 — 2026-09-20`），并在 `Resources/{zh-Hant,en,ja,ko}.lproj/ReleaseNotes.md` 补齐同版本翻译。应用内按所选语言显示；`release.sh` 会校验五语种段落并嵌入 appcast。
 2. 修改 `Resources/Info.plist` 中的 `CFBundleShortVersionString` 和 `CFBundleVersion`，然后提交，确保工作区干净（脚本会校验）。
 3. 选择发布模式：
 

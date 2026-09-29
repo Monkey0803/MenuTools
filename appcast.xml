@@ -5,8 +5,8 @@
     <channel>
         <title>MenuTools</title>
         <link>https://github.com/Monkey0803/MenuTools</link>
-        <description>MenuTools 更新</description>
-        <language>zh-CN</language>
+        <description>MenuTools update feed</description>
+        <language>en</language>
         <!--
           发布时由 Sparkle 的 generate_appcast 写入 item，并使用 Ed25519 私钥签名。
           空 feed 表示当前没有可供用户安装的更新。

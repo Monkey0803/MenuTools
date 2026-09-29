@@ -205,9 +205,9 @@ struct SystemStorageSettingsView: View {
                         }
                         .controlSize(.small)
 
-                    if entry.category.supportsDetailedCleanup, entry.bytes > 0 {
-                        developerItemsSection(for: entry.category)
-                    } else if entry.category.requiresManualReview {
+                        if entry.category.supportsDetailedCleanup, entry.bytes > 0 {
+                            developerItemsSection(for: entry.category)
+                        } else if entry.category.requiresManualReview {
                             Text(L("storage.manualReview"))
                                 .font(.caption)
                                 .foregroundStyle(.tertiary)

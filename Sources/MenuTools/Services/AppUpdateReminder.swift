@@ -9,7 +9,15 @@ import Observation
 @MainActor
 @Observable
 final class AppUpdateReminder {
-    static let shared = AppUpdateReminder()
+    static let shared = AppUpdateReminder(defaults: .standard)
+
+    private struct StoredReminder: Codable {
+        var version: String
+        var notes: String?
+    }
+
+    private static let storageKey = "appUpdate.pendingReminder"
+    @ObservationIgnored private let defaults: UserDefaults?
 
     /// 后台发现、还没被用户处理的新版本号。
     private(set) var availableVersion: String?
@@ -18,6 +26,21 @@ final class AppUpdateReminder {
 
     var hasUnseenUpdate: Bool { availableVersion != nil }
 
+    /// 测试默认不使用真实偏好；共享实例才持久化到应用偏好。
+    init(defaults: UserDefaults? = nil, currentVersion: String = AppVersionService.current) {
+        self.defaults = defaults
+        guard let defaults,
+              let data = defaults.data(forKey: Self.storageKey),
+              let stored = try? JSONDecoder().decode(StoredReminder.self, from: data) else { return }
+
+        if stored.version.compare(currentVersion, options: [.numeric, .caseInsensitive]) == .orderedDescending {
+            availableVersion = stored.version
+            availableNotes = stored.notes
+        } else {
+            defaults.removeObject(forKey: Self.storageKey)
+        }
+    }
+
     /// 后台检查到新版本时记录；同一版本重复记录不会有副作用。
     func noteAvailable(version: String, notes: String? = nil) {
         let trimmedVersion = version.trimmingCharacters(in: .whitespacesAndNewlines)
@@ -25,11 +48,15 @@ final class AppUpdateReminder {
         availableVersion = trimmedVersion
         let trimmedNotes = notes?.trimmingCharacters(in: .whitespacesAndNewlines)
         availableNotes = (trimmedNotes?.isEmpty ?? true) ? nil : trimmedNotes
+        if let data = try? JSONEncoder().encode(StoredReminder(version: trimmedVersion, notes: availableNotes)) {
+            defaults?.set(data, forKey: Self.storageKey)
+        }
     }
 
     /// 用户已经看到正式更新提示（或本轮更新会话结束）时收起提醒。
     func acknowledge() {
         availableVersion = nil
         availableNotes = nil
+        defaults?.removeObject(forKey: Self.storageKey)
     }
 }

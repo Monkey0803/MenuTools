@@ -706,9 +706,18 @@ struct GeneralSettingsView: View {
                         Button(L("settings.updateNow")) {
                             checkForUpdate()
                         }
+                        .disabled(!SparkleUpdateService.shared.canCheckForUpdates)
                     } label: {
                         Label(L("update.available", pendingVersion), systemImage: "arrow.down.circle.fill")
                             .foregroundStyle(.tint)
+                    }
+                    if let notes = updateReminder.availableNotes {
+                        DisclosureGroup(L("settings.availableReleaseNotes")) {
+                            Text(notes)
+                                .font(.caption)
+                                .foregroundStyle(.secondary)
+                                .fixedSize(horizontal: false, vertical: true)
+                        }
                     }
                 }
 
@@ -719,6 +728,19 @@ struct GeneralSettingsView: View {
                     .disabled(!SparkleUpdateService.shared.canCheckForUpdates)
                 } label: {
                     Text(L("settings.manualCheck"))
+                }
+
+                switch SparkleUpdateService.shared.checkAvailability {
+                case .ready:
+                    EmptyView()
+                case .temporarilyUnavailable:
+                    Text(L("settings.updateTemporarilyUnavailable"))
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                case .startupFailed(let error):
+                    Text(L("settings.updateStartupFailed", error))
+                        .font(.caption)
+                        .foregroundStyle(.orange)
                 }
             }
 

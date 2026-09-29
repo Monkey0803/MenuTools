@@ -268,9 +268,9 @@ struct MenuPanelView: View {
 
     @ObservedObject private var caffeinate = CaffeinateService.shared
     @ObservedObject private var bleMonitor = BLEBatteryMonitor.shared
-        /// 后台发现的待处理更新（温和提醒）。
+    /// 后台发现的待处理更新（温和提醒）。
     @State private var updateReminder = AppUpdateReminder.shared
-@State private var isDarkMode = AppearanceService.isDarkMode
+    @State private var isDarkMode = AppearanceService.isDarkMode
     @State private var btDevices: [BluetoothDeviceBattery] = []
     @State private var toggles = SystemToggleStates()
     @State private var systemResourceService = SystemResourceService.shared

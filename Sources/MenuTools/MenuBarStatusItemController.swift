@@ -184,7 +184,6 @@ final class MenuBarStatusItemController: NSObject {
 
     @objc private func togglePanel() {
         guard let button = statusItem?.button else { return }
-        try? Data("toggle".utf8).write(to: URL(fileURLWithPath: "/tmp/menutools-status-toggle.marker"))
 
         if BuiltInPluginManager.shared.isEnabled(.windowManagement) {
             WindowManagementService.shared.rememberFrontmostExternalApplication()

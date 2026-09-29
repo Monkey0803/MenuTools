@@ -555,11 +555,14 @@
 "settings.currentVersion" = "현재 버전";
 "settings.releaseDate" = "릴리스 날짜";
 "settings.releaseNotes" = "릴리스 노트";
+"settings.availableReleaseNotes" = "새 버전 릴리스 노트";
 "settings.updateNow" = "지금 업데이트";
 "update.available" = "버전 %@ 사용 가능";
 "footer.updateAvailable" = "새 버전 %@";
 "settings.manualCheck" = "수동 확인";
 "settings.checkNow" = "지금 확인";
+"settings.updateTemporarilyUnavailable" = "업데이트 확인을 일시적으로 사용할 수 없습니다. 잠시 후 다시 시도하세요.";
+"settings.updateStartupFailed" = "업데이터를 시작하지 못했습니다: %@";
 "settings.download" = "v%@ 다운로드";
 "settings.latest" = "최신 버전입니다";
 "settings.found" = "새 버전 v%@ 발견";

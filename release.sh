@@ -250,6 +250,14 @@ fi
     -o "$OUT_DIR/appcast.xml" \
     "$APPCAST_ARCHIVES"
 
+# 更新源与应用内说明共用五语种来源；缺少本版翻译时中止发布。
+python3 "$SCRIPT_DIR/Scripts/localize_appcast.py" \
+    --appcast "$OUT_DIR/appcast.xml" \
+    --version "$VERSION" \
+    --resources "$SCRIPT_DIR/Resources" \
+    --info-plist "$INFO_PLIST"
+xmllint --noout "$OUT_DIR/appcast.xml"
+
 echo "==> 生成 Release 说明"
 write_release_notes "$TEST_COUNT"
 

@@ -59,3 +59,36 @@ func updateReminderIgnoresEmptyInput() {
 func updateReminderSharedInstanceIsSingleton() {
     #expect(AppUpdateReminder.shared === AppUpdateReminder.shared)
 }
+
+@Test("待处理更新在重启后恢复，已确认后不再出现")
+@MainActor
+func updateReminderPersistsUntilAcknowledged() throws {
+    let suite = "MenuTools.UpdateReminderTests.\(UUID().uuidString)"
+    let defaults = try #require(UserDefaults(suiteName: suite))
+    defer { defaults.removePersistentDomain(forName: suite) }
+
+    let first = AppUpdateReminder(defaults: defaults, currentVersion: "1.1.6")
+    first.noteAvailable(version: "1.1.7", notes: "修复更新检查")
+
+    let relaunched = AppUpdateReminder(defaults: defaults, currentVersion: "1.1.6")
+    #expect(relaunched.availableVersion == "1.1.7")
+    #expect(relaunched.availableNotes == "修复更新检查")
+
+    relaunched.acknowledge()
+    #expect(!AppUpdateReminder(defaults: defaults, currentVersion: "1.1.6").hasUnseenUpdate)
+}
+
+@Test("安装了目标版本后不恢复过期的更新提醒")
+@MainActor
+func updateReminderDropsInstalledVersion() throws {
+    let suite = "MenuTools.UpdateReminderTests.\(UUID().uuidString)"
+    let defaults = try #require(UserDefaults(suiteName: suite))
+    defer { defaults.removePersistentDomain(forName: suite) }
+
+    AppUpdateReminder(defaults: defaults, currentVersion: "1.1.6")
+        .noteAvailable(version: "1.1.7", notes: "说明")
+
+    let updatedApp = AppUpdateReminder(defaults: defaults, currentVersion: "1.1.7")
+    #expect(!updatedApp.hasUnseenUpdate)
+    #expect(!AppUpdateReminder(defaults: defaults, currentVersion: "1.1.6").hasUnseenUpdate)
+}

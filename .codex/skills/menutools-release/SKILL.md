@@ -50,11 +50,12 @@ gh release list --repo Monkey0803/MenuTools --limit 5
 
 - 表头改成 `## <版本> — <YYYY-MM-DD>`。
 - **删掉那行占位**——它在段落内部，不删会被当作一条更新内容带进 Release 说明。
+- 同步更新 `Resources/{zh-Hant,en,ja,ko}.lproj/ReleaseNotes.md` 中的同版本段落；简体中文仍以 `Resources/ReleaseNotes.md` 为准。`release.sh` 会把五语种说明嵌入 appcast，缺翻译会停止发布。
 
 改完先提交，再跑发布：
 
 ```bash
-git add Resources/ReleaseNotes.md
+git add Resources/ReleaseNotes.md Resources/{zh-Hant,en,ja,ko}.lproj/ReleaseNotes.md
 git commit -m "docs(release): 定稿 <版本> 更新说明并移除开发中占位"
 ```
 
@@ -71,6 +72,7 @@ git commit -m "docs(release): 定稿 <版本> 更新说明并移除开发中占�
 - `build.sh release` 有副作用：会安装到 `/Applications/MenuTools.app`、重启 Finder 扩展与 Finder、并启动应用。这是预期行为，不是失败。
 - 不要用管道掩盖退出码；若把输出重定向到日志，要确认日志里出现 `==> 发布资产已准备` 才算成功。
 - `dist/` 已被忽略，不要提交；根 `appcast.xml` 只是空 feed 模板（`release.sh` 把它作为种子拷进归档目录），发布不需要改它。
+- `Scripts/localize_appcast.py` 在 `generate_appcast` 之后为当前版本添加带 `xml:lang` 的 Markdown 说明；需要 Python 3，且若启用了 `SURequireSignedFeed` 会主动拒绝改写签名后的 feed。发布前可用 `python3 Scripts/test_localized_appcast.py` 验证该步骤。
 - 只想按现有产物重算校验值并重生成说明：`RELEASE_NOTES_ONLY=1 ./release.sh`。
 - 想补充验证条目，先写 `docs/release-verification-<版本>.md`，其内容会被并入 Release 说明的「验证」小节。
 

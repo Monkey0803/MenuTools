@@ -1,7 +1,7 @@
 # MenuTools 待办与优先级
 
 > **原始基线**：1.1.4 已发布，开发分支 1.1.5 ｜ **生成时间**：2026-09-28
-> **状态复核**：2026-09-29，当前分支 1.1.6；P0、P1、P2 的完成记录见各节，原始问题描述保留作审计依据。
+> **状态复核**：2026-09-29，1.1.6 已发布；P0、P1、P2 的完成记录见各节，原始问题描述保留作审计依据。发布后的 P3 清理在 `codex/post-1.1.6-cleanup` 分支继续。
 > **来源**：对 14 个内置模块的只读代码走查，加上本机实测（进程开销、数据目录、`vm_stat`、系统路径存在性、线上链接）
 > **定位约束**：常驻菜单栏的「轻量、高频、菜单栏优先」工具集。与这条定位冲突的候选**一律不列入待办**，见文末「明确不做」。
 
@@ -275,21 +275,20 @@
 |---|---|
 | 锁定屏幕、启动器、截屏权限 | 已分别随 P0-2、P1-5、P0-4 修复；`TODO.md` 与 README 现描述的是修复后行为 |
 | Wi-Fi 名称 | 仍待真实无定位权限场景验证；当前 `NetworkStatusService` 使用 `ssid()`，为空时界面回退显示接口名，不能保证始终显示网络名称 |
-| 温度读数 | `TODO.md` 已改为可选只读温度读数；AppleSMC 不可用时隐藏，系统升级后需跑 `Scripts/test_smc_temperature.swift` |
+| 温度读数 | `TODO.md` 已改为可选只读温度读数；AppleSMC 不可用时隐藏。2026-09-29 运行 `swift Scripts/test_smc_temperature.swift` 返回 `UNSUPPORTED`（退出码 2，所有候选键不可读），当前机器无法验收温度数值 |
 | Finder 右键验收链接 | README 已改为指向现有的 `docs/ops-guide.md`，不再链接不存在的文件 |
 | 操作日志路径 | README 与 `docs/ops-guide.md` 已改为当前配置目录 `MenuTools/operations.log`；自签名默认路径由健康检查页可打开 |
-| 系统监控与音频设置验收 | 文档已按现有子页结构整理，真实界面验收仍待逐项记录；上线不等于已验收 |
+| 系统监控与音频设置验收 | 已在安装版 1.1.6 的真实设置窗口逐项验证概览、进程、历史、告警展示、音频五个子页与快速面板，并将证据记入 `docs/system-and-audio-acceptance.md`；发现音频自检与兼容性诊断同步展开，开发分支已分离状态并补回归测试。偏好修改、菜单栏资源浮层、采样停止及当前开发分支界面仍待验收 |
 | Finder 扩展版本 | `Extension/Info.plist` 已与主程序统一为 1.1.6，并增加版本一致性用例 |
 
 **其他清理项**：
 
-- `Sources/MenuTools/SystemStorageSettingsView.swift:208-215` —— `if/else if` 块缩进比同级 `Button` 浅一层、内层 `Text` 多缩一层（纯排版，编译无误）。
-- `Sources/MenuTools/MenuBarStatusItemController.swift:187` —— 每次点面板无条件写 `/tmp/menutools-status-toggle.marker`，全仓无消费者。
-- `Sources/MenuTools/Services/SparkleUpdateService.swift:141-145` —— 启动失败只 `NSLog`；`SettingsView.swift:585` 的灰按钮无任何解释。
-- `Sources/MenuTools/Services/AppUpdateReminder.swift:11-34` —— 提醒仅存内存；`availableNotes` 从不展示。
-- `Resources/ReleaseNotes.md`、`appcast.xml` 的更新说明只有中文，而应用界面支持五语种。
+- 系统存储页的 `if/else if` 缩进已对齐；菜单栏按钮不再写没有消费者的 `/tmp/menutools-status-toggle.marker`。
+- Sparkle 启动失败会在设置页显示具体错误；暂时无法检查更新时显示说明，相关入口不再无声失效。更新提醒已跨重启保存，安装目标版本或用户确认后清除；若 appcast 提供说明，设置页会显示。全量 1040 项测试与 Release 配置打包通过；相关真实界面仍待验收。
+- 更新说明已补齐繁体中文、英语、日语、韩语的 1.1.6 条目（各 27 条，与简体中文逐条对应）；应用内按所选语言读取，旧版本缺翻译时回退中文。`release.sh` 在后续版本生成 appcast 时嵌入五语种说明，缺任一版本段落便中止；独立脚本测试及 1.1.6 临时 feed 的 XML 解析通过。**线上已发布的 v1.1.6 appcast 未改写**，多语言 feed 从下一次发布生效。
 - 右键健康检查已修正两项误导：配置卡只测实际配置目录是否可写，不推断扩展通信；辅助功能卡只显示 `AXIsProcessTrusted()` 的结果，并提供系统设置跳转。日志卡目前仍只打开实际日志目录；`RightClickLogger.readRecent`/`clear` 尚无 UI 入口，后续按真实使用需求决定是否增加。
-- `Sources/MenuTools/AppLauncherService.swift:95-101` 的 `refresh()` 同步扫 5 个目录——接 P1-5 的 UI 时需保持现有 `.task` 调用方式。
+- `AGENTS.md` 与中英文 README 的构建说明已对齐 `build.sh` 的真实行为：默认会安装到 `/Applications`、重启 Finder 并启动应用，`--no-install` 仍会启动 `dist` 构建。
+- 启动器 `refresh()` 同步扫描 5 个目录，P1-5 的界面目前仍通过 `.task` 调用；此条为后续改动约束。
 
 ---
 

@@ -53,16 +53,38 @@ enum AppReleaseNotes {
 
     /// 读取打包进 App 的更新说明。
     static func note(for version: String, bundle: Bundle = .main) -> AppReleaseNote? {
-        guard let url = bundle.url(forResource: resourceName, withExtension: "md"),
+        guard let url = bundle.resourceURL?.appendingPathComponent("\(resourceName).md"),
               let markdown = try? String(contentsOf: url, encoding: .utf8) else {
             return nil
         }
         return note(for: version, in: markdown)
     }
 
+    /// 优先使用应用内语言对应的说明；旧版本缺翻译时保留中文说明。
+    static func note(for version: String, language: String?, bundle: Bundle = .main) -> AppReleaseNote? {
+        if let language,
+           AppLanguage(rawValue: language) != nil,
+           let resourceURL = bundle.resourceURL {
+            let localizedURL = resourceURL
+                .appendingPathComponent("\(language).lproj", isDirectory: true)
+                .appendingPathComponent("\(resourceName).md")
+            if let markdown = try? String(contentsOf: localizedURL, encoding: .utf8),
+               let localized = note(for: version, in: markdown) {
+                return localized
+            }
+        }
+        return note(for: version, bundle: bundle)
+    }
+
     /// 当前版本的更新说明。
     static func current(bundle: Bundle = .main) -> AppReleaseNote? {
-        note(for: AppVersionService.current, bundle: bundle)
+        let configured = UserDefaults.standard.string(forKey: SettingsKey.appLanguage)
+            ?? AppLanguage.system.rawValue
+        let language = AppLanguageResolver.resourceLanguage(
+            configuredLanguage: configured,
+            preferredLanguages: Locale.preferredLanguages
+        )
+        return note(for: AppVersionService.current, language: language, bundle: bundle)
     }
 
     // MARK: - 解析细节

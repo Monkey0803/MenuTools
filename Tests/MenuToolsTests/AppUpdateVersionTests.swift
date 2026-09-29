@@ -1,6 +1,13 @@
 import Testing
 @testable import MenuTools
 
+@Test("更新检查不可用时优先解释启动失败")
+func updateCheckAvailabilityExplainsFailure() {
+    #expect(AppUpdateCheckAvailability.resolve(canCheck: true, startupError: nil) == .ready)
+    #expect(AppUpdateCheckAvailability.resolve(canCheck: false, startupError: nil) == .temporarilyUnavailable)
+    #expect(AppUpdateCheckAvailability.resolve(canCheck: false, startupError: "签名错误") == .startupFailed("签名错误"))
+}
+
 @Test("当前版本高于发布版本时识别为开发版")
 func newerLocalVersionIsDevelopmentVersion() {
     #expect(

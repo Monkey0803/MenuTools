@@ -300,6 +300,11 @@ struct AppVolumeQuickAccessView: View {
     }
 }
 
+struct AppVolumeAdvancedDisclosureState {
+    var showsSelfCheck = false
+    var showsCompatibility = false
+}
+
 struct AppVolumeSettingsView: View {
     @State private var service = AppVolumeService.shared
     @State private var shortcutService = AppVolumeShortcutService.shared
@@ -321,8 +326,8 @@ struct AppVolumeSettingsView: View {
     @State private var showsRememberedSessions = false
     /// 通知的按类型开关默认收起：权限状态常显，四种提醒类型按需展开。
     @State private var showsNotificationKinds = false
-    /// 自检与诊断报告是只读参考信息，默认收起。
-    @State private var showsDiagnostics = false
+    /// 自检与兼容性诊断分别展开，互不影响。
+    @State private var advancedDisclosures = AppVolumeAdvancedDisclosureState()
     @State private var presetSync = AppVolumePresetSyncService.shared
     @State private var presetSyncPassphrase = ""
     @State private var presetSyncConflictCopies: [URL] = []
@@ -997,7 +1002,7 @@ struct AppVolumeSettingsView: View {
                 Label(L("volume.sleepTimer.title"), systemImage: "moon.zzz")
             }
             Section {
-                DisclosureGroup(isExpanded: $showsDiagnostics) {
+                DisclosureGroup(isExpanded: $advancedDisclosures.showsSelfCheck) {
                 ForEach(service.selfCheckSteps) { step in
                     HStack(alignment: .top, spacing: 8) {
                         Image(systemName: step.status.symbolName)
@@ -1018,7 +1023,7 @@ struct AppVolumeSettingsView: View {
             }
 
             Section {
-                DisclosureGroup(isExpanded: $showsDiagnostics) {
+                DisclosureGroup(isExpanded: $advancedDisclosures.showsCompatibility) {
                 Button(didCopyDiagnostic ? L("volume.diagnostics.copied") : L("volume.diagnostics.copy")) {
                     didCopyDiagnostic = service.copyDiagnosticReport()
                 }

@@ -18,6 +18,17 @@ enum AppUpdateVersionRelationship: Equatable {
     }
 }
 
+enum AppUpdateCheckAvailability: Equatable {
+    case ready
+    case temporarilyUnavailable
+    case startupFailed(String)
+
+    static func resolve(canCheck: Bool, startupError: String?) -> Self {
+        if let startupError { return .startupFailed(startupError) }
+        return canCheck ? .ready : .temporarilyUnavailable
+    }
+}
+
 /// 在开发版本高于公开发布版本时，避免 Sparkle 把较旧的发布版本描述为“当前最新版”。
 @MainActor
 private final class MenuToolsUpdateUserDriver: SPUStandardUserDriver {
@@ -120,6 +131,7 @@ final class SparkleUpdateService {
     /// Sparkle 只弱引用 delegate，必须由这里强引用住。
     private let reminderDelegate: MenuToolsUpdateReminderDelegate
     private let updater: SPUUpdater
+    private(set) var startupError: String?
 
     private init() {
         let reminderDelegate = MenuToolsUpdateReminderDelegate()
@@ -141,6 +153,7 @@ final class SparkleUpdateService {
         do {
             try updater.start()
         } catch {
+            startupError = error.localizedDescription
             NSLog("Sparkle updater 启动失败：%@", error.localizedDescription)
         }
     }
@@ -148,6 +161,7 @@ final class SparkleUpdateService {
     /// 手动检查时显示 Sparkle 标准更新窗口。
     /// 界面上的「新版本可用」入口也走这里，把更新窗口带到前台。
     func checkForUpdates() {
+        guard canCheckForUpdates else { return }
         updater.checkForUpdates()
     }
 
@@ -158,6 +172,10 @@ final class SparkleUpdateService {
     }
 
     var canCheckForUpdates: Bool {
-        updater.canCheckForUpdates
+        startupError == nil && updater.canCheckForUpdates
+    }
+
+    var checkAvailability: AppUpdateCheckAvailability {
+        .resolve(canCheck: canCheckForUpdates, startupError: startupError)
     }
 }

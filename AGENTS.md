@@ -9,13 +9,14 @@ MenuTools 是常驻 macOS 菜单栏的系统工具集（SPM 可执行工程，�
 ## 常用命令
 
 ```bash
-./build.sh                  # 一键：swift build -c release + 组装 .app + ad-hoc 签名 → dist/MenuTools.app
+./build.sh                  # 编译、组装并签名；默认安装到 /Applications、重启 Finder 并启动 App
+./build.sh --no-install     # 只组装 dist/MenuTools.app（仍会启动 App，必要时重启 Finder）
 swift build -c release      # 仅编译（Swift 6 严格并发检查在此暴露错误）
 swift test                  # 运行 Swift Testing 单元测试
 swift test --filter MenuToolsTests  # 运行指定测试 target
 
 # 修改代码后的标准重启验证流程：
-pkill -f MenuTools.app/Contents/MacOS/MenuTools; ./build.sh && open dist/MenuTools.app
+./build.sh                  # 脚本会结束 /Applications 中的旧实例并启动新构建
 
 # 重新生成 App 图标（渐变+玻璃高光+SF Symbol 程序化绘制）：
 swift Scripts/make_icon.swift /tmp/icon/AppIcon.iconset && iconutil -c icns /tmp/icon/AppIcon.iconset -o Resources/AppIcon.icns
