@@ -1681,13 +1681,14 @@
 "health.title" = "扩展状态与权限诊断";
 "health.extension.enabled" = "Finder 扩展状态";
 "health.extension.desc" = "扩展必须启用才能在上下文菜单中显示项目。";
-"health.appgroup.name" = "配置与扩展通信";
-"health.appgroup.desc" = "优先使用 App Group；不可用时会通过本地存储和通知安全降级。";
-"health.automation.name" = "辅助功能与自动化";
-"health.automation.desc" = "系统设置 → 隐私与安全性 → 自动化 → MenuTools 必需。";
+"health.storage.name" = "配置存储";
+"health.storage.desc" = "检查当前使用的配置目录是否可写；扩展连接状态由上方单独显示。";
+"health.accessibility.name" = "辅助功能权限";
+"health.accessibility.desc" = "检查 MenuTools 的辅助功能授权；未授权时可前往系统设置开启。";
 "health.logging.name" = "操作日志";
 "health.logging.desc" = "日志保存在 MenuTools 当前可用的配置目录中；可点击“查看日志”打开。";
 "health.button.openSettings" = "管理扩展";
+"health.button.openAccessibility" = "打开辅助功能设置";
 "health.button.viewLogs" = "查看日志";
 
 /* Undo queue */

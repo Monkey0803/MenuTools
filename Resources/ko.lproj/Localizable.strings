@@ -1681,13 +1681,14 @@
 "health.title" = "확장 기능 상태 및 권한";
 "health.extension.enabled" = "Finder 확장 기능 상태";
 "health.extension.desc" = "컨텍스트 메뉴에 항목을 표시하려면 확장 기능을 활성화해야 합니다.";
-"health.appgroup.name" = "설정 및 확장 기능 통신";
-"health.appgroup.desc" = "App Group을 우선 사용하며 사용할 수 없으면 로컬 저장소와 알림으로 안전하게 대체됩니다.";
-"health.automation.name" = "접근성 및 자동화";
-"health.automation.desc" = "시스템 설정 → 개인정보 및 보안 → 자동화 → MenuTools 가 필수입니다.";
+"health.storage.name" = "설정 저장소";
+"health.storage.desc" = "현재 사용하는 설정 폴더에 쓸 수 있는지 확인합니다. 확장 기능 상태는 위에 별도로 표시됩니다.";
+"health.accessibility.name" = "손쉬운 사용 권한";
+"health.accessibility.desc" = "MenuTools의 손쉬운 사용 권한을 확인합니다. 필요하면 시스템 설정에서 허용하세요.";
 "health.logging.name" = "작업 로그";
 "health.logging.desc" = "로그는 MenuTools에서 현재 사용할 수 있는 설정 디렉터리에 저장됩니다. ‘로그 보기’를 클릭해 열 수 있습니다.";
 "health.button.openSettings" = "확장 프로그램 관리";
+"health.button.openAccessibility" = "손쉬운 사용 설정 열기";
 "health.button.viewLogs" = "로그 보기";
 
 /* Undo queue */

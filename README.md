@@ -77,7 +77,7 @@
 - 最近操作可撤销；常用应用可按文本、代码、图片、PDF、音视频、压缩包、文件夹等类型筛选；模板除日期、时间、目录和项目名外，还支持 UUID、剪贴板文本和创建时输入的变量。
 - 设置支持菜单开关与排序，模板、应用、目录一并纳入设置备份。
 
-功能边界与验收记录见 [Finder 右键增强验收](docs/finder-right-click-acceptance.md)。
+右键操作的实现与排查步骤见 [开发者指南](docs/ops-guide.md)。
 
 ## 📖 使用指南
 
@@ -90,7 +90,7 @@
 
 #### 错误日志查看
 - 当操作失败时会自动显示错误提示
-- 持久化日志存储在：`~/Library/Application Support/com.monkey0803.MenuTools/operations.log`
+- 持久化日志位于当前配置目录的 `MenuTools/operations.log`；自签名安装通常是 `~/Library/Application Support/MenuTools/operations.log`，可用健康检查页的「查看日志」打开实际目录
 - 可通过健康检查页面的「查看日志」按钮快速打开目录
 
 #### 性能监控

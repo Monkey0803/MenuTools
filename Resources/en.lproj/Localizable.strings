@@ -1681,13 +1681,14 @@
 "health.title" = "Extension Health & Permissions";
 "health.extension.enabled" = "Finder Extension Status";
 "health.extension.desc" = "The extension must be enabled for context menu items to appear.";
-"health.appgroup.name" = "Configuration & Extension Communication";
-"health.appgroup.desc" = "Uses App Group when available and safely falls back to local storage plus notifications.";
-"health.automation.name" = "Accessibility & Automation";
-"health.automation.desc" = "System Settings → Privacy & Security → Automation → MenuTools required.";
+"health.storage.name" = "Configuration Storage";
+"health.storage.desc" = "Checks whether the current configuration directory is writable; extension status is shown separately above.";
+"health.accessibility.name" = "Accessibility Permission";
+"health.accessibility.desc" = "Checks MenuTools Accessibility access; open System Settings to grant it if needed.";
 "health.logging.name" = "Operation Logs";
 "health.logging.desc" = "Logs are stored in MenuTools' active configuration directory. Choose View Logs to open it.";
 "health.button.openSettings" = "Manage Extension";
+"health.button.openAccessibility" = "Open Accessibility Settings";
 "health.button.viewLogs" = "View Logs";
 
 /* Undo queue */

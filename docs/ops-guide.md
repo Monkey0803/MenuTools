@@ -188,7 +188,7 @@ swift test --filter RightClickCustomFileServiceTests
 
 ```bash
 # 实时跟踪日志
-tail -f ~/Library/Application\ Support/com.monkey0803.MenuTools/operations.log
+tail -f "$HOME/Library/Application Support/MenuTools/operations.log"
 
 # 筛选特定级别的日志
 grep ERROR ops.log
@@ -213,7 +213,7 @@ let recent = RightClickLogger.readRecent(count: 10)
 菜单构建时会自动输出性能报告：
 
 ```bash
-grep "Menu total:" ~/Library/Application\ Support/com.monkey0803.MenuTools/operations.log
+grep "Menu total:" "$HOME/Library/Application Support/MenuTools/operations.log"
 ```
 
 示例输出：
@@ -290,7 +290,7 @@ log show --last 5m --style compact --predicate 'subsystem == "com.qoder.menutool
 log show --last 5m --style compact --predicate 'process == "Finder"' | grep -i "finder-sync"
 ```
 
-正式的操作日志（开关见上文）落在扩展容器里的 `Library/Application Support/com.monkey0803.MenuTools/operations.log`。
+正式的操作日志（开关见上文）由主程序写入当前配置目录的 `MenuTools/operations.log`。自签名安装通常使用 `~/Library/Application Support/MenuTools/operations.log`；若启用了可写的 App Group，路径会改用共享容器。以应用内健康检查页「查看日志」打开的实际目录为准。
 
 ---
 

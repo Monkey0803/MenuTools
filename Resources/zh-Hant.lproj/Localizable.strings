@@ -1681,13 +1681,14 @@
 "health.title" = "擴展功能狀態與權限診斷";
 "health.extension.enabled" = "Finder 擴展功能狀態";
 "health.extension.desc" = "必須啟用擴展才能在上下文選單中顯示項目。";
-"health.appgroup.name" = "設定與擴充功能通訊";
-"health.appgroup.desc" = "優先使用 App Group；無法使用時會透過本機儲存與通知安全降級。";
-"health.automation.name" = "無障礙與自動化";
-"health.automation.desc" = "系統設定 → 隱私與安全性 → 自動化 → MenuTools 必需。";
+"health.storage.name" = "設定儲存";
+"health.storage.desc" = "檢查目前使用的設定目錄是否可寫；擴充功能連線狀態由上方單獨顯示。";
+"health.accessibility.name" = "輔助使用權限";
+"health.accessibility.desc" = "檢查 MenuTools 的輔助使用授權；未授權時可前往系統設定開啟。";
 "health.logging.name" = "操作日誌";
 "health.logging.desc" = "日誌保存在 MenuTools 目前可用的設定目錄中；可點擊「查看日誌」開啟。";
 "health.button.openSettings" = "管理擴充功能";
+"health.button.openAccessibility" = "開啟輔助使用設定";
 "health.button.viewLogs" = "檢視日誌";
 
 /* Undo queue */

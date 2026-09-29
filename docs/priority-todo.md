@@ -1,6 +1,7 @@
 # MenuTools 待办与优先级
 
-> **基线**：1.1.4 已发布，当前开发分支 1.1.5 ｜ **生成时间**：2026-09-28
+> **原始基线**：1.1.4 已发布，开发分支 1.1.5 ｜ **生成时间**：2026-09-28
+> **状态复核**：2026-09-29，当前分支 1.1.6；P0、P1、P2 的完成记录见各节，原始问题描述保留作审计依据。
 > **来源**：对 14 个内置模块的只读代码走查，加上本机实测（进程开销、数据目录、`vm_stat`、系统路径存在性、线上链接）
 > **定位约束**：常驻菜单栏的「轻量、高频、菜单栏优先」工具集。与这条定位冲突的候选**一律不列入待办**，见文末「明确不做」。
 
@@ -268,19 +269,17 @@
 
 # P3：文档与清理
 
-**文档与实现不一致清单**（均已核实）：
+**文档与实现不一致复核**（原始问题说明留在 P0/P1/P2 章节；以下记录当前处理状态）：
 
-| 文档位置 | 现写内容 | 实际 |
-|---|---|---|
-| `TODO.md:19` | 锁定屏幕已完成 | **已失效**（见 P0-2） |
-| `TODO.md:31-34` | 启动器支持搜索/收藏/最近 | UI 不存在，收藏无写入入口（见 P1-5） |
-| `TODO.md:45` | 网络卡片显示 Wi-Fi 名称 | 无 CoreLocation 引用、`Info.plist` 无 `NSLocation*` 键；macOS 26/27 起 `ssid()` 需定位授权，未授权返回 nil 后静默显示 `en0`（`MenuPanelView.swift:1154-1158`）。**系统行为未验证** |
-| `TODO.md:114` | 温度监控「暂不优先」 | 实现已在跑 AppleSMC 私有调用（`SystemResourceOptionalMetrics.swift:75-197`）并配了 `Scripts/test_smc_temperature.swift`——文档/TODO/实现三方不一致 |
-| `README.md:403` | 拒绝权限时面板显示失败原因 | 截屏路径未兑现（见 P0-4） |
-| `README.md:80` | 链接 `docs/finder-right-click-acceptance.md` | **该文件不存在** |
-| `README.md:93`、`docs/ops-guide.md:191,216,293` | 日志路径 `com.monkey0803.MenuTools` | 实际 bundle id 为 `com.qoder.menutools`，数据目录是 `~/Library/Application Support/MenuTools/` |
-| `docs/system-and-audio-acceptance.md:3` | 「待验收」 | 该改造已随 1.1.3/1.1.4 上线；同文件 `:88/:139`、`:95/:146` 两段重复，`:101`(687pt) 与 `:152`(843pt) 屏数互相矛盾 |
-| `Extension/Info.plist` | 扩展版本 1.0.0 | 主程序已是 1.1.5，扩展版本从未跟上 |
+| 项目 | 当前状态 |
+|---|---|
+| 锁定屏幕、启动器、截屏权限 | 已分别随 P0-2、P1-5、P0-4 修复；`TODO.md` 与 README 现描述的是修复后行为 |
+| Wi-Fi 名称 | 仍待真实无定位权限场景验证；当前 `NetworkStatusService` 使用 `ssid()`，为空时界面回退显示接口名，不能保证始终显示网络名称 |
+| 温度读数 | `TODO.md` 已改为可选只读温度读数；AppleSMC 不可用时隐藏，系统升级后需跑 `Scripts/test_smc_temperature.swift` |
+| Finder 右键验收链接 | README 已改为指向现有的 `docs/ops-guide.md`，不再链接不存在的文件 |
+| 操作日志路径 | README 与 `docs/ops-guide.md` 已改为当前配置目录 `MenuTools/operations.log`；自签名默认路径由健康检查页可打开 |
+| 系统监控与音频设置验收 | 文档已按现有子页结构整理，真实界面验收仍待逐项记录；上线不等于已验收 |
+| Finder 扩展版本 | `Extension/Info.plist` 已与主程序统一为 1.1.6，并增加版本一致性用例 |
 
 **其他清理项**：
 
@@ -289,8 +288,7 @@
 - `Sources/MenuTools/Services/SparkleUpdateService.swift:141-145` —— 启动失败只 `NSLog`；`SettingsView.swift:585` 的灰按钮无任何解释。
 - `Sources/MenuTools/Services/AppUpdateReminder.swift:11-34` —— 提醒仅存内存；`availableNotes` 从不展示。
 - `Resources/ReleaseNotes.md`、`appcast.xml` 的更新说明只有中文，而应用界面支持五语种。
-- 右键健康检查页三处结论不可信：`RightClickHealthCheckView.swift:76-78` 先 `resolveBaseDirectory()`（该函数已过滤不可写候选并有兜底）再测可写 → **该卡不可能变红**；`:83-88` 的「辅助功能与自动化」卡实际测的是 `AXIsProcessTrusted()`（辅助功能）却只讲自动化文案，且无修复入口（同库正确做法见 `RuntimeStatusCenter.swift:189,196` 与 `RuntimePermissionSettingsLink`（`:232-246`））；`:99-105` 的「查看日志」只在 Finder 里打开目录，而 `RightClickLogger.swift:110-124` 的 `readRecent`/`clear` 除测试外**无人调用**、日志上限 1000 行且关闭后旧日志永久留盘。
-- `Extension/Info.plist:15-18` 版本号脱节（见上表）。
+- 右键健康检查已修正两项误导：配置卡只测实际配置目录是否可写，不推断扩展通信；辅助功能卡只显示 `AXIsProcessTrusted()` 的结果，并提供系统设置跳转。日志卡目前仍只打开实际日志目录；`RightClickLogger.readRecent`/`clear` 尚无 UI 入口，后续按真实使用需求决定是否增加。
 - `Sources/MenuTools/AppLauncherService.swift:95-101` 的 `refresh()` 同步扫 5 个目录——接 P1-5 的 UI 时需保持现有 `.task` 调用方式。
 
 ---

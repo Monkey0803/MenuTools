@@ -5,8 +5,8 @@ import FinderSync
 /// 健康检查页面 - 显示扩展状态与权限诊断
 struct RightClickHealthCheckView: View {
     @StateObject private var extensionStatus = FinderSyncExtensionStatusService()
-    @State private var configurationCommunicationAvailable = false
-    @State private var automationPermission = false
+    @State private var configurationStorageWritable = false
+    @State private var accessibilityPermission = false
     @State private var logFileExists = false
     
     /// 日志开关存在共享配置里（扩展进程同样读得到），设置页在「Finder 右键菜单 → 诊断」。
@@ -25,22 +25,22 @@ struct RightClickHealthCheckView: View {
 
                 Divider()
 
-                // 配置与扩展通信状态；App Group 不可用时会走本地存储与通知回退。
+                // 只检查当前进程实际使用的配置目录是否可写，不推断扩展通信状态。
                 StatusCard(
-                    title: L("health.appgroup.name"),
-                    description: L("health.appgroup.desc"),
-                    isHealthy: configurationCommunicationAvailable,
+                    title: L("health.storage.name"),
+                    description: L("health.storage.desc"),
+                    isHealthy: configurationStorageWritable,
                     actionButton: nil
                 )
 
                 Divider()
 
-                // 自动化权限
+                // AXIsProcessTrusted 只表示辅助功能授权，不代表自动化授权。
                 StatusCard(
-                    title: L("health.automation.name"),
-                    description: L("health.automation.desc"),
-                    isHealthy: automationPermission,
-                    actionButton: nil
+                    title: L("health.accessibility.name"),
+                    description: L("health.accessibility.desc"),
+                    isHealthy: accessibilityPermission,
+                    actionButton: accessibilityPermission ? nil : AnyView(openAccessibilityButton)
                 )
 
                 Divider()
@@ -63,6 +63,9 @@ struct RightClickHealthCheckView: View {
         .padding(SettingsScrollLayout.contentInsets())
         .frame(width: SettingsLayout.width, height: SettingsLayout.height, alignment: .top)
         .onAppear(perform: diagnose)
+        .onReceive(NotificationCenter.default.publisher(for: NSApplication.didBecomeActiveNotification)) { _ in
+            diagnose()
+        }
     }
     
     // MARK: - Private Helpers
@@ -71,21 +74,16 @@ struct RightClickHealthCheckView: View {
         // 扩展启用状态
         extensionStatus.refresh(finderAPIEnabled: FIFinderSyncController.isExtensionEnabled)
         
-        // App Group 必须真的可写；自签名包可能遇到 EPERM，此时配置会回退到本地目录，
-        // 并由分布式通知把变更同步给 Finder 扩展。
-        configurationCommunicationAvailable = RightClickConfigStore.isWritableDirectory(
-            RightClickConfigStore.resolveBaseDirectory()
-        )
+        // fileURL 是配置读写实际使用的路径；按该路径探测，避免重新选择候选目录。
+        let configBase = RightClickConfigStore.fileURL
+            .deletingLastPathComponent()
+            .deletingLastPathComponent()
+        configurationStorageWritable = RightClickConfigStore.isWritableDirectory(configBase)
         
-        // 自动化权限检查
-        automationPermission = checkAutomationPermission()
+        accessibilityPermission = AXIsProcessTrusted()
         
         // 日志文件存在性
         logFileExists = FileManager.default.fileExists(atPath: RightClickLogger.logFile.path)
-    }
-    
-    private func checkAutomationPermission() -> Bool {
-        AXIsProcessTrusted()
     }
     
     private var openSettingsButton: some View {
@@ -93,6 +91,15 @@ struct RightClickHealthCheckView: View {
             FIFinderSyncController.showExtensionManagementInterface()
         }
         .buttonStyle(.borderedProminent)
+        .controlSize(.small)
+    }
+
+    private var openAccessibilityButton: some View {
+        Button(L("health.button.openAccessibility")) {
+            guard let url = RuntimePermissionSettingsLink.url(for: .accessibility) else { return }
+            NSWorkspace.shared.open(url)
+        }
+        .buttonStyle(.bordered)
         .controlSize(.small)
     }
     
