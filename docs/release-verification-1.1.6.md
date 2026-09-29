@@ -1,0 +1,2 @@
+- 自签名 App 与 Finder 扩展的版本均为 1.1.6，`codesign --verify --deep --strict` 通过
+- ZIP 解压完整性与 DMG 校验和通过；`appcast.xml` 可解析，1.1.6 ZIP 的 Ed25519 签名与 App 内公钥匹配
