@@ -763,8 +763,9 @@
 "scroll.openAccessibility" = "Open Accessibility";
 "scroll.section.smooth" = "Smooth Scrolling";
 "scroll.compatibility.note" = "Mouse wheel input is emitted as finite continuous scroll events; trackpad input remains native.";
+"scroll.recommendedPreset" = "Apply Recommended Feel (1.5× · 20 px · 0.18 s)";
 "scroll.gain" = "Speed Gain";
-"scroll.gain.desc" = "Distance moved for each wheel step. 1× is default; raise it to scroll faster.";
+"scroll.gain.desc" = "Distance moved per wheel step. The recommended preset is 1.5×; raise it to scroll faster.";
 "scroll.duration" = "Duration";
 "scroll.duration.desc" = "Time for one wheel input to reach its accumulated target. Shorter feels more immediate; longer feels softer.";
 "scroll.minStep" = "Min Step";

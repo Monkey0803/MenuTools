@@ -763,8 +763,9 @@
 "scroll.openAccessibility" = "손쉬운 사용 열기";
 "scroll.section.smooth" = "부드러운 스크롤";
 "scroll.compatibility.note" = "마우스 휠 입력을 유한 시간의 연속 스크롤 이벤트로 출력합니다. 트랙패드 입력은 그대로 유지됩니다.";
+"scroll.recommendedPreset" = "권장 설정 적용 (1.5× · 20 px · 0.18초)";
 "scroll.gain" = "속도 게인";
-"scroll.gain.desc" = "휠 한 칸당 이동 거리입니다. 1×가 기본이며, 높이면 더 빠르게 스크롤됩니다.";
+"scroll.gain.desc" = "휠 한 칸당 이동 거리입니다. 권장 설정은 1.5×이며, 높이면 더 빠르게 스크롤됩니다.";
 "scroll.duration" = "지속 시간";
 "scroll.duration.desc" = "한 번의 휠 입력이 누적 목표에 도달하는 시간입니다. 짧을수록 즉각적이고 길수록 부드럽습니다.";
 "scroll.minStep" = "최소 단계";

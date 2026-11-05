@@ -763,8 +763,9 @@
 "scroll.openAccessibility" = "打開輔助使用";
 "scroll.section.smooth" = "平滑捲動";
 "scroll.compatibility.note" = "滑鼠滾輪會拆分為有限時長的連續捲動事件；觸控板輸入保持原生。";
+"scroll.recommendedPreset" = "套用建議手感（1.5× · 20 px · 0.18 秒）";
 "scroll.gain" = "速度增益";
-"scroll.gain.desc" = "每一格滾輪的移動距離。1× 為預設；調高會捲得更快。";
+"scroll.gain.desc" = "每一格滾輪的移動距離。建議預設為 1.5×；調高會捲得更快。";
 "scroll.duration" = "持續時間";
 "scroll.duration.desc" = "一次捲動輸入平滑抵達累計目標的時長；較短更跟手，較長更柔和。";
 "scroll.minStep" = "最短步長";

@@ -763,8 +763,9 @@
 "scroll.openAccessibility" = "打开辅助功能";
 "scroll.section.smooth" = "平滑滚动";
 "scroll.compatibility.note" = "鼠标滚轮会拆分为有限时长的连续滚动事件；触控板输入保持原生。";
+"scroll.recommendedPreset" = "应用推荐手感（1.5× · 20 px · 0.18 秒）";
 "scroll.gain" = "速度增益";
-"scroll.gain.desc" = "每一格滚轮的移动距离。1× 为默认；调高滚得更快。";
+"scroll.gain.desc" = "每一格滚轮的移动距离。推荐预设为 1.5×；调高滚得更快。";
 "scroll.duration" = "持续时间";
 "scroll.duration.desc" = "一次滚动输入平滑抵达累计目标的时长；较短更跟手，较长更柔和。";
 "scroll.minStep" = "最短步长";

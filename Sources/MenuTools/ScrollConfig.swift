@@ -1,5 +1,11 @@
 import Foundation
 
+enum ScrollPreset {
+    static let recommendedGain = 1.5
+    static let recommendedDuration = 0.18
+    static let recommendedMinStep = 20.0
+}
+
 /// 平滑滚动配置（从 UserDefaults 读取，UI 用 @AppStorage 写入同一批 Key）
 struct ScrollConfig: Sendable {
     var enabled: Bool
@@ -7,8 +13,8 @@ struct ScrollConfig: Sendable {
     var smoothHorizontal: Bool
     var invertVertical: Bool
     var invertHorizontal: Bool
-    var gain: Double       // 速度增益 0.5 ~ 3.0
-    var duration: Double   // 持续时间（秒）0.1 ~ 0.8
+    var gain: Double       // 速度增益 0.1 ~ 10.0
+    var duration: Double   // 持续时间（秒）0.05 ~ 2.0
     var minStep: Double    // 最短步长（像素）
     var touchpadEmulation: Bool
     var accelModifier: UInt   // 加速键（NSEvent.ModifierFlags rawValue，0=未设）
@@ -32,10 +38,9 @@ struct ScrollConfig: Sendable {
             smoothHorizontal: bool(SettingsKey.scrollSmoothH, true),
             invertVertical: bool(SettingsKey.scrollInvertV, false),
             invertHorizontal: bool(SettingsKey.scrollInvertH, false),
-            gain: dbl(SettingsKey.scrollGain, 1.0),
-            // 与 OpenLogi 的有限动画一致：100 ms 有明显平滑感，同时不会让棘轮滚轮产生拖尾。
-            duration: dbl(SettingsKey.scrollDuration, 0.1),
-            minStep: dbl(SettingsKey.scrollMinStep, 8),
+            gain: dbl(SettingsKey.scrollGain, ScrollPreset.recommendedGain),
+            duration: dbl(SettingsKey.scrollDuration, ScrollPreset.recommendedDuration),
+            minStep: dbl(SettingsKey.scrollMinStep, ScrollPreset.recommendedMinStep),
             touchpadEmulation: bool(SettingsKey.scrollTouchpad, true),
             accelModifier: uint(SettingsKey.scrollAccelKey),
             shiftModifier: uint(SettingsKey.scrollShiftKey),

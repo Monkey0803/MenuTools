@@ -51,8 +51,7 @@ enum ScrollDeviceClassifier {
     }
 }
 
-/// OpenLogi 只对离散滚轮刻度生成有限动画。连续像素流（触控板或 Logitech
-/// 自由滚轮）已经携带系统精确度，重新合成反而会造成距离和跟手感退化。
+/// 离散滚轮刻度才进入有限动画；自由滚轮使用独立的一帧滤波，触控板保持原生。
 enum SmoothScrollInputPolicy {
     static func shouldAnimate(isTrackpad: Bool, isContinuous: Bool) -> Bool {
         !isTrackpad && !isContinuous
@@ -183,6 +182,10 @@ struct ScrollVector: Sendable, Equatable {
         Self(x: lhs.x - rhs.x, y: lhs.y - rhs.y)
     }
 
+    static func * (lhs: Self, rhs: Double) -> Self {
+        Self(x: lhs.x * rhs, y: lhs.y * rhs)
+    }
+
     func approximatelyEquals(_ other: Self, accuracy: Double = 0.000_001) -> Bool {
         abs(x - other.x) <= accuracy && abs(y - other.y) <= accuracy
     }
@@ -204,6 +207,56 @@ struct ScrollQuantizer: Sendable {
     }
 }
 
+/// 行字段也需要跨帧累计；否则每帧 1～3 px 会全部取整为零。
+struct ScrollLineQuantizer: Sendable {
+    private var residual = ScrollVector.zero
+    private let pointsPerLine: Double
+
+    init(pointsPerLine: Double) {
+        self.pointsPerLine = pointsPerLine.isFinite ? max(pointsPerLine, 1) : 20
+    }
+
+    mutating func quantize(_ points: ScrollVector) -> ScrollVector {
+        guard points.isFinite else { return .zero }
+        let exact = residual + points * (1 / pointsPerLine)
+        let output = ScrollVector(x: exact.x.rounded(), y: exact.y.rounded())
+        residual = exact - output
+        return output
+    }
+}
+
+enum ContinuousScrollPhase: Sendable {
+    case began
+    case changed
+    case ended
+    case cancelled
+}
+
+/// 自由滚轮保留输入事件的手势阶段；仅把单个尖峰的四分之一留给下一帧。
+struct ContinuousScrollSmoother: Sendable {
+    private var pending = ScrollVector.zero
+
+    mutating func consume(_ delta: ScrollVector, phase: ContinuousScrollPhase) -> (delta: ScrollVector, phase: ContinuousScrollPhase) {
+        guard delta.isFinite else { return (.zero, phase) }
+        if phase == .ended || phase == .cancelled {
+            let output = delta + pending
+            pending = .zero
+            return (output, phase)
+        }
+        let output = delta * 0.75 + pending
+        pending = delta * 0.25
+        return (output, phase)
+    }
+
+    mutating func drain() -> ScrollVector {
+        let output = pending
+        pending = .zero
+        return output
+    }
+
+    mutating func reset() { pending = .zero }
+}
+
 /// OpenLogi 风格的有限平滑动画模型。
 ///
 /// 新的滚动输入会从当前实际位置重新定向至累计目标，而非排队播放，快速拨动也不会越滚越慢或丢失距离。
@@ -211,6 +264,7 @@ struct SmoothScrollMotion: Sendable {
     private struct Segment: Sendable {
         var from: ScrollVector
         var target: ScrollVector
+        var initialVelocity: ScrollVector
         var startedAt: TimeInterval
     }
 
@@ -230,11 +284,35 @@ struct SmoothScrollMotion: Sendable {
         guard delta.isFinite, !delta.isZero else { return .zero }
 
         let position = position(at: time)
+        let currentVelocity = velocity(at: time)
         let flushed = position - emitted
         emitted = position
         let priorTarget = segment?.target ?? position
-        segment = Segment(from: position, target: priorTarget + delta, startedAt: time)
+        let target = ScrollVector(
+            x: retargetAxis(position: position.x, priorTarget: priorTarget.x, delta: delta.x, velocity: currentVelocity.x),
+            y: retargetAxis(position: position.y, priorTarget: priorTarget.y, delta: delta.y, velocity: currentVelocity.y)
+        )
+        let distance = target - position
+        segment = Segment(
+            from: position,
+            target: target,
+            initialVelocity: ScrollVector(
+                x: startingVelocity(distance: distance.x, current: currentVelocity.x),
+                y: startingVelocity(distance: distance.y, current: currentVelocity.y)
+            ),
+            startedAt: time
+        )
         return flushed
+    }
+
+    /// 当前像素速度，用于连续刻度接线时保留动量。
+    func velocity(at time: TimeInterval) -> ScrollVector {
+        guard let segment else { return .zero }
+        let progress = min(max((time - segment.startedAt) / duration, 0), 1)
+        return ScrollVector(
+            x: axisVelocity(from: segment.from.x, target: segment.target.x, initial: segment.initialVelocity.x, progress: progress),
+            y: axisVelocity(from: segment.from.y, target: segment.target.y, initial: segment.initialVelocity.y, progress: progress)
+        )
     }
 
     /// 前进至 `time`，返回自上次输出后的增量；完成时会保留精确的末尾余量。
@@ -257,12 +335,38 @@ struct SmoothScrollMotion: Sendable {
     private func position(at time: TimeInterval) -> ScrollVector {
         guard let segment else { return emitted }
         let progress = min(max((time - segment.startedAt) / duration, 0), 1)
-        // cubic smoothstep：起止速度为零，适合带物理棘轮的 MX Master 2S。
-        let eased = progress * progress * (3 - 2 * progress)
         return ScrollVector(
-            x: segment.from.x + (segment.target.x - segment.from.x) * eased,
-            y: segment.from.y + (segment.target.y - segment.from.y) * eased
+            x: axisPosition(from: segment.from.x, target: segment.target.x, initial: segment.initialVelocity.x, progress: progress),
+            y: axisPosition(from: segment.from.y, target: segment.target.y, initial: segment.initialVelocity.y, progress: progress)
         )
+    }
+
+    private func retargetAxis(position: Double, priorTarget: Double, delta: Double, velocity: Double) -> Double {
+        guard delta != 0 else { return priorTarget }
+        // 反向输入优先响应手指意图，放弃尚未输出的旧方向尾量。
+        if (priorTarget - position) * delta < 0 || velocity * delta < 0 {
+            return position + delta
+        }
+        return priorTarget + delta
+    }
+
+    private func startingVelocity(distance: Double, current: Double) -> Double {
+        guard distance != 0 else { return 0 }
+        let fallback = 1.5 * distance / duration
+        guard current * distance > 0 else { return fallback }
+        return current.sign == .minus
+            ? max(current, 2 * distance / duration)
+            : min(current, 2 * distance / duration)
+    }
+
+    private func axisPosition(from: Double, target: Double, initial: Double, progress t: Double) -> Double {
+        let distance = target - from
+        return from + (t * t * (3 - 2 * t)) * distance + (t * (1 - t) * (1 - t)) * initial * duration
+    }
+
+    private func axisVelocity(from: Double, target: Double, initial: Double, progress t: Double) -> Double {
+        let distance = target - from
+        return (6 * t * (1 - t) * distance) / duration + (1 - 4 * t + 3 * t * t) * initial
     }
 
     private func hasFinished(_ segment: Segment, at time: TimeInterval) -> Bool {
@@ -296,6 +400,7 @@ private final class SmoothScrollAnimator: @unchecked Sendable {
     private var timer: DispatchSourceTimer?
     private var motion = SmoothScrollMotion(duration: 0.1)
     private var quantizer = ScrollQuantizer()
+    private var lineQuantizer = ScrollLineQuantizer(pointsPerLine: 8)
     private var outputActive = false
     private var style = ScrollOutputStyle(continuous: true, pointsPerLine: 8)
 
@@ -306,12 +411,18 @@ private final class SmoothScrollAnimator: @unchecked Sendable {
             let now = ProcessInfo.processInfo.systemUptime
             if self.motion.isIdle {
                 // 新一段采用最新配置；进行中的动画不改时长，避免截断已累计的距离。
+                if self.style.pointsPerLine != style.pointsPerLine {
+                    self.lineQuantizer = ScrollLineQuantizer(pointsPerLine: style.pointsPerLine)
+                }
                 self.style = style
                 self.motion = SmoothScrollMotion(duration: duration)
                 _ = self.motion.retarget(by: delta, at: now)
             } else if self.motion.isFinished(at: now) {
                 // 计时器尚未来得及发出末帧时，先结清旧距离再开始新的手势。
                 self.emit(self.motion.advance(to: now), terminal: true)
+                if self.style.pointsPerLine != style.pointsPerLine {
+                    self.lineQuantizer = ScrollLineQuantizer(pointsPerLine: style.pointsPerLine)
+                }
                 self.style = style
                 self.motion = SmoothScrollMotion(duration: duration)
                 _ = self.motion.retarget(by: delta, at: now)
@@ -331,6 +442,7 @@ private final class SmoothScrollAnimator: @unchecked Sendable {
             self.timer = nil
             self.motion = SmoothScrollMotion(duration: 0.1)
             self.quantizer = ScrollQuantizer()
+            self.lineQuantizer = ScrollLineQuantizer(pointsPerLine: 8)
             if self.outputActive {
                 SmoothScrollEngine.postSynthetic(.zero, phase: .cancelled, style: self.style)
                 self.outputActive = false
@@ -362,19 +474,97 @@ private final class SmoothScrollAnimator: @unchecked Sendable {
     private func emit(_ delta: ScrollVector, terminal: Bool) {
         guard delta.isFinite else { return }
         let quantized = quantizer.quantize(delta)
+        let lines = lineQuantizer.quantize(quantized)
         if terminal {
             if outputActive {
-                SmoothScrollEngine.postSynthetic(quantized, phase: .ended, style: style)
+                SmoothScrollEngine.postSynthetic(quantized, phase: .ended, style: style, lines: lines)
                 outputActive = false
-            } else if !delta.isZero {
-                SmoothScrollEngine.postSynthetic(quantized, phase: .began, style: style)
+            } else if !quantized.isZero {
+                SmoothScrollEngine.postSynthetic(quantized, phase: .began, style: style, lines: lines)
                 SmoothScrollEngine.postSynthetic(.zero, phase: .ended, style: style)
             }
-        } else if !delta.isZero {
+        } else if !quantized.isZero {
             let phase: SmoothScrollPhase = outputActive ? .changed : .began
-            SmoothScrollEngine.postSynthetic(quantized, phase: phase, style: style)
+            SmoothScrollEngine.postSynthetic(quantized, phase: phase, style: style, lines: lines)
             outputActive = true
         }
+    }
+}
+
+/// 连续鼠标滚轮只暂存最多一帧的尖峰余量；原始事件和 phase 仍直接交给目标应用。
+private final class ContinuousScrollProcessor: @unchecked Sendable {
+    private let lock = NSLock()
+    private let queue = DispatchQueue(label: "com.menutools.continuous-scroll", qos: .userInteractive)
+    private var smoother = ContinuousScrollSmoother()
+    private var quantizer = ScrollQuantizer()
+    private var generation = 0
+
+    func process(_ event: CGEvent, pointsPerLine: Double) {
+        let input = ScrollVector(
+            x: event.getDoubleValueField(.scrollWheelEventPointDeltaAxis2),
+            y: event.getDoubleValueField(.scrollWheelEventPointDeltaAxis1)
+        )
+        guard input.isFinite else { return }
+        let rawPhase = event.getIntegerValueField(.scrollWheelEventScrollPhase)
+        let phase: ContinuousScrollPhase = switch rawPhase {
+        case 1: .began
+        case 4: .ended
+        case 8: .cancelled
+        default: .changed
+        }
+        let result = lock.withLock { () -> (ScrollVector, Int) in
+            let smoothed = smoother.consume(input, phase: phase)
+            generation &+= 1
+            return (quantizer.quantize(smoothed.delta), generation)
+        }
+        event.setDoubleValueField(.scrollWheelEventPointDeltaAxis1, value: result.0.y)
+        event.setDoubleValueField(.scrollWheelEventPointDeltaAxis2, value: result.0.x)
+        // 固定小数位字段与像素字段同步；line 字段保持硬件原值供只认刻度的应用使用。
+        event.setDoubleValueField(.scrollWheelEventFixedPtDeltaAxis1, value: scaledFixed(event: event, axis: 1, original: input.y, output: result.0.y))
+        event.setDoubleValueField(.scrollWheelEventFixedPtDeltaAxis2, value: scaledFixed(event: event, axis: 2, original: input.x, output: result.0.x))
+        if phase == .ended || phase == .cancelled { return }
+        queue.asyncAfter(deadline: .now() + .milliseconds(8)) { [weak self] in
+            guard let self else { return }
+            let remainder = self.lock.withLock { () -> ScrollVector in
+                guard self.generation == result.1 else { return .zero }
+                return self.quantizer.quantize(self.smoother.drain())
+            }
+            if !remainder.isZero {
+                SmoothScrollEngine.postSynthetic(
+                    remainder,
+                    phase: .changed,
+                    style: ScrollOutputStyle(continuous: true, pointsPerLine: pointsPerLine)
+                )
+            }
+        }
+    }
+
+    func cancel() {
+        lock.withLock {
+            generation &+= 1
+            smoother.reset()
+            quantizer = ScrollQuantizer()
+        }
+    }
+
+    func flush(pointsPerLine: Double) {
+        let remainder = lock.withLock { () -> ScrollVector in
+            generation &+= 1
+            return quantizer.quantize(smoother.drain())
+        }
+        if !remainder.isZero {
+            SmoothScrollEngine.postSynthetic(
+                remainder,
+                phase: .changed,
+                style: ScrollOutputStyle(continuous: true, pointsPerLine: pointsPerLine)
+            )
+        }
+    }
+
+    private func scaledFixed(event: CGEvent, axis: Int, original: Double, output: Double) -> Double {
+        guard original != 0 else { return 0 }
+        let field: CGEventField = axis == 1 ? .scrollWheelEventFixedPtDeltaAxis1 : .scrollWheelEventFixedPtDeltaAxis2
+        return event.getDoubleValueField(field) * output / original
     }
 }
 
@@ -529,6 +719,7 @@ final class SmoothScrollEngine: ObservableObject, @unchecked Sendable {
     private let tapRunner = SmoothScrollTapRunner()
     private var activityToken: NSObjectProtocol?
     private let animator = SmoothScrollAnimator()
+    private let continuousProcessor = ContinuousScrollProcessor()
     /// 「本进程是否有可交互窗口」的短时缓存，避免在每个滚动事件里枚举窗口。
     private var ownWindowStateCache: (checkedAt: Date, value: Bool)?
 
@@ -564,6 +755,7 @@ final class SmoothScrollEngine: ObservableObject, @unchecked Sendable {
 
     func stop() {
         animator.cancel()
+        continuousProcessor.cancel()
         if let token = activityToken {
             ProcessInfo.processInfo.endActivity(token)
             activityToken = nil
@@ -615,13 +807,24 @@ final class SmoothScrollEngine: ObservableObject, @unchecked Sendable {
             return Unmanaged.passUnretained(event)
         }
         let config = configurationStore.snapshot()
-        let isTrackpad = isTrackpad(event)
-        let isContinuous = event.getIntegerValueField(.scrollWheelEventIsContinuous) != 0
         guard config.enabled,
               event.getIntegerValueField(.eventSourceUserData) != Self.syntheticEventUserData,
-              SmoothScrollInputPolicy.shouldAnimate(isTrackpad: isTrackpad, isContinuous: isContinuous),
               shouldTransform(event: event)
         else {
+            return Unmanaged.passUnretained(event)
+        }
+
+        let trackpad = isTrackpad(event)
+        if trackpad { return Unmanaged.passUnretained(event) }
+        let isContinuous = event.getIntegerValueField(.scrollWheelEventIsContinuous) != 0
+        if isContinuous {
+            if config.smoothVertical && config.smoothHorizontal &&
+                event.getIntegerValueField(.scrollWheelEventMomentumPhase) == 0 &&
+                event.getIntegerValueField(.scrollWheelEventScrollPhase) != 0 {
+                continuousProcessor.process(event, pointsPerLine: config.minStep)
+            } else {
+                continuousProcessor.flush(pointsPerLine: config.minStep)
+            }
             return Unmanaged.passUnretained(event)
         }
 
@@ -723,7 +926,12 @@ final class SmoothScrollEngine: ObservableObject, @unchecked Sendable {
         )
     }
 
-    fileprivate static func postSynthetic(_ delta: ScrollVector, phase: SmoothScrollPhase, style: ScrollOutputStyle) {
+    fileprivate static func postSynthetic(
+        _ delta: ScrollVector,
+        phase: SmoothScrollPhase,
+        style: ScrollOutputStyle,
+        lines: ScrollVector = .zero
+    ) {
         guard delta.isFinite,
               let source = CGEventSource(stateID: .hidSystemState)
         else { return }
@@ -731,14 +939,14 @@ final class SmoothScrollEngine: ObservableObject, @unchecked Sendable {
         let unit: CGScrollEventUnit = style.continuous ? .pixel : .line
         let pointsX = Int64(delta.x)
         let pointsY = Int64(delta.y)
-        let lineX = style.continuous ? pointsX : Int64((Double(pointsX) / style.pointsPerLine).rounded())
-        let lineY = style.continuous ? pointsY : Int64((Double(pointsY) / style.pointsPerLine).rounded())
+        let lineX = Int64(lines.x)
+        let lineY = Int64(lines.y)
         guard let event = CGEvent(
             scrollWheelEvent2Source: source,
             units: unit,
             wheelCount: 2,
-            wheel1: Int32(clamping: lineY),
-            wheel2: Int32(clamping: lineX),
+            wheel1: Int32(clamping: style.continuous ? pointsY : lineY),
+            wheel2: Int32(clamping: style.continuous ? pointsX : lineX),
             wheel3: 0
         ) else { return }
 
@@ -746,10 +954,10 @@ final class SmoothScrollEngine: ObservableObject, @unchecked Sendable {
             event.setIntegerValueField(.scrollWheelEventIsContinuous, value: 1)
             event.setIntegerValueField(.scrollWheelEventPointDeltaAxis1, value: pointsY)
             event.setIntegerValueField(.scrollWheelEventPointDeltaAxis2, value: pointsX)
-            event.setIntegerValueField(.scrollWheelEventDeltaAxis1, value: pointsY / 10)
-            event.setIntegerValueField(.scrollWheelEventDeltaAxis2, value: pointsX / 10)
-            event.setIntegerValueField(.scrollWheelEventFixedPtDeltaAxis1, value: pointsY * (1 << 16) / 10)
-            event.setIntegerValueField(.scrollWheelEventFixedPtDeltaAxis2, value: pointsX * (1 << 16) / 10)
+            event.setIntegerValueField(.scrollWheelEventDeltaAxis1, value: lineY)
+            event.setIntegerValueField(.scrollWheelEventDeltaAxis2, value: lineX)
+            event.setIntegerValueField(.scrollWheelEventFixedPtDeltaAxis1, value: Int64((Double(pointsY) / style.pointsPerLine * 65_536).rounded()))
+            event.setIntegerValueField(.scrollWheelEventFixedPtDeltaAxis2, value: Int64((Double(pointsX) / style.pointsPerLine * 65_536).rounded()))
             event.setIntegerValueField(.scrollWheelEventScrollPhase, value: phase.cgValue)
             event.setIntegerValueField(.scrollWheelEventMomentumPhase, value: 0)
         }

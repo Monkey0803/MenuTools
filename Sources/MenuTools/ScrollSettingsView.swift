@@ -9,9 +9,9 @@ struct ScrollSettingsView: View {
     @AppStorage(SettingsKey.scrollSmoothH) private var smoothH = true
     @AppStorage(SettingsKey.scrollInvertV) private var invertV = false
     @AppStorage(SettingsKey.scrollInvertH) private var invertH = false
-    @AppStorage(SettingsKey.scrollGain) private var gain = 1.0
-    @AppStorage(SettingsKey.scrollDuration) private var duration = 0.1
-    @AppStorage(SettingsKey.scrollMinStep) private var minStep = 8.0
+    @AppStorage(SettingsKey.scrollGain) private var gain = ScrollPreset.recommendedGain
+    @AppStorage(SettingsKey.scrollDuration) private var duration = ScrollPreset.recommendedDuration
+    @AppStorage(SettingsKey.scrollMinStep) private var minStep = ScrollPreset.recommendedMinStep
     @AppStorage(SettingsKey.scrollTouchpad) private var touchpad = true
     @AppStorage(SettingsKey.scrollAccelKey) private var accelKey = 0
     @AppStorage(SettingsKey.scrollShiftKey) private var shiftKey = 0
@@ -128,6 +128,10 @@ struct ScrollSettingsView: View {
                     .font(.caption2)
                     .foregroundStyle(.secondary)
                     .fixedSize(horizontal: false, vertical: true)
+                Button(L("scroll.recommendedPreset")) {
+                    applyRecommendedPreset()
+                }
+                .controlSize(.small)
                 sliderRow(title: L("scroll.gain"), description: L("scroll.gain.desc"), value: $gain, range: 0.1...10.0, unit: "×")
                 Divider()
                 sliderRow(title: L("scroll.duration"), description: L("scroll.duration.desc"), value: $duration, range: 0.05...2.0, unit: "s")
@@ -232,7 +236,7 @@ struct ScrollSettingsView: View {
 
     private var resetButton: some View {
         Button(L("scroll.reset")) {
-            gain = 1.0; duration = 0.1; minStep = 8
+            applyRecommendedPreset()
             touchpad = true; invertV = false; invertH = false
             smoothV = true; smoothH = true
             accelKey = 0; shiftKey = 0; disableKey = 0
@@ -240,6 +244,14 @@ struct ScrollSettingsView: View {
         }
         .frame(maxWidth: .infinity)
         .disabled(!enabled)
+    }
+
+    private func applyRecommendedPreset() {
+        gain = ScrollPreset.recommendedGain
+        duration = ScrollPreset.recommendedDuration
+        minStep = ScrollPreset.recommendedMinStep
+        touchpad = true
+        engine.reload()
     }
 
     // MARK: - 轴向独立

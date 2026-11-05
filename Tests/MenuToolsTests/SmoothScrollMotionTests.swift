@@ -8,8 +8,10 @@ func smoothScrollMotionEmitsAnEasedFiniteDistance() {
     motion.retarget(by: ScrollVector(x: 0, y: 10), at: 0)
 
     #expect(motion.advance(to: 0) == .zero)
-    #expect(motion.advance(to: 0.05).approximatelyEquals(ScrollVector(x: 0, y: 5)))
-    #expect(motion.advance(to: 0.1).approximatelyEquals(ScrollVector(x: 0, y: 5)))
+    let firstHalf = motion.advance(to: 0.05)
+    let secondHalf = motion.advance(to: 0.1)
+    #expect(firstHalf.y > secondHalf.y)
+    #expect((firstHalf + secondHalf).approximatelyEquals(ScrollVector(x: 0, y: 10)))
     #expect(motion.isFinished(at: 0.1))
 }
 
@@ -19,9 +21,60 @@ func smoothScrollMotionRetargetsWithoutLosingDistance() {
     motion.retarget(by: ScrollVector(x: 0, y: 10), at: 0)
     let flushed = motion.retarget(by: ScrollVector(x: 0, y: 10), at: 0.05)
 
-    #expect(flushed.approximatelyEquals(ScrollVector(x: 0, y: 5)))
-    #expect(motion.advance(to: 0.15).approximatelyEquals(ScrollVector(x: 0, y: 15)))
+    #expect(flushed.y > 0)
+    #expect((flushed + motion.advance(to: 0.15)).approximatelyEquals(ScrollVector(x: 0, y: 20)))
     #expect(motion.isFinished(at: 0.15))
+}
+
+@Test("连续刻度衔接时保持速度，不从静止重新起步")
+func smoothScrollMotionKeepsVelocityAcrossDetents() {
+    var motion = SmoothScrollMotion(duration: 0.18)
+    motion.retarget(by: ScrollVector(x: 0, y: 30), at: 0)
+    _ = motion.advance(to: 0.04)
+    _ = motion.retarget(by: ScrollVector(x: 0, y: 30), at: 0.04)
+
+    let before = motion.velocity(at: 0.04).y
+    let firstFrame = motion.advance(to: 0.048).y
+    #expect(before > 0)
+    #expect(firstFrame > 0.008 * before * 0.5)
+    #expect(motion.advance(to: 0.22).y > 0)
+}
+
+@Test("反向刻度立即取消旧方向拖尾")
+func smoothScrollMotionReversesWithoutOldTail() {
+    var motion = SmoothScrollMotion(duration: 0.18)
+    motion.retarget(by: ScrollVector(x: 0, y: 30), at: 0)
+    _ = motion.advance(to: 0.04)
+    _ = motion.retarget(by: ScrollVector(x: 0, y: -30), at: 0.04)
+
+    #expect(motion.advance(to: 0.048).y < 0)
+}
+
+@Test("推荐预设的离散滚轮首帧有可见位移且总量守恒")
+func recommendedScrollPresetStartsImmediatelyAndPreservesDistance() {
+    var motion = SmoothScrollMotion(duration: ScrollPreset.recommendedDuration)
+    var quantizer = ScrollQuantizer()
+    motion.retarget(by: ScrollVector(x: 0, y: ScrollPreset.recommendedGain * ScrollPreset.recommendedMinStep), at: 0)
+    let first = quantizer.quantize(motion.advance(to: 0.008)).y
+    var total = first
+    for frame in 2...23 {
+        total += quantizer.quantize(motion.advance(to: Double(frame) * 0.008)).y
+    }
+    #expect(first >= 1)
+    #expect(total == 30)
+}
+
+@Test("自由滚轮轻量滤波保留总位移并在结束时清空余量")
+func continuousScrollSmootherPreservesGestureDistance() {
+    var smoother = ContinuousScrollSmoother()
+    let first = smoother.consume(ScrollVector(x: 0, y: 8), phase: .began)
+    let second = smoother.consume(ScrollVector(x: 0, y: 24), phase: .changed)
+    let last = smoother.consume(.zero, phase: .ended)
+    #expect(first.phase == .began)
+    #expect(second.phase == .changed)
+    #expect(last.phase == .ended)
+    #expect(first.delta.y + second.delta.y + last.delta.y == 32)
+    #expect(last.delta.y >= 0)
 }
 
 @Test("分帧注入会保留不足一个像素的小数距离")
@@ -31,6 +84,16 @@ func scrollQuantizerPreservesFractionalDistanceAcrossFrames() {
     #expect(quantizer.quantize(ScrollVector(x: 0, y: 0.4)) == .zero)
     #expect(quantizer.quantize(ScrollVector(x: 0, y: 0.4)) == ScrollVector(x: 0, y: 1))
     #expect(quantizer.quantize(ScrollVector(x: 0, y: 0.2)) == .zero)
+}
+
+@Test("合成滚动的行字段累计小帧余量，不会每帧都截成零")
+func scrollLineQuantizerCarriesSmallFrameRemainders() {
+    var quantizer = ScrollLineQuantizer(pointsPerLine: 20)
+    var total = 0.0
+    for _ in 0..<10 {
+        total += quantizer.quantize(ScrollVector(x: 0, y: 3)).y
+    }
+    #expect(total == 2)
 }
 
 @Test("MenuTools 成为前台应用时保留原始滚动事件")
@@ -82,7 +145,7 @@ func smoothScrollConfigurationStorePublishesLatestConfiguration() {
     #expect(store.snapshot().minStep == 16)
 }
 
-@Test("连续像素滚轮保持原始事件，只有离散滚轮进入平滑动画")
+@Test("连续像素滚轮不进入离散滚轮动画")
 func smoothScrollInputPolicyKeepsContinuousMouseInputNative() {
     #expect(!SmoothScrollInputPolicy.shouldAnimate(isTrackpad: false, isContinuous: true))
     #expect(!SmoothScrollInputPolicy.shouldAnimate(isTrackpad: true, isContinuous: false))

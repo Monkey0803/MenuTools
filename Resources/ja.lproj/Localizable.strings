@@ -763,8 +763,9 @@
 "scroll.openAccessibility" = "アクセシビリティを開く";
 "scroll.section.smooth" = "スムーズスクロール";
 "scroll.compatibility.note" = "マウスホイール入力を有限時間の連続スクロールイベントとして出力します。トラックパッド入力はそのままです。";
+"scroll.recommendedPreset" = "おすすめ設定を適用（1.5× · 20 px · 0.18 秒）";
 "scroll.gain" = "速度ゲイン";
-"scroll.gain.desc" = "ホイール1段あたりの移動量です。1×が標準で、上げると速くスクロールします。";
+"scroll.gain.desc" = "ホイール1段あたりの移動量です。おすすめ設定は1.5×で、上げると速くスクロールします。";
 "scroll.duration" = "継続時間";
 "scroll.duration.desc" = "1 回のホイール入力が累積目標に到達するまでの時間です。短いほど追従性が高く、長いほど滑らかです。";
 "scroll.minStep" = "最小ステップ";
