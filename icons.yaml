@@ -1,0 +1,18 @@
+product: macOS 菜单栏系统工具集，面向重视效率与原生体验的用户
+personality: [轻盈, 圆润, 精确]
+sizes: [16, 20, 28]
+dir: Resources/Icons
+avoid: [图标内的文字或字母, 图标内的数字]
+dna:
+  style: outline
+  stroke: 1.5
+  grid: 24
+  padding: 1
+  keylines: { circle: 20, square: 18, portrait: [16, 20], landscape: [20, 16] }
+  corners: { family: squircle, radius: { large: 5, small: 2.5 }, largeThreshold: 8 }
+  caps: round
+  joins: round
+  angles: [0, 45, 90]
+  detail: low
+  minGap: 2
+  badge: { position: bottom-right, size: 8, gap: 2 }

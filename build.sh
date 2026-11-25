@@ -73,6 +73,14 @@ if [[ -f "Resources/AppIcon.icns" ]]; then
     cp "Resources/AppIcon.icns" "$APP_BUNDLE/Contents/Resources/AppIcon.icns"
 fi
 
+# 自定义功能图标只复制构建产物，source/ 中的中心线几何不进入 App Bundle。
+if [[ -d "Resources/Icons" ]]; then
+    mkdir -p "$APP_BUNDLE/Contents/Resources/Icons"
+    for icon in Resources/Icons/*.svg(N); do
+        cp "$icon" "$APP_BUNDLE/Contents/Resources/Icons/"
+    done
+fi
+
 # 本地化资源（多语言 Localizable.strings）
 for lproj in Resources/*.lproj; do
     [[ -d "$lproj" ]] && cp -R "$lproj" "$APP_BUNDLE/Contents/Resources/"

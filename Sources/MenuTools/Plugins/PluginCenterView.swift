@@ -217,11 +217,13 @@ struct PluginCenterView: View {
         showsChevron: Bool
     ) -> some View {
         HStack(spacing: 12) {
-            Image(systemName: manifest.symbol)
-                .font(.title3)
-                .symbolRenderingMode(.hierarchical)
-                .foregroundStyle(.tint)
-                .frame(width: 28, height: 28)
+            MenuToolsIcon(
+                name: MenuToolsIconCatalog.name(for: manifest.id),
+                fallbackSystemName: manifest.symbol,
+                size: 28
+            )
+            .foregroundStyle(.tint)
+            .frame(width: 28, height: 28)
 
             VStack(alignment: .leading, spacing: 3) {
                 HStack(spacing: 7) {

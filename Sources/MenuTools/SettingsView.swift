@@ -208,10 +208,13 @@ struct SettingsView: View {
                         }
                         .buttonStyle(.borderless)
                     }
-                    Image(systemName: currentTab.symbol)
-                        .font(.title3)
-                        .foregroundStyle(.secondary)
-                        .frame(width: 24)
+                    MenuToolsIcon(
+                        name: MenuToolsIconCatalog.name(for: currentTab),
+                        fallbackSystemName: currentTab.symbol,
+                        size: 20
+                    )
+                    .foregroundStyle(.secondary)
+                    .frame(width: 24)
                     Text(L(currentTab.titleKey))
                         .font(.title3.weight(.semibold))
                     Spacer()
@@ -351,8 +354,11 @@ struct SettingsView: View {
                         isSettingsSearchFocused = false
                     } label: {
                         HStack(spacing: 8) {
-                            Image(systemName: entry.tab.symbol)
-                                .font(.caption)
+                            MenuToolsIcon(
+                                name: MenuToolsIconCatalog.name(for: entry.tab),
+                                fallbackSystemName: entry.tab.symbol,
+                                size: 16
+                            )
                             Text(entry.title)
                                 .font(.callout)
                             Spacer(minLength: 0)
@@ -496,9 +502,12 @@ private struct SettingsSidebarNavigationItem: View {
 
         Button(action: action) {
             HStack(spacing: 9) {
-                Image(systemName: tab.symbol)
-                    .font(.system(size: 13, weight: isSelected ? .semibold : .regular))
-                    .frame(width: 18)
+                MenuToolsIcon(
+                    name: MenuToolsIconCatalog.name(for: tab),
+                    fallbackSystemName: tab.symbol,
+                    size: 16
+                )
+                .frame(width: 18)
 
                 Text(title)
                     .font(.system(size: 13, weight: isSelected ? .semibold : .regular))
